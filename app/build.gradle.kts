@@ -225,7 +225,7 @@ val licensesAsset by tasks.registering {
         "Galmuri - SIL Open Font License 1.1" to "app/src/main/assets/fonts/LICENSE-Galmuri.txt",
         "Atkinson Hyperlegible - SIL Open Font License 1.1" to "app/src/main/assets/fonts/LICENSE-AtkinsonHyperlegible.txt",
         "PokeAPI data - BSD 3-Clause" to "third_party/licenses/PokeAPI-BSD-3-Clause.txt",
-        "AndroidX, Jetpack Compose, Kotlin, Apache Commons Compress / IO / Codec / Lang, Firebase Crashlytics, ZXing, OkHttp, Okio - Apache License 2.0" to "third_party/licenses/Apache-2.0.txt",
+        "AndroidX, Jetpack Compose / Compose Multiplatform, Kotlin, kotlinx.atomicfu, kotlinx-datetime, Apache Commons Compress / IO / Codec / Lang, Firebase Crashlytics, ZXing, OkHttp, Okio - Apache License 2.0" to "third_party/licenses/Apache-2.0.txt",
         "Apache Commons - NOTICE" to "third_party/licenses/Apache-Commons-NOTICE.txt",
         "XZ for Java - BSD Zero Clause" to "third_party/licenses/XZ-Java-0BSD.txt",
         "Bouncy Castle (co-op) - MIT" to "third_party/licenses/BouncyCastle-MIT.txt",
@@ -252,8 +252,6 @@ tasks.withType<Test> {
     // Tests that read real ROMs skip without them (Assume). Point them at a folder of
     // the player's own dumps with POKEDAISY_ROM_DIR (the release workflow's runner does).
     System.getenv("POKEDAISY_ROM_DIR")?.takeIf { it.isNotBlank() }?.let { systemProperty("romDir", it) }
-    // `--tests` picks across the app and shared/ (the Makefile passes it to both): no match here is fine.
-    filter.isFailOnNoMatchingTests = false
     // `make test-quick` (-Pquick): the everyday run. The Paparazzi renders assert nothing and were 86% of the
     // full run's time; BestEffortTest scans 26 whole ROMs. The forks run side by side (still one class each).
     if (project.hasProperty("quick")) {
