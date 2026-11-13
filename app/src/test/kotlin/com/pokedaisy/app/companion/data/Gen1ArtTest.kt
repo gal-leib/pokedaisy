@@ -31,6 +31,6 @@ class Gen1ArtTest {
 
     @Test
     fun `another cart gets nothing`() {
-        assertTrue(Gen1Art.extractTo(ByteArray(0x8000), File.createTempFile("gen1", "").also { it.delete() }).isEmpty())
+        assertTrue(Gen1Art.extractTo(ByteArray(0x8000), File.createTempFile("gen1", "").also { it.delete() }.toOkioPath()).isEmpty())
     }
 }
