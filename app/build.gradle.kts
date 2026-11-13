@@ -1,5 +1,6 @@
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 import java.net.URI
 import java.nio.file.FileSystems
@@ -168,6 +169,9 @@ android {
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/licenses"))
     sourceSets["test"].java.srcDirs("src/test/kotlin", "../server/coop-relay/src/main/kotlin")
 
+    // The shared module's files are compiled there; lint reads them there too.
+    sourceSets["main"].java.filter.exclude("com/pokedaisy/app/companion/data/**", "com/pokedaisy/app/companion/i18n/**")
+
     testOptions {
         unitTests.isIncludeAndroidResources = false
     }
@@ -176,6 +180,18 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+// companion/data and companion/i18n are compiled by shared/ (Android + iOS), so the app leaves them out of its own
+// compile, and their tests too but those that also use the app's classes (the root build's appOnlyTests).
+@Suppress("UNCHECKED_CAST")
+val appOnlyTests = rootProject.extra["appOnlyTests"] as List<String>
+val sharedDirs = listOf("com/pokedaisy/app/companion/data/", "com/pokedaisy/app/companion/i18n/")
+tasks.withType<KotlinCompile>().configureEach {
+    val tests = name.contains("UnitTest")
+    exclude { e ->
+        !e.isDirectory && sharedDirs.any { e.path.startsWith(it) } && !(tests && e.file.nameWithoutExtension in appOnlyTests)
     }
 }
 
@@ -234,6 +250,8 @@ tasks.withType<Test> {
     // Tests that read real ROMs skip without them (Assume). Point them at a folder of
     // the player's own dumps with POKEDAISY_ROM_DIR (the release workflow's runner does).
     System.getenv("POKEDAISY_ROM_DIR")?.takeIf { it.isNotBlank() }?.let { systemProperty("romDir", it) }
+    // `--tests` picks across the app and shared/ (the Makefile passes it to both): no match here is fine.
+    filter.isFailOnNoMatchingTests = false
     // `make test-quick` (-Pquick): the everyday run. The Paparazzi renders assert nothing and were 86% of the
     // full run's time; BestEffortTest scans 26 whole ROMs. The forks run side by side (still one class each).
     if (project.hasProperty("quick")) {
@@ -272,6 +290,8 @@ val jdkHttpServerJar by tasks.registering(Zip::class) {
 }
 
 dependencies {
+    // The companion's data and language code (shared/build.gradle.kts).
+    implementation(project(":shared"))
     implementation("androidx.core:core-ktx:1.13.1")
     // FOLD LAYOUT: a foldable's hinge and posture (WindowInfoTracker's FoldingFeature), for a plain Activity.
     implementation("androidx.window:window:1.3.0")

@@ -66,12 +66,12 @@ const val SPECIES_EGG = 412
 internal const val ITEM_EVERSTONE = 195
 internal const val ITEM_ENIGMA_BERRY = 175
 /** IS_ITEM_MAIL: ORANGE MAIL .. RETRO MAIL. */
-internal val MAIL_ITEMS = 121..132
+val MAIL_ITEMS = 121..132
 
 /** gEvolutionTable's trade evolutions: species, the item it must hold (0 = none; used up), what it becomes. */
 class TradeEvolution(val species: Int, val item: Int, val into: Int)
 
-internal val tradeEvolutions: List<TradeEvolution> = listOf(
+val tradeEvolutions: List<TradeEvolution> = listOf(
     TradeEvolution(61, 187, 186), // POLIWHIRL -> POLITOED
     TradeEvolution(64, 0, 65), // KADABRA -> ALAKAZAM
     TradeEvolution(67, 0, 68), // MACHOKE -> MACHAMP
