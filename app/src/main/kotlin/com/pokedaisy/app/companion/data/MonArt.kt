@@ -41,7 +41,7 @@ object MonArt {
         val old = dir(filesDir).listFiles().filter { f -> f.isFile && f.name.endsWith(".bin") }
         if (old.isEmpty()) return
         val to = dir(filesDir, Source.HEART_AND_SOUL).apply { mkdirs() }
-        old.forEach { f -> runCatching { okio.FileSystem.SYSTEM.atomicMove(f, to / f.name) }.onFailure { f.delete() } }
+        old.forEach { f -> runCatching { f.moveTo(to / f.name) }.onFailure { f.delete() } }
     }
 
     /** One species' pieces as a source reads them: [frames] six frames of 32x32 or 64x64 (S, S', N, N', W, W'). */

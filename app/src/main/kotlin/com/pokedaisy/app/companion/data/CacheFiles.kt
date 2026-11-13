@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.data
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import okio.SYSTEM
 
 /*
  * The files the data code keeps under filesDir (ROM art, caches, small stores), through okio (Kotlin
@@ -49,8 +50,11 @@ fun Path.writeTextAtomically(text: String) = writeAtomically(text.encodeToByteAr
 fun Path.writeAtomically(bytes: ByteArray) {
     val tmp = resolveSibling("$name.tmp")
     tmp.writeBytes(bytes)
-    FileSystem.SYSTEM.atomicMove(tmp, this)
+    tmp.moveTo(this)
 }
+
+/** Moves this file over [to] in one step, as File.renameTo did (but throwing where that returned false). */
+fun Path.moveTo(to: Path) = FileSystem.SYSTEM.atomicMove(this, to)
 
 /** Copies this file over [to], creating its parent directories. */
 fun Path.copyTo(to: Path) {
