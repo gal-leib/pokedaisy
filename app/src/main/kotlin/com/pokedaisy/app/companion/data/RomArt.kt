@@ -1,13 +1,15 @@
 package com.pokedaisy.app.companion.data
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.pokedaisy.app.platform.ByteArrayOutputStream
+import com.pokedaisy.app.platform.ByteBuffer
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.byteBufferAllocate
+import com.pokedaisy.app.platform.byteBufferWrap
 import java.util.zip.CRC32
 import java.util.zip.Deflater
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Game art the companion draws with - FireRed's / Emerald's party menu (slot,
@@ -193,7 +195,7 @@ object RomArt {
         val byHead = RomBlob.entries.groupBy { it.head }
         val filter = LongArray(1 shl 10)
         RomBlob.entries.forEach { filter[it.pre ushr 6] = filter[it.pre ushr 6] or (1L shl it.pre) }
-        val buf = ByteBuffer.wrap(rom).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = byteBufferWrap(rom).order(LITTLE_ENDIAN)
         val found = HashMap<RomBlob, ByteArray>()
         if (rom.size < 16) return found
         var a = buf.getLong(0) shl 8 // shifted in again below, one byte per offset
@@ -672,7 +674,7 @@ object RomArt {
             val out = ByteArrayOutputStream()
             out.write(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 13, 10, 26, 10))
             // 8-bit depth, colour type 6 (RGBA), deflate, no filter, no interlace.
-            val ihdr = ByteBuffer.allocate(13).putInt(img.width).putInt(img.height).put(byteArrayOf(8, 6, 0, 0, 0)).array()
+            val ihdr = byteBufferAllocate(13).putInt(img.width).putInt(img.height).put(byteArrayOf(8, 6, 0, 0, 0)).array()
             chunk(out, "IHDR", ihdr)
             chunk(out, "IDAT", z.toByteArray())
             chunk(out, "IEND", ByteArray(0))
@@ -681,10 +683,10 @@ object RomArt {
 
         private fun chunk(out: ByteArrayOutputStream, type: String, data: ByteArray) {
             val t = type.toByteArray(Charsets.US_ASCII)
-            out.write(ByteBuffer.allocate(4).putInt(data.size).array())
+            out.write(byteBufferAllocate(4).putInt(data.size).array())
             out.write(t); out.write(data)
             val crc = CRC32().apply { update(t); update(data) }.value
-            out.write(ByteBuffer.allocate(4).putInt(crc.toInt()).array())
+            out.write(byteBufferAllocate(4).putInt(crc.toInt()).array())
         }
     }
 }

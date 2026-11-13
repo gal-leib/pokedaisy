@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.io.RandomAccessFile
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
  * Pokémon Origin HeartGold (v4.0.3, English patch 1.0.0): Yannanfei TB's hack, rebuilt by Alex on hg-engine over the

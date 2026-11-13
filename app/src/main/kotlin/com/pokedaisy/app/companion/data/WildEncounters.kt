@@ -1,10 +1,10 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.io.RandomAccessFile
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.channels.FileChannel
+import com.pokedaisy.app.platform.ByteBuffer
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.RandomAccessFile
+import com.pokedaisy.app.platform.mapReadOnly
 
 /**
  * WILD ENCOUNTERS (SETTINGS > CONTROLS, GitHub #43): the game's own switch for random encounters,
@@ -54,7 +54,7 @@ object WildEncounters {
         synchronized(cache) { cache[key]?.let { return it } }
         val found = runCatching {
             RandomAccessFile(rom, "r").use { f ->
-                find(f.channel.map(FileChannel.MapMode.READ_ONLY, 0, f.length()).order(ByteOrder.LITTLE_ENDIAN))
+                find(mapReadOnly(f))
             }
         }.getOrDefault(0L)
         synchronized(cache) { cache[key] = found }
@@ -62,7 +62,7 @@ object WildEncounters {
     }
 
     fun find(rom: ByteBuffer): Long {
-        val b = rom.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+        val b = rom.duplicate().order(LITTLE_ENDIAN)
         val size = b.limit()
         val bpre = size >= 0xB0 && String(ByteArray(3) { b.get(0xAC + it) }, Charsets.ISO_8859_1) == "BPR"
         var cfru = false

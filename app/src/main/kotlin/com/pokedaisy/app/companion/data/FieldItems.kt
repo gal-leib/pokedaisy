@@ -1,5 +1,8 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.byteBufferWrap
+
 /**
  * Using an item from the companion, the way the game does it - by calling the
  * game's own functions between frames (MgbaCore.pkCall), not by steering its
@@ -970,7 +973,7 @@ fun usableItems(fns: FieldItemFns, items: ByteArray): Set<Int> {
     if (p.useFuncs.isEmpty()) return all
     return all.filter { id ->
         val o = id * fns.itemSize + fns.itemFieldUseOff
-        o + 4 <= items.size && (java.nio.ByteBuffer.wrap(items, o, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).int.toLong() and 0xFFFFFFFEL) in p.useFuncs
+        o + 4 <= items.size && (byteBufferWrap(items, o, 4).order(LITTLE_ENDIAN).int.toLong() and 0xFFFFFFFEL) in p.useFuncs
     }.toSet()
 }
 

@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.ByteArrayOutputStream
-import java.io.DataOutputStream
+import com.pokedaisy.app.platform.ByteArrayOutputStream
+import com.pokedaisy.app.platform.DataOutputStream
 
 /**
  * A TrueType font built from 8x8 bitmap glyphs - how a Game Boy game's own font

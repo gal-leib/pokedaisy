@@ -7,8 +7,8 @@ import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV0
 import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV1
 import com.pokedaisy.app.companion.data.TelemetrySampler
 import com.pokedaisy.app.companion.data.decodeMonIcon
-import java.io.File
-import java.io.RandomAccessFile
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap
 
 /**

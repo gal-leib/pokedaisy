@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.InputStream
+import com.pokedaisy.app.platform.InputStream
 import java.security.MessageDigest
 
 /**

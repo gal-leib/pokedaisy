@@ -1,9 +1,9 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.ByteArrayOutputStream
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.File
+import com.pokedaisy.app.platform.ByteArrayOutputStream
+import com.pokedaisy.app.platform.DataInputStream
+import com.pokedaisy.app.platform.DataOutputStream
+import com.pokedaisy.app.platform.File
 
 /**
  * The companion's data saved beside a savestate (`<state>.companion`), so a launch that resumes
@@ -97,7 +97,7 @@ object SnapshotCache {
         return bytes.toByteArray()
     }
 
-    fun decode(bytes: ByteArray): SnapshotView? = DataInputStream(bytes.inputStream()).use { i ->
+    fun decode(bytes: ByteArray): SnapshotView? = DataInputStream(bytes).use { i ->
         if (i.readInt() != MAGIC || i.readInt() != VERSION) return null
         val game = GameKind.valueOf(i.readUTF())
         val textCode = i.readUTF()

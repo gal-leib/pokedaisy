@@ -1,10 +1,9 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.io.RandomAccessFile
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.channels.FileChannel
+import com.pokedaisy.app.platform.ByteBuffer
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.RandomAccessFile
+import com.pokedaisy.app.platform.mapReadOnly
 
 /**
  * REUSABLE TMS (SETTINGS > GAMEPLAY, GitHub #135): a TM stays in the bag after it teaches a move, as an HM does.
@@ -64,7 +63,7 @@ object ReusableTms {
         synchronized(cache) { cache[key]?.let { return it } }
         val found = runCatching {
             RandomAccessFile(rom, "r").use { f ->
-                find(f.channel.map(FileChannel.MapMode.READ_ONLY, 0, f.length()).order(ByteOrder.LITTLE_ENDIAN))
+                find(mapReadOnly(f))
             }
         }.getOrDefault(emptyList())
         synchronized(cache) { cache[key] = found }

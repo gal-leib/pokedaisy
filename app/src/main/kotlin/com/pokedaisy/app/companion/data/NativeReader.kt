@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.byteBufferWrap
 
 /**
  * Rebuilds a Telemetry snapshot by polling a Gen 3 game's own RAM globals: how
@@ -352,10 +352,10 @@ internal fun saveBlock2(c: MemoryReader, cfg: NativeConfig): Long =
     if (cfg.staticSaveBlocks) cfg.saveBlock2Ptr else u32le(c.readCoreMemory(cfg.saveBlock2Ptr, 4), 0)
 
 internal fun u16le(b: ByteArray, off: Int) =
-    ByteBuffer.wrap(b, off, 2).order(ByteOrder.LITTLE_ENDIAN).short.toInt() and 0xFFFF
+    byteBufferWrap(b, off, 2).order(LITTLE_ENDIAN).short.toInt() and 0xFFFF
 
 internal fun u32le(b: ByteArray, off: Int) =
-    (ByteBuffer.wrap(b, off, 4).order(ByteOrder.LITTLE_ENDIAN).int.toLong()) and 0xFFFFFFFFL
+    (byteBufferWrap(b, off, 4).order(LITTLE_ENDIAN).int.toLong()) and 0xFFFFFFFFL
 
 private const val BAG_REFRESH_EVERY = 6
 

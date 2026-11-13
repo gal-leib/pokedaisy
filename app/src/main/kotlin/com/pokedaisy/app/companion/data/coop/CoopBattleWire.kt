@@ -1,7 +1,9 @@
 package com.pokedaisy.app.companion.data.coop
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.pokedaisy.app.platform.ByteBuffer
+import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.byteBufferAllocate
+import com.pokedaisy.app.platform.byteBufferWrap
 
 /** A name that says nothing: eight 0xFF bytes, the game's string terminator. */
 val COOP_NO_NAME: ByteArray get() = ByteArray(8) { 0xFF.toByte() }
@@ -88,7 +90,7 @@ object CoopBattleWire {
     /** The type and payload of [m]; throws when a field couldn't survive [decode]. */
     fun encode(m: CoopBattleMsg): Pair<Int, ByteArray> {
         val type = typeOf(m)
-        val out = ByteBuffer.allocate(payloadSize(m)).order(ByteOrder.LITTLE_ENDIAN)
+        val out = byteBufferAllocate(payloadSize(m)).order(LITTLE_ENDIAN)
         out.putInt(m.battleId)
         when (m) {
             is CoopBattleMsg.Status -> { out.put(((if (m.free) 1 else 0) or (if (m.ready) 2 else 0)).toByte()); out.putShort(m.story.toShort()) }
@@ -153,7 +155,7 @@ object CoopBattleWire {
 
     private fun decodeChecked(type: Int, payload: ByteArray): CoopBattleMsg? {
         if (type !in STATUS..STORY_STATE || payload.size < 4) return null   // the removed replica types in between fall to the `else` below
-        val b = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
+        val b = byteBufferWrap(payload).order(LITTLE_ENDIAN)
         val id = b.int
         if ((id == 0) != (type == STATUS)) return null
         val msg: CoopBattleMsg = when (type) {

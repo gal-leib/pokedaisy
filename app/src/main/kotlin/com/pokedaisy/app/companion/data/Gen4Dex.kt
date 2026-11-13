@@ -2,7 +2,7 @@ package com.pokedaisy.app.companion.data
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import java.io.File
+import com.pokedaisy.app.platform.File
 
 /**
  * A DS game's POKéDEX (Platinum, HeartGold / SoulSilver): its pages and front pictures, which [NdsArt] takes from the

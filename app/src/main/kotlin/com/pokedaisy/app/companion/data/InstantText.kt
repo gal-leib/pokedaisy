@@ -1,8 +1,9 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.pokedaisy.app.platform.ByteBuffer
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.byteBufferWrap
 
 /**
  * INSTANT TEXT (SETTINGS > GAMEPLAY, GitHub #111): a text box's words appear at once, whatever the game's own text speed,
@@ -92,7 +93,7 @@ object InstantText {
                 if (n < 0) break
                 got += n
             }
-            find(ByteBuffer.wrap(head, 0, got).order(ByteOrder.LITTLE_ENDIAN))
+            find(byteBufferWrap(head, 0, got).order(LITTLE_ENDIAN))
         }
     }.getOrNull()
 

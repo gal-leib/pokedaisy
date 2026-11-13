@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.io.RandomAccessFile
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
  * Pokémon Blaze Black 2 Redux / Volt White 2 Redux (v1.4.1): Drayano and AphexCubed's hacks, US / Europe Black 2 and

@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.io.RandomAccessFile
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
  * Pokémon Renegade Platinum (v1.3.0): Drayano's hack, retail Platinum (USA rev 1) edited in place. Its header is the

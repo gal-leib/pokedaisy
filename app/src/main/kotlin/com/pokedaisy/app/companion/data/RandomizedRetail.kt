@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.InputStream
+import com.pokedaisy.app.platform.InputStream
 
 /**
  * Retail FireRed (rev 0 / 1) or Emerald (English) as Universal Pokémon Randomizer ZX leaves it ([RANDOMIZED_RETAIL],

@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
+import com.pokedaisy.app.platform.File
 
 /**
  * Draws the game's own TRAINER CARD, pixel for pixel, from the player's ROM:
