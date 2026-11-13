@@ -1,8 +1,9 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.Bitmap
+import com.pokedaisy.app.platform.ConcurrentHashMap
 import com.pokedaisy.app.platform.createBitmap
-import java.util.concurrent.ConcurrentHashMap
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * Serves Pokémon Unbound party-icon sprites by pulling them out of the running

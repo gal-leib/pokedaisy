@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.platform.Bitmap
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.decodeBitmapFile
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * A DS game's POKéDEX (Platinum, HeartGold / SoulSilver): its pages and front pictures, which [NdsArt] takes from the

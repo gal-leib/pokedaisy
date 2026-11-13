@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.util.concurrent.ConcurrentHashMap
+import com.pokedaisy.app.platform.ConcurrentHashMap
+
 
 /**
  * Where a game keeps its item descriptions: the pointer to item `id`'s text sits at

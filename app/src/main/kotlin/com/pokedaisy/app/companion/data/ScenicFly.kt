@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.util.PriorityQueue
+import com.pokedaisy.app.platform.PriorityQueue
 import kotlin.math.abs
 
 /**

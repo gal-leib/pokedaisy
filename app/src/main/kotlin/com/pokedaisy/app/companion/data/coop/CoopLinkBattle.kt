@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data.coop
 
+import com.pokedaisy.app.platform.synchronized
+
 
 /**
  * The game side of a link battle, mirroring the native bridge (`pkCoopLink*`, `pkCoopStory*`). Emu thread only.

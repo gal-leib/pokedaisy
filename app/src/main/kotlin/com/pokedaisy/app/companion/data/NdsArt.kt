@@ -4,6 +4,8 @@ import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.RandomAccessFile
+import com.pokedaisy.app.platform.arraycopy
+import com.pokedaisy.app.platform.startDaemonThread
 
 /**
  * A DS game's art, rebuilt from the player's own cart like [RomArt] / [Gen2Art] (nothing of the game is bundled):
@@ -129,7 +131,7 @@ object NdsArt {
         OriginHeartGold.data = null
         RenegadePlatinum.data = null
         Black2Redux.data = null
-        Thread({
+        startDaemonThread("pokedaisy-nds-art") {
             // The names first (a few text banks): the companion's first samples use them.
             runCatching { names = readNames(rom) }.onFailure { Log.w("pokedaisy", "NdsArt: names failed", it) }
             runCatching { OriginHeartGold.data = if (OriginHeartGold.matches(rom)) readOrigin(rom) else null }
@@ -149,7 +151,7 @@ object NdsArt {
                 dir = RomArt.dir(filesDir)
                 if (extractTo(rom, RomArt.dir(filesDir))) RomArt.announce()
             }.onFailure { Log.w("pokedaisy", "NdsArt: failed", it) }
-        }, "pokedaisy-nds-art").apply { isDaemon = true; start() }
+        }
     }
 
     /** Carts on Platinum's files: USA rev 1, France rev 0, the Platinum language ports. */
@@ -548,7 +550,7 @@ object NdsArt {
         for (screen in intArrayOf(22, 24)) drawScreen(img, narc.member(screen) ?: return, tiles, mapPal)   // MAIN_3, then MAIN_2
         val (l, t, r, b) = PLATINUM_MAP_CROP.toList()
         val crop = RomArt.Image(r - l, b - t)
-        for (y in 0 until crop.height) System.arraycopy(img.argb, (t + y) * 256 + l, crop.argb, y * crop.width, crop.width)
+        for (y in 0 until crop.height) arraycopy(img.argb, (t + y) * 256 + l, crop.argb, y * crop.width, crop.width)
         write(dir, "regionmap/$PLATINUM_MAP.png", crop.png())
         val blockTiles = ncgrData(narc.member(16)) ?: return
         val blocks = ncerCells(narc.member(17) ?: return)
@@ -987,7 +989,7 @@ object NdsArt {
         if (r <= l || b <= t) return
         for ((pocket, open, img) in drawn) {
             val crop = RomArt.Image(r - l, b - t)
-            for (y in 0 until crop.height) System.arraycopy(img.argb, (t + y) * 64 + l, crop.argb, y * crop.width, crop.width)
+            for (y in 0 until crop.height) arraycopy(img.argb, (t + y) * 64 + l, crop.argb, y * crop.width, crop.width)
             write(dir, "${heartGoldPocket(pocket, open)}.png", crop.png())
         }
     }

@@ -3,7 +3,8 @@ package com.pokedaisy.app.companion.i18n
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import java.util.Locale
+import com.pokedaisy.app.platform.Locale
+import com.pokedaisy.app.platform.defaultLocale
 
 /**
  * The app's own text in nine languages. Game data (Pokémon / move / item / type
@@ -88,7 +89,7 @@ object L10n {
      * (Library / Settings) the device's, else English. A language no ROM comes in
      * (Portuguese) wins over an English game too.
      */
-    fun apply(setting: String, romCode: String?, device: Locale = Locale.getDefault()) {
+    fun apply(setting: String, romCode: String?, device: Locale = defaultLocale()) {
         if (romCode != lastRomCode) gameLetter = null
         lastRomCode = romCode
         lastSetting = setting

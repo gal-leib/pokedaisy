@@ -1,7 +1,8 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.ConcurrentHashMap
 import com.pokedaisy.app.platform.Log
-import java.util.concurrent.ConcurrentHashMap
+import com.pokedaisy.app.platform.synchronized
 
 /*
  * The DEX page's EVOLVE / AREA / MOVES sections, read from the ROM the way the

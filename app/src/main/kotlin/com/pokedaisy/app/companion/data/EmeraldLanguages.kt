@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.ConcurrentHashMap
+
 /**
  * A game's names in its own language - the other-language Emeralds (read from
  * each ROM by scripts/gen_emerald_lang_tables.py, EmeraldText<Lang>Gen.kt) and
@@ -97,7 +99,7 @@ private val EMERALD_LEGACY by lazy {
 /** Emerald Legacy is running ([LEGACY_TEXT]): its own species past 411, egg, move stats and guide. */
 val emeraldLegacy: Boolean get() = romGameCode == LEGACY_TEXT
 
-private val portTexts = java.util.concurrent.ConcurrentHashMap<String, GameText>()
+private val portTexts = ConcurrentHashMap<String, GameText>()
 
 /** The names of the game with [code] ("BPED", "AXVF", [UNBOUND_FR_TEXT]); null for English and every game without its own. */
 fun gameText(code: String): GameText? = when (code) {

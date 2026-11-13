@@ -7,9 +7,9 @@ import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV1
 import com.pokedaisy.app.companion.data.TelemetrySampler
 import com.pokedaisy.app.companion.data.decodeMonIcon
 import com.pokedaisy.app.platform.Bitmap
+import com.pokedaisy.app.platform.ConcurrentHashMap
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.RandomAccessFile
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Party icons for PC BOXES / TRADE, read from the player's own ROM *file* - nothing is bundled, and no game is

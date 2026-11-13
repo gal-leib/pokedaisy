@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.synchronized
+
 /**
  * Pokémon Modern Emerald (v3.6; resetes12's pokeemerald fork, public at github.com/resetes12/pokeemerald, tag Release3.6):
  * a gcc build of pokeemerald on Emerald's ids, 50 species past Emerald's 411, FAIRY as type 18. It runs as EMERALD with

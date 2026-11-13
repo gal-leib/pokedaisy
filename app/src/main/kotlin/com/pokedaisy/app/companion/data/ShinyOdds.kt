@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.companion.data.save.Gen3BoxMon
-import java.util.Random
+import com.pokedaisy.app.platform.Random
 
 /**
  * SHINY ODDS (GAMEPLAY on the companion, `Prefs.shinyOdds`): a wild or legendary Pokémon turns up shiny at the odds the

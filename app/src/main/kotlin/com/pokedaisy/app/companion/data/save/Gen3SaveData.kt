@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data.save
 
 import com.pokedaisy.app.companion.data.Gen3Text
+import com.pokedaisy.app.platform.arraycopy
 
 /** A PC box position: box 0..13, slot 0..29 (rows of 6, as the game lays them out). */
 data class BoxSlot(val box: Int, val slot: Int)
@@ -152,8 +153,8 @@ class Gen3SaveEditor(val file: Gen3SaveFile) {
         val ao = Gen3SaveData.recordOff(from)
         val bo = Gen3SaveData.recordOff(to)
         val tmp = storage.copyOfRange(ao, ao + Gen3BoxMon.SIZE)
-        System.arraycopy(storage, bo, storage, ao, Gen3BoxMon.SIZE)
-        System.arraycopy(tmp, 0, storage, bo, Gen3BoxMon.SIZE)
+        arraycopy(storage, bo, storage, ao, Gen3BoxMon.SIZE)
+        arraycopy(tmp, 0, storage, bo, Gen3BoxMon.SIZE)
     }
 
     /** The 80 bytes at [at], as stored. */

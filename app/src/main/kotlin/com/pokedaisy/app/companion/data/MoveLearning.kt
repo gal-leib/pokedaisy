@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.util.concurrent.ConcurrentHashMap
+import com.pokedaisy.app.platform.ConcurrentHashMap
+
 
 /** A move a party Pokémon could learn: at [level] (a level-up), or from the bag's [tm] ("TM35", "HM03"). */
 data class LearnOption(val move: Int, val level: Int, val tm: String, val advice: MoveAdvice)

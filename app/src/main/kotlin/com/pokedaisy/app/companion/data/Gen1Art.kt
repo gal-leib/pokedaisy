@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.sha1
+import com.pokedaisy.app.platform.startDaemonThread
 
 /**
  * A Game Boy Pokémon game's own art, rebuilt from the player's ROM on its first
@@ -381,11 +382,11 @@ object Gen1Art {
 
     /** In the background, once per ROM file: a Game Boy cart is at most a few MB. */
     fun prefetch(filesDir: File, rom: File) {
-        Thread({
+        startDaemonThread("pokedaisy-gen1-art") {
             runCatching {
                 val wrote = extractTo(rom.readBytes(), RomArt.dir(filesDir))
                 if (wrote.isNotEmpty()) RomArt.announce()
             }.onFailure { Log.w("pokedaisy", "Gen1Art: failed", it) }
-        }, "pokedaisy-gen1-art").apply { isDaemon = true; start() }
+        }
     }
 }

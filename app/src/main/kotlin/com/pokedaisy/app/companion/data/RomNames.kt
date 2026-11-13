@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.BitSet
+
 /**
  * Which names the ROM's own text holds - BEST EFFORT's check of what the companion would show
  * (`BestEffort.kt`). A name counts when the ROM has it as a whole string: the game's text bytes,
@@ -107,7 +109,7 @@ class RomNames private constructor(private val found: Map<String, IntArray>, pri
             val pats = keys.distinct().filter { it.length >= MIN_LEN }
             if (pats.isEmpty() || size <= 0) return RomNames(emptyMap(), norm())
             val heads = HashMap<Int, MutableList<String>>()
-            val bits = java.util.BitSet(1 shl 24)
+            val bits = BitSet(1 shl 24)
             for (p in pats) {
                 val h = head(p[0].code, p[1].code, p[2].code)
                 bits.set(h)

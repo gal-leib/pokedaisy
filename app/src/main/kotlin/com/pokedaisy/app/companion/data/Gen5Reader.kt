@@ -1,5 +1,8 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.arraycopy
+import com.pokedaisy.app.platform.localHour
+
 // Nintendo DS, Gen 5 (Black first): the companion's reads of the game's main RAM. There is no pret decomp for Gen 5, so
 // every address here came from headless captures of the retail cart (native-capture/nds_dump: dumps of the field, a text
 // box, the X menu, the party screen and a Battle Subway battle, diffed) and the cart's own files. The game keeps its whole
@@ -235,7 +238,7 @@ const val GEN5_NATIONAL_DEX_FLAG = 0x30000
 /** The event flags and vars (the GUIDE's [SaveProgress]), with the badges as [GEN4_BADGE_FLAG] + n, the DS clock's
  * hour as [GEN4_VAR_HOUR], like the Gen 4 games', and [GEN5_NATIONAL_DEX_FLAG]. */
 fun readGen5Progress(
-    r: MemoryReader, cfg: Gen5Config, img: Long, national: Boolean = false, hour: Int = java.time.LocalTime.now().hour,
+    r: MemoryReader, cfg: Gen5Config, img: Long, national: Boolean = false, hour: Int = localHour(),
 ): SaveProgress? {
     val flagBytes = cfg.numFlags / 8
     val vars = r.readCoreMemory(img + cfg.varsFlagsOff, cfg.numVars * 2)
@@ -535,7 +538,7 @@ fun useGen5Repel(cfg: Gen5Config, calls: GameCalls, itemId: Int, steps: Int, fie
         out[slot * 4 + 2] = left.toByte()
         out[slot * 4 + 3] = (left shr 8).toByte()
     } else {
-        System.arraycopy(raw, (slot + 1) * 4, out, slot * 4, (size - slot - 1) * 4)
+        arraycopy(raw, (slot + 1) * 4, out, slot * 4, (size - slot - 1) * 4)
         for (i in (size - 1) * 4 until size * 4) out[i] = 0
     }
     if (!calls.write(pocket, out)) return ItemUseOutcome(ItemUseResult.FAILED)

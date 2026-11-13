@@ -3,7 +3,7 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.i18n.trGuide
-import java.util.concurrent.ConcurrentHashMap
+import com.pokedaisy.app.platform.ConcurrentHashMap
 
 /**
  * What's around an area, for the GUIDE's HERE page: its items and what its

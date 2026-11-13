@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.platform.LITTLE_ENDIAN
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.byteBufferWrap
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * Rebuilds a Telemetry snapshot by polling a Gen 3 game's own RAM globals: how

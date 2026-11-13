@@ -4,6 +4,7 @@ import com.pokedaisy.app.platform.ByteBuffer
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.RandomAccessFile
 import com.pokedaisy.app.platform.mapReadOnly
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * REUSABLE TMS (SETTINGS > GAMEPLAY, GitHub #135): a TM stays in the bag after it teaches a move, as an HM does.

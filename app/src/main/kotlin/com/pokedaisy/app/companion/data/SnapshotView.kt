@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.platform.synchronized
 
 data class MoveVsFoe(val vsName: String, val label: String, val pct: Int)
 data class MoveView(val name: String, val type: String, val pp: Int, val power: Int, val vs: List<MoveVsFoe> = emptyList(), val id: Int = 0)

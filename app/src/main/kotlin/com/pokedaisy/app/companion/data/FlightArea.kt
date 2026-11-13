@@ -2,6 +2,7 @@ package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * FLIGHT AREA (SETTINGS > GAMEPLAY, [com.pokedaisy.app.companion.FlightAreaMode]): FREE FLIGHT and the scenic FLY cross only

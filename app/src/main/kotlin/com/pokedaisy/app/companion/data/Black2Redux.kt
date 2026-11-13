@@ -2,6 +2,7 @@ package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.RandomAccessFile
+import com.pokedaisy.app.platform.localMonth
 
 /**
  * Pokémon Blaze Black 2 Redux / Volt White 2 Redux (v1.4.1): Drayano and AphexCubed's hacks, US / Europe Black 2 and
@@ -109,7 +110,7 @@ object Black2Redux {
         val wildRates: List<IntArray>,
     ) {
         /** The rates for the device's season, as Black 2's world gives its own. */
-        fun wildRateWords(): IntArray = wildRates.getOrNull((java.time.LocalDate.now().monthValue - 1) % 4) ?: IntArray(0)
+        fun wildRateWords(): IntArray = wildRates.getOrNull((localMonth() - 1) % 4) ?: IntArray(0)
     }
 
     @Volatile var data: Data? = null

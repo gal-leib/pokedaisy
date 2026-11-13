@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.RandomAccessFile
+import com.pokedaisy.app.platform.startDaemonThread
 
 /**
  * Whether the game has its region map (Town Map, Fly map, a wall map, the
@@ -31,7 +32,7 @@ object RegionMapWatch {
     /** Scans [rom] in the background for its map pointers. */
     fun load(rom: File) {
         watches = emptyList()
-        Thread({
+        startDaemonThread("pokedaisy-map-watch") {
             try {
                 watches = RandomAccessFile(rom, "r").use { f ->
                     val n = minOf(f.length(), SCAN_END.toLong()).toInt()
@@ -42,7 +43,7 @@ object RegionMapWatch {
             } catch (t: Throwable) {
                 Log.w("pokedaisy", "RegionMapWatch: scan failed", t)
             }
-        }, "pokedaisy-map-watch").apply { isDaemon = true; start() }
+        }
     }
 
     /** True while any of this ROM's map screens is open. */

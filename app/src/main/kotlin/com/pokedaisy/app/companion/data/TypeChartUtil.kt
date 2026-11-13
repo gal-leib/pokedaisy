@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.normalizeNfd
+
 val typeNames = mapOf(
     0 to "Normal", 1 to "Fighting", 2 to "Flying", 3 to "Poison", 4 to "Ground",
     5 to "Rock", 6 to "Bug", 7 to "Ghost", 8 to "Steel", 9 to "???",
@@ -28,7 +30,7 @@ fun typeMultiplierPct(atkType: Int, defType1: Int, defType2: Int): Int {
 
 /** A move's name with its case, accents and punctuation gone, for [moveMultiplierPct]'s lists. */
 private fun moveKey(name: String): String =
-    java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD).uppercase().filter { it in 'A'..'Z' }
+    normalizeNfd(name).uppercase().filter { it in 'A'..'Z' }
 
 // As the games spell them: Unbound FR cuts its name short, Team Rocket Edition 2026's ROM has "Lioflización".
 private val FREEZE_DRY = setOf("FREEZEDRY", "LYOPHILISAT", "LYOPHILISATION", "LIOFILIZACION", "LIOFLIZACION")

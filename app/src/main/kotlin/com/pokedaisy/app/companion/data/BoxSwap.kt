@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.CRC32
+import com.pokedaisy.app.platform.identityHashMap
 
 /**
  * The BOXES tab's SWAP: a box Pokémon and a party Pokémon trade places in the running game, as the game's own PC does
@@ -77,7 +78,7 @@ fun boxSwapFor(fields: FieldItemFns?, cfg: NativeConfig?): BoxSwapFns? {
 /** FIELD_ITEMS_PORTS' keys by table, by identity (the hacks on FireRed rev 0's code share BPRE0's bag table object, but
  * their boxes aren't vanilla's at its pointer, which [boxSwapFor] checks). */
 private val boxSwapPortKeys: Map<FieldItemFns, String> by lazy {
-    java.util.IdentityHashMap<FieldItemFns, String>().apply { FIELD_ITEMS_PORTS.forEach { (k, v) -> put(v, k) } }
+    identityHashMap<FieldItemFns, String>().apply { FIELD_ITEMS_PORTS.forEach { (k, v) -> put(v, k) } }
 }
 
 /** What a SWAP, DEPOSIT or WITHDRAW did. */

@@ -1,8 +1,9 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.Bitmap
+import com.pokedaisy.app.platform.ConcurrentHashMap
 import com.pokedaisy.app.platform.Log
-import java.util.concurrent.ConcurrentHashMap
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * Party / bag icons pulled straight out of the running FireRed/Emerald ROM,

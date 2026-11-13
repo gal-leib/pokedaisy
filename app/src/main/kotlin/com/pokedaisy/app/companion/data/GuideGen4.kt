@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.localHour
+
 /**
  * The DS games' GUIDE data: HERE's wild Pokémon by map header and NEXT BOSS's teams, generated from pret's decomps by
  * scripts/gen_gen4_guide.py (GuideGen4PlatinumGen.kt, GuideGen4HeartGoldGen.kt: numbers only), picked for the save's
@@ -134,7 +136,7 @@ class Gen4World(
     }
 
     private fun timeOfDay(progress: SaveProgress?): Int {
-        val hour = progress?.variable(GEN4_VAR_HOUR) ?: java.time.LocalTime.now().hour
+        val hour = progress?.variable(GEN4_VAR_HOUR) ?: localHour()
         return when (hour) {
             in 4..9 -> MORNING
             in 10..19 -> DAY

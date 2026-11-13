@@ -1,9 +1,10 @@
 package com.pokedaisy.app.companion.data.coop
 
+import com.pokedaisy.app.platform.Executor
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.IOException
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
+import com.pokedaisy.app.platform.singleThreadExecutor
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * The partner's catches that are still on their way (the host's side) and the ones already given (the partner's side), so a
@@ -103,6 +104,6 @@ class FileCatchStore(private val file: File, private val io: Executor = defaultI
     companion object {
         private const val MAX_GIVEN = 50
         /** One background thread for every store: the files are tiny, the order of writes is the order of changes. */
-        val defaultIo: Executor by lazy { Executors.newSingleThreadExecutor { r -> Thread(r, "pokedaisy-coop-catches").apply { isDaemon = true } } }
+        val defaultIo: Executor by lazy { singleThreadExecutor("pokedaisy-coop-catches") }
     }
 }

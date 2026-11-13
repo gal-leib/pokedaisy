@@ -1,9 +1,10 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.Bitmap
+import com.pokedaisy.app.platform.ConcurrentHashMap
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.createBitmap
-import java.util.concurrent.ConcurrentHashMap
+import com.pokedaisy.app.platform.synchronized
 
 /** Which memory a game's seen / caught arrays are offsets into. */
 enum class DexFlagBlock { SAVE_BLOCK_1, SAVE_BLOCK_2, FIXED }

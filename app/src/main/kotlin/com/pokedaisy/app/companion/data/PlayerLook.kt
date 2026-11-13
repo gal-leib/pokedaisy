@@ -4,6 +4,7 @@ import com.pokedaisy.app.platform.ByteArrayOutputStream
 import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.binarySearchOf
 import com.pokedaisy.app.platform.byteBufferAllocate
 import com.pokedaisy.app.platform.byteBufferWrap
 
@@ -178,7 +179,7 @@ object PlayerLook {
             val w = buf.getInt(o)
             if (w ushr 25 == 4) {
                 val off = w - 0x08000000
-                if (java.util.Arrays.binarySearch(targets, off) >= 0) {
+                if (targets.binarySearchOf(off) >= 0) {
                     refs.getOrPut(off) { ArrayList() } += Ref(o, buf.getShort(o + 4).toInt() and 0xFFFF, buf.getShort(o + 6).toInt() and 0xFFFF)
                 }
             }

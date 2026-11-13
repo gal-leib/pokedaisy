@@ -8,6 +8,8 @@ import com.pokedaisy.app.platform.LITTLE_ENDIAN
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.byteBufferAllocate
 import com.pokedaisy.app.platform.byteBufferWrap
+import com.pokedaisy.app.platform.nanoTime
+import com.pokedaisy.app.platform.startDaemonThread
 import com.pokedaisy.app.platform.zlibDeflate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,20 +64,20 @@ object RomArt {
         val marker = File(dir, "scanned/v$SCAN_VERSION-$romKey")
         if (marker.isFile || running || OUTPUTS.all { File(dir, it).isFile }) return
         running = true
-        Thread({
+        startDaemonThread("pokedaisy-rom-art") {
             try {
-                val t0 = System.nanoTime()
+                val t0 = nanoTime()
                 val wrote = extractTo(readChunked(rom), dir)
                 marker.parentFile?.mkdirs()
                 marker.writeText(wrote.joinToString("\n"))
-                Log.i("pokedaisy", "RomArt: ${wrote.size} new files from ${rom.name} in ${(System.nanoTime() - t0) / 1_000_000} ms")
+                Log.i("pokedaisy", "RomArt: ${wrote.size} new files from ${rom.name} in ${(nanoTime() - t0) / 1_000_000} ms")
                 if (wrote.isNotEmpty()) _updates.value++
             } catch (t: Throwable) {
                 Log.w("pokedaisy", "RomArt: scan failed", t)
             } finally {
                 running = false
             }
-        }, "pokedaisy-rom-art").apply { isDaemon = true; start() }
+        }
     }
 
     /** The whole file, 1 MiB per read: one 32 MiB read holds a JNI critical lock (stalling GC) for ~20 ms. */

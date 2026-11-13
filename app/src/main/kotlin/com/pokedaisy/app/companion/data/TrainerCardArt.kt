@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.ConcurrentHashMap
 import com.pokedaisy.app.platform.File
 
 /**
@@ -166,7 +167,7 @@ object TrainerCardArt {
         return Art(style, d)
     }
 
-    private val loaded = java.util.concurrent.ConcurrentHashMap<CardStyle, Art>()
+    private val loaded = ConcurrentHashMap<CardStyle, Art>()
 
     /** [style]'s card from the cached blobs under [dir] ([RomArt.dir]); kept for [cached]. */
     fun load(dir: File, style: CardStyle): Art? =

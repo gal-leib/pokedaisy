@@ -1,5 +1,8 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.arraycopy
+import com.pokedaisy.app.platform.localHour
+
 // Nintendo DS, Gen 4 (Platinum first): the companion's reads of a DS game's main RAM (nds/pk_nds.cpp's pkReadBytes:
 // 0x02000000 + offset). Everything lives in the game's SaveData, a heap block whose pointer is a static word
 // (pret/pokeplatinum's sSaveDataPtr, from its .xMAP - the decomp builds the retail ROM byte for byte). Its body is the
@@ -84,7 +87,7 @@ private const val GEN4_FLAG_BYTES = 2912 / 8
 
 /** The save's event flags and vars, as the GUIDE reads them ([Gen4Config.varsFlagsOff]), with the hour as
  * [GEN4_VAR_HOUR]; null without them. */
-fun readGen4Progress(r: MemoryReader, cfg: Gen4Config, body: Long, hour: Int = java.time.LocalTime.now().hour): SaveProgress? {
+fun readGen4Progress(r: MemoryReader, cfg: Gen4Config, body: Long, hour: Int = localHour()): SaveProgress? {
     if (cfg.varsFlagsOff < 0) return null
     val vars = r.readCoreMemory(body + cfg.varsFlagsOff, cfg.numVars * 2)
     val flags = r.readCoreMemory(body + cfg.varsFlagsOff + cfg.numVars * 2, GEN4_FLAG_BYTES)
@@ -879,7 +882,7 @@ fun useGen4Repel(cfg: Gen4Config, calls: GameCalls, itemId: Int, steps: Int, fie
         out[slot * 4 + 3] = (left shr 8).toByte()
     } else {
         // The empty slot to the end, the others moved up in order.
-        System.arraycopy(raw, (slot + 1) * 4, out, slot * 4, (size - slot - 1) * 4)
+        arraycopy(raw, (slot + 1) * 4, out, slot * 4, (size - slot - 1) * 4)
         for (i in (size - 1) * 4 until size * 4) out[i] = 0
     }
     if (!calls.write(pocket, out)) return ItemUseOutcome(ItemUseResult.FAILED)

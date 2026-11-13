@@ -3,6 +3,8 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.RandomAccessFile
+import com.pokedaisy.app.platform.arraycopy
+import com.pokedaisy.app.platform.startDaemonThread
 
 /**
  * A FireRed-engine hack's own region map - Unbound's Borrius, Odyssey's,
@@ -70,14 +72,14 @@ object RomRegionMap {
     /** Reads [rom] in the background and publishes its map as [current]. */
     fun load(filesDir: File, romKey: String, rom: File) {
         current = null
-        Thread({
+        startDaemonThread("pokedaisy-region-map") {
             try {
-                current = loadNow(filesDir, romKey, rom) ?: return@Thread
+                current = loadNow(filesDir, romKey, rom) ?: return@startDaemonThread
                 RomArt.announce()
             } catch (t: Throwable) {
                 Log.w("pokedaisy", "RomRegionMap: read failed", t)
             }
-        }, "pokedaisy-region-map").apply { isDaemon = true; start() }
+        }
     }
 
     /** [read] [rom], writing its screens (once per [romKey]) where [RomArt]'s art goes. */
@@ -151,7 +153,7 @@ object RomRegionMap {
         val images = screens.mapIndexed { i, img ->
             val (left, top, right, bottom) = crops[i]
             RomArt.Image((right - left) * 8, (bottom - top) * 8).also { out ->
-                for (y in 0 until out.height) System.arraycopy(img.argb, (top * 8 + y) * 240 + left * 8, out.argb, y * out.width, out.width)
+                for (y in 0 until out.height) arraycopy(img.argb, (top * 8 + y) * 240 + left * 8, out.argb, y * out.width, out.width)
             }
         }
 

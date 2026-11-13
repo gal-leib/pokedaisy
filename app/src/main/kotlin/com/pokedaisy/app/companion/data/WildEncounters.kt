@@ -5,6 +5,7 @@ import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.LITTLE_ENDIAN
 import com.pokedaisy.app.platform.RandomAccessFile
 import com.pokedaisy.app.platform.mapReadOnly
+import com.pokedaisy.app.platform.synchronized
 
 /**
  * WILD ENCOUNTERS (SETTINGS > CONTROLS, GitHub #43): the game's own switch for random encounters,

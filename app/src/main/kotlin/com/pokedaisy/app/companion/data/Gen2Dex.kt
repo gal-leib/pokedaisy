@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.synchronized
+
 /**
  * A Game Boy Color (Gen 2) game's POKéDEX and item text, read from the cart's own bytes ([Gen1Dex.rom]:
  * the running Game Boy cart, which PokeDaisyActivity sets for either generation - a cart is

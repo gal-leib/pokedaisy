@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.sha1
+import com.pokedaisy.app.platform.startDaemonThread
 
 /**
  * A Game Boy Color (Gen 2) Pokémon game's own art, rebuilt from the player's ROM on its first launch
@@ -573,12 +574,12 @@ object Gen2Art {
 
     /** In the background, once per ROM file: a Game Boy Color cart is 2 MB. */
     fun prefetch(filesDir: File, rom: File) {
-        Thread({
+        startDaemonThread("pokedaisy-gen2-art") {
             runCatching {
                 val wrote = extractTo(rom.readBytes(), RomArt.dir(filesDir))
                 if (wrote.isNotEmpty()) RomArt.announce()
             }.onFailure { Log.w("pokedaisy", "Gen2Art: failed", it) }
-        }, "pokedaisy-gen2-art").apply { isDaemon = true; start() }
+        }
     }
 
 }

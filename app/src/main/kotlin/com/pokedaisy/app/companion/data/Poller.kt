@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.data
 import com.pokedaisy.app.MgbaCore
 import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.Sha1
+import com.pokedaisy.app.platform.nanoTime
 
 /** Told once per game when the Poller has decided what it is (a GameKind's name, and a BEST EFFORT match's title):
  * crash reports name it (CrashReports.gameIdentified, set up in PokeDaisyApp). */
@@ -225,9 +226,9 @@ class TelemetrySampler {
 
     private fun verdict(reader: MemoryReader, code: String): BestEffort.Verdict? {
         val text = beText ?: runCatching {
-            val t0 = System.nanoTime()
+            val t0 = nanoTime()
             BestEffort.romText(reader, code, beSize).also {
-                Log.i("pokedaisy", "best effort: ROM text read in ${(System.nanoTime() - t0) / 1_000_000} ms")
+                Log.i("pokedaisy", "best effort: ROM text read in ${(nanoTime() - t0) / 1_000_000} ms")
             }
         }.getOrNull()?.also { beText = it } ?: return null
         return BestEffort.evaluate(reader, code, beSize, text).also { beVerdict = it }

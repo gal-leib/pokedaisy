@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data.save
 
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.platform.arraycopy
 
 /**
  * A Gen 3 save file (Ruby / Sapphire / Emerald / FireRed / LeafGreen's 128 KB flash), read and
@@ -178,7 +179,7 @@ class Gen3SaveFile private constructor(
                 in 1..4 -> saveBlock1 to (id - 1) * DATA
                 else -> storage to (id - 5) * DATA
             }
-            System.arraycopy(block, start, out, base, size)
+            arraycopy(block, start, out, base, size)
             putU16(out, base + ID_OFF, id)
             putU16(out, base + CHECKSUM_OFF, checksum(out, base, size))
             putU32(out, base + SIGNATURE_OFF, SIGNATURE)
@@ -245,9 +246,9 @@ class Gen3SaveFile private constructor(
                 val base = s.sectorBase[id]
                 val size = format.chunkSize(id)
                 when (id) {
-                    0 -> System.arraycopy(bytes, base, sb2, 0, size)
-                    in 1..4 -> System.arraycopy(bytes, base, sb1, (id - 1) * DATA, size)
-                    else -> System.arraycopy(bytes, base, storage, (id - 5) * DATA, size)
+                    0 -> arraycopy(bytes, base, sb2, 0, size)
+                    in 1..4 -> arraycopy(bytes, base, sb1, (id - 1) * DATA, size)
+                    else -> arraycopy(bytes, base, storage, (id - 5) * DATA, size)
                 }
             }
             val rotation = (s.sectorBase[0] / SECTOR) % SECTORS_PER_SLOT
