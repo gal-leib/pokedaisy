@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.CoreKey
 import okio.Path
 import okio.Path.Companion.toOkioPath
 import android.view.KeyEvent
@@ -28,13 +29,13 @@ class GbaControlsSplitTest {
     @Test fun theDefaultsKeepXAndYAsTheyWere() {
         val dir = tmp.newFolder().toOkioPath()
         val gba = input(dir, ds = false)
-        assertEquals(MgbaCore.Key.START, gba.buttonFor(x))
-        assertEquals(MgbaCore.Key.SELECT, gba.buttonFor(y))
+        assertEquals(CoreKey.START, gba.buttonFor(x))
+        assertEquals(CoreKey.SELECT, gba.buttonFor(y))
         assertTrue(gba.isCompanion(x))
         assertFalse(gba.isCompanion(y))
         val ds = input(dir, ds = true)
-        assertEquals(MgbaCore.Key.X, ds.buttonFor(x))
-        assertEquals(MgbaCore.Key.Y, ds.buttonFor(y))
+        assertEquals(CoreKey.X, ds.buttonFor(x))
+        assertEquals(CoreKey.Y, ds.buttonFor(y))
         assertFalse(ds.isCompanion(x))
     }
 
@@ -62,7 +63,7 @@ class GbaControlsSplitTest {
         assertTrue(gba.isCompanion(x))
         assertTrue(gba.onKey(x, true))
         assertEquals(0, gba.mask)
-        assertEquals(MgbaCore.Key.START, gba.buttonFor(r3))
+        assertEquals(CoreKey.START, gba.buttonFor(r3))
         assertEquals(null, input(dir, ds = true).buttonFor(r3))
     }
 
@@ -71,7 +72,7 @@ class GbaControlsSplitTest {
         GbaControls.clearBinding(dir, Btn.TO_COMPANION)
         val gba = input(dir, ds = false)
         assertFalse(gba.isCompanion(x))
-        assertEquals(MgbaCore.Key.START, gba.buttonFor(x))
+        assertEquals(CoreKey.START, gba.buttonFor(x))
     }
 
     @Test fun aSharedButtonTakesTheKeyFromBothGroupsButNotFromToCompanion() {
@@ -82,15 +83,15 @@ class GbaControlsSplitTest {
         assertEquals(emptyList<String>(), raw[Btn.START_2])
         assertEquals(listOf("BUTTON_X"), raw[Btn.TO_COMPANION])
         val gba = input(dir, ds = false)
-        assertEquals(MgbaCore.Key.B, gba.buttonFor(x))
+        assertEquals(CoreKey.B, gba.buttonFor(x))
         assertTrue(gba.isCompanion(x))
-        assertEquals(MgbaCore.Key.B, input(dir, ds = true).buttonFor(x))
+        assertEquals(CoreKey.B, input(dir, ds = true).buttonFor(x))
     }
 
     @Test fun theCompanionMarkNeverReachesTheGame() {
         val dir = tmp.newFolder().toOkioPath()
         val gba = input(dir, ds = false)
         gba.onKey(x, true)
-        assertEquals(MgbaCore.Key.START, gba.mask)
+        assertEquals(CoreKey.START, gba.mask)
     }
 }

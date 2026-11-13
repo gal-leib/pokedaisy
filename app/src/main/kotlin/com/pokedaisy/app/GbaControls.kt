@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.data.KeyCodes
 import com.pokedaisy.app.companion.data.Logs
 import com.pokedaisy.app.companion.data.PropertiesText
@@ -30,17 +31,17 @@ object GbaControls {
      * (PokeDaisyActivity's bottom focus) - by default all on the DS's X / Y keys. TURBO A / B (issue #32, unbound by
      * default) press A / B on and off while held - [TURBO] marks them in [load]'s map, [GbaInput] pulses them. */
     enum class Btn(val bit: Int, val label: String, val group: Group = Group.ALL) {
-        A(MgbaCore.Key.A, "A"), B(MgbaCore.Key.B, "B"),
-        L(MgbaCore.Key.L, "L"), R(MgbaCore.Key.R, "R"),
-        START(MgbaCore.Key.START, "START"), SELECT(MgbaCore.Key.SELECT, "SELECT"),
-        TURBO_A(MgbaCore.Key.A or TURBO, "TURBO A"), TURBO_B(MgbaCore.Key.B or TURBO, "TURBO B"),
-        X(MgbaCore.Key.X, "X", Group.DS), Y(MgbaCore.Key.Y, "Y", Group.DS),
-        START_2(MgbaCore.Key.START, "START 2", Group.GBA), SELECT_2(MgbaCore.Key.SELECT, "SELECT 2", Group.GBA),
+        A(CoreKey.A, "A"), B(CoreKey.B, "B"),
+        L(CoreKey.L, "L"), R(CoreKey.R, "R"),
+        START(CoreKey.START, "START"), SELECT(CoreKey.SELECT, "SELECT"),
+        TURBO_A(CoreKey.A or TURBO, "TURBO A"), TURBO_B(CoreKey.B or TURBO, "TURBO B"),
+        X(CoreKey.X, "X", Group.DS), Y(CoreKey.Y, "Y", Group.DS),
+        START_2(CoreKey.START, "START 2", Group.GBA), SELECT_2(CoreKey.SELECT, "SELECT 2", Group.GBA),
         TO_COMPANION(COMPANION, tk("TO COMPANION"), Group.GBA),
         // More keys for the D-pad, unbound by default (the D-pad itself stays fixed, GbaInput): a controller whose D-pad
         // sends other keys - the 8BitDo Micro's keyboard mode sends letters, its UP the C of ZOOM's hotkey.
-        UP(MgbaCore.Key.UP, tk("D-PAD UP")), DOWN(MgbaCore.Key.DOWN, tk("D-PAD DOWN")),
-        LEFT(MgbaCore.Key.LEFT, tk("D-PAD LEFT")), RIGHT(MgbaCore.Key.RIGHT, tk("D-PAD RIGHT"));
+        UP(CoreKey.UP, tk("D-PAD UP")), DOWN(CoreKey.DOWN, tk("D-PAD DOWN")),
+        LEFT(CoreKey.LEFT, tk("D-PAD LEFT")), RIGHT(CoreKey.RIGHT, tk("D-PAD RIGHT"));
 
         /** One of the D-pad's extra keys ([UP] .. [RIGHT]). */
         val dpad get() = this == UP || this == DOWN || this == LEFT || this == RIGHT

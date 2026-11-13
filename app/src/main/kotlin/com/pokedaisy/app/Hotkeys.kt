@@ -1,6 +1,7 @@
 package com.pokedaisy.app
 
 import com.pokedaisy.app.companion.NewFeatures
+import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.data.KeyCodes
 import com.pokedaisy.app.companion.data.Logs
 import com.pokedaisy.app.companion.data.PropertiesText
@@ -153,7 +154,7 @@ class Hotkeys private constructor(
         }
         if (consumes(keyCode)) return true
         val button = input.buttonFor(keyCode) ?: return false
-        if (button and (MgbaCore.Key.START or MgbaCore.Key.SELECT) != 0 && inChord(keyCode) && !input.holdsButtons) {
+        if (button and (CoreKey.START or CoreKey.SELECT) != 0 && inChord(keyCode) && !input.holdsButtons) {
             heldBack[keyCode] = false
             return true
         }

@@ -1,5 +1,7 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.DsCore
+import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.ui.produceKeyedState
 import android.app.ActivityManager
 import android.app.Activity
@@ -418,7 +420,7 @@ class PokeDaisyActivity : Activity() {
     private val gamePick get() = telemetry.gamePick
 
     /** The match notice's SHARE - the player's yes to sending exactly what it listed. */
-    private val shareBestEffort: (com.pokedaisy.app.companion.data.BestEffortReport) -> Unit = { r ->
+    private val shareBestEffort = com.pokedaisy.app.companion.data.BestEffortSharing(BuildConfig.VERSION_NAME) { r ->
         BestEffortShare.share(this, r)
     }
 
@@ -1211,9 +1213,9 @@ class PokeDaisyActivity : Activity() {
                 if (com.pokedaisy.app.companion.data.KeyItems.selectWheel) {
                     // SoulGold: SELECT opens its wheel, DOWN uses the slot written above; the player's own put back after.
                     val down = com.pokedaisy.app.companion.data.KeyItems.WHEEL_DOWN_AFTER
-                    input.setPress(MgbaCore.Key.SELECT)
+                    input.setPress(CoreKey.SELECT)
                     engine.requestFieldItemJob(false, delayFrames = 2) { _, _ -> input.setPress(0) }
-                    engine.requestFieldItemJob(false, delayFrames = down) { _, _ -> input.setPress(MgbaCore.Key.DOWN) }
+                    engine.requestFieldItemJob(false, delayFrames = down) { _, _ -> input.setPress(CoreKey.DOWN) }
                     engine.requestFieldItemJob(false, delayFrames = down + 2) { _, _ -> input.setPress(0) }
                     engine.requestFieldItemJob(false, delayFrames = down + 20) { c, _ -> if (u16(c.read(addr, 2)) == itemId) c.write(addr, le16(old)) }
                     return@runCatching true
@@ -1238,7 +1240,7 @@ class PokeDaisyActivity : Activity() {
         val riding = engine.riding
         val sure = engine.fieldMovesKnown
         var took = false
-        input.setPress(MgbaCore.Key.SELECT)
+        input.setPress(CoreKey.SELECT)
         for (f in 1..SELECT_WAIT) engine.requestFieldItemJob(false, delayFrames = f) { c, _ ->
             if (engine.riding != riding || c.call(locked) != 0L) took = true
         }
@@ -3302,7 +3304,7 @@ class PokeDaisyActivity : Activity() {
         AudioEffects.load(Prefs(this))
         AudioEffectsTrack.open(this)
         val save = SavesLocation.saveFor(this, Prefs(this), r)
-        engine.ndsCore = if (dsperate) MgbaCore.NDS_CORE_DSPERATE else MgbaCore.NDS_CORE_MELONDS   // DS CORE (pickDsCore)
+        engine.ndsCore = if (dsperate) DsCore.CORE_DSPERATE else DsCore.CORE_MELONDS   // DS CORE (pickDsCore)
         // Cheats may have changed in the library's Settings since the game was last up.
         syncCheats()
         // Back from sleep: the game held on its frame (onPause) and goes on from it. The state written as it went to
@@ -4050,7 +4052,7 @@ class PokeDaisyActivity : Activity() {
     private fun dismissDsTouch() {
         if (dsWindowManual.value) { dsWindowManual.value = false; return }
         if (telemetry.snapshot.value.inBattle) return
-        input.setPress(MgbaCore.Key.B)
+        input.setPress(CoreKey.B)
         window.decorView.postDelayed({ input.setPress(0) }, DS_B_PRESS_MS)
     }
 
@@ -4895,8 +4897,8 @@ class PokeDaisyActivity : Activity() {
         if (bottomKeys.stick(event.getAxisValue(MotionEvent.AXIS_X), event.getAxisValue(MotionEvent.AXIS_Y))) {
             val hx = event.getAxisValue(MotionEvent.AXIS_HAT_X)
             val hy = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-            bits = (if (hx < -0.5f) MgbaCore.Key.LEFT else 0) or (if (hx > 0.5f) MgbaCore.Key.RIGHT else 0) or
-                (if (hy < -0.5f) MgbaCore.Key.UP else 0) or (if (hy > 0.5f) MgbaCore.Key.DOWN else 0)
+            bits = (if (hx < -0.5f) CoreKey.LEFT else 0) or (if (hx > 0.5f) CoreKey.RIGHT else 0) or
+                (if (hy < -0.5f) CoreKey.UP else 0) or (if (hy > 0.5f) CoreKey.DOWN else 0)
         }
         val pressed = bits and bottomHat.inv()
         bottomHat = bits
@@ -5042,18 +5044,18 @@ class PokeDaisyActivity : Activity() {
 
     /** The window's key for a GBA button bit (a diagonal counts as its up / down). */
     private fun menuKeyFor(bits: Int): MenuKey? = when {
-        bits and MgbaCore.Key.UP != 0 -> MenuKey.UP
-        bits and MgbaCore.Key.DOWN != 0 -> MenuKey.DOWN
-        bits and MgbaCore.Key.LEFT != 0 -> MenuKey.LEFT
-        bits and MgbaCore.Key.RIGHT != 0 -> MenuKey.RIGHT
-        bits and MgbaCore.Key.A != 0 -> MenuKey.A
-        bits and MgbaCore.Key.B != 0 -> MenuKey.B
-        bits and MgbaCore.Key.L != 0 -> MenuKey.L
-        bits and MgbaCore.Key.R != 0 -> MenuKey.R
-        bits and MgbaCore.Key.START != 0 -> MenuKey.START
-        bits and MgbaCore.Key.SELECT != 0 -> MenuKey.SELECT
-        bits and MgbaCore.Key.X != 0 -> MenuKey.X
-        bits and MgbaCore.Key.Y != 0 -> MenuKey.Y
+        bits and CoreKey.UP != 0 -> MenuKey.UP
+        bits and CoreKey.DOWN != 0 -> MenuKey.DOWN
+        bits and CoreKey.LEFT != 0 -> MenuKey.LEFT
+        bits and CoreKey.RIGHT != 0 -> MenuKey.RIGHT
+        bits and CoreKey.A != 0 -> MenuKey.A
+        bits and CoreKey.B != 0 -> MenuKey.B
+        bits and CoreKey.L != 0 -> MenuKey.L
+        bits and CoreKey.R != 0 -> MenuKey.R
+        bits and CoreKey.START != 0 -> MenuKey.START
+        bits and CoreKey.SELECT != 0 -> MenuKey.SELECT
+        bits and CoreKey.X != 0 -> MenuKey.X
+        bits and CoreKey.Y != 0 -> MenuKey.Y
         else -> null
     }
 
@@ -5064,8 +5066,8 @@ class PokeDaisyActivity : Activity() {
         if (sidePanel.menuStick(event.getAxisValue(MotionEvent.AXIS_X), event.getAxisValue(MotionEvent.AXIS_Y))) {
             val hx = event.getAxisValue(MotionEvent.AXIS_HAT_X)
             val hy = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-            bits = (if (hx < -0.5f) MgbaCore.Key.LEFT else 0) or (if (hx > 0.5f) MgbaCore.Key.RIGHT else 0) or
-                (if (hy < -0.5f) MgbaCore.Key.UP else 0) or (if (hy > 0.5f) MgbaCore.Key.DOWN else 0)
+            bits = (if (hx < -0.5f) CoreKey.LEFT else 0) or (if (hx > 0.5f) CoreKey.RIGHT else 0) or
+                (if (hy < -0.5f) CoreKey.UP else 0) or (if (hy > 0.5f) CoreKey.DOWN else 0)
         }
         val pressed = bits and menuHat.inv()
         menuHat = bits
@@ -5535,10 +5537,10 @@ class PokeDaisyActivity : Activity() {
     /** DS CORE for the DS game that's loaded ([dsperate]), and what follows from it: EXPAND only on melonDS (a cart its
      * field read knows). The engine starts the game on it ([startGame], [restartGame]). */
     private fun pickDsCore() {
-        dsperate = romIsNds && Prefs(this).dsCore.runs() == MgbaCore.NDS_CORE_DSPERATE
+        dsperate = romIsNds && Prefs(this).dsCore.runs() == DsCore.CORE_DSPERATE
         if (!romIsNds) return
         wideGame = if (!dsperate && (WideScreen.ndsKnows(romCode, romRev) || romOrigin)) WideScreen.NDS else WideScreen.OFF
-        if (::engine.isInitialized) engine.ndsCore = if (dsperate) MgbaCore.NDS_CORE_DSPERATE else MgbaCore.NDS_CORE_MELONDS
+        if (::engine.isInitialized) engine.ndsCore = if (dsperate) DsCore.CORE_DSPERATE else DsCore.CORE_MELONDS
     }
 
     /** RESTART GAME (SETTINGS, and its hotkey): the game booted again from its save, the resume state dropped. */

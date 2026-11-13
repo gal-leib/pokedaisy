@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.CoreKey
 import okio.Path
 import okio.Path.Companion.toOkioPath
 import org.junit.Assert.assertEquals
@@ -39,11 +40,11 @@ class StartSelect2Test {
     fun releasingOneOfTwoStartKeysKeepsStartHeld() {
         val start = 108   // KEYCODE_BUTTON_START
         val x = 99        // KEYCODE_BUTTON_X
-        val input = GbaInput().apply { setControls(mapOf(start to MgbaCore.Key.START, x to MgbaCore.Key.START)) }
+        val input = GbaInput().apply { setControls(mapOf(start to CoreKey.START, x to CoreKey.START)) }
         input.onKey(start, true)
         input.onKey(x, true)
         input.onKey(x, false)
-        assertEquals(MgbaCore.Key.START, input.mask and MgbaCore.Key.START)
+        assertEquals(CoreKey.START, input.mask and CoreKey.START)
         input.onKey(start, false)
         assertEquals(0, input.mask)
     }
