@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion
 
+import kotlin.concurrent.Volatile
 import com.pokedaisy.app.MgbaCore
 import com.pokedaisy.app.companion.i18n.tk
 
