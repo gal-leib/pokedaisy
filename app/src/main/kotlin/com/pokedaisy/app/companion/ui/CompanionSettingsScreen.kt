@@ -879,6 +879,16 @@ private fun homeRows(
             tk("CHALLENGE ICONS"), onOff(s.raIcons), subtitle = "RetroAchievements' icons in the corner",
             labelBadge = NewFeatures.badge(NewFeatures.RA_ICONS),
         ) { s.setRaIcons(!s.raIcons); changed() },
+        // RetroAchievements' popups; tracking and submissions carry on with them off (the top screen's RetroAchievements
+        // page has these too).
+        SettingRow(
+            tk("ACHIEVEMENT POPUPS"), onOff(s.raPopups), subtitle = "Unlocks, game complete, leaderboards and connection notices",
+            labelBadge = NewFeatures.badge(NewFeatures.RA_POPUPS),
+        ) { s.setRaPopups(!s.raPopups); changed() },
+        SettingRow(
+            tk("PROGRESS POPUPS"), onOff(s.raProgressPopups), enabled = s.raPopups,
+            subtitle = "A notice when a counting achievement gets closer", labelBadge = NewFeatures.badge(NewFeatures.RA_POPUPS),
+        ) { s.setRaProgressPopups(!s.raProgressPopups); changed() },
         // Small on / off preferences: the icons' bounce, the map cursor's blink, tab slides, the battle jump.
         SettingRow(tk("TWEAKS"), null, opensPage = true, subtitle = "Small animations and the battle jump") { navigate(Page.TWEAKS) },
     ) + coopRows(s, changed, navigate, pick = { title, choices, current, onPick -> select(Selector(title, choices, current) { onPick(it); changed() }) }, askLock = askLock) + listOfNotNull(

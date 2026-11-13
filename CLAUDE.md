@@ -166,7 +166,7 @@ species2/level2/item2 too, and zero padding is harmless since 0x00 is `nop`).
 A homebrew 3DS build, early preview (see `3ds/README.md`): a portable C core (`3ds/core/`) re-implements
 the companion's reads (addresses generated from `gamedata/`: `pd_configs_gen.h`; decoding from `Gen3Mon.kt` - keep in sync) and
 draws it at 320x240 in the OPTION look; `3ds/ctr/` runs GBA games on armGBA (`third_party/armgba`, ratherDashing's 3DS
-fork at `3ds-v0.0.2-alpha`: a recompiler; MPL-2.0, its GPL-2.0-only Gambatte left out, `3ds/emu/gb_none.c`) and Game Boy
+fork at `3ds-v0.0.3-alpha`: a recompiler; MPL-2.0, its GPL-2.0-only Gambatte left out, `3ds/emu/gb_none.c`) and Game Boy
 games on libmgba (the same submodule). armGBA sits behind mGBA's own `struct mCore` (`3ds/emu/pd_armgba_core.c`), so the
 shared C (`pk_wide.c`, `linux/*.c`) needs no change for it; the app's `pk_call.c` / `pk_host.c` / `pk_cheats.c` are built
 as `*_mgba` there and `3ds/emu/pd_dispatch.c` picks. Code that reaches into mGBA's CPU or renderer checks `pd_armgba_is()`
@@ -265,8 +265,9 @@ pixel, so there its text was as large for the screen as on a GBA): `LocalTextSte
    to 3 columns past 2.0:1 (1.6 caught the Duo Lite's 4:3 grid, ~1.56-1.75) (a measuring `Layout` - BoxWithConstraints composed the slots late and FireRed's
    icons missed the frame), and the MAP fills the tab only while that stretches it <= 1.2x
    (`MAX_MAP_STRETCH`; the Thor's bottom is ~1.16), else it keeps its shape, centred, buttons with it. Add a
-   test when adding a screen. Paparazzi is pinned to **1.3.4** — the last release on
-   Kotlin 1.9.24; newer ones need a Kotlin 2 bump first. Library/Settings (top screen)
+   test when adding a screen. Paparazzi is on **1.3.5** (Kotlin 2.4.21, Compose BOM
+   2025.03.01 = Compose 1.7.8) — the last release on compileSdk 34's layoutlib; 2.x, Compose 1.8+ and a Kotlin past
+   2.4 need compileSdk 35+ and a newer AGP first (Kotlin 2.4's lowest AGP is our 8.5.2). Library/Settings (top screen)
    are private composables inside their Activities, so Paparazzi can't reach them; use
    the preview harness below for those.
 2. **`ui-preview/`** (Maven Central only — works in cloud sessions
@@ -279,7 +280,7 @@ pixel, so there its text was as large for the screen as on a GBA): `LocalTextSte
    (`-Ponly=settings` filters by name, `-Pgame=EMERALD` switches game; render only what you changed,
    a render of everything needs the user's OK). It's also the
    only compile check available in such sessions, so run it (with `-Ponly`) after any UI edit there. See
-   its README for the shims and quirks (CMP 1.5 / Kotlin 1.9.22, `Icons.AutoMirrored`
+   its README for the shims and quirks (CMP 1.5's libraries under the app's Kotlin 2.4.21 and its Compose compiler, `Icons.AutoMirrored`
    rewritten to `Icons.Filled`, a stale incremental cache once faked "Unresolved
    reference" errors — delete `build/kotlin` if errors look impossible).
 
