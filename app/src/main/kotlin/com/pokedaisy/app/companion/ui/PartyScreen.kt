@@ -33,7 +33,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
@@ -1033,7 +1032,7 @@ internal fun HeldItemMarker(itemId: Int, u: Int, x: Float, y: Float) {
             com.pokedaisy.app.companion.data.GameKind.GOLD, com.pokedaisy.app.companion.data.GameKind.SILVER ->
                 com.pokedaisy.app.companion.data.Gen2Art.GOLD_SILVER_HOLD_ICONS
             else -> RomArt.HOLD_ICONS
-        })?.asImageBitmap()
+        })
     } ?: return
     val mail = if (com.pokedaisy.app.companion.data.activeGame.isGen2) {
         itemId in com.pokedaisy.app.companion.data.activeGen2.mailItems
