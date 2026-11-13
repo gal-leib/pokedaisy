@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.ui
 
+import kotlin.concurrent.Volatile
+import com.pokedaisy.app.companion.data.LockedMap
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -69,7 +71,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Achievement badges (64x64 PNGs on RetroAchievements' media server), fetched
@@ -78,7 +79,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object AchievementBadges {
     @Volatile var dir: File? = null
-    private val cache = ConcurrentHashMap<String, Bitmap>()
+    private val cache = LockedMap<String, Bitmap>()
 
     fun cached(url: String): Bitmap? = cache[url]
 
