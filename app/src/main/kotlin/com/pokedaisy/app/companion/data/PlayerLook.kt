@@ -1,11 +1,11 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.ByteArrayOutputStream
+import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.LITTLE_ENDIAN
 import com.pokedaisy.app.platform.byteBufferAllocate
 import com.pokedaisy.app.platform.byteBufferWrap
-import java.util.zip.CRC32
 
 /** Whose sprite set a hero has: FireRed / LeafGreen's (same art in both), Emerald's, Ruby / Sapphire's (Emerald's
  * sheets, but the heroes drawn before Emerald's redraw and walking and running in one sheet) or Heart and Soul's (Emerald's

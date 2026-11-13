@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
 
 /** A piece of a game's text look: the dialogue box's tiles and palette, the normal font's glyphs and their widths. */
@@ -92,7 +93,7 @@ object TextLook {
             val start = at - sig.anchor
             if (start >= 0 && start % 4 == 0 && start + sig.length <= rom.size) {
                 val keep = mask(rom, start, sig.length)
-                val crc = java.util.zip.CRC32()
+                val crc = CRC32()
                 for (k in 0 until sig.length) crc.update(if (keep[k]) rom[start + k].toInt() and 0xFF else 0)
                 if (crc.value == sig.crc) out += start
             }

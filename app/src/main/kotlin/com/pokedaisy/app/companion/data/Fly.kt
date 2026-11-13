@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
+
 /**
  * FLY from the MAP tab, the way the game does it (FieldItems.kt's idea: the game's own functions, called between
  * frames). pokefirered's party menu: FIELD_MOVE_FLY needs FLAG_BADGE01_GET + its index (the Thunder Badge) and
@@ -179,7 +181,7 @@ fun flyVisitedTowns(fly: FlyFns, g: GameCalls): List<Int> =
 /** Whether the running ROM has [fly]'s functions where they're expected. */
 fun flyCodeMatches(fly: FlyFns, read: (addr: Long, len: Int) -> ByteArray): Boolean =
     fly.functions.zip(fly.codeCrcs).all { (fn, crc) ->
-        val got = java.util.zip.CRC32().apply { update(read(fn, 32)) }.value
+        val got = CRC32().apply { update(read(fn, 32)) }.value
         got == crc || fn == fly.getMapsecType && got == fly.getMapsecTypeAltCrc
     }
 

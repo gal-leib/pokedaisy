@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
+
 /**
  * FREE FLIGHT and the scenic FLY: the player flies over the field on the game's own FLY bird, through trees, water and
  * mountains, kept to the map and its connections, and lands on the nearest tile a player can stand on. The flying is
@@ -134,7 +136,7 @@ enum class FlightVehicle(val id: Int, val label: String) {
 /** Whether the running ROM has [f]'s functions where they're expected. */
 fun flightCodeMatches(f: FlightFns, read: (addr: Long, len: Int) -> ByteArray): Boolean =
     f.functions.size == f.codeCrcs.size && f.functions.zip(f.codeCrcs).all { (fn, crc) ->
-        java.util.zip.CRC32().apply { update(read(fn, 32)) }.value == crc
+        CRC32().apply { update(read(fn, 32)) }.value == crc
     }
 
 /**

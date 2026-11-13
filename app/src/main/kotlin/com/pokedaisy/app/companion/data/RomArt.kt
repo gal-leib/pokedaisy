@@ -2,12 +2,12 @@ package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.ByteArrayOutputStream
 import com.pokedaisy.app.platform.ByteBuffer
+import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.LITTLE_ENDIAN
 import com.pokedaisy.app.platform.byteBufferAllocate
 import com.pokedaisy.app.platform.byteBufferWrap
-import java.util.zip.CRC32
-import java.util.zip.Deflater
+import com.pokedaisy.app.platform.zlibDeflate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -652,31 +652,12 @@ object RomArt {
                     raw[o++] = (c shr 16).toByte(); raw[o++] = (c shr 8).toByte(); raw[o++] = c.toByte(); raw[o++] = (c ushr 24).toByte()
                 }
             }
-            // Fed 16 KiB at a time: each deflate() holds a JNI critical lock
-            // (stalling GC while the game runs) for as long as its input lasts.
-            val z = ByteArrayOutputStream()
-            val def = Deflater()
-            val chunk = ByteArray(8192)
-            var at = 0
-            while (!def.finished()) {
-                if (def.needsInput()) {
-                    if (at < raw.size) {
-                        val n = minOf(16 shl 10, raw.size - at)
-                        def.setInput(raw, at, n)
-                        at += n
-                    } else {
-                        def.finish()
-                    }
-                }
-                z.write(chunk, 0, def.deflate(chunk))
-            }
-            def.end()
             val out = ByteArrayOutputStream()
             out.write(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 13, 10, 26, 10))
             // 8-bit depth, colour type 6 (RGBA), deflate, no filter, no interlace.
             val ihdr = byteBufferAllocate(13).putInt(img.width).putInt(img.height).put(byteArrayOf(8, 6, 0, 0, 0)).array()
             chunk(out, "IHDR", ihdr)
-            chunk(out, "IDAT", z.toByteArray())
+            chunk(out, "IDAT", zlibDeflate(raw))
             chunk(out, "IEND", ByteArray(0))
             return out.toByteArray()
         }

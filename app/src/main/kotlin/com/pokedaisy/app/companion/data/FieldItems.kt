@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.LITTLE_ENDIAN
 import com.pokedaisy.app.platform.byteBufferWrap
 
@@ -151,7 +152,7 @@ data class PartyItemFns(
 fun fieldItemCodeMatches(fns: FieldItemFns, readRom: (addr: Long, len: Int) -> ByteArray): Boolean {
     val party = fns.party
     val all = fns.functions.zip(fns.codeCrcs) + (party?.let { it.functions.zip(it.codeCrcs) }.orEmpty())
-    return all.all { (fn, crc) -> java.util.zip.CRC32().apply { update(readRom(fn, 32)) }.value == crc }
+    return all.all { (fn, crc) -> CRC32().apply { update(readRom(fn, 32)) }.value == crc }
 }
 
 /** REPEL / SUPER REPEL / MAX REPEL: the same ids in both games. */

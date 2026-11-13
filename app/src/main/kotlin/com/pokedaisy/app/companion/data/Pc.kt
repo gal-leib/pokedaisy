@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
+
 /**
  * PC anywhere (GitHub #85): the game's own PC from the BAG tab. On the retail games its whole menu ([PcMenuScript]: the
  * storage, the player's own PC with its items, and the rest); elsewhere Bill's / Someone's alone (WITHDRAW, DEPOSIT, MOVE
@@ -37,7 +39,7 @@ val PC_SAPPHIRE = PcFns(0x080655DCL, 60, 0x0814B1B4L, 0x08096121L, listOf(0xBC36
 val PC_EMERALD_LEGACY = PcFns(0x0809A294L, 63, 0x081E1168L, 0x080CACA1L, listOf(0xEF3698BAL, 0x3BE7A304L))
 /** Whether the running ROM has [pc]'s code and its specials entry where expected. */
 fun pcCodeMatches(pc: PcFns, read: (addr: Long, len: Int) -> ByteArray): Boolean {
-    fun crc(a: Long) = java.util.zip.CRC32().apply { update(read(a and 1L.inv(), 32)) }.value
+    fun crc(a: Long) = CRC32().apply { update(read(a and 1L.inv(), 32)) }.value
     val entry = read(pc.specials + 4L * pc.special, 4).let { b -> (0..3).fold(0L) { v, i -> v or ((b[i].toLong() and 0xFF) shl (8 * i)) } }
     return entry == pc.pcFn && listOf(crc(pc.setupScript), crc(pc.pcFn)) == pc.codeCrcs
 }

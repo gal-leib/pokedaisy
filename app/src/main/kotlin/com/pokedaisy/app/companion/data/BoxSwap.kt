@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
+
 /**
  * The BOXES tab's SWAP: a box Pokémon and a party Pokémon trade places in the running game, as the game's own PC does
  * when one is dropped on the other (pokefirered's pokemon_storage_system: SetPlacedMonData) - the box Pokémon comes out
@@ -145,7 +147,7 @@ private fun boxMove(fields: FieldItemFns, fns: BoxSwapFns, busy: Boolean, g: Gam
     val p = fields.party ?: return BoxSwapResult.FAILED
     val crcs = fns.codeCrcs.zip(listOf(fns.boxMonToMon, fns.boxMonRestorePP, fns.getBoxMonData))
     if (!fieldItemCodeMatches(fields, g::read) ||
-        crcs.any { (crc, fn) -> java.util.zip.CRC32().apply { update(g.read(fn, 32)) }.value != crc }) return BoxSwapResult.FAILED
+        crcs.any { (crc, fn) -> CRC32().apply { update(g.read(fn, 32)) }.value != crc }) return BoxSwapResult.FAILED
     if (busy || g.call(fields.fieldControlsLocked) != 0L) return BoxSwapResult.NOT_NOW
     return runCatching { BoxMove(fields, p, fns, g).move() }.getOrElse { BoxSwapResult.FAILED }
 }

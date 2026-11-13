@@ -5,8 +5,8 @@ import com.pokedaisy.app.companion.data.LookBlob
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.LookPart
 import com.pokedaisy.app.companion.data.PlayerLook
+import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
-import java.util.zip.CRC32
 
 /**
  * The co-op partner's art (pk_wide.c's `pk_partner_set`): 42 frames of 32x32 4bpp in reading order, then the

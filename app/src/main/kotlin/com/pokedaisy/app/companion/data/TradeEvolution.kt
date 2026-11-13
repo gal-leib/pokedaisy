@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
+
 /**
  * TRADE EVOLUTIONS (a GAMEPLAY setting, off by default): a party Pokémon that evolves by trading - KADABRA, MACHOKE,
  * GRAVELER, HAUNTER, or one holding its item (ONIX with a METAL COAT, ...) - evolves from its summary, through the
@@ -49,7 +51,7 @@ fun tradeEvoFor(kind: GameKind?, gameCode: String, revision: Int, hack: Boolean)
 
 /** Whether the running ROM has [evo]'s functions where they're expected. */
 fun tradeEvoCodeMatches(evo: TradeEvoFns, read: (addr: Long, len: Int) -> ByteArray): Boolean =
-    evo.functions.zip(evo.codeCrcs).all { (fn, crc) -> java.util.zip.CRC32().apply { update(read(fn, 32)) }.value == crc }
+    evo.functions.zip(evo.codeCrcs).all { (fn, crc) -> CRC32().apply { update(read(fn, 32)) }.value == crc }
 
 enum class TradeEvoResult {
     /** The game's evolution is playing. */

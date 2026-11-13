@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
+
 /**
  * FLASH from the QUICK MENU, the way the party menu's field move does it (Fly.kt's idea: the game's own functions,
  * called between frames). party_menu.c's CursorCb_FieldMove: FIELD_MOVE_FLASH needs its badge (FLAG_BADGE01_GET +
@@ -103,7 +105,7 @@ val FIRERED_REV0_HACKS = setOf(
 fun flashBadgeRule(flash: FlashFns, read: (addr: Long, len: Int) -> ByteArray): FlashFns? {
     if (flash.badgeCheck == 0L) return flash
     val b = read(flash.badgeCheck, 16)
-    if (java.util.zip.CRC32().apply { update(b) }.value == flash.badgeCheckCrc) return flash
+    if (CRC32().apply { update(b) }.value == flash.badgeCheckCrc) return flash
     val alwaysYes = byteArrayOf(0x01, 0x20) + ByteArray(8)
     if (b.copyOfRange(4, 14).contentEquals(alwaysYes)) return flash.copy(badgeFlag = NO_BADGE)
     return cfruBadgeFn(flash.badgeCheck, b, read)?.let { flash.copy(badgeFn = it) }
@@ -145,7 +147,7 @@ fun flashCandidatesFor(kind: GameKind?, gameCode: String, revision: Int, rebuild
 
 /** Whether the running ROM has [flash]'s functions where they're expected. */
 fun flashCodeMatches(flash: FlashFns, read: (addr: Long, len: Int) -> ByteArray): Boolean =
-    flash.functions.zip(flash.codeCrcs).all { (fn, crc) -> java.util.zip.CRC32().apply { update(read(fn, 32)) }.value == crc }
+    flash.functions.zip(flash.codeCrcs).all { (fn, crc) -> CRC32().apply { update(read(fn, 32)) }.value == crc }
 
 enum class FlashResult {
     /** The game's FLASH is on its way (the cut-in, then the light). */

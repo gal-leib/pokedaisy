@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
+
 /**
  * A ROM hack nothing knows by its hash that kept retail FireRed's or Emerald's engine: a hack made by editing retail
  * in place (a map editor, a hex editor, a patch tool) keeps retail's code, and with it retail's RAM. That is checked
@@ -84,7 +86,7 @@ object RetailEngine {
         return out
     }
 
-    private fun crc32(b: ByteArray): Int = java.util.zip.CRC32().apply { update(b) }.value.toInt()
+    private fun crc32(b: ByteArray): Int = CRC32().apply { update(b) }.value.toInt()
 }
 
 /** One retail build's fingerprints (RetailEngineGen.kt). */

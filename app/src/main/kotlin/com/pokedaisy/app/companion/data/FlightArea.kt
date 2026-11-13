@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
-import java.util.zip.CRC32
 
 /**
  * FLIGHT AREA (SETTINGS > GAMEPLAY, [com.pokedaisy.app.companion.FlightAreaMode]): FREE FLIGHT and the scenic FLY cross only

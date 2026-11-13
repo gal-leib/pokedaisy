@@ -127,6 +127,9 @@ class PlatformTest {
         assertArrayEquals(java.security.MessageDigest.getInstance("SHA-1").digest(data), sha1(data))
         val inflated = java.util.zip.InflaterInputStream(zlibDeflate(data).inputStream()).readBytes()
         assertArrayEquals(data, inflated)
+        val big = ByteArray(100_000) { (it * 31 xor it / 7).toByte() } // several of zlibDeflate's 16 KiB pieces
+        val whole = java.util.zip.Deflater().run { setInput(big); finish(); val b = ByteArray(200_000); val n = deflate(b); end(); b.copyOf(n) }
+        assertArrayEquals(whole, zlibDeflate(big))
         val buf = byteBufferWrap(data, 10, 20)
         assertEquals(10, buf.position())
         assertEquals(30, buf.limit())

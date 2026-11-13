@@ -47,15 +47,26 @@ class Sha1 {
 /** SHA-1 of [b] in one go. */
 fun sha1(b: ByteArray): ByteArray = Sha1().apply { update(b) }.digest()
 
-/** [data] as a zlib stream, java.util.zip.Deflater at its default level (the PNGs RomArt writes). */
+/** [data] as a zlib stream, java.util.zip.Deflater at its default level (the PNGs RomArt writes). Fed 16 KiB at a
+ * time: each deflate() holds a JNI critical lock (stalling GC while the game runs) for as long as its input lasts. */
 fun zlibDeflate(data: ByteArray): ByteArray {
     val out = java.io.ByteArrayOutputStream()
     val def = java.util.zip.Deflater()
     try {
-        def.setInput(data)
-        def.finish()
-        val chunk = ByteArray(64 * 1024)
-        while (!def.finished()) out.write(chunk, 0, def.deflate(chunk))
+        val chunk = ByteArray(8192)
+        var at = 0
+        while (!def.finished()) {
+            if (def.needsInput()) {
+                if (at < data.size) {
+                    val n = minOf(16 shl 10, data.size - at)
+                    def.setInput(data, at, n)
+                    at += n
+                } else {
+                    def.finish()
+                }
+            }
+            out.write(chunk, 0, def.deflate(chunk))
+        }
     } finally {
         def.end()
     }
