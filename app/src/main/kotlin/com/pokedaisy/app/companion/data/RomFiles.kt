@@ -5,6 +5,7 @@ import okio.FileHandle
 import okio.FileSystem
 import okio.Path
 import okio.SYSTEM
+import okio.use
 
 /*
  * Reading ROM files with okio (Kotlin Multiplatform) instead of java.io.RandomAccessFile / InputStream and a mapped
