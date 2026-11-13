@@ -166,7 +166,7 @@ object PlayerLook {
         val buf = LittleEndianBytes(rom)
         // The words pointing at a graphic: palette table entries ({ptr, tag}), picture tables ({ptr, size, tag}),
         // literal pools.
-        val targets = LookBlob.entries.flatMap { hits[it].orEmpty() }.toSortedSet().toIntArray()
+        val targets = LookBlob.entries.flatMap { hits[it].orEmpty() }.distinct().sorted().toIntArray()
         val refs = HashMap<Int, MutableList<Ref>>()
         var o = 0
         while (o + 8 <= rom.size) {
