@@ -62,7 +62,7 @@ fun rememberTrainerCardArt(style: CardStyle?): TrainerCardArt.Art? {
         // (another identity) re-rendered the card: load only what this generation hasn't.
         val s = style ?: run { value = null; return@produceKeyedState }
         if (value != null && cardArtGeneration[s] == generation) return@produceKeyedState
-        value = withContext(Dispatchers.IO) { runCatching { TrainerCardArt.load(RomArt.dir(context.filesDir.toOkioPath()), s) }.getOrNull() }
+        value = withContext(Dispatchers.IO) { runCatching { TrainerCardArt.load(RomArt.dir(context.filesDir?.toOkioPath()), s) }.getOrNull() }
         if (value != null) cardArtGeneration[s] = generation
     }.value
 }
