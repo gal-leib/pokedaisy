@@ -2280,7 +2280,7 @@ class PokeDaisyActivity : Activity() {
                 kotlinx.coroutines.delay(500)
             }
         }
-        com.pokedaisy.app.companion.FeatureTips.init(Prefs(this))
+        Prefs(this).let { com.pokedaisy.app.companion.FeatureTips.init(it.tipStore, it.tips) }
         com.pokedaisy.app.companion.FeatureTips.available = ::tipAvailable
 
         // Debug-only mirror of the companion UI onto the main display, for
