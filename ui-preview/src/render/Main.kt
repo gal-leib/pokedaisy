@@ -1339,6 +1339,8 @@ fun ndsSnapshot(): SnapshotView {
 }
 
 fun main(args: Array<String>) {
+    // The app sets this at start (PokeDaisyApp): the screens find the art under it.
+    com.pokedaisy.app.companion.data.RomArt.filesDir = okio.Path.Companion.run { android.content.Context().filesDir.toOkioPath() }
     // The docs' shots (gradle docsShots) never show a game's art: no ROM art, only the invented map.
     if (docsMode) installDocsArt() else romArt()
     // A DS game's art from its cart (-PndsRom): icons, item icons, the Pokégear map's pieces.

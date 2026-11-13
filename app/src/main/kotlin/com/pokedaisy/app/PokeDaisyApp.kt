@@ -1,6 +1,7 @@
 package com.pokedaisy.app
 
 import android.app.Application
+import okio.Path.Companion.toOkioPath
 
 /** Process start: counts the app open (for CrashReports' one-time ask) and applies the crash-report choice. */
 class PokeDaisyApp : Application() {
@@ -8,6 +9,8 @@ class PokeDaisyApp : Application() {
         super.onCreate()
         // The data code reads the emulator through MgbaCore (companion/data/EmulatorCore.kt).
         com.pokedaisy.app.companion.data.EmulatorCore.current = MgbaEmulatorCore
+        // The app's files folder, where the screens find the art RomArt rebuilt from the player's ROMs.
+        com.pokedaisy.app.companion.data.RomArt.filesDir = filesDir.toOkioPath()
         // The data code's log lines (companion/data/Logs.kt) go to Android's log.
         com.pokedaisy.app.companion.data.Logs.sink = com.pokedaisy.app.companion.data.Logs.Sink { tag, warning, message, error ->
             if (warning) android.util.Log.w(tag, message, error) else android.util.Log.i(tag, message)

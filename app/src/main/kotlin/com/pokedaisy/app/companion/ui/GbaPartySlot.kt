@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.pokedaisy.app.companion.data.GENDER_SYMBOL_FEMALE
@@ -496,14 +495,13 @@ private fun buildBandFrame(
 /** The slot's art, or null while no ROM has supplied it (FireRed / Emerald: see RomArt). */
 @Composable
 internal fun rememberPartySlotAssets(st: PartySlotStyle): PartySlotAssets? {
-    val context = LocalContext.current
     val gen = rememberArtGeneration()
-    return remember(context, st, gen) {
+    return remember(st, gen) {
         // Shared by every slot and every visit: the grid and its 6 slots used to build 7
         // sets, each recolouring the 256x256 font again (MBs per PARTY visit).
         slotAssetsCache[st to gen]?.let { return@remember it }
         runCatching {
-            fun load(path: String): ImageBitmap = GameArt.get(context, path) ?: error("no $path")
+            fun load(path: String): ImageBitmap = GameArt.get(path) ?: error("no $path")
             fun frame(name: String) = load("${st.frameDir}/$name")
             PartySlotAssets(
                 slotNormal = frame("slot_normal.png"),
@@ -515,7 +513,7 @@ internal fun rememberPartySlotAssets(st: PartySlotStyle): PartySlotAssets? {
                 slotEmpty = if (st.hasEmptySlot) frame("slot_empty.png") else null,
                 pokeball = st.pokeballAsset?.let { load(it) },
                 statusIcons = load(st.statusAsset),
-                heldIcons = GameArt.get(context, com.pokedaisy.app.companion.data.RomArt.HOLD_ICONS),
+                heldIcons = GameArt.get(com.pokedaisy.app.companion.data.RomArt.HOLD_ICONS),
                 fontMask = load(st.fontAsset),
             )
         }.getOrNull()?.also {

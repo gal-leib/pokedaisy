@@ -60,7 +60,6 @@ import androidx.compose.ui.graphics.Color
 import com.pokedaisy.app.companion.data.RomArt
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -660,9 +659,8 @@ fun ItemsBackdrop(game: GameKind, modifier: Modifier = Modifier) {
     val (a, b) = pal.backdrop ?: return
     pal.pattern?.let { DsBackdrop(it, modifier); return }
     val m = rememberGbaTextMetrics()
-    val context = LocalContext.current
     val gen = rememberArtGeneration()
-    val art = remember(pal.backdropArt, gen) { pal.backdropArt?.let { GameArt.get(context, it) } }
+    val art = remember(pal.backdropArt, gen) { pal.backdropArt?.let { GameArt.get(it) } }
     // Dark mode: an image backdrop (SoulGold's night sky) under the game backdrops' scrim; stripes come pre-dimmed.
     val scrim = OptionColors.backdropScrim
     // HeartGold / SoulSilver: the band behind the pocket buttons, laid out in root pixels by HgssBagBody.
@@ -1095,9 +1093,8 @@ private fun hgssPocketItem(pocket: Int?): Int? = when (pocket) {
 /** One of the bag's pocket buttons from the cart ([NdsArt.heartGoldPocket]), [open] or not; null before the art is in. */
 @Composable
 private fun hgssPocketArt(pocket: Int, open: Boolean): ImageBitmap? {
-    val context = LocalContext.current
     val gen = rememberArtGeneration()
-    return remember(pocket, open, gen) { GameArt.get(context, "${NdsArt.heartGoldPocket(pocket, open)}.png") }
+    return remember(pocket, open, gen) { GameArt.get("${NdsArt.heartGoldPocket(pocket, open)}.png") }
 }
 
 /** The FAVORITES button in the pocket buttons' own look: a pocket button ([open] or not) with its icon painted out by

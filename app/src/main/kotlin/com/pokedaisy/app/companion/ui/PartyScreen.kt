@@ -1019,11 +1019,10 @@ internal fun DrawScope.drawPixelBitmap(bitmap: List<String>, palette: Map<Char, 
 @Composable
 internal fun HeldItemMarker(itemId: Int, u: Int, x: Float, y: Float) {
     if (itemId == 0) return
-    val context = androidx.compose.ui.platform.LocalContext.current
     val gen = rememberArtGeneration()
     val icons = androidx.compose.runtime.remember(gen) {
         // The Gen 2 games' own marks (Gen2Art), the GBA games' from RomArt.
-        GameArt.get(context, when (com.pokedaisy.app.companion.data.activeGame) {
+        GameArt.get(when (com.pokedaisy.app.companion.data.activeGame) {
             com.pokedaisy.app.companion.data.GameKind.CRYSTAL -> com.pokedaisy.app.companion.data.Gen2Art.CRYSTAL_HOLD_ICONS
             com.pokedaisy.app.companion.data.GameKind.CRYSTAL_CLEAR -> com.pokedaisy.app.companion.data.Gen2Art.CRYSTAL_CLEAR_HOLD_ICONS
             com.pokedaisy.app.companion.data.GameKind.CRYSTAL_LEGACY -> com.pokedaisy.app.companion.data.Gen2Art.CRYSTAL_LEGACY_HOLD_ICONS
