@@ -16,7 +16,7 @@ import okio.use
 internal inline fun <T> withRomFile(rom: Path, block: (FileHandle) -> T): T = FileSystem.SYSTEM.openReadOnly(rom).use(block)
 
 /** [len] bytes from [off]; throws EOFException where the file is shorter, as RandomAccessFile.readFully did. */
-fun FileHandle.readFully(off: Long, len: Int): ByteArray {
+internal fun FileHandle.readFully(off: Long, len: Int): ByteArray {
     val b = ByteArray(len)
     var got = 0
     while (got < len) {
