@@ -3625,6 +3625,12 @@ cmake -S app/src/main/cpp/test -B build/pk_api_test && cmake --build build/pk_ap
 ctest --test-dir build/pk_api_test --output-on-failure
 ```
 
+On iOS the shared module (`shared/`) reaches it through Kotlin/Native cinterop: `shared/native/build_ios_core.sh`
+(Gradle's `buildIosCore`, on a Mac with Xcode) builds `pk_api` for the iPad and the iPad simulator into
+`shared/build/pkcore/` (one `libpkcore.a` per slice, plus `PkCore.xcframework` for Xcode), and `PkApiCore` (iosMain)
+runs a game through it and is the data code's `EmulatorCore` there. `./gradlew :shared:iosSimulatorArm64Test` runs it
+in the iPad simulator on the same diagnostic ROMs (CI's "Shared code for iOS" job, on macOS).
+
 The generator scripts under `scripts/` and ui-preview's ROM-art rendering read
 built pret decomp checkouts (`pokefirered/`, `pokeemerald/`, `pokeruby/`,
 `pokehns/`, each built at its pinned commit) from the directory in the
