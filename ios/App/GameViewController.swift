@@ -15,6 +15,8 @@ final class GameViewController: UIViewController, MTKViewDelegate {
     private var companionPoints = CGRect.zero
     private var lastTick = CACurrentMediaTime()
     private var keyboardKeys: UInt32 = 0
+    /// Keys pressed since the last tick, held or not (a quick key press can fall between two refreshes).
+    private var keyboardPressed: UInt32 = 0
     private var keyboardFF = false
     private var quickPending = false
     private var companionTouch: UITouch?
@@ -215,7 +217,7 @@ final class GameViewController: UIViewController, MTKViewDelegate {
         for p in presses {
             guard let code = p.key?.keyCode else { continue }
             if let bit = GameViewController.keyMap[code] {
-                if down { keyboardKeys |= bit } else { keyboardKeys &= ~bit }
+                if down { keyboardKeys |= bit; keyboardPressed |= bit } else { keyboardKeys &= ~bit }
                 handled = true
             } else if code == .keyboardQ {
                 if down { quickPending = true }
@@ -288,7 +290,9 @@ final class GameViewController: UIViewController, MTKViewDelegate {
         pd_ios_set_battery(level < 0 ? -1 : Int32(level * 100))
         let quick = quickPending || padQuick
         quickPending = false
-        pd_ios_tick(gamepad.keys | keyboardKeys | padKeys, quick, gamepad.ffHeld || keyboardFF || padFF, angle, ms)
+        let keys = gamepad.takeKeys() | keyboardKeys | keyboardPressed | padKeys
+        keyboardPressed = 0
+        pd_ios_tick(keys, quick, gamepad.ffHeld || keyboardFF || padFF, angle, ms)
         if pd_ios_take_leave() {
             leave()
             return

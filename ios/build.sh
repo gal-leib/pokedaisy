@@ -34,7 +34,9 @@ if [ -z "$UDID" ]; then
     [ -n "$UDID" ] || { echo "no iPad simulator: add one in Xcode > Settings > Components"; exit 1; }
     xcrun simctl boot "$UDID"
 fi
-open -a Simulator
+# The simulator's window: Simulator.app, or DeviceHub.app from Xcode 27 on (it has no Simulator.app); the app runs
+# without either, so a missing one isn't an error.
+open -a Simulator 2>/dev/null || open "$(xcode-select -p)/../Applications/DeviceHub.app" 2>/dev/null || true
 xcrun simctl install "$UDID" "$APP"
 if [ $# -gt 0 ]; then
     DOCS="$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data)/Documents"

@@ -10,7 +10,15 @@ final class GamepadView: UIView {
 
     /// GBA buttons held (PD_IOS_KEY_*), and the app's own.
     private(set) var keys: UInt32 = 0
+    /// Buttons pressed since the last tick, even if already let go: a quick tap can begin and end between two refreshes.
+    private var pressedSinceTick: UInt32 = 0
     private(set) var ffHeld = false
+    /// The buttons for this tick: those held, and any tapped and let go since the last one.
+    func takeKeys() -> UInt32 {
+        let k = keys | pressedSinceTick
+        pressedSinceTick = 0
+        return k
+    }
     var onQuick: (() -> Void)?
     var onClose: (() -> Void)?
 
@@ -148,6 +156,7 @@ final class GamepadView: UIView {
             k |= touchDirs[t] ?? 0
         }
         keys = k
+        pressedSinceTick |= k
         ffHeld = ff
         refreshLook()
     }
