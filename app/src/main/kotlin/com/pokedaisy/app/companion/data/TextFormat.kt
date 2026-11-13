@@ -6,21 +6,21 @@ package com.pokedaisy.app.companion.data
  */
 
 /** This value's bits in hex (as `%x` prints an Int, negatives as their unsigned bits), zero-padded to [width]. */
-fun Int.hex(width: Int = 0, upper: Boolean = false): String = toUInt().toString(16).padStart(width, '0').let { if (upper) it.uppercase() else it }
+internal fun Int.hex(width: Int = 0, upper: Boolean = false): String = toUInt().toString(16).padStart(width, '0').let { if (upper) it.uppercase() else it }
 
 /** This value's bits in hex (as `%x` prints a Long), zero-padded to [width]. */
-fun Long.hex(width: Int = 0, upper: Boolean = false): String = toULong().toString(16).padStart(width, '0').let { if (upper) it.uppercase() else it }
+internal fun Long.hex(width: Int = 0, upper: Boolean = false): String = toULong().toString(16).padStart(width, '0').let { if (upper) it.uppercase() else it }
 
 /** Two lower-case hex digits a byte, as `joinToString("") { "%02x".format(it) }` gave. */
-fun ByteArray.hex(upper: Boolean = false): String = joinToString("") { (it.toInt() and 0xFF).hex(2, upper) }
+internal fun ByteArray.hex(upper: Boolean = false): String = joinToString("") { (it.toInt() and 0xFF).hex(2, upper) }
 
 /** This number zero-padded to [width] digits (`%02d`). */
-fun Int.pad(width: Int): String = if (this < 0) "-" + (-toLong()).toString().padStart(width - 1, '0') else toString().padStart(width, '0')
+internal fun Int.pad(width: Int): String = if (this < 0) "-" + (-toLong()).toString().padStart(width - 1, '0') else toString().padStart(width, '0')
 
-fun Long.pad(width: Int): String = if (this < 0) "-" + (-this).toString().padStart(width - 1, '0') else toString().padStart(width, '0')
+internal fun Long.pad(width: Int): String = if (this < 0) "-" + (-this).toString().padStart(width - 1, '0') else toString().padStart(width, '0')
 
 /** [decimals] digits after the point, rounded half up (`%.2f`), always with a '.'. */
-fun Double.fixed(decimals: Int): String {
+internal fun Double.fixed(decimals: Int): String {
     var scale = 1L
     repeat(decimals) { scale *= 10 }
     val neg = this < 0
