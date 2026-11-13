@@ -2499,7 +2499,7 @@ class LibraryActivity : ComponentActivity() {
             onScreenScraperSignIn = { s.ssLogin.signIn(prefs, { r -> runOnUiThread { r() } }) { startMediaSync(s.covers) } },
             onScreenScraperSignOut = { s.ssLogin.signOut(prefs) },
             buttonRequest = { btn ->
-                val dir = getExternalFilesDir(null) ?: filesDir
+                val dir = controlsDir
                 KeyCapture.Request(
                     btn.title, chord = false,
                     onDone = { keys -> GbaControls.setBinding(dir, btn, keys.first()); readButtons(s) },
@@ -2538,7 +2538,7 @@ class LibraryActivity : ComponentActivity() {
 
     /** The GAME BUTTONS step's list: A, B, L, R, START, SELECT (+ the second START / SELECT, turbo) as bound now. */
     private fun readButtons(s: SetupState) {
-        s.buttons = GbaControls.rawBindings(getExternalFilesDir(null) ?: filesDir)
+        s.buttons = GbaControls.rawBindings(controlsDir)
     }
 
     private fun finishSetup() {

@@ -1,5 +1,7 @@
 package com.pokedaisy.app
 
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import android.view.KeyEvent
 import com.pokedaisy.app.GbaControls.Btn
 import org.junit.Assert.assertEquals
@@ -16,10 +18,10 @@ class GbaControlsDpadTest {
     @get:Rule
     val tmp = TemporaryFolder()
 
-    private fun input(dir: File, ds: Boolean) = GbaInput().apply { setControls(GbaControls.load(dir)); this.ds = ds }
+    private fun input(dir: Path, ds: Boolean) = GbaInput().apply { setControls(GbaControls.load(dir)); this.ds = ds }
 
     @Test fun unboundByDefaultAndTheDpadStillMoves() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         val raw = GbaControls.rawBindings(dir)
         for (b in listOf(Btn.UP, Btn.DOWN, Btn.LEFT, Btn.RIGHT)) assertEquals(emptyList<String>(), raw[b])
         val gba = input(dir, ds = false)
@@ -28,7 +30,7 @@ class GbaControlsDpadTest {
     }
 
     @Test fun aLetterBecomesADirectionInEveryGame() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         GbaControls.setBindingNamed(dir, Btn.UP, "C")
         GbaControls.setBindingNamed(dir, Btn.DOWN, "D")
         GbaControls.setBindingNamed(dir, Btn.LEFT, "E")
@@ -45,7 +47,7 @@ class GbaControlsDpadTest {
     }
 
     @Test fun theKeyLeavesAHotkeyThatWasItAlone() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         // ZOOM is R3 and C by default: C goes to the D-pad, R3 stays ZOOM's.
         assertTrue("C" in Hotkeys.load(dir).rawBindings[Hotkeys.Action.ZOOM].orEmpty())
         GbaControls.setBindingNamed(dir, Btn.UP, "C")
@@ -56,7 +58,7 @@ class GbaControlsDpadTest {
     }
 
     @Test fun cleared() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         GbaControls.setBindingNamed(dir, Btn.UP, "C")
         assertTrue(Btn.UP.canClear)
         GbaControls.clearBinding(dir, Btn.UP)

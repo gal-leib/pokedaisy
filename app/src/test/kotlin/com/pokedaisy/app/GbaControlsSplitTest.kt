@@ -1,5 +1,7 @@
 package com.pokedaisy.app
 
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import android.view.KeyEvent
 import com.pokedaisy.app.GbaControls.Btn
 import org.junit.Assert.assertEquals
@@ -21,10 +23,10 @@ class GbaControlsSplitTest {
     private val y = KeyEvent.KEYCODE_BUTTON_Y
     private val r3 = KeyEvent.KEYCODE_BUTTON_THUMBR
 
-    private fun input(dir: File, ds: Boolean) = GbaInput().apply { setControls(GbaControls.load(dir)); this.ds = ds }
+    private fun input(dir: Path, ds: Boolean) = GbaInput().apply { setControls(GbaControls.load(dir)); this.ds = ds }
 
     @Test fun theDefaultsKeepXAndYAsTheyWere() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         val gba = input(dir, ds = false)
         assertEquals(MgbaCore.Key.START, gba.buttonFor(x))
         assertEquals(MgbaCore.Key.SELECT, gba.buttonFor(y))
@@ -37,9 +39,9 @@ class GbaControlsSplitTest {
     }
 
     @Test fun aFileFromBeforeTheSplitGivesEachRowItsOldKeys() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         // X / Y moved to L3 / R3 when they were one row each.
-        File(dir, "controls.properties").writeText("start2=BUTTON_THUMBL\nselect2=BUTTON_THUMBR\n")
+        File(dir.toFile(), "controls.properties").writeText("start2=BUTTON_THUMBL\nselect2=BUTTON_THUMBR\n")
         val raw = GbaControls.rawBindings(dir)
         assertEquals(listOf("BUTTON_THUMBL"), raw[Btn.X])
         assertEquals(listOf("BUTTON_THUMBR"), raw[Btn.Y])
@@ -49,7 +51,7 @@ class GbaControlsSplitTest {
     }
 
     @Test fun startTwoMovesWithoutTakingTheDsX() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         GbaControls.setBindingNamed(dir, Btn.START_2, "BUTTON_THUMBR")
         val raw = GbaControls.rawBindings(dir)
         assertEquals(listOf("BUTTON_X"), raw[Btn.X])
@@ -65,7 +67,7 @@ class GbaControlsSplitTest {
     }
 
     @Test fun toCompanionCanBeClearedLeavingStartTwo() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         GbaControls.clearBinding(dir, Btn.TO_COMPANION)
         val gba = input(dir, ds = false)
         assertFalse(gba.isCompanion(x))
@@ -73,7 +75,7 @@ class GbaControlsSplitTest {
     }
 
     @Test fun aSharedButtonTakesTheKeyFromBothGroupsButNotFromToCompanion() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         GbaControls.setBindingNamed(dir, Btn.B, "BUTTON_X")
         val raw = GbaControls.rawBindings(dir)
         assertEquals(emptyList<String>(), raw[Btn.X])
@@ -86,7 +88,7 @@ class GbaControlsSplitTest {
     }
 
     @Test fun theCompanionMarkNeverReachesTheGame() {
-        val dir = tmp.newFolder()
+        val dir = tmp.newFolder().toOkioPath()
         val gba = input(dir, ds = false)
         gba.onKey(x, true)
         assertEquals(MgbaCore.Key.START, gba.mask)

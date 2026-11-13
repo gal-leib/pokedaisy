@@ -1886,16 +1886,16 @@ class PokeDaisyActivity : Activity() {
         override fun editTouchLayout() = runOnUiThread { openTouchEditor() }
         override val touchRevision get() = touchRev.intValue
         override val touchControlsShown get() = ::touchControls.isInitialized && touchControls.visibility == View.VISIBLE
-        override fun gbaControlBindings() = GbaControls.rawBindings(getExternalFilesDir(null) ?: filesDir)
+        override fun gbaControlBindings() = GbaControls.rawBindings(controlsDir)
         override val keyCapture get() = this@PokeDaisyActivity.keyCapture
         override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {
             val code = keyCodeForName(keyName) ?: return
-            GbaControls.setBinding(getExternalFilesDir(null) ?: filesDir, btn, code)
-            input.setControls(GbaControls.load(getExternalFilesDir(null) ?: filesDir))
+            GbaControls.setBinding(controlsDir, btn, code)
+            input.setControls(GbaControls.load(controlsDir))
         }
         override fun clearGbaControlBinding(btn: GbaControls.Btn) {
-            GbaControls.clearBinding(getExternalFilesDir(null) ?: filesDir, btn)
-            input.setControls(GbaControls.load(getExternalFilesDir(null) ?: filesDir))
+            GbaControls.clearBinding(controlsDir, btn)
+            input.setControls(GbaControls.load(controlsDir))
         }
         override val buttonGroup get() = if (romIsNds) GbaControls.Group.DS else GbaControls.Group.GBA
         override val hotkeysEnabled get() = hotkeysOn
@@ -1903,12 +1903,12 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).hotkeysEnabled = on
             setHotkeysOn(on)
         }
-        override fun hotkeyBindings() = Hotkeys.load(getExternalFilesDir(null) ?: filesDir).rawBindings
+        override fun hotkeyBindings() = Hotkeys.load(controlsDir).rawBindings
         override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {
-            val dir = getExternalFilesDir(null) ?: filesDir
+            val dir = controlsDir
             if (keyNames.isNullOrEmpty()) Hotkeys.clearBinding(dir, action)
             else Hotkeys.setBindingNamed(dir, action, keyNames, takeFrom)
-            hotkeys = Hotkeys.load(getExternalFilesDir(null) ?: filesDir)
+            hotkeys = Hotkeys.load(controlsDir)
         }
         override fun restartGame() = this@PokeDaisyActivity.restartGame()
         override fun closeGame() {
@@ -2438,7 +2438,7 @@ class PokeDaisyActivity : Activity() {
         syncOrientation(secondScreen() != null)
         syncGameScreen()
 
-        hotkeys = Hotkeys.load(getExternalFilesDir(null) ?: filesDir)
+        hotkeys = Hotkeys.load(controlsDir)
         // L2 / R2 are TOUCH SCREEN / DS LAYOUT's in a DS game on one screen, SPEED CYCLE / FF HOLD's elsewhere.
         Hotkeys.dsActive = { a ->
             when (a) {
@@ -2987,9 +2987,9 @@ class PokeDaisyActivity : Activity() {
         view.onResume()
         // Pick up any Settings changes made since launch.
         if (romCode.isNotEmpty()) com.pokedaisy.app.companion.i18n.L10n.apply(Prefs(this).appLanguage, romCode)
-        hotkeys = Hotkeys.load(getExternalFilesDir(null) ?: filesDir)
+        hotkeys = Hotkeys.load(controlsDir)
         hotkeysOn = Prefs(this).hotkeysEnabled
-        input.setControls(GbaControls.load(getExternalFilesDir(null) ?: filesDir))
+        input.setControls(GbaControls.load(controlsDir))
         if (::engine.isInitialized) {
             engine.ffMaxSpeed = Prefs(this).ffMaxSpeed
             engine.ffMusicMode = Prefs(this).ffMusicMode
@@ -5200,7 +5200,7 @@ class PokeDaisyActivity : Activity() {
         rtDown = false; ltDown = false
         if (::view.isInitialized) { view.camera.stickX = 0f; view.camera.stickY = 0f }
         if (::engine.isInitialized) { engine.setFastForwardHeld(false); engine.setSlowmoHeld(false); engine.setRewindHeld(false) }
-        hotkeys = Hotkeys.load(getExternalFilesDir(null) ?: filesDir)
+        hotkeys = Hotkeys.load(controlsDir)
     }
 
     /** Turns the hotkeys on/off from the companion. Off lets go of any held one (FF / slow-mo
@@ -5208,7 +5208,7 @@ class PokeDaisyActivity : Activity() {
     private fun setHotkeysOn(on: Boolean) {
         hotkeysOn = on
         if (::engine.isInitialized) { engine.setFastForwardHeld(false); engine.setSlowmoHeld(false) }
-        hotkeys = Hotkeys.load(getExternalFilesDir(null) ?: filesDir)
+        hotkeys = Hotkeys.load(controlsDir)
     }
 
     private fun handleHotkey(e: Hotkeys.Event) {
