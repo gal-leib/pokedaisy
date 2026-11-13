@@ -4,6 +4,7 @@ import okio.EOFException
 import okio.FileHandle
 import okio.FileSystem
 import okio.Path
+import okio.SYSTEM
 
 /*
  * Reading ROM files with okio (Kotlin Multiplatform) instead of java.io.RandomAccessFile / InputStream and a mapped
