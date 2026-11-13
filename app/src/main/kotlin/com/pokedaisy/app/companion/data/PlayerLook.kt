@@ -176,7 +176,7 @@ object PlayerLook {
             val w = buf.getInt(o)
             if (w ushr 25 == 4) {
                 val off = w - 0x08000000
-                if (targets.asList().binarySearch(off) >= 0) {
+                if (targets.binarySearch(off) >= 0) {
                     refs.getOrPut(off) { ArrayList() } += Ref(o, buf.getShort(o + 4).toInt() and 0xFFFF, buf.getShort(o + 6).toInt() and 0xFFFF)
                 }
             }
