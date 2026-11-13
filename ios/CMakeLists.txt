@@ -59,15 +59,27 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(PokeDaisy PRIVATE pokedaisy_native)
     set_target_properties(PokeDaisy PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/App/Info.plist"
-        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.pokedaisy.ipad"
         XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/App/PokeDaisy-Bridging-Header.h"
         XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
         XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "16.0"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
-        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
-        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
         XCODE_ATTRIBUTE_HEADER_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/native"
         XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
+    # Signing: off for the simulator; an iPad needs a team (-DPD_IOS_TEAM=<team id>, never committed), signed
+    # automatically. The bundle id can be changed for a free account (-DPD_IOS_BUNDLE_ID=...).
+    set(PD_IOS_TEAM "" CACHE STRING "Apple developer team id for building to an iPad")
+    set(PD_IOS_BUNDLE_ID "com.pokedaisy.ipad" CACHE STRING "Bundle id")
+    set_target_properties(PokeDaisy PROPERTIES XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${PD_IOS_BUNDLE_ID}")
+    if(PD_IOS_TEAM)
+        set_target_properties(PokeDaisy PROPERTIES
+            XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${PD_IOS_TEAM}"
+            XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development")
+    else()
+        set_target_properties(PokeDaisy PROPERTIES
+            XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
+    endif()
     target_link_libraries(PokeDaisy PRIVATE "-framework UIKit" "-framework Metal" "-framework MetalKit"
         "-framework AVFoundation" "-framework GameController")
 else()

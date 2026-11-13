@@ -43,7 +43,14 @@ On a Mac with Xcode and CMake 3.20+ (`brew install cmake`):
 
 configures `build/ios` with CMake's Xcode generator, builds for the simulator, boots an iPad simulator, installs the app,
 copies the files given into its Documents and launches it. `SIM="iPad Pro 13-inch (M4)"` picks the simulator. Open
-`build/ios/PokeDaisy.xcodeproj` in Xcode to run it on an iPad (set a team under Signing first).
+`build/ios/PokeDaisy.xcodeproj` in Xcode to run it on an iPad: configure a separate build with your team, which
+signs the app (the simulator build isn't signed), then press Run with the iPad as the destination:
+
+    cmake -S ios -B build/ios-device -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
+        -DCMAKE_OSX_ARCHITECTURES=arm64 -DPD_IOS_TEAM=<your team id>
+
+A free Apple account works (its builds run for 7 days); `-DPD_IOS_BUNDLE_ID=` changes the bundle id if
+`com.pokedaisy.ipad` is taken. The iPad needs Developer Mode on.
 
 Anywhere else, the C side builds alone with a headless check:
 
