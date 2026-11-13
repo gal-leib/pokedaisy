@@ -67,6 +67,74 @@ Raise these together, before the first PR, as one upstream Discussion or issue w
 | 10 | **Who reviews and tests iOS changes**, and on which devices (an iPad mini is in hand). | The code owner reviews everything; iOS PRs need someone who can run them. |
 | 11 | **Docs**: an iOS section in `CLAUDE.md` / `docs/DEVELOPMENT.md` and "On iPad" notes in the manual, in the repo's style. | The manual is the single source for the site and the in-app HELP. |
 
+## 3b. Gal's proposed positions (2026-11-13)
+
+Gal's answers to section 3, to bring to the maintainer as proposals (he can agree or change each):
+
+| # | Gal proposes |
+|---|---|
+| 1 | Kotlin Multiplatform + Compose Multiplatform for the full app |
+| 2 | Shared code compiled where it lives, no file moves |
+| 3 | Kotlin 2 first, as its own PR |
+| 4 | The big Android classes split, in small PRs timed with the maintainer |
+| 5 | New libraries allowed, each in the PR that needs it, with its NOTICE entry |
+| 6 | The iOS CI job advisory at first, required once it's stable |
+| 7 | First iOS release: GBA and Game Boy with the companion |
+| 8 | **Gal's Apple developer account** holds the bundle id and signing |
+| 9 | **Sideload only** at first (AltStore / SideStore style), no App Store or TestFlight |
+| 10 | Gal tests on the iPad mini; the maintainer reviews and merges |
+| 11 | iOS documented in the existing docs (CLAUDE.md, DEVELOPMENT.md, "On iPad" notes in the manual) |
+
+Gal drafts the upstream Discussion and posts it under their own name.
+
+### What 8 and 9 change
+
+**How a sideloaded build is signed.** An AltStore / SideStore install is re-signed on the player's device with the
+*player's own* Apple ID; the developer's signature isn't what runs. So the release can be an **unsigned `.ipa`**
+attached to the GitHub release, and Gal's account is then needed only for development builds, not for players.
+Distribution ways, by what they need:
+
+| Way | Account | Who can install | Builds expire |
+|---|---|---|---|
+| AltStore / SideStore with an unsigned `.ipa` | none for us; the player uses their own free Apple ID | anyone, through the AltStore source | the player's free signature: every 7 days (AltStore / SideStore refresh it), at most 3 sideloaded apps on a free ID |
+| Xcode builds to Gal's own iPad | Gal's free or paid account | Gal's registered devices | free account: 7 days; paid: a year |
+| Ad hoc `.ipa` signed by Gal | paid ($99 / year) | up to 100 registered devices per device type a year | a year |
+| AltStore PAL (EU alternative marketplace) | paid, under Apple's EU terms; builds notarized by Apple | EU players | none while notarized |
+
+**CI signing.** For unsigned `.ipa`s, upstream CI needs no Apple secrets at all: a macOS job builds with
+`CODE_SIGNING_ALLOWED=NO` and packs `Payload/PokeDaisy.app` into a zip. Signed builds (ad hoc, PAL) would put Gal's
+certificate (`.p12`), its password and a provisioning profile into an upstream `ios-release` environment that only
+the maintainer's release tags reach, like `KEYSTORE_BASE64` for Android. That ties upstream releases to secrets only
+Gal can renew, which is why the unsigned route fits a repo Gal doesn't own better.
+
+**Updates.** The Android app updates itself from GitHub releases (`AppUpdater`). The iOS equivalent is an **AltStore
+source**: a small JSON file listing versions and `.ipa` URLs, which AltStore and SideStore poll. It can live on the
+website (deployed with each release, per the site's rule) or in the repo. The app itself can't install updates, but it
+can say one is out (the update check stays, without the download).
+
+**Trademark and review risk.** No App Store review means no rejection over the name, the "Pokémon" text or the ROM
+import flow, and guideline 4.7 no longer applies. The trademark risk moves to a takedown notice against the hosted
+`.ipa` or the AltStore source, which is the exposure the Android APK on GitHub already has. AltStore PAL would bring
+back Apple's notarization review, a lighter one.
+
+**What sideloading reopens**:
+- **JIT.** A sideloaded app can get executable memory only while a debugger is attached (tools like StikDebug do it
+  on the device). That would allow armGBA's recompiler and melonDS / DSperate's JIT, but it needs a helper the player
+  sets up, and Apple's changes across iOS versions have broken it before. Not reliable enough to depend on.
+- **DS games** (decision 7) become more plausible with a JIT, but stay gated on the same benchmark.
+- **The self-update check** (above) and a looser release cadence (no review wait).
+- Nothing else: the sandbox, files, background rules and APIs are the same as for an App Store app.
+
+**What it costs**: a much smaller audience (AltStore or SideStore setup, a computer for the first install, the
+7-day refresh and 3-app limit on free IDs), and no TestFlight for beta testers.
+
+**New questions** (not decided here):
+1. Unsigned `.ipa` through an AltStore source (recommended above), or Gal-signed ad hoc builds?
+2. A paid Apple account at all, now or later (needed for TestFlight, ad hoc, AltStore PAL, a later App Store move)?
+3. Where the AltStore source lives (pokedaisy.com, the repo, a release asset) and who publishes it with each release.
+4. Use a JIT when a debugger is attached, or interpreter only? (The plan assumes interpreter only for the first release.)
+5. If the app moves to the App Store later, under whose account (an app can be transferred between paid accounts)?
+
 ## 4. What exists today and how it folds in
 
 - **The iPad proof of concept** (fork branch `claude/project-thread-b6fnra`, draft PR #3 on the fork, kept there, not
@@ -197,8 +265,9 @@ companion, the TV as the game: the two-screen code path with `UIScene`s), Stage 
 "On iPad" note wherever a feature differs, and the website lists iOS only once a release is live.
 
 **PR 14. Crash reports** (Firebase Crashlytics for iOS, opt-in exactly as on Android, `GoogleService-Info.plist`
-from a secret, never committed) and **PR 15. Release**: TestFlight builds from a protected workflow like
-`release.yml`, the maintainer's approval as for Android.
+from a secret, never committed) and **PR 15. Release**: with Gal's proposal 9, an unsigned `.ipa` built by a macOS
+job of `release.yml` on the maintainer's tag and attached to the GitHub release, plus the AltStore source updated
+with it (section 3b). Signed or store builds only if the new questions there say so.
 
 **Later: co-op** (behind its flag on Android too): X25519 from CryptoKit instead of Bouncy Castle (the only use is
 `CoopKeys.kt`), AES-GCM / HMAC / SHA-256 from CryptoKit behind an `expect`, Bonjour (`NWBrowser`) instead of Android
@@ -231,11 +300,12 @@ backend or a Metal port.
 3. **`PokeDaisyActivity` / `EmulatorEngine`**: without the `GameSession` split the iOS shell would grow a second copy
    of them.
 4. **Pixel-exact text and per-glyph font fallback on Skia**: the app's whole look depends on it.
-5. **App Store review** of the name and the ROM import flow.
+5. **Distribution**: sideloading keeps the audience small, and a takedown notice against the `.ipa` or the AltStore
+   source replaces App Store review as the trademark risk (section 3b).
 6. **DS speed without a JIT.**
 
 ## 8. Open questions for Gal
 
 - iPad only for the first release, or iPhone too (mostly the upright layout)?
 - Minimum iOS: 16 keeps `GCController`, Stage Manager and `AVAudioSourceNode` simple and covers the iPad mini.
-- Whether Gal or the maintainer opens the upstream Discussion for section 3.
+- The five new questions in section 3b (signing, a paid account, the AltStore source, JIT, a later App Store move).
