@@ -36,7 +36,7 @@ internal fun s32le(b: ByteArray, off: Int): Int =
     (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8) or ((b[off + 2].toInt() and 0xFF) shl 16) or (b[off + 3].toInt() shl 24)
 
 /** [v] as 4 little-endian bytes. */
-fun le32(v: Int): ByteArray = byteArrayOf(v.toByte(), (v ushr 8).toByte(), (v ushr 16).toByte(), (v ushr 24).toByte())
+internal fun le32(v: Int): ByteArray = byteArrayOf(v.toByte(), (v ushr 8).toByte(), (v ushr 16).toByte(), (v ushr 24).toByte())
 
 /** [v] as 4 big-endian bytes. */
 internal fun be32(v: Int): ByteArray = byteArrayOf((v ushr 24).toByte(), (v ushr 16).toByte(), (v ushr 8).toByte(), v.toByte())

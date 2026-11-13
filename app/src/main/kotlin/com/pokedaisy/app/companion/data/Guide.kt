@@ -277,12 +277,12 @@ private fun wholeGuide(id: GuideId?): GameGuide? = when (id) {
 }
 
 // Small builders so the per-game files read like the content they hold.
-fun page(title: String, vararg sections: GuideSection) = GuidePage(title, sections.toList())
-fun section(heading: String, vararg entries: GuideEntry) = GuideSection(heading, entries.toList())
+internal fun page(title: String, vararg sections: GuideSection) = GuidePage(title, sections.toList())
+internal fun section(heading: String, vararg entries: GuideEntry) = GuideSection(heading, entries.toList())
 /** A section that holds only on an unrandomized game, or only on a randomized one ([Randomized]). */
-fun section(heading: String, randomized: Randomized, vararg entries: GuideEntry) =
+internal fun section(heading: String, randomized: Randomized, vararg entries: GuideEntry) =
     GuideSection(heading, entries.toList(), randomized = randomized)
-fun entry(
+internal fun entry(
     title: String, answer: String, hint: String? = null, have: Have? = null, areas: List<String> = emptyList(),
     randomized: Randomized = Randomized.ANY,
 ) = GuideEntry(title, answer, hint, have, areas = areas, randomized = randomized)
