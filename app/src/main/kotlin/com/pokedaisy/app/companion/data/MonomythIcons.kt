@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.ByteArrayOutputStream
+
 /**
  * Pokémon Monomyth's packed party icons ([IconTables.monIconPacked]): gMonIconTable points at a blob per species, not at
  * vanilla's raw 1 KB of tiles. Its sprite copy queue hands a frame to an ARM decoder it runs from the stack (0x081C4284,
@@ -41,7 +43,7 @@ internal object MonomythIcons {
         val streams = dict + dictTiles * 32
         val table = streams + frame * 6
         val data = (streams + frames * 6 + 3) and 3.inv()
-        val out = java.io.ByteArrayOutputStream(FRAME_BYTES)
+        val out = ByteArrayOutputStream(FRAME_BYTES)
         fun put32(w: Long) { for (k in 0 until 4) out.write(((w shr (8 * k)) and 0xFF).toInt()) }
         // Word, halfword and byte streams: the frame's own, or a record's for one tile.
         class Streams(var w: Int, var h: Int, var b: Int)

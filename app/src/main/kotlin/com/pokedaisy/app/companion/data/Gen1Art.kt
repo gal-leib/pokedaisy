@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
+import com.pokedaisy.app.platform.File
 import java.security.MessageDigest
 
 /**

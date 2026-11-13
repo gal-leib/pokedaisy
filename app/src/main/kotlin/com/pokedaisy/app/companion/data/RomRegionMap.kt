@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.io.RandomAccessFile
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
  * A FireRed-engine hack's own region map - Unbound's Borrius, Odyssey's,

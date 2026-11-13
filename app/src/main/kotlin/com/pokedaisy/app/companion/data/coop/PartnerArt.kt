@@ -5,7 +5,7 @@ import com.pokedaisy.app.companion.data.LookBlob
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.LookPart
 import com.pokedaisy.app.companion.data.PlayerLook
-import java.io.File
+import com.pokedaisy.app.platform.File
 import java.util.zip.CRC32
 
 /**

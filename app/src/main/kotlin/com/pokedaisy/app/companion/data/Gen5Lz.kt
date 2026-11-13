@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.RandomAccessFile
+import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
  * The DS's compression as Black / White's cart uses it: the BIOS's LZ77 (type 0x10) and its LZ11 variant (0x11) for

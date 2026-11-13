@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
+import com.pokedaisy.app.platform.File
 
 /**
  * HeartGold / SoulSilver's Pokégear map on the MAP tab, put together the way the game does (overlay_101_021E9270.c's

@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.io.RandomAccessFile
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
  * Whether the game has its region map (Town Map, Fly map, a wall map, the

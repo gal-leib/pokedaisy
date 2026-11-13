@@ -1,8 +1,9 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.pokedaisy.app.platform.ByteBuffer
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.byteBufferWrap
 
 /**
  * PLAYER LOOK's Pokémon and the FOLLOWER: each species' overworld sprite (a following Pokémon's: 32x32, two frames each
@@ -53,7 +54,7 @@ object MonArt {
     private class Reader(val source: Source, val mon: (Int) -> Raw?)
 
     private class Rom(val b: ByteArray) {
-        val buf: ByteBuffer = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN)
+        val buf: ByteBuffer = byteBufferWrap(b).order(LITTLE_ENDIAN)
         fun ok(o: Int, n: Int = 4) = o >= 0 && o + n <= b.size
         fun u16(o: Int) = if (ok(o, 2)) buf.getShort(o).toInt() and 0xFFFF else -1
         fun s16(o: Int) = if (ok(o, 2)) buf.getShort(o).toInt() else -1

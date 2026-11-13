@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
+import com.pokedaisy.app.platform.File
 
 /**
  * BEST EFFORT for a ROM the companion doesn't know (an unrecognised hash): read the running game

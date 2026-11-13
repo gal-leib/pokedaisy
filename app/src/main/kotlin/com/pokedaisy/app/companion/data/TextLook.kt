@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
+import com.pokedaisy.app.platform.File
 
 /** A piece of a game's text look: the dialogue box's tiles and palette, the normal font's glyphs and their widths. */
 enum class TextPart { BOX, BOX_PAL, FONT, FONT_WIDTHS }

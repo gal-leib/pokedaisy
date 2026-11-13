@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data.coop
 
-import java.io.File
+import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.IOException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -57,7 +58,7 @@ class FileCatchStore(private val file: File, private val io: Executor = defaultI
     private fun load() {
         if (loaded) return
         loaded = true
-        val lines = try { if (file.exists()) file.readLines() else emptyList() } catch (e: java.io.IOException) { emptyList() }
+        val lines = try { if (file.exists()) file.readLines() else emptyList() } catch (e: IOException) { emptyList() }
         for (line in lines) {
             val p = line.split(' ')
             try {
@@ -87,7 +88,7 @@ class FileCatchStore(private val file: File, private val io: Executor = defaultI
             val tmp = File(file.parentFile, file.name + ".tmp")
             tmp.writeText(text)
             if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
-        } catch (e: java.io.IOException) { /* kept in memory; written with the next change */ }
+        } catch (e: IOException) { /* kept in memory; written with the next change */ }
     }
 
     private fun hex(s: String) = ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
