@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
+import androidx.compose.ui.graphics.ImageBitmap
 import com.pokedaisy.app.companion.data.LockedMap
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.ui.draw.drawWithContent
@@ -60,7 +61,6 @@ import com.pokedaisy.app.companion.data.RomArt
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -662,7 +662,7 @@ fun ItemsBackdrop(game: GameKind, modifier: Modifier = Modifier) {
     val m = rememberGbaTextMetrics()
     val context = LocalContext.current
     val gen = rememberArtGeneration()
-    val art = remember(pal.backdropArt, gen) { pal.backdropArt?.let { GameArt.get(context, it)?.asImageBitmap() } }
+    val art = remember(pal.backdropArt, gen) { pal.backdropArt?.let { GameArt.get(context, it) } }
     // Dark mode: an image backdrop (SoulGold's night sky) under the game backdrops' scrim; stripes come pre-dimmed.
     val scrim = OptionColors.backdropScrim
     // HeartGold / SoulSilver: the band behind the pocket buttons, laid out in root pixels by HgssBagBody.
@@ -1094,7 +1094,7 @@ private fun hgssPocketItem(pocket: Int?): Int? = when (pocket) {
 
 /** One of the bag's pocket buttons from the cart ([NdsArt.heartGoldPocket]), [open] or not; null before the art is in. */
 @Composable
-private fun hgssPocketArt(pocket: Int, open: Boolean): android.graphics.Bitmap? {
+private fun hgssPocketArt(pocket: Int, open: Boolean): ImageBitmap? {
     val context = LocalContext.current
     val gen = rememberArtGeneration()
     return remember(pocket, open, gen) { GameArt.get(context, "${NdsArt.heartGoldPocket(pocket, open)}.png") }
@@ -1102,18 +1102,18 @@ private fun hgssPocketArt(pocket: Int, open: Boolean): android.graphics.Bitmap? 
 
 /** The FAVORITES button in the pocket buttons' own look: a pocket button ([open] or not) with its icon painted out by
  * the fill each row has at its left edge, cached per button. */
-private val hgssBlankButtons = LockedMap<android.graphics.Bitmap, android.graphics.Bitmap>()
+private val hgssBlankButtons = LockedMap<ImageBitmap, ImageBitmap>()
 
-private fun hgssBlankButton(button: android.graphics.Bitmap): android.graphics.Bitmap = hgssBlankButtons.getOrPut(button) {
+private fun hgssBlankButton(button: ImageBitmap): ImageBitmap = hgssBlankButtons.getOrPut(button) {
     val w = button.width
     val px = IntArray(w * button.height)
-    button.getPixels(px, 0, w, 0, 0, w, button.height)
+    button.readPixels(px, 0, 0, w, button.height)
     val inset = 3
     for (y in inset until button.height - inset) {
         val fill = px[y * w + inset]
         for (x in inset until w - inset) px[y * w + x] = fill
     }
-    android.graphics.Bitmap.createBitmap(px, w, button.height, android.graphics.Bitmap.Config.ARGB_8888)
+    imageBitmapOf(px, w, button.height)
 }
 
 /**
@@ -1174,7 +1174,7 @@ private fun HgssBagBody(
                 ) {
                     when {
                         art != null -> Image(
-                            bitmap = (if (gamePocket >= 0) art else hgssBlankButton(art)).asImageBitmap(), contentDescription = null,
+                            bitmap = (if (gamePocket >= 0) art else hgssBlankButton(art)), contentDescription = null,
                             filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize(),
                         )
                         // No cart art yet: a drawn button, the item standing in for the pocket's icon.

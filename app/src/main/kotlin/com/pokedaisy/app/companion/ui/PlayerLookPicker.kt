@@ -1,6 +1,5 @@
 package com.pokedaisy.app.companion.ui
 
-import android.graphics.Bitmap
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -38,7 +37,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -99,7 +97,7 @@ internal fun PlayerLookPicker(
                     val c = LookChar.byName(name) ?: return@mapNotNull null
                     runCatching { LookArt.walk(context.filesDir.toOkioPath(), c) }.getOrNull() ?: return@mapNotNull null
                 }
-                name to frames.map { Bitmap.createBitmap(it.argb, it.width, it.height, Bitmap.Config.ARGB_8888).asImageBitmap() }
+                name to frames.map { imageBitmapOf(it.argb, it.width, it.height) }
             }.toMap()
         }
     }.value

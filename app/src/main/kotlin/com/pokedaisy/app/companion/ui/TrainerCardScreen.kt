@@ -5,7 +5,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.pokedaisy.app.companion.i18n.tr
-import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -28,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -96,7 +94,7 @@ fun TrainerCardScreen(card: TrainerCardInfo, art: TrainerCardArt.Art, modifier: 
         val img = TrainerCardArt.render(art, card, back, colon, backdrop = false, pic = lookPic)
         val (l, t, r, b) = TrainerCardArt.cardBounds(img).toList()
         val px = IntArray((r - l) * (b - t)) { img.argb[(t + it / (r - l)) * img.width + l + it % (r - l)] }
-        Bitmap.createBitmap(px, r - l, b - t, Bitmap.Config.ARGB_8888).asImageBitmap().also { renders[if (colon) 1 else 0] = it }
+        imageBitmapOf(px, r - l, b - t).also { renders[if (colon) 1 else 0] = it }
     }
     val squash = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()

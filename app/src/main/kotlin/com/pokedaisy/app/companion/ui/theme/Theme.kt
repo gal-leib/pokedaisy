@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.ui.theme
 
+import com.pokedaisy.app.companion.ui.imageBitmapOf
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawOutline
@@ -30,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -526,12 +527,12 @@ private val EMERALD_BACKDROP = intArrayOf(0xFFCED67B.toInt(), 0xFFB5B55A.toInt()
 
 /** [bmp] (FireRed's backdrop, or another whose colours are [from]) with [from] swapped for [to]; or, with no art yet,
  * its stripes alone. */
-private fun recolorBackdrop(bmp: android.graphics.Bitmap?, to: IntArray, from: IntArray = FIRERED_BACKDROP): android.graphics.Bitmap {
+private fun recolorBackdrop(bmp: ImageBitmap?, to: IntArray, from: IntArray = FIRERED_BACKDROP): ImageBitmap {
     val w = bmp?.width ?: 240
     val h = bmp?.height ?: 160
     val px = IntArray(w * h)
     if (bmp != null) {
-        bmp.getPixels(px, 0, w, 0, 0, w, h)
+        bmp.readPixels(px, 0, 0, w, h)
         for (i in px.indices) {
             val k = from.indexOf(px[i] or (0xFF shl 24))
             if (k >= 0) px[i] = to[k]
@@ -539,7 +540,7 @@ private fun recolorBackdrop(bmp: android.graphics.Bitmap?, to: IntArray, from: I
     } else {
         for (y in 0 until h) px.fill(to[y and 1], y * w, (y + 1) * w)
     }
-    return android.graphics.Bitmap.createBitmap(px, w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    return imageBitmapOf(px, w, h)
 }
 
 @Composable
@@ -571,26 +572,26 @@ private fun buildGameBackground(context: android.content.Context, game: GameKind
     val ghostGrey = game == GameKind.FIRERED && com.pokedaisy.app.companion.data.runningGhostGrey
     if (game.isGameBoyGame || ghostGrey) {
         val paper = if (ghostGrey) -1 else com.pokedaisy.app.companion.ui.OptionColors.gbPaper(game).toArgb()
-        return GameBackground(android.graphics.Bitmap.createBitmap(intArrayOf(paper), 1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap(), false)
+        return GameBackground(imageBitmapOf(intArrayOf(paper), 1, 1), false)
     }
     // Let's Go Pikachu / Eevee: CFRU's party menu with its own grid (RomArt), else CFRU's own.
     if (game == GameKind.FIRERED && com.pokedaisy.app.companion.data.runningLetsGo) {
         sequenceOf(com.pokedaisy.app.companion.data.RomArt.LETS_GO_BACKDROP, com.pokedaisy.app.companion.data.RomArt.CFRU_BACKDROP)
-            .firstNotNullOfOrNull { GameArt.get(context, it) }?.let { return GameBackground(it.asImageBitmap(), true) }
+            .firstNotNullOfOrNull { GameArt.get(context, it) }?.let { return GameBackground(it, true) }
     }
     // Sword and Shield Ultimate Plus: CFRU's grid in its own red, one 32px cell tiled (RomArt).
     if (game == GameKind.SWORD_SHIELD) {
-        GameArt.get(context, com.pokedaisy.app.companion.data.RomArt.SWSH_BACKDROP)?.let { return GameBackground(it.asImageBitmap(), true) }
+        GameArt.get(context, com.pokedaisy.app.companion.data.RomArt.SWSH_BACKDROP)?.let { return GameBackground(it, true) }
     }
     backdropColors(game)?.let { to ->
-        return GameBackground(recolorBackdrop(GameArt.get(context, "partybg/firered.png"), to).asImageBitmap(), false)
+        return GameBackground(recolorBackdrop(GameArt.get(context, "partybg/firered.png"), to), false)
     }
     // Team Rocket Edition: Dragonsden's party menu is Emerald's backdrop in FireRed's three teals (sampled headless):
     // FireRed's own art where a FireRed ROM has made it, else Emerald's recoloured.
     if (game == GameKind.TEAM_ROCKET) {
-        GameArt.get(context, "partybg/firered.png")?.let { return GameBackground(it.asImageBitmap(), false) }
+        GameArt.get(context, "partybg/firered.png")?.let { return GameBackground(it, false) }
         GameArt.get(context, "partybg/emerald.png")?.let {
-            return GameBackground(recolorBackdrop(it, FIRERED_BACKDROP, from = EMERALD_BACKDROP).asImageBitmap(), false)
+            return GameBackground(recolorBackdrop(it, FIRERED_BACKDROP, from = EMERALD_BACKDROP), false)
         }
     }
     val (asset, tiled) = when (game) {
@@ -607,7 +608,7 @@ private fun buildGameBackground(context: android.content.Context, game: GameKind
     // game's own is there, FireRed's or Emerald's if one of those is (untiled).
     val bmp = sequenceOf(asset, "partybg/firered.png", "partybg/emerald.png").distinct()
         .firstNotNullOfOrNull { path -> GameArt.get(context, path)?.let { it to (tiled && path == asset) } }
-    return bmp?.let { (b, tile) -> GameBackground(b.asImageBitmap(), tile) }
+    return bmp?.let { (b, tile) -> GameBackground(b, tile) }
 }
 
 /**
