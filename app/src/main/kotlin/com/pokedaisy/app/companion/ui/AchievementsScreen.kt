@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.ui
 
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import android.graphics.Bitmap
@@ -158,7 +160,7 @@ enum class AchievementFilter(val label: String, val short: String) {
 /** A request to open the list on achievement [id] (a tapped unlock / progress popup), marked as the
  * cursor row; [unlocked] = it's an unlock, so a LOCKED filter would hide it. [id] 0 = just the list. */
 class AchievementFocus(val id: Int, val unlocked: Boolean) {
-    val at = System.nanoTime()
+    val at = TimeSource.Monotonic.markNow()
 }
 
 /**
@@ -290,7 +292,7 @@ private fun AchievementList(
     // reported (it moves up to RECENTLY UNLOCKED), but not later, under a player scrolling.
     LaunchedEffect(marked, target) {
         val f = marked ?: return@LaunchedEffect
-        if (target >= 0 && System.nanoTime() - f.at < FOLLOW_MARKED_NANOS) listState.animateScrollToItem(target)
+        if (target >= 0 && f.at.elapsedNow() < FOLLOW_MARKED) listState.animateScrollToItem(target)
     }
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -711,4 +713,4 @@ object AchievementIcons {
 }
 
 /** How long the list keeps scrolling to a popup's achievement as it re-sorts (see [AchievementList]). */
-private const val FOLLOW_MARKED_NANOS = 3_000_000_000L
+private val FOLLOW_MARKED = 3.seconds
