@@ -52,6 +52,8 @@ private val trace = System.getProperty("trace") == "1"
 private var desktopDispatchNpes = 0
 
 fun main() {
+    // The app sets this at start (PokeDaisyApp): the screens find the art under it.
+    com.pokedaisy.app.companion.data.RomArt.filesDir = okio.Path.Companion.run { android.content.Context().filesDir.toOkioPath() }
     romArt()
     val game = GameKind.valueOf(System.getProperty("game") ?: "FIRERED")
     activeGame = game

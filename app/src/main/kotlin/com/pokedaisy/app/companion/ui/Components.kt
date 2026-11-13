@@ -62,10 +62,9 @@ private fun rememberTypeTags(): androidx.compose.ui.graphics.ImageBitmap? {
         game == com.pokedaisy.app.companion.data.GameKind.EMERALD -> com.pokedaisy.app.companion.data.RomArt.TYPE_TAGS_EMERALD
         else -> null
     } ?: return null
-    val context = androidx.compose.ui.platform.LocalContext.current
     val generation = rememberArtGeneration()
     return androidx.compose.runtime.remember(path, generation) {
-        GameArt.get(context, path)
+        GameArt.get(path)
     }
 }
 
