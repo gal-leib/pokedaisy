@@ -49,7 +49,7 @@ internal object GameArt {
         val gen = RomArt.updates.value
         if (missing[path] == gen) return null
         val bmp = try {
-            RomArt.file(context.filesDir.toOkioPath(), path)?.let { f -> BitmapFactory.decodeFile(f.toString()) }
+            RomArt.file(context.filesDir?.toOkioPath(), path)?.let { f -> BitmapFactory.decodeFile(f.toString()) }
                 ?: context.assets.open(path).use { BitmapFactory.decodeStream(it) }
         } catch (e: Exception) {
             null

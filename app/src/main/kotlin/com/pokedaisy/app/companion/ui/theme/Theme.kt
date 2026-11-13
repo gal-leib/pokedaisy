@@ -416,7 +416,7 @@ fun rememberGameFont(game: GameKind?): FontFamily? {
             GameKind.GOLD, GameKind.SILVER -> com.pokedaisy.app.companion.data.Gen2Art.GOLD_SILVER_FONT
             else -> null
         } ?: return@remember null
-        com.pokedaisy.app.companion.data.RomArt.file(context.filesDir.toOkioPath(), path)?.let { com.pokedaisy.app.gameFontFamily(context, it.toFile()) }
+        com.pokedaisy.app.companion.data.RomArt.file(context.filesDir?.toOkioPath(), path)?.let { com.pokedaisy.app.gameFontFamily(context, it.toFile()) }
     }
 }
 
