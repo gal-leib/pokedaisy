@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion
 
+import com.pokedaisy.app.companion.data.fixed
 import androidx.compose.ui.geometry.Rect
 import com.pokedaisy.app.companion.i18n.tk
 
@@ -159,8 +160,8 @@ data class TouchLayout(val places: Map<TouchButton, TouchPlace> = emptyMap()) {
 
     /** Stored as `NAME:ax,dx,ay,dy,scale,hidden;...` ([com.pokedaisy.app.Prefs.touchLayoutFor]). */
     fun encode(): String = places.entries.joinToString(";") { (b, p) ->
-        "${b.name}:${p.ax.ordinal},${"%.1f".format(java.util.Locale.ROOT, p.dx)},${p.ay.ordinal},${"%.1f".format(java.util.Locale.ROOT, p.dy)}," +
-            "${"%.2f".format(java.util.Locale.ROOT, p.scale)},${if (p.hidden) 1 else 0}"
+        "${b.name}:${p.ax.ordinal},${p.dx.toDouble().fixed(1)},${p.ay.ordinal},${p.dy.toDouble().fixed(1)}," +
+            "${p.scale.toDouble().fixed(2)},${if (p.hidden) 1 else 0}"
     }
 
     companion object {
