@@ -439,7 +439,7 @@ class LibraryActivity : ComponentActivity() {
         identifyGames()
         updates.onResume()
         // The manual (Settings > HELP), fetched in the background so it's there offline later.
-        if (com.pokedaisy.app.companion.ui.DocsSources.override == null) DocsStore.prefetch(this)
+        if (com.pokedaisy.app.companion.ui.DocsSources.current is StoreDocsSource) DocsStore.prefetch(this)
         bump()   // refresh list / PLAYING marker after returning
         launcher.mediaChanged()   // Settings may have fetched some
         syncLauncher()

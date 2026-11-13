@@ -212,7 +212,7 @@ class SettingsActivity : ComponentActivity() {
 
     /** HELP: the manual (DocsScreen.kt), its place kept while Settings is open. */
     private val docsUi = com.pokedaisy.app.companion.ui.DocsUiState()
-    private val docsSource by lazy { com.pokedaisy.app.companion.ui.DocsSources.of(this) }
+    private val docsSource by lazy { com.pokedaisy.app.companion.ui.DocsSources.get() }
     /** Opened straight on HELP (the library's ? button): BACK from its contents leaves. */
     private var helpOnly = false
 
