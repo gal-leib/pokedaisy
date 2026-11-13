@@ -17,8 +17,8 @@ those ports it is a rewrite, not the Android app recompiled: the Swift app here 
 
 ## Layout
 
-Landscape: the companion on the right at the largest whole scale that fits 42% of the width, the game left of it as wide
-as the rest, the buttons under the game. Portrait: the game across the top, the companion under it with the D-pad and
+Landscape: the game and the companion side by side (the companion at the largest whole scale that fits half the width),
+centred over a row of buttons along the bottom: the D-pad under the left thumb, A / B under the right. Portrait: the game across the top, the companion under it with the D-pad and
 A / B either side. The game sits on a 400x240 "top screen" as on the 3DS, so the HUD, QUICK MENU and EXPAND's window line
 up with it unchanged.
 

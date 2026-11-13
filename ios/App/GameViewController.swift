@@ -125,23 +125,33 @@ final class GameViewController: UIViewController, MTKViewDelegate {
         let pad: CGFloat = min(170, max(120, min(b.width, b.height) * 0.2))
         let ab: CGFloat = pad * 0.42
         if b.width > b.height {
-            let s = companionScale(b.width * 0.42, b.height - 2 * m)
-            comp = CGRect(x: b.maxX - m - 320 * s, y: b.minY + m, width: 320 * s, height: 240 * s)
-            let gw = comp.minX - b.minX - 2 * m
-            game = CGRect(x: b.minX + m, y: b.minY + m, width: gw, height: gw * 0.6)
-            let area = CGRect(x: game.minX, y: game.maxY + m, width: gw, height: b.maxY - game.maxY - 2 * m)
-            let cy = area.midY
+            // The buttons along the bottom (D-pad under the left thumb, A / B under the right), the game and the
+            // companion side by side over them, the pair centred in the height that's left.
+            let rowH: CGFloat = 34
+            let controlsH = pad + rowH + 2 * m
+            let topH = b.height - controlsH - m
+            let s = companionScale(b.width * 0.5 - 1.5 * m, topH)
+            let cw = 320 * s, ch = 240 * s
+            let gw = b.width - cw - 3 * m
+            let gh = min(gw * 0.6, topH)
+            let bandH = max(ch, gh)
+            let bandY = b.minY + m + (topH - bandH) / 2
+            comp = CGRect(x: b.maxX - m - cw, y: bandY + (bandH - ch) / 2, width: cw, height: ch)
+            let gameW = gh / 0.6
+            game = CGRect(x: b.minX + m + (gw - gameW) / 2, y: bandY + (bandH - gh) / 2, width: gameW, height: gh)
+            let area = CGRect(x: b.minX + m, y: b.maxY - controlsH, width: b.width - 2 * m, height: controlsH - m)
+            let cy = area.maxY - pad / 2
             buttons[.dpad] = CGRect(x: area.minX + m, y: cy - pad / 2, width: pad, height: pad)
             buttons[.a] = CGRect(x: area.maxX - m - ab, y: cy - ab * 1.1, width: ab, height: ab)
             buttons[.b] = CGRect(x: area.maxX - m - ab * 2.2, y: cy - ab * 0.1, width: ab, height: ab)
-            buttons[.l] = CGRect(x: area.minX + m, y: area.minY, width: 90, height: 34)
-            buttons[.r] = CGRect(x: area.maxX - m - 90, y: area.minY, width: 90, height: 34)
-            let rowY = area.maxY - 34
-            buttons[.select] = CGRect(x: area.midX - 130, y: rowY, width: 80, height: 30)
-            buttons[.start] = CGRect(x: area.midX - 40, y: rowY, width: 80, height: 30)
-            buttons[.quick] = CGRect(x: area.midX + 50, y: rowY, width: 80, height: 30)
-            buttons[.ff] = CGRect(x: comp.minX, y: comp.maxY + m, width: 70, height: 30)
-            buttons[.close] = CGRect(x: comp.maxX - 80, y: comp.maxY + m, width: 80, height: 30)
+            buttons[.l] = CGRect(x: area.minX + m, y: area.minY, width: 90, height: rowH)
+            buttons[.r] = CGRect(x: area.maxX - m - 90, y: area.minY, width: 90, height: rowH)
+            let rowY = cy - 15
+            buttons[.select] = CGRect(x: area.midX - 215, y: rowY, width: 80, height: 30)
+            buttons[.start] = CGRect(x: area.midX - 125, y: rowY, width: 80, height: 30)
+            buttons[.quick] = CGRect(x: area.midX - 35, y: rowY, width: 80, height: 30)
+            buttons[.ff] = CGRect(x: area.midX + 55, y: rowY, width: 70, height: 30)
+            buttons[.close] = CGRect(x: area.midX + 135, y: rowY, width: 80, height: 30)
         } else {
             let gw = b.width - 2 * m
             game = CGRect(x: b.minX + m, y: b.minY + m, width: gw, height: gw * 0.6)
