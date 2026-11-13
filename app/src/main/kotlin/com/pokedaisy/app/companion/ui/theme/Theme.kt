@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.pokedaisy.app.companion.ui.imageBitmapOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.translate
@@ -223,9 +224,8 @@ fun themeToWear(id: Int, before: Int, date: kotlinx.datetime.LocalDate = ThemeCl
 }
 
 /** Puts on [spec] on both screens and saves it; a limited-time one remembers the theme it replaced, to go back to. */
-fun pickTheme(context: android.content.Context, spec: ThemeSpec) {
-    runCatching {
-        val prefs = com.pokedaisy.app.Prefs(context)
+fun pickTheme(spec: ThemeSpec) {
+    ThemeStore.current?.let { prefs ->
         val was = themeById(prefs.appTheme)
         if (spec.season != null && was.season == null) prefs.themeBeforeSeasonal = was.id
         prefs.appTheme = spec.id
@@ -234,8 +234,8 @@ fun pickTheme(context: android.content.Context, spec: ThemeSpec) {
 }
 
 /** The saved theme ([themeToWear]: a limited one that has ended gives way), put on and saved again if it changed. */
-fun loadTheme(context: android.content.Context) {
-    val prefs = runCatching { com.pokedaisy.app.Prefs(context) }.getOrNull()
+fun loadTheme() {
+    val prefs = ThemeStore.current
     val spec = prefs?.let { themeToWear(it.appTheme, it.themeBeforeSeasonal) } ?: themeById(DAISY_THEME_ID)
     if (prefs != null && prefs.appTheme != spec.id) runCatching { prefs.appTheme = spec.id }
     AppColors.applyTheme(spec)
@@ -434,12 +434,14 @@ fun AppTheme(content: @Composable () -> Unit) {
     // stomped the just-picked theme back to whatever it was on first launch —
     // selecting a theme visibly never stuck. remember{} only runs its block
     // once (until its key changes), so this only "loads from disk" at startup.
-    val context = LocalContext.current
-    remember(context) {
-        // runCatching: previews / screenshot tests may have no real prefs.
-        runCatching { loadTheme(context) }
-        runCatching { DarkMode.load(context) }
+    remember {
+        // runCatching: a store that can't be read leaves the defaults (previews and screenshot tests have none).
+        runCatching { loadTheme() }
+        runCatching { DarkMode.load() }
     }
+    // AUTO dark mode follows the device's.
+    val systemDark = isSystemInDarkTheme()
+    remember(systemDark) { DarkMode.systemDark = systemDark }
 
     val pixel = pixelFontFamily()
     // lineHeight in em so a Text() that overrides fontSize keeps a

@@ -15,6 +15,13 @@ class PokeDaisyApp : Application() {
         com.pokedaisy.app.companion.data.Logs.sink = com.pokedaisy.app.companion.data.Logs.Sink { tag, warning, message, error ->
             if (warning) android.util.Log.w(tag, message, error) else android.util.Log.i(tag, message)
         }
+        // THEME and DARK MODE are saved in the app's Prefs.
+        val themePrefs = Prefs(this)
+        com.pokedaisy.app.companion.ui.theme.ThemeStore.current = object : com.pokedaisy.app.companion.ui.theme.ThemeStore {
+            override var appTheme by themePrefs::appTheme
+            override var themeBeforeSeasonal by themePrefs::themeBeforeSeasonal
+            override var darkMode by themePrefs::darkMode
+        }
         // The NEW tags' week starts with the first launch of a build that has the feature.
         com.pokedaisy.app.companion.NewFeatures.init(Prefs(this))
         val prefs = Prefs(this)

@@ -25,7 +25,7 @@ import kotlin.system.exitProcess
  */
 fun main() {
     // The app sets this at start (PokeDaisyApp): the screens find the art under it.
-    com.pokedaisy.app.companion.data.RomArt.filesDir = okio.Path.Companion.run { android.content.Context().filesDir.toOkioPath() }
+    installPreviewHosts()
     val keyed = shownFor { species, show ->
         val v by produceKeyedState(cached(species), species) { if (value == null && species > 0) value = "spots of $species" }
         show(v ?: "reading")
