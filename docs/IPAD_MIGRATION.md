@@ -1,328 +1,241 @@
-# PokeDaisy on iPad: migration plan
+# PokeDaisy on iPad: plan for the full app, merged upstream
 
-A plan for bringing PokeDaisy to iPad (and later iPhone) without forking the app: one Kotlin codebase,
-shared with Android through Kotlin Multiplatform (KMP), its UI drawn by Compose Multiplatform (CMP) on
-iOS, and the same C emulator cores built for Apple platforms. Nothing in this document is built yet; it
-is the order of work, the risks and how each step is checked.
+How to bring the whole PokeDaisy app (not a separate port) to iPad, and later iPhone, through a series of small
+pull requests that the maintainer can review one at a time, that keep the Android app working after every one,
+and that land in the upstream repository rather than living in a fork.
 
-Surveyed on main at `0040e61f` (v1.5.1). Numbers below are from that tree.
+The route: one Kotlin codebase shared with Android through Kotlin Multiplatform (KMP), the companion and the
+top-screen UI drawn by Compose Multiplatform (CMP) on iOS, and the same C cores built for Apple platforms behind a
+thin Swift host. Nothing here is built yet. This is the order of work, what has to be agreed first, the risks and
+how each step is checked.
 
-## Where the code stands
+Surveyed 2026-11-13 on upstream `main` at `0040e61f` (v1.5.1) and upstream `dev` at `05e98fd8`.
 
-| Area | Size | Platform ties |
+## 1. Upstream and how it takes contributions
+
+- **Upstream is `lidor30/pokedaisy`** (public; `gal-leib/pokedaisy` is a GitHub fork of it). Its maintainer is the
+  only code owner (`.github/CODEOWNERS`: `* @lidor30`).
+- **Contributions arrive as pull requests from forks into `dev`**, not `main`. Recent merged examples: #730 and #721
+  (ZTMYO), #704 / #706 / #701 / #686 (DFelten), #709 / #710 / #711 / #718 / #719 (keeganwhitacre, the Linux and
+  handheld work). `dev` is merged into `main` at each release.
+- **The rules a PR meets** (`docs/RELEASING.md`'s "Collaborators with write access", `CLAUDE.md`, the PR template):
+  - one approval from the code owner, dropped again by any new push;
+  - CI green (`.github/workflows/ci.yml`: unit tests, the debug APK, ui-preview's stress and docs-search checks);
+  - the PR template's checklist: the manual (`docs/manual/`) updated for anything a player can notice, changed
+    screens looked at (ui-preview / Paparazzi), `make check` passing;
+  - the repo's standing rules in `CLAUDE.md`: commits carry no AI attribution lines (a local `commit-msg` hook rejects
+    them), new bundled code goes in `NOTICE` and the LICENSES page, workflow actions are pinned to commit SHAs, a new
+    player-facing feature gets a NEW tag, new UI text gets its eight translations, no ROMs, saves or secrets.
+- **It moves fast.** 50 commits reached `dev` on 2026-11-12 and 13 alone, from the maintainer and four outside
+  contributors. Any PR that touches hundreds of files at once will conflict with work in flight; the plan is shaped
+  around that.
+- **There is a precedent for other platforms in-tree**: `3ds/` and `linux/` (with `libretro/`) are ports that live
+  in the same repo, build in their own CI workflows (`linux.yml`, `libretro.yml`) and never get in the Android app's
+  way. An `ios/` folder fits the same pattern.
+
+## 2. Rules for every PR in this plan
+
+1. **Branch from upstream `dev`**, target upstream `dev`. (The fork's `main` equals upstream `main`; its `dev` needs
+   syncing first.)
+2. **The Android app keeps working and looks the same.** Every PR before the iOS app exists is a refactor a player
+   can't see, or one they can see that follows the repo's manual / NEW tag / translation rules like any feature.
+3. **Small and single-purpose.** Hand-written diff under ~500 lines where possible; mechanical changes (renames,
+   API swaps) in their own PRs, with the mechanical rule stated in the description so review is a spot-check.
+4. **No mass file moves while others are working.** Shared code is compiled where it already lives (section 5,
+   PR 6). If a physical move to `shared/src/commonMain` is ever wanted, it is one pure `git mv` PR, timed with the
+   maintainer right after a release.
+5. **CI proves it.** Each PR names its check: an existing test, a new one, or a ui-preview render. Full suites run in
+   CI; locally, `make test-quick` and the tests for the files touched (the repo's testing rule).
+6. **iOS-only code goes under `ios/`** (plus `iosMain` source sets), so the maintainer can merge it without a Mac and
+   Android builds never depend on it.
+
+## 3. What needs the maintainer's agreement before work starts
+
+Raise these together, before the first PR, as one upstream Discussion or issue with a link to this document.
+
+| # | Decision | Why it can't wait |
 |---|---|---|
-| `companion/data` (readers, tables, guides, save editor) | 484 files, ~278k lines (mostly generated tables) | 6 files import `android.*` (all `Bitmap` / `BitmapFactory`: `Gfx.kt`, `Pokedex.kt`, `Gen4Dex.kt`, the icon sources, `save/RomMonIcons.kt`). JVM APIs: `java.io` 29 files, `java.nio` 10, `java.util.zip` 15, `java.util.concurrent` 13, `synchronized` 19, `String.format` 25, `java.time` 5, `Thread(` 7, `MessageDigest` 4 |
-| `companion/i18n` | 16 files, ~2.9k lines | none |
-| `companion/ui` (incl. `ui/theme`) | 88 files, ~34k lines | 11 files: `Bitmap` (10), `BitmapFactory`, `Context`, `Configuration`; one `HttpURLConnection` (`AchievementsScreen.kt`) |
-| `companion/coop` | 26 files | `java.net` sockets, Android NSD, `javax.crypto` (AES-GCM, HMAC, SHA-256), Bouncy Castle (X25519 only, `CoopKeys.kt`), ZXing (`CoopQr.kt`) |
-| App root (`com.pokedaisy.app`, 109 files) | `PokeDaisyActivity` 5,685 lines, `EmulatorEngine` 2,501, `EmulatorView` 1,207, `MgbaCore` 520, `Prefs` 956 | Activities, `GLSurfaceView` + GLES, `AudioTrack`, `Presentation`, SAF / All files access, OkHttp (7 files), `org.json` (8 files), Firebase Crashlytics, the APK updater |
-| Native (`app/src/main/cpp`) | `pokedaisy_jni.c` 2,213 lines (137 JNI exports), `pokedaisy_ra.c` (19), `pk_link_jni.c` (12), `pk_coop_lock_jni.c` (6), plus ~30 `pk_*.c` and `nds/` | mGBA 0.10.5, rcheevos 12.5, melonDS 1.1 (+ patch, ARM64 JIT on, GLES 3), DSperate (JIT on) |
+| 1 | **The route: KMP + Compose Multiplatform for the full app.** The alternative is growing the C ports (the 3DS / Linux companion in `3ds/core/`, which the iPad proof of concept uses) into a full iOS app, a second implementation of every feature. | It decides everything after it, and KMP changes the Android build. |
+| 2 | **Kotlin 2** (from 1.9.24) with the Compose compiler plugin, a newer Compose BOM, Paparazzi past 1.3.4, ui-preview's pins. | `CLAUDE.md` documents the current pins; every later PR depends on it. |
+| 3 | **Shared code compiled in place, no file moves**, with a `:shared` Gradle module that points at the existing folders. | Avoids conflicts with every open PR; changes how the app's Gradle files read. |
+| 4 | **New dependencies**: Ktor client, kotlinx.serialization, multiplatform-settings, kotlinx-io (or Okio), atomicfu, kotlinx-datetime; later CMP itself. | `NOTICE` / LICENSES entries; APK size. |
+| 5 | **Refactors of the big Android classes**: a plain C API under the JNI (`pokedaisy_jni.c`), a `GameSession` split out of `PokeDaisyActivity` / `EmulatorEngine`, the Library and Settings screens split out of their Activities. | These are the maintainer's most edited files. Timing matters as much as approval. |
+| 6 | **CI**: a macOS job (GitHub's hosted runners are free for public repos) that builds the iOS framework and runs the shared tests on the simulator; required or advisory. | Adds minutes to every PR. |
+| 7 | **The Apple side**: who holds the paid Apple Developer account, the bundle id (`com.pokedaisy.*`), signing secrets in a protected `ios-release` environment like the Android `release` one, TestFlight testers. | The proof of concept uses a personal free team; a release can't. |
+| 8 | **App Store risk**: the name and "Pokémon" in the listing (trademark), and whether to ship on the App Store at all or TestFlight / AltStore first. | A store rejection or takedown late in the work wastes it. |
+| 9 | **Scope of the first iOS release**: GBA + Game Boy with the companion; what's left out (DS, co-op, LINK PLAY, the APK updater, the frontend launch intents). | Keeps the manual and the website honest about the iOS build. |
+| 10 | **Who reviews and tests iOS changes**, and on which devices (an iPad mini is in hand). | The code owner reviews everything; iOS PRs need someone who can run them. |
+| 11 | **Docs**: an iOS section in `CLAUDE.md` / `docs/DEVELOPMENT.md` and "On iPad" notes in the manual, in the repo's style. | The manual is the single source for the site and the in-app HELP. |
 
-Two facts make the KMP route realistic:
+## 4. What exists today and how it folds in
 
-1. `ui-preview/` already compiles `companion/**`, `LibraryActivity`, `SettingsActivity` and ~30 more app
-   files on Compose **Desktop** against hand-written shims (`ui-preview/data/shims/`, 16 files, and
-   `ui-preview/src/shims/`, 25 files; 792 lines together). Those shims are an exact list of the Android
-   surface the shared code touches, so they are the map for the `expect` / `actual` layer.
-2. Everything game-specific that's hard (EXPAND, field reads, FLY / PC calls, cheats, rewind, flight,
-   co-op link) is portable C inside the native library, not Kotlin. The 3DS and Linux ports already
-   build most of it without Android.
+- **The iPad proof of concept** (fork branch `claude/project-thread-b6fnra`, draft PR #3 on the fork, kept there, not
+  merged): a Swift app in `ios/` over mGBA and the C companion from `3ds/core/` + `3ds/host/pd_session.c`, running on
+  a real iPad mini. Section 6 lists what carries over.
+- **Kotlin 2** (fork PR #2, branch `claude/project-thread-ic6z3l`): Kotlin 2.4.21, Compose BOM 2025.03.01, Paparazzi
+  1.3.5, ui-preview on the same compiler. Never built for Android: no CI ran on the fork's PRs (Actions look off
+  there) and the cloud session can't reach Google's Maven. It becomes upstream PR 1 below once it has been built.
+- **Shared module WIP** (fork branch `claude/project-thread-5xppq9`, doesn't build): moves 500+ files into `shared/`
+  and adds a platform layer (`platform/Bytes`, `Concurrent`, `Files`, `Image`, `Streams`, `System`, `Text` + an
+  Android actual). The platform layer is kept and re-cut into PRs 4 and 5 below, *without* the move.
 
-The tie that has to be cut first is Kotlin itself: the app is on Kotlin 1.9.24 / Compose compiler
-1.5.14, Paparazzi is pinned to 1.3.4 because of that, and ui-preview to CMP 1.5.12 / Kotlin 1.9.22. A
-current Compose Multiplatform iOS target needs Kotlin 2.x.
+Before any of it goes upstream, on the fork: sync `dev` from upstream, turn on GitHub Actions for the fork if they're off (so
+`ci.yml` builds the Android app on PRs; GitHub's runners reach Google's Maven), and rebase PR #2 on `dev`.
 
-## Target shape
+## 5. The PR sequence
 
-```
-:shared            KMP: commonMain (data, i18n, theme, engine logic, Prefs interface)
-                   androidMain / jvmMain / iosMain (actuals: files, zip, images, prefs, locks, clock)
-:shared-ui         KMP + CMP: companion/ui, Library / Settings screens, resources (fonts, shaders)
-:core-native       C: mGBA + rcheevos + pk_*.c behind one plain C header (pk_api.h)
-                   -> libpokedaisy.so (Android, + thin JNI)  /  PokeDaisyCore.xcframework (iOS, cinterop)
-:app               Android shell (Activities, GL view, AudioTrack, Presentation, updater)
-ios/PokeDaisy      iOS shell (SwiftUI app, Metal view, AVAudioEngine, GCController, document picker)
-ui-preview         stays: the desktop (jvm) target of :shared-ui, now the same sources without copying
-```
+Phases A to C are Android-only refactors (no player sees them), D adds iOS build targets in CI, E is the iOS app.
+Within a phase, PRs can run in parallel where marked.
 
-## Steps
+### Phase A: prerequisites
 
-Each step lands on Android first where it can, so the Android app is the regression test for the
-refactor and nothing ships half-moved. Steps 1 to 4 change no player-visible behaviour on Android.
+**PR 1. Kotlin 2 and current Compose.** Fork PR #2, rebased on `dev`.
+- *Android stays working because*: no source changes beyond what K2 requires; CI builds and tests it.
+- *Check*: CI green; one Paparazzi class and a few `gradle render -Ponly=...` shots by eye; the maintainer plays a
+  session on the Thor (he owns the hardware and the release key).
+- *Risk*: K2 compile differences in ~300k lines; generated `*Gen.kt` tables compiling slower. Split it if review
+  wants (Kotlin + compiler plugin; Paparazzi; ui-preview).
 
-### Step 0. Kotlin 2 and current Compose (Android only)
+**PR 2a to 2e. A plain C API under the JNI** (parallel with Phase B). `pokedaisy_jni.c` (2,213 lines, 137 exports)
+plus `pokedaisy_ra.c`, `pk_link_jni.c`, `pk_coop_lock_jni.c` become `pk_api.c` / `pk_api.h` (plain C types and
+callbacks) and thin JNI files that only convert arguments. One PR per area: core and frames; memory reads and writes;
+states, saves and rewind; RetroAchievements; cheats, patches, link and co-op.
+- *Android stays working because*: `MgbaCore.kt`'s `external` functions keep their signatures.
+- *Check*: `make test-quick`; the native builds that already compile the `pk_*.c` without JNI (`native-capture`,
+  `libretro/test`); a script that every `pk_api.h` function has one JNI caller; a session of FireRed, Emerald, Yellow
+  and HeartGold (FF, states, an RA unlock, EXPAND).
+- *Risk*: the hot `pkReadInto` path must keep reading without a copy; the core lock stays where
+  `PerformanceGuardsTest` expects it.
 
-- **Work**: Kotlin 2.x with the Compose compiler Gradle plugin, the Compose BOM and AGP to what that
-  Kotlin wants, Paparazzi past 1.3.4 (the newer releases need Kotlin 2), ui-preview to a current CMP
-  (this also lifts its "CMP 1.6+ needs Google Maven jars" pin: check it still builds in cloud sessions
-  where `dl.google.com` is blocked, or keep a pinned copy of the needed jars).
-- **Risks**: K2 compiler differences in a 300k-line codebase (smart casts, overload picks); the
-  generated tables (`*Gen.kt`) may compile slower or hit size limits; Paparazzi's image diffs move
-  (they're viewing tools, not gates, so that's fine); ui-preview's `Icons.AutoMirrored` rewrite can go.
-- **Verify**: `make test-quick`, then a full `make check` / CI with the user's OK; one Paparazzi class
-  and a few `gradle render -Ponly=...` shots compared by eye; an APK on the Thor and the RP6 for a session.
+### Phase B: platform-neutral Kotlin, in place
 
-### Step 1. One C API under the JNI (Android only)
+**PR 3a to 3g. HTTP and JSON** (parallel, any time after PR 1). OkHttp in 7 files (`AppUpdater`, `BestEffortShare`,
+`SteamGridDbClient`, `ScreenScraperClient`, `DocsApi`, `RetroAchievements`, `CoopRelaySocket`) and the
+`HttpURLConnection` in `AchievementsScreen.kt` move to Ktor client (OkHttp engine on Android), `org.json` (8 files) to
+kotlinx.serialization. One client per PR. Good first PRs: small, self-contained, easy to review.
+- *Check*: the existing parsing tests (`BestEffortShareTest`, the RA / docs tests); a manual pass over covers, HELP,
+  an RA sign-in.
 
-- **Work**: split `pokedaisy_jni.c` (and the RA / link / coop lock JNI files) into `pk_api.c` / `pk_api.h`,
-  plain C functions over C types (`pk_init(const char* rom, ...)`, `pk_run_frame()`, `pk_read_into(addr,
-  buf, len)`, ...), and a thin JNI file that only converts arguments. `MgbaCore.kt` keeps its `external`
-  functions, now calling the thin layer. Callbacks into Kotlin (RA HTTP requests, audio, log) become C
-  function pointers set once.
-- **Risks**: 137 exports is a lot of mechanical change; JNI-specific lifetimes (local refs, byte arrays
-  pinned with `GetPrimitiveArrayCritical`) hide behaviour that has to be kept (no copies on the hot
-  `pkReadInto` path); the global core lock must stay where it is (`PerformanceGuardsTest`).
-- **Verify**: `make test-quick` (fixture tests call the readers, not JNI, so also run the native host
-  tests: `libretro/test`, `native-capture` builds, which already compile the `pk_*.c` without JNI); a
-  check script like `libretro/test/check_exports.sh` that every `pk_api.h` function has exactly one JNI
-  caller; play FireRed, Emerald, Yellow and HeartGold on a device (FF, states, RA unlock, EXPAND).
+**PR 4. The platform layer.** The WIP's `platform/` files added inside `:app` (package `com.pokedaisy.app.platform`),
+JVM / Android implementations only, used by nothing yet.
+- *Check*: unit tests for each helper (byte order, the formatter, file helpers) against the JDK calls they replace.
 
-### Step 2. A `:shared` KMP module with Android + JVM targets
+**PR 5a to 5h. Data code onto the platform layer**, one kind of API per PR, files stay where they are:
+`java.io` / `java.nio` (29 / 10 files in `companion/data`), `java.util.zip` and commons-compress (15),
+`Bitmap` / `BitmapFactory` (6, onto a common `PixelImage`), `synchronized` / `java.util.concurrent` (19 / 13, onto
+atomicfu), `String.format` (25), `java.time` (5), `MessageDigest` / CRC32 (4), `Thread(` (7, onto coroutines).
+`Prefs` (956 lines over `SharedPreferences`) behind an interface over multiplatform-settings, same keys.
+- *Android stays working because*: behaviour-preserving swaps, each over code the fixture tests cover.
+- *Check*: `make test-quick` plus the tests of the files touched by name (`MoneyTest`, `DexDetailsTest`,
+  `RomItemTextTest`, `BestEffortTest`...); a `grep` in the PR description showing the API is gone from
+  `companion/data`.
 
-- **Work**: move `companion/data`, `companion/i18n`, `companion/ui/theme`'s colour logic, `gamedata`'s
-  generated Kotlin, `Hotkeys`, `GbaControls` and the engine's pure logic (pacing maths, `SmartFf`,
-  `BattleInputController`, `FfGroupFit`, the music key / loop finders) into a KMP module with
-  `androidTarget()` and `jvm()`. Code that still needs JVM APIs goes in a shared `jvmAndAndroidMain`
-  source set for now; nothing is rewritten yet. ui-preview's `data/` module depends on it instead of
-  compiling a copy. Tests move to `commonTest` / `jvmTest` with the code.
-- **Risks**: package-private / `internal` visibility across what becomes a module boundary; Gradle
-  generator tasks (`make gamedata`, `NativeConfigsGen.kt`, `SiteDataExportTest`) that write into
-  `app/src/main/kotlin` paths; build time.
-- **Verify**: `make test-quick`; `GameDataMigrationTest`, `DexDetailsTest`, `BestEffortTest` by name;
-  `make gamedata` and `make check`'s staleness check still pass; ui-preview renders the same PNGs.
+### Phase C: the shared modules
 
-### Step 3. Make `:shared` common, then add iOS targets
+**PR 6. `:shared` compiles `companion/data`, `companion/i18n` and the theme logic in place.** A KMP module with
+`androidTarget()` and `jvm()` whose `commonMain` source set points at the existing folders under
+`app/src/main/kotlin` with include patterns (the way ui-preview already compiles app sources), while `:app` excludes
+those folders from its own compile and depends on `:shared`. Code that still needs the JVM sits in a
+`jvmAndAndroidMain` set. ui-preview's `data/` module depends on `:shared` instead of compiling its own copy.
+- *Android stays working because*: the same files compile into the same classes, from a different module.
+- *Check*: `make test-quick`; `GameDataMigrationTest`, `BestEffortTest` by name; `make gamedata` and `make check`'s
+  staleness checks (the generators keep writing to the same paths); ui-preview renders unchanged.
+- *Risk*: `internal` visibility across the new module boundary; AGP's source-set filtering (fallback: exclude in
+  the `KotlinCompile` task, as ui-preview does).
 
-- **Work**: replace the JVM APIs with common ones or a small `expect` layer, one kind at a time:
-  - files: `kotlinx-io` (or Okio) for `java.io` / `java.nio`;
-  - zip / 7z: `java.util.zip` and commons-compress have no common twin. An `expect` `RomArchive` reader
-    (Android: as today; iOS: zlib's minizip from the native library for `.zip`, and 7z through the C
-    `LZMA SDK` or deferred; `.7z` may simply be iOS v2);
-  - `Bitmap` / `BitmapFactory`: a common `PixelImage` (ARGB `IntArray` + size, as ui-preview's shim
-    already is) with platform conversion to `ImageBitmap` at the UI edge;
-  - `synchronized` / `ConcurrentHashMap` / `AtomicX`: `kotlinx-atomicfu` locks and atomics;
-  - `String.format`: a tiny common formatter (most uses are `%d`, `%02d`, `%X`, `%.1f`);
-  - `java.time` / `System.currentTimeMillis`: `kotlinx-datetime` and `kotlin.time`;
-  - `MessageDigest` (SHA-1 / MD5 / CRC32 for ROM identity): the native library already has rcheevos'
-    MD5; add SHA-1 there or use `kotlincrypto/hash`; CRC32 is a few lines;
-  - `Thread(` -> coroutines on `Dispatchers.Default` / a single-thread dispatcher;
-  - `Prefs` (956 lines over `SharedPreferences`): an interface over `multiplatform-settings`
-    (`SharedPreferences` / `NSUserDefaults`), keys unchanged so Android users keep their settings.
-  Then add `iosArm64()` and `iosSimulatorArm64()`.
-- **Risks**: the generated tables on Kotlin/Native. A ~250k-line set of `listOf` / `arrayOf` constants
-  can make K/N compile for a very long time and bloat the binary; if it does, change the generators to
-  emit binary resources (packed tables read at start, lazily, like the records already are) rather than
-  Kotlin literals. Measure this first, before the other rewrites. Also: `Regex` behaviour differs a
-  little on K/N; ROM reads that assume JVM `ByteArray` performance.
-- **Verify**: `commonTest` runs on `iosSimulatorArm64` in CI (macOS runner): the fixture decode tests
-  (party / bag / battle / dex on every `*_battle` fixture) read RAM dumps from files and are the best
-  proof the readers behave the same; time `:shared:linkDebugFrameworkIosSimulatorArm64` and the
-  framework's size.
+**PR 7a to 7c. Engine logic into `:shared`.** The pure parts of `EmulatorEngine` and `PokeDaisyActivity` (pacing
+maths, `SmartFf`, `BattleInputController`, `FfGroupFit`, the music key and loop finders, `Hotkeys`, `GbaControls`)
+first, then a `GameSession` that holds "what happens when" (start, resume, sleep, close, the companion's sampling)
+with the Activity as its Android host.
+- *Check*: the existing controller tests (`BattleInputControllerTest`, `TipSchedulerTest`...) move with the code; a
+  device session with states, FF, a battle switch and sleep / wake.
+- *Risk*: the largest and most edited Android files; agree timing with the maintainer (decision 5).
 
-### Step 4. The native core as an XCFramework
+**PR 8a to 8e. The UI into `:shared-ui`, in place.** `companion/ui/**` compiled by a CMP module (Android + desktop),
+the ui-preview shims (`ui-preview/data/shims/`, `ui-preview/src/shims/`: 41 files, 792 lines) turned into `expect`
+declarations or small interfaces (`Toast` -> a notice host, `Context` -> an app environment, `Uri` -> a path or
+bookmark type), fonts and shaders into CMP resources, `GameClickSound` and haptics behind interfaces. Library and
+Settings, private composables inside their Activities today, pulled out into `LibraryScreen` / `SettingsScreen`.
+ui-preview becomes `:shared-ui`'s desktop target with no source copying.
+- *Check*: ui-preview renders identical PNGs; Paparazzi classes for the screens moved; `LocalizedScreenshotTest`.
+- *Risk*: Compose on Android goes from AndroidX artifacts to CMP's (they map to the same AndroidX code on Android,
+  but versions are pinned by CMP).
 
-- **Work**: a CMake build of mGBA (static, `BUILD_QT/SDL/LIBRETRO OFF`, no debuggers, GBA + GB cores),
-  rcheevos and the `pk_*.c` files (without `nds/`) for `iphoneos-arm64` and `iphonesimulator-arm64`,
-  packed as `PokeDaisyCore.xcframework`; a `.def` file over `pk_api.h` for cinterop; an `IosCore` in
-  `iosMain` implementing the same `Core` interface `MgbaCore` becomes in `commonMain`. The hot
-  `pkReadInto` path reads into pinned Kotlin arrays (`usePinned`) so there's no copy. The STEADY music
-  renderer's second core (`rg`) comes along: it's the same API with another handle.
-- **Risks**: mGBA's `USE_PTHREADS` / `DISABLE_THREADING` must match between the library and our files
-  (the `mCoreRewindContext` size bug: keep `pk_rewind.c`'s `#error`); mGBA's GL / EGL code must stay out;
-  file access through `VFile` must take paths the iOS sandbox allows; the `pk_savevf.c` mmap path
-  (copy-in-memory fallback) matters more on iOS; Apple's static-library rules for the App Store (no
-  dynamic code, no `dlopen` of downloaded code).
-- **Verify**: an XCTest (or Kotlin `iosTest`) that boots the diagnostic ROMs used by `linux-host-test`,
-  runs N frames and compares frame CRCs and a RAM read with the same run in `native-capture/mgba_dump`;
-  a save written, reloaded, byte-equal; a state saved and loaded.
+### Phase D: iOS targets in CI
 
-### Step 5. The UI in `commonMain`
+**PR 9. `iosArm64` / `iosSimulatorArm64` targets for `:shared`**, plus a macOS CI workflow (`ios.yml`) that runs
+`commonTest` on the simulator. The fixture decode tests (party, bag, battle, dex over every `*_battle` fixture) read
+RAM dumps from files and are the proof the readers behave the same on iOS.
+- *First measure*: Kotlin/Native compile time and binary size of the generated tables (~250k lines of literals). If
+  they're too heavy, the generators emit packed binary resources read lazily instead, which is its own earlier PR.
 
-- **Work**: move `companion/ui/**` into `:shared-ui`'s `commonMain`. The shims become the `expect`
-  layer: for each file in `ui-preview/*/shims/`, either the code stops needing it (most of the activity
-  and `Intent` stubs) or it turns into a small platform interface (`Toast` -> a notice host, `Context`
-  -> an `AppEnvironment`, `Configuration` -> window size classes, `Uri` -> a path / bookmark type).
-  Fonts (Pixel Operator, PixelMplusJP, GalmuriKO) and shaders go to CMP resources. Library and Settings
-  are private composables inside their Activities today: pull them out into `LibraryScreen` /
-  `SettingsScreen` with the Activities as hosts. `GameClickSound` (SoundPool) and haptics become
-  interfaces. ui-preview becomes `:shared-ui`'s desktop target with no source copy.
-- **Risks**:
-  - per-glyph font fallback: `PixelTypeface.kt` uses Android's `CustomFallbackBuilder` so Japanese and
-    Hangul fall to the pixel fonts glyph by glyph; CMP on iOS (Skia) has to give the same fallback order,
-    or Japanese / Korean text comes out in the system font;
-  - `CompanionColors`' AGSL `RenderEffect` (ON COMPANION shaders): on iOS it's Skia's runtime effects,
-    which take the same SkSL, but the API differs (`RuntimeShader` vs Skiko's `RuntimeEffect`); behind
-    an `expect`;
-  - pixel-exact text: `GbaText` / `GbaTextMetrics` rely on whole-pixel font sizes and `drawText`; Skia on
-    iOS rounds differently than Android's text stack; check crispness at iPad densities (2.0 / 3.0);
-  - Compose focus and D-pad navigation (`focusStart`, `gbaFocusRing`) must be fed from GCController, not
-    key events;
-  - performance: CMP iOS is slower than Android for very long lazy lists and many `Text` nodes; the
-    weak-device work (`GbaText` as one node, no path clips) already helps.
-- **Verify**: ui-preview renders stay the same PNGs (the jvm target now compiles the real
-  `commonMain`); Paparazzi on Android; an iOS screenshot test (Compose UI tests on the simulator, or
-  XCUITest screenshots) of the main tabs for FireRed and Emerald fixtures, compared by eye against the
-  ui-preview shots; `LocalizedScreenshotTest`'s screens in JA and KO on iOS.
+**PR 10. The native core as an XCFramework.** mGBA (static, GBA + Game Boy, no frontends), rcheevos and the app's
+`pk_*.c` (without `nds/`) built for device and simulator by CMake under `ios/`, a cinterop `.def` over `pk_api.h`, and
+`IosCore` in `iosMain` implementing the same `Core` interface `MgbaCore` implements on Android.
+- *Check*: an `iosTest` boots the diagnostic ROMs `linux-host-test` uses, runs N frames and compares frame CRCs and a
+  RAM read with `native-capture/mgba_dump`; a save written and reloaded byte-equal.
 
-### Step 6. The iOS shell (first playable)
+**PR 11. `:shared-ui` gets its iOS targets**, rendering the main companion tabs from fixtures in a simulator test.
+- *Check*: those renders beside ui-preview's, by eye; Japanese and Korean text (per-glyph font fallback through
+  Skia must match `PixelTypeface.kt`'s order).
 
-- **Work**, an Xcode project (`ios/`) with a SwiftUI app hosting `ComposeUIViewController`s:
-  - **Video**: a `CAMetalLayer` / `MTKView` drawing the core's 240x160 (or EXPAND's wider) frame as a
-    texture, integer-scaled like `EmulatorView`. Filters: our own shaders (LCD, LCD PAPER, CRT,
-    SCANLINES, UNLIT, GBA COLORS) are short and get hand-ported to Metal Shading Language; libretro's
-    xBRZ / xBR / ScaleFX `.glsl` go through glslang -> SPIR-V -> SPIRV-Cross -> MSL at build time (the
-    files stay unmodified, as their licences and the repo's rule want). SMOOTHING can be iOS v2.
-  - **Pacing**: `CADisplayLink` drives `EmulatorEngine.onVsync` exactly as Android's vsync tick does;
-    ProMotion iPads run 120 Hz, which the FF-on-refresh code already handles (`ffFramesPerRefresh`).
-    Set `preferredFrameRateRange` to 60 like `Surface.setFrameRate`.
-  - **Audio**: `AVAudioEngine` with an `AVAudioSourceNode` pulling from a ring buffer the emu thread
-    fills; the dynamic rate control stays in shared code. Audio session category `.ambient` (or
-    `.playback` with a setting), interruptions handled. STEADY clips play through a second player node;
-    FLAC decode via `AVAudioFile` (it reads FLAC since iOS 11).
-  - **Input**: `GCController` (MFi, Xbox, PlayStation, Backbone, 8BitDo) and `GCKeyboard`, mapped into
-    `GbaInput` with the same binding model; rebinding stays "press the key" (`KeyCapture`), fed from
-    GCController's value-changed handlers. The touch controls are already Compose.
-  - **Files**: the app's Documents folder shown in Files (`UIFileSharingEnabled`,
-    `LSSupportsOpeningDocumentsInPlace`) as the default `roms/` and saves place; "link a ROMs folder" =
-    `UIDocumentPickerViewController` for a folder + a security-scoped bookmark per linked folder (the
-    `Prefs.romsFolders` list holds bookmarks on iOS); a save next to a ROM in a linked folder is written
-    under that bookmark. Opening a `.gba` / `.gbc` / `.zip` / `.bps` from Files or AirDrop =
-    `CFBundleDocumentTypes` + `onOpenURL`, replacing `LaunchActivity`'s intents. `SavesLocation` /
-    `SaveBackups` keep their order and rules.
-  - **Lifecycle**: `scenePhase` background -> the existing `sleep` path (finish a save in progress,
-    write the resume state); iOS can end the app in the background, so the resume state is written
-    every time, not only on screen-off.
-  - **Layouts**: an iPad held sideways is a single screen, so the companion window / side panel paths
-    (`SidePanel`, `companionWindowSize`) apply as on the RP6; an iPad held upright is the
-    `PortraitPanel` layout (game on top, companion under it), which on a 4:3 iPad is close to the Thor.
-    Stage Manager / Split View resize the window: the stage already lays out from its size. An external
-    display (`UIWindowSceneSessionRoleExternalDisplayNonInteractive`) maps onto the two-screen mode: the
-    game on the TV, the companion on the iPad (SWAP SCREENS' code path, with `Screens` backed by
-    `UIScene`s instead of `DisplayManager`).
-- **Risks**: Compose-in-SwiftUI keyboard and focus quirks; a Metal layer under Compose views (z-order,
-  touch pass-through like `GameStageLayout.overGame`); `PokeDaisyActivity` (5.7k lines) is the largest
-  piece of Android-only logic and has to be split into a shared `GameSession` (what happens when) and
-  a thin platform host, or the iOS shell grows a second copy of it; App Store review of the save /
-  ROM import flow.
-- **Verify**: milestone "FireRed and Emerald play on an iPad with the companion": the FPS / CPU panel
-  reads ~60.0 with 0 late frames over 10 minutes, no audio underruns, FF 4x steady, a save made in game
-  survives a force quit and loads in the Android app (same file), a resume state comes back after the
-  app is killed in the background, a controller and the touch pad both play a battle. Instruments' Time
-  Profiler on an older iPad (A12 / A13) for the weak-device case.
+### Phase E: the iOS app
 
-### Step 7. Feature parity pass
+**PR 12. `ios/` app shell**: a SwiftUI app hosting `ComposeUIViewController`, the Metal game view, audio, input and
+files from the proof of concept (section 6), wired to `GameSession`. First milestone: FireRed and Emerald play on an
+iPad with the companion beside the game (landscape) or under it (portrait).
+- *Check*: the FPS / CPU panel reads ~60.0 with no late frames over 10 minutes; no audio underruns; FF 4x steady; an
+  in-game save survives a force quit and loads in the Android app; a resume state comes back after the app is killed
+  in the background; a controller and the touch controls both play a battle.
 
-Most features are shared code or C once steps 2 to 6 are done; this step turns them on one by one, each
-with its own check from the repo's existing verification notes:
+**PR 13a onwards. Feature parity**, each its own PR with the check the repo already uses for it: savestates, REWIND,
+TURBO, GAME SPEED, STEADY music (second core, FLAC cache in `Caches/`), EXPAND / ZOOM (`widecheck` against
+`mgba_dump`), HUD, QUICK MENU, BATTLE BUTTONS, FLY / PC / field items, FREE FLIGHT, PLAYER LOOK, cheats, RetroAchievements
+(softcore only), Game Boy games, covers, HELP, PATCH A ROM, SAVE EDITOR, TRADE SAVES, the screen filters (our shaders
+hand-ported to Metal; libretro's through SPIRV-Cross at build time), an external display (the iPad screen as the
+companion, the TV as the game: the two-screen code path with `UIScene`s), Stage Manager sizes. The manual gets an
+"On iPad" note wherever a feature differs, and the website lists iOS only once a release is live.
 
-- savestates, REWIND, TURBO, GAME SPEED, SCENE SPEEDS, FF MUSIC (STEADY needs the second core and the
-  FLAC cache under an iOS budget: `Caches/` can be purged by the system, which is fine for clips);
-- EXPAND / ZOOM (pure C in `pk_wide.c`; check with `widecheck` frames from the iOS build against
-  `mgba_dump`), HUD, QUICK MENU, BATTLE BUTTONS, FLY / PC / field items, FREE FLIGHT, PLAYER LOOK,
-  cheats, game-option patches;
-- RetroAchievements (rcheevos is in the XCFramework; the HTTP goes through step 8; the `User-Agent`
-  names the iOS build); softcore stays the only mode;
-- the Game Boy games (mGBA's GB core, `pk_gb_audio.c`'s resampler);
-- covers (SteamGridDB, RA box art), HELP (`DocsApi`), PATCH A ROM, SAVE EDITOR, TRADE SAVES, LINK PLAY;
-- the manual: an "On iPad" note where a feature differs (folders, controllers, no updater), the
-  settings that don't exist on iOS hidden there, NEW tags as usual.
+**PR 14. Crash reports** (Firebase Crashlytics for iOS, opt-in exactly as on Android, `GoogleService-Info.plist`
+from a secret, never committed) and **PR 15. Release**: TestFlight builds from a protected workflow like
+`release.yml`, the maintainer's approval as for Android.
 
-Dropped or replaced on iOS: the APK updater (TestFlight / App Store), All files access, the frontend
-launch intents (a `pokedaisy://` URL scheme instead, if a frontend wants it), foldable postures,
-`TouchInputWindows`, Android NSD (-> Bonjour, step 8), `DualScreenPresentation` (-> scenes, step 6).
+**Later: co-op** (behind its flag on Android too): X25519 from CryptoKit instead of Bouncy Castle (the only use is
+`CoopKeys.kt`), AES-GCM / HMAC / SHA-256 from CryptoKit behind an `expect`, Bonjour (`NWBrowser`) instead of Android
+NSD, CoreImage for the QR code; `CoopSafetyTest` and the Noise test vectors run on iOS.
 
-### Step 8. Networking and services
+**Later: Nintendo DS.** No JIT for App Store apps, so melonDS (`ENABLE_JIT OFF`) and DSperate (`DSPERATE_JIT OFF`) run
+interpreted. Gate it on a benchmark first: `nds_dump`'s HeartGold walking and battle traces replayed on iPads
+(M-series and A-series), carrying on only where they hold ~55 fps. The GLES renderer would need ANGLE's Metal
+backend or a Metal port.
 
-- **HTTP**: OkHttp is used in 7 files (`AppUpdater`, `BestEffortShare`, `SteamGridDbClient`,
-  `ScreenScraperClient`, `DocsApi`, `RetroAchievements`, `CoopRelaySocket`) plus one
-  `HttpURLConnection` in `AchievementsScreen.kt`; JSON is `org.json` in 8 files. Move to Ktor client
-  (OkHttp engine on Android, Darwin on iOS, WebSockets for the co-op relay) and `kotlinx.serialization`
-  JSON. Keep the same requests, headers and timeouts; do it on Android first, file by file.
-- **Crash reports**: Firebase Crashlytics' iOS SDK through Swift Package Manager, opt-in exactly as on
-  Android (collection off until the player says yes), with Touchlab's CrashKiOS to symbolicate Kotlin
-  frames; the `GoogleService-Info.plist` written from a secret in CI like `google-services.json`, never
-  committed. Native crashes in the core are covered by Crashlytics' own signal handler.
-- **Co-op link** (behind `FeatureFlags.coop`, so it can wait): Bouncy Castle is used for X25519 only;
-  AES-GCM, HMAC-SHA256 and SHA-256 come from `javax.crypto` / `MessageDigest`. On iOS: CryptoKit
-  (`Curve25519.KeyAgreement`, `AES.GCM`, `HMAC<SHA256>`) behind an `expect` crypto interface, or
-  `cryptography-kotlin` if its X25519 support is there by then. `CoopNoise` / `CoopChannel` stay shared;
-  the Noise IK test vectors in the existing tests must pass on iOS too. LAN discovery: Android NSD ->
-  `NWBrowser` / `NWListener` (Bonjour; needs `NSLocalNetworkUsageDescription` and `NSBonjourServices`);
-  direct TCP -> `Network.framework` or Ktor sockets. ZXing (QR) -> CoreImage's QR generator.
-  `CoopSafetyTest`'s rule (nothing from the network reaches game memory) is shared code and holds.
-- **Risks**: Ktor's Darwin engine and OkHttp differ on redirects, proxies and cancellation; RA's
-  rate limits and the queued-answer-on-emu-thread design (`RetroAchievements.onFrame`) must not change.
-- **Verify**: the existing client tests (`BestEffortShareTest`, the RA / docs parsing tests) on both
-  targets; a sign-in to RA and an unlock on iOS; co-op: an iPad and an Android device pair over the
-  relay and over the same Wi-Fi.
+## 6. What carries over from the proof of concept
 
-### Step 9. Release
+| Piece (`ios/` on the PoC branch) | In the full app |
+|---|---|
+| `CMakeLists.txt`: mGBA as a static library for iOS (the flags that turn off frontends, GL, Qt, SDL, debuggers) | Carries: the base of PR 10's XCFramework build, with the app's `pk_*.c` and rcheevos added instead of `3ds/core` |
+| `Renderer.swift`: one Metal pass, sharp bilinear, textures uploaded per frame | Carries: the game view in PR 12; the filters are added on top |
+| `AudioOutput.swift`: `AVAudioEngine` + `AVAudioSourceNode` reading a C ring buffer on the audio thread | Carries as is; the app's dynamic rate control (shared Kotlin) sets the ring's resampling |
+| Input in `GameViewController.swift`: keyboard through `pressesBegan`, `GCController` with Nintendo's button places, the stick angle for the QUICK MENU ring, the keyboard-after-rotation fix | Carries, feeding the shared `GbaInput` / hotkeys / `KeyCapture` instead of `pd_ios_tick`'s key bits |
+| Files: everything in Documents, shown in the Files app (`Info.plist`'s file sharing keys), `saves/`, backups before every start, `UIDocumentPickerViewController` import as a copy | Carries, mapped onto `SavesLocation` / `SaveBackups`; linked folders add security-scoped bookmarks |
+| Signing: `PD_IOS_TEAM` / `PD_IOS_BUNDLE_ID` cache variables (never committed), simulator builds unsigned, `build.sh`'s simulator boot / install / copy-in flow, the Xcode 27 `DeviceHub` fallback | Carries for development; a release adds a paid team and CI signing (decision 7) |
+| `smoke/pd_ios_smoke.c`: a headless run of the native side on any machine | Carries as the idea behind PR 10's headless check |
+| Layout lessons: landscape game and companion side by side over a row of buttons, portrait stacked, whole scales | Inform the shared layout; the app's own `SidePanel` / `PortraitPanel` paths do the work |
+| `pd_ios.c` / `pd_ios.h` (the 3DS host's `run_game`), the `3ds/core` companion, `LibraryViewController.swift`, `GamepadView.swift`, `pd_armgba_none.c` | Not carried: the full app's companion, library and touch controls are the shared Compose ones, and the app doesn't link armGBA |
 
-- TestFlight builds from a `macos` GitHub runner (`release-ios.yml`), signed with an App Store Connect
-  API key held in a protected environment like the Android signing secrets; the owner approves, as
-  with Android releases.
-- App Store review: emulators are allowed (guideline 4.7, since 2024) as long as no game is bundled or
-  linked (already the repo's rule: no ROMs, game art rebuilt from the player's own ROM by `RomArt`).
-  Expect questions about the import flow and the name: "Pokémon" in the app's text and the store
-  listing is a trademark risk (a takedown request is possible). The store listing should describe "Game
-  Boy Advance games and fan-made hacks" and keep the invented creatures in screenshots, like the
-  website.
-- The website: an iPad row on the download page only once the App Store build is live (the site never
-  lists what the released app can't do).
+## 7. Risks, biggest first
 
-### Step 10 (later). Nintendo DS
+1. **Upstream churn** against the refactors in phases B and C: mitigated by no file moves, small PRs and timing with
+   the maintainer; a PR that sits too long gets rebased or split, never force-merged.
+2. **Kotlin/Native and the generated tables**: compile time and binary size; measured in PR 9 before the iOS UI work.
+3. **`PokeDaisyActivity` / `EmulatorEngine`**: without the `GameSession` split the iOS shell would grow a second copy
+   of them.
+4. **Pixel-exact text and per-glyph font fallback on Skia**: the app's whole look depends on it.
+5. **App Store review** of the name and the ROM import flow.
+6. **DS speed without a JIT.**
 
-App Store apps can't map memory as executable, so there is no JIT: melonDS' ARM64 JIT
-(`ENABLE_JIT ON` in `CMakeLists.txt`) and DSperate's recompiler must be built off. melonDS' interpreter is
-several times slower; on an M-series iPad it may reach full speed for HeartGold / Platinum, on A-series
-iPads likely not.
+## 8. Open questions for Gal
 
-- **Work**: add `nds/` to the XCFramework with `ENABLE_JIT OFF` (and DSperate with `DSPERATE_JIT OFF`);
-  the software 3D renderer first (DS RESOLUTION = ORIGINAL), the GLES renderer from our patch later
-  through ANGLE's Metal backend or a Metal port; the DS bottom screen as the companion's place or a touch
-  window (the one-screen `DsTouchWindow` path).
-- **Risks**: speed without a JIT is the whole question; melonDS' GL patch is GLES 3.2, which needs
-  ANGLE (MetalANGLE / ANGLE Metal) on iOS; App Store review of a DS emulator is the same rule set.
-  Outside the App Store (EU alternative marketplaces, sideloading with a debugger-enabled JIT) the JIT
-  could come back, but that's a separate distribution track.
-- **Verify**: before any UI work, a benchmark: `native-capture/nds_dump`'s HeartGold walking and battle
-  traces replayed on iPad hardware (M1, M2, A14, A16) with the interpreter, frames per second per
-  device; go on only where it's at least ~55 fps. Then the DS fixtures' field reads compared with
-  `nds_dump`.
-
-## Order and milestones
-
-| # | Step | Ships on | Milestone |
-|---|---|---|---|
-| 0 | Kotlin 2 / current Compose | Android | the Android release builds on Kotlin 2 |
-| 1 | C API under the JNI | Android | `pk_api.h` is the only way into the core |
-| 2 | `:shared` (Android + JVM) | Android | data, i18n, engine logic out of `:app` |
-| 3 | `:shared` common + iOS targets | CI | fixture tests green on the iOS simulator |
-| 4 | Core XCFramework | CI | a ROM boots in an iOS test, frame CRCs match `mgba_dump` |
-| 5 | UI in `commonMain` | Android + desktop | ui-preview renders `commonMain` unchanged |
-| 6 | iOS shell | TestFlight (internal) | FireRed / Emerald playable with the companion on iPad |
-| 7 | Feature parity | TestFlight (beta) | the README's GBA / GB features on iPad, gaps listed |
-| 8 | Networking / services | both | Ktor everywhere, crash reports on iOS, co-op when its flag goes |
-| 9 | Release | App Store | public iPad build |
-| 10 | DS | later | only if the interpreter benchmark passes |
-
-Steps 1 and 2 can run side by side; step 8's HTTP move can start any time after step 2 and is easier
-done early (it removes OkHttp / `org.json` from the shared code before step 3).
-
-## Biggest risks, in order
-
-1. **Kotlin/Native and the generated tables** (step 3): compile time and binary size. Measured first;
-   the fallback (binary resources) touches the generators, not the readers.
-2. **`PokeDaisyActivity` / `EmulatorEngine`** mixing logic with Android: without splitting them into
-   shared logic + a host, the iOS shell becomes a second app to keep in step.
-3. **Pixel-exact text and per-glyph font fallback on Skia** (step 5): the app's look depends on it.
-4. **App Store review** of the name and the ROM import flow (step 9).
-5. **DS speed without a JIT** (step 10).
-
-## Open questions for the owner
-
-- iPad only, or iPhone too? (Most of the work is the same; iPhone mostly means the upright layout.)
-- Minimum iOS: 16 keeps `GCController` / Stage Manager / `AVAudioSourceNode` simple and covers iPads
-  from 2017 on.
-- Which iPad and controller to test on first.
-- Is co-op wanted on iPad at launch, or after its Android flag goes?
+- iPad only for the first release, or iPhone too (mostly the upright layout)?
+- Minimum iOS: 16 keeps `GCController`, Stage Manager and `AVAudioSourceNode` simple and covers the iPad mini.
+- Whether Gal or the maintainer opens the upstream Discussion for section 3.
