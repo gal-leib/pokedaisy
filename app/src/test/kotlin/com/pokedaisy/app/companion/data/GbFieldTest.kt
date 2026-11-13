@@ -42,13 +42,19 @@ class GbFieldTest {
             "Pokemon - Versione Gialla - Speciale Edizione Pikachu (Italy) (GBC,SGB Enhanced).gb" to GB_FIELD_YELLOW_IT,
             "Pokemon - Edicion Amarilla - Edicion Especial Pikachu (Spain) (GBC,SGB Enhanced).gb" to GB_FIELD_YELLOW_ES,
             "Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb" to GB_FIELD_RED_BLUE,
+            "Pokemon - Rote Edition (Germany) (SGB Enhanced).gb" to GB_FIELD_RED_BLUE_DE,
+            "Pokemon - Blaue Edition (Germany) (SGB Enhanced).gb" to GB_FIELD_RED_BLUE_DE,
             "Pokemon PureRed (v2.7.6).gb" to GB_FIELD_PURE_RGB,
         )
+        // The carts on this machine: one that's missing (German Red / Blue here) mustn't skip the others' checks.
+        var checked = 0
         for ((name, own) in carts) {
-            val rom = romOf(name)
+            val rom = File(dir, name).takeIf { it.isFile }?.readBytes() ?: continue
             for ((_, cfg) in carts) assertEquals(name, cfg === own, cfg.matches(rom))
             assertFalse(name, GbField.Crystal.matches(rom))
+            checked++
         }
+        assumeTrue("no Gen 1 cart on this machine", checked > 0)
     }
 
     /** 64 KB of bus, plus Color WRAM bank 1 at (1 << 16) | D000-DFFF, and a cart. */
