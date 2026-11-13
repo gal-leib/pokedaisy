@@ -51,10 +51,16 @@ gamedata: ## Regenerate the per-game code from gamedata/ (NativeConfigsGen.kt, t
 	python3 scripts/gen_gamedata.py
 	python3 scripts/gen_nds_ports.py
 
-# The app's unit tests and shared/'s (the companion's data and language code), with --tests for each when T is set.
-UNIT_TESTS = :app:testDebugUnitTest $(if $(T),--tests '$(T)') :shared:testDebugUnitTest $(if $(T),--tests '$(T)')
+# Unfiltered runs cover both modules. Focused runs select one owner so a misspelled filter fails in Gradle.
+# Example: make test-quick MODULE=shared T='*RomFilesTest'
+ifneq ($(strip $(T)),)
+ifeq ($(filter app shared,$(MODULE)),)
+$(error T requires MODULE=app or MODULE=shared)
+endif
+endif
+UNIT_TESTS = $(if $(T),:$(MODULE):testDebugUnitTest --tests '$(T)',:app:testDebugUnitTest :shared:testDebugUnitTest)
 
-test-quick: ## Everyday unit tests: no Paparazzi renders or BestEffortTest, forks in parallel (T='*FooTest' to pick)
+test-quick: ## Everyday unit tests: no Paparazzi renders or BestEffortTest, forks in parallel (MODULE=shared T='*FooTest' to pick)
 	./gradlew $(UNIT_TESTS) -Pquick
 
 test: ## All JVM unit tests, Paparazzi renders included (CLAUDE.md: agents ask first)
