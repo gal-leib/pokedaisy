@@ -5,6 +5,7 @@ import com.pokedaisy.app.platform.ByteBuffer
 import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.LITTLE_ENDIAN
+import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.byteBufferAllocate
 import com.pokedaisy.app.platform.byteBufferWrap
 import com.pokedaisy.app.platform.zlibDeflate
@@ -67,10 +68,10 @@ object RomArt {
                 val wrote = extractTo(readChunked(rom), dir)
                 marker.parentFile?.mkdirs()
                 marker.writeText(wrote.joinToString("\n"))
-                android.util.Log.i("pokedaisy", "RomArt: ${wrote.size} new files from ${rom.name} in ${(System.nanoTime() - t0) / 1_000_000} ms")
+                Log.i("pokedaisy", "RomArt: ${wrote.size} new files from ${rom.name} in ${(System.nanoTime() - t0) / 1_000_000} ms")
                 if (wrote.isNotEmpty()) _updates.value++
             } catch (t: Throwable) {
-                android.util.Log.w("pokedaisy", "RomArt: scan failed", t)
+                Log.w("pokedaisy", "RomArt: scan failed", t)
             } finally {
                 running = false
             }

@@ -1,6 +1,8 @@
 package com.pokedaisy.app.companion.data
 
-import android.graphics.Bitmap
+import com.pokedaisy.app.platform.Bitmap
+import com.pokedaisy.app.platform.Log
+import com.pokedaisy.app.platform.createBitmap
 import java.util.concurrent.ConcurrentHashMap
 
 /** Which memory a game's seen / caught arrays are offsets into. */
@@ -1694,7 +1696,7 @@ object PokedexSource {
         // Not cached here: before NdsArt has the cart's pages in, there's nothing yet (Gen4Dex keeps them once read).
         t.gen4?.let { g -> return Gen4Dex.entry(g, national) }
         return runCatching { readEntry(t, national) }
-            .onFailure { android.util.Log.w("pokedaisy", "dex entry $national failed", it) }
+            .onFailure { Log.w("pokedaisy", "dex entry $national failed", it) }
             .getOrNull()?.also { entries[national] = it }
     }
 
@@ -1704,11 +1706,11 @@ object PokedexSource {
         if (species <= 0) return null
         sprites[species]?.let { return it }
         t.gen2?.let { g ->
-            return runCatching { Gen2Dex.frontPixels(g, species)?.let { Bitmap.createBitmap(it, 56, 56, Bitmap.Config.ARGB_8888) } }
+            return runCatching { Gen2Dex.frontPixels(g, species)?.let { createBitmap(it, 56, 56) } }
                 .getOrNull()?.also { sprites[species] = it }
         }
         t.gen1?.let { g ->
-            return runCatching { Gen1Dex.frontPixels(g, species)?.let { Bitmap.createBitmap(it, 56, 56, Bitmap.Config.ARGB_8888) } }
+            return runCatching { Gen1Dex.frontPixels(g, species)?.let { createBitmap(it, 56, 56) } }
                 .getOrNull()?.also { sprites[species] = it }
         }
         t.gen4?.let { g -> return Gen4Dex.front(g, species)?.also { sprites[species] = it } }
@@ -1757,7 +1759,7 @@ object PokedexSource {
                     px[((tile / 2) * 8 + row) * 16 + (tile % 2) * 8 + col] = 0xFF000000.toInt()
                 }
             }
-            Bitmap.createBitmap(px, 16, 16, Bitmap.Config.ARGB_8888)
+            createBitmap(px, 16, 16)
         }.getOrNull()?.also { footprints[species] = it }
     }
 

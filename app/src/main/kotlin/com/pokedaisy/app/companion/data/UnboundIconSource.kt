@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
-import android.graphics.Bitmap
+import com.pokedaisy.app.platform.Bitmap
+import com.pokedaisy.app.platform.createBitmap
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -122,7 +123,7 @@ object UnboundIconSource {
                 tile++
             }
         }
-        return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
+        return createBitmap(px, w, h)
     }
 
     /** GBA BIOS LZ77 (type 0x10): 4-byte header then flag-grouped literal /

@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.sha1
 
 /**
@@ -384,7 +385,7 @@ object Gen1Art {
             runCatching {
                 val wrote = extractTo(rom.readBytes(), RomArt.dir(filesDir))
                 if (wrote.isNotEmpty()) RomArt.announce()
-            }.onFailure { android.util.Log.w("pokedaisy", "Gen1Art: failed", it) }
+            }.onFailure { Log.w("pokedaisy", "Gen1Art: failed", it) }
         }, "pokedaisy-gen1-art").apply { isDaemon = true; start() }
     }
 }

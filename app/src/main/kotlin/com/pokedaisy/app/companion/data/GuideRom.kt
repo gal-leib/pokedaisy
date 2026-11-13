@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.platform.Log
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -323,7 +324,7 @@ object GuideRomSource {
                 goodRod = merge(fishing.drop(2).take(3), GOOD_ROD_ODDS),
                 superRod = merge(fishing.drop(5), SUPER_ROD_ODDS),
             )
-        }.onFailure { android.util.Log.w("pokedaisy", "encounters $group.$num failed", it) }
+        }.onFailure { Log.w("pokedaisy", "encounters $group.$num failed", it) }
             .getOrNull()?.also { encounters[key or (set shl 16)] = it }
     }
 
@@ -431,7 +432,7 @@ object GuideRomSource {
                     else defaultMoves(t, species, level),
                 )
             }
-        }.onFailure { android.util.Log.w("pokedaisy", "trainer $id failed", it) }
+        }.onFailure { Log.w("pokedaisy", "trainer $id failed", it) }
             .getOrNull()?.also { parties[id] = it }
     }
 

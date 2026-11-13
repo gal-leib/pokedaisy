@@ -1,6 +1,8 @@
 package com.pokedaisy.app.companion.data
 
-import android.graphics.Bitmap
+import com.pokedaisy.app.platform.Bitmap
+import com.pokedaisy.app.platform.createBitmap
+
 
 /** Shared GBA graphics decode helpers (4bpp tiles, BGR555 palette, BIOS LZ77). */
 object Gfx {
@@ -48,7 +50,7 @@ object Gfx {
                 tile++
             }
         }
-        return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
+        return createBitmap(px, w, h)
     }
 
     /**

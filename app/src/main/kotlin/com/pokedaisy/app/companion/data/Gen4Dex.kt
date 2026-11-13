@@ -1,8 +1,8 @@
 package com.pokedaisy.app.companion.data
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.pokedaisy.app.platform.Bitmap
 import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.decodeBitmapFile
 
 /**
  * A DS game's POKéDEX (Platinum, HeartGold / SoulSilver): its pages and front pictures, which [NdsArt] takes from the
@@ -128,7 +128,7 @@ object Gen4Dex {
     fun front(t: Gen4DexTables, species: Int): Bitmap? {
         val dir = NdsArt.dir ?: return null
         val f = File(dir, "${t.fronts}/$species.png")
-        return if (f.isFile) runCatching { BitmapFactory.decodeFile(f.path) }.getOrNull() else null
+        return if (f.isFile) runCatching { decodeBitmapFile(f.path) }.getOrNull() else null
     }
 
     /** NdsArt's lines: species, category, description, height dm, weight hg, the six stats (the page's order), type 1 / 2,

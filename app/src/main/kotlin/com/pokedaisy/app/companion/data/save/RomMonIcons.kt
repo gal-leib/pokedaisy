@@ -1,12 +1,12 @@
 package com.pokedaisy.app.companion.data.save
 
-import android.graphics.Bitmap
 import com.pokedaisy.app.companion.data.IconTables
 import com.pokedaisy.app.companion.data.NATIVE_EMERALD_RETAIL
 import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV0
 import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV1
 import com.pokedaisy.app.companion.data.TelemetrySampler
 import com.pokedaisy.app.companion.data.decodeMonIcon
+import com.pokedaisy.app.platform.Bitmap
 import com.pokedaisy.app.platform.File
 import com.pokedaisy.app.platform.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap

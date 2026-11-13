@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
@@ -39,7 +40,7 @@ object RegionMapWatch {
                     find(b)
                 }
             } catch (t: Throwable) {
-                android.util.Log.w("pokedaisy", "RegionMapWatch: scan failed", t)
+                Log.w("pokedaisy", "RegionMapWatch: scan failed", t)
             }
         }, "pokedaisy-map-watch").apply { isDaemon = true; start() }
     }

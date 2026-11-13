@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
@@ -74,7 +75,7 @@ object RomRegionMap {
                 current = loadNow(filesDir, romKey, rom) ?: return@Thread
                 RomArt.announce()
             } catch (t: Throwable) {
-                android.util.Log.w("pokedaisy", "RomRegionMap: read failed", t)
+                Log.w("pokedaisy", "RomRegionMap: read failed", t)
             }
         }, "pokedaisy-region-map").apply { isDaemon = true; start() }
     }

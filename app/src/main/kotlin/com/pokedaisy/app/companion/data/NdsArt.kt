@@ -2,6 +2,7 @@ package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.platform.CRC32
 import com.pokedaisy.app.platform.File
+import com.pokedaisy.app.platform.Log
 import com.pokedaisy.app.platform.RandomAccessFile
 
 /**
@@ -130,13 +131,13 @@ object NdsArt {
         Black2Redux.data = null
         Thread({
             // The names first (a few text banks): the companion's first samples use them.
-            runCatching { names = readNames(rom) }.onFailure { android.util.Log.w("pokedaisy", "NdsArt: names failed", it) }
+            runCatching { names = readNames(rom) }.onFailure { Log.w("pokedaisy", "NdsArt: names failed", it) }
             runCatching { OriginHeartGold.data = if (OriginHeartGold.matches(rom)) readOrigin(rom) else null }
-                .onFailure { android.util.Log.w("pokedaisy", "NdsArt: Origin HeartGold's tables failed", it) }
+                .onFailure { Log.w("pokedaisy", "NdsArt: Origin HeartGold's tables failed", it) }
             runCatching { RenegadePlatinum.data = if (RenegadePlatinum.matches(rom)) readRenegade(rom) else null }
-                .onFailure { android.util.Log.w("pokedaisy", "NdsArt: Renegade Platinum's tables failed", it) }
+                .onFailure { Log.w("pokedaisy", "NdsArt: Renegade Platinum's tables failed", it) }
             runCatching { Black2Redux.data = if (Black2Redux.matches(rom)) readRedux(rom) else null }
-                .onFailure { android.util.Log.w("pokedaisy", "NdsArt: the Redux hacks' tables failed", it) }
+                .onFailure { Log.w("pokedaisy", "NdsArt: the Redux hacks' tables failed", it) }
             names?.let { n ->
                 if (activeGame.isDsGame) {
                     romLanguage = n.language
@@ -147,7 +148,7 @@ object NdsArt {
                 PokegearMap.dir = RomArt.dir(filesDir)
                 dir = RomArt.dir(filesDir)
                 if (extractTo(rom, RomArt.dir(filesDir))) RomArt.announce()
-            }.onFailure { android.util.Log.w("pokedaisy", "NdsArt: failed", it) }
+            }.onFailure { Log.w("pokedaisy", "NdsArt: failed", it) }
         }, "pokedaisy-nds-art").apply { isDaemon = true; start() }
     }
 
