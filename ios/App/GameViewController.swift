@@ -99,6 +99,7 @@ final class GameViewController: UIViewController, MTKViewDelegate {
     @objc private func didBecomeActive() {
         lastTick = CACurrentMediaTime()
         if started { mtkView.isPaused = false }
+        becomeFirstResponder()
     }
 
     // MARK: layout
@@ -107,6 +108,8 @@ final class GameViewController: UIViewController, MTKViewDelegate {
         super.viewDidLayoutSubviews()
         gamepad.frame = view.bounds
         relayout()
+        // A rotation can leave the keyboard's presses with no one: take them back after every relayout.
+        if view.window != nil && !isFirstResponder { becomeFirstResponder() }
     }
 
     /// Landscape: the companion on the right at a whole scale, the game left of it, the buttons under the game.
