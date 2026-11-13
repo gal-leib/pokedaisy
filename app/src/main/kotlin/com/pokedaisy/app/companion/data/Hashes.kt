@@ -36,7 +36,7 @@ internal class Crc32 {
 }
 
 /** The CRC32 of [len] bytes of [b] from [off]. */
-fun crc32(b: ByteArray, off: Int = 0, len: Int = b.size - off): Long = Crc32().apply { update(b, off, len) }.value
+internal fun crc32(b: ByteArray, off: Int = 0, len: Int = b.size - off): Long = Crc32().apply { update(b, off, len) }.value
 
 /** SHA-1 fed in pieces, as Sha1() was. */
 internal class Sha1 {
@@ -50,4 +50,4 @@ internal class Sha1 {
 }
 
 /** The SHA-1 of [b]. */
-fun sha1(b: ByteArray): ByteArray = Sha1().apply { update(b) }.digest()
+internal fun sha1(b: ByteArray): ByteArray = Sha1().apply { update(b) }.digest()
