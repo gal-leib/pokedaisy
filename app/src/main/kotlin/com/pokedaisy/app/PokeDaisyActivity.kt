@@ -45,6 +45,7 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.pokedaisy.app.achievements.RetroAchievements
+import com.pokedaisy.app.achievements.downloadBadge
 import com.pokedaisy.app.companion.ui.AchievementBadges
 import com.pokedaisy.app.companion.BatteryStatus
 import com.pokedaisy.app.companion.DeviceBattery
@@ -2240,7 +2241,8 @@ class PokeDaisyActivity : Activity() {
         goImmersive()
         RetroAchievements.init(this)
         RetroAchievements.onUnlockSound = { unlockSound?.play() }
-        AchievementBadges.dir = java.io.File(cacheDir, "ra-badges")
+        AchievementBadges.dir = cacheDir.toOkioPath() / "ra-badges"
+        AchievementBadges.download = ::downloadBadge
         // A popup goes to the companion the player can see, else over the game (a DS game's touch screen hides it: #500).
         com.pokedaisy.app.companion.ui.AchievementPopupRoute.shownProbe = {
             val v = androidx.compose.ui.platform.LocalView.current
