@@ -43,7 +43,6 @@ kotlin {
             kotlin.srcDir(appTest.resolve("data"))
             kotlin.srcDir(appTest.resolve("i18n"))
             kotlin.exclude(appOnlyTests.map { "**/$it.kt" })
-            resources.srcDir(rootDir.resolve("app/src/test/resources"))
             dependencies {
                 implementation("junit:junit:4.13.2")
                 // The real org.json (android.jar's is a stub in unit tests).
@@ -57,6 +56,9 @@ android {
     namespace = "com.pokedaisy.shared"
     compileSdk = 34
     defaultConfig { minSdk = 26 }
+    // The fixtures the data tests load from the classpath. Set on Android's own test source set: a resource
+    // folder added to the Kotlin androidUnitTest source set doesn't reach AGP's unit-test resources.
+    sourceSets["test"].resources.srcDir(rootDir.resolve("app/src/test/resources"))
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
