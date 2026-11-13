@@ -326,5 +326,7 @@ dependencies {
     implementation("com.squareup.okio:okio:3.10.2")
     // Locks in the data code shared with the iPad app (atomicfu is Kotlin Multiplatform; the coroutines are above).
     implementation("org.jetbrains.kotlinx:atomicfu:0.23.1")
+    // The local date and time in the data code shared with the iPad app (Kotlin Multiplatform).
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 }
 
