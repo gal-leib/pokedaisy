@@ -22,6 +22,7 @@ class PokeDaisyApp : Application() {
             override var themeBeforeSeasonal by themePrefs::themeBeforeSeasonal
             override var darkMode by themePrefs::darkMode
         }
+        com.pokedaisy.app.companion.ui.DocsSources.current = StoreDocsSource(this)
         // The NEW tags' week starts with the first launch of a build that has the feature.
         com.pokedaisy.app.companion.NewFeatures.init(Prefs(this))
         val prefs = Prefs(this)
