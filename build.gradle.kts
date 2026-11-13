@@ -25,3 +25,7 @@ val appOnlyTests by extra(
         "RenegadePlatinumTest", "ShinyOddsTest",
     ),
 )
+// Test helpers in those folders that the app's own tests use too: compiled in both modules' tests.
+val sharedTestHelpers by extra(
+    listOf("FixtureMemoryReader", "RomFileReader", "Gen3RetailSupport", "NativeDecodeSupport", "SyntheticSave", "FakeLinkEngine"),
+)

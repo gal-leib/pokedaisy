@@ -187,11 +187,13 @@ kotlin {
 // compile, and their tests too but those that also use the app's classes (the root build's appOnlyTests).
 @Suppress("UNCHECKED_CAST")
 val appOnlyTests = rootProject.extra["appOnlyTests"] as List<String>
+@Suppress("UNCHECKED_CAST")
+val sharedTestHelpers = rootProject.extra["sharedTestHelpers"] as List<String>
 val sharedDirs = listOf("com/pokedaisy/app/companion/data/", "com/pokedaisy/app/companion/i18n/")
 tasks.withType<KotlinCompile>().configureEach {
     val tests = name.contains("UnitTest")
     exclude { e ->
-        !e.isDirectory && sharedDirs.any { e.path.startsWith(it) } && !(tests && e.file.nameWithoutExtension in appOnlyTests)
+        !e.isDirectory && sharedDirs.any { e.path.startsWith(it) } && !(tests && e.file.nameWithoutExtension in appOnlyTests + sharedTestHelpers)
     }
 }
 
