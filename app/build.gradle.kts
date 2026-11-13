@@ -324,5 +324,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Byte buffers, files and hashes in the data code shared with the iPad app (okio is Kotlin Multiplatform).
     implementation("com.squareup.okio:okio:3.10.2")
+    // Locks in the data code shared with the iPad app (atomicfu is Kotlin Multiplatform; the coroutines are above).
+    implementation("org.jetbrains.kotlinx:atomicfu:0.23.1")
 }
 
