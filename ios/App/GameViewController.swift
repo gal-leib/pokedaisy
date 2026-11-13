@@ -15,6 +15,8 @@ final class GameViewController: UIViewController, MTKViewDelegate {
     private var companionPoints = CGRect.zero
     private var lastTick = CACurrentMediaTime()
     private var keyboardKeys: UInt32 = 0
+    /// What shows of the top screen (Renderer.visibleAspect), as last laid out: a change (EXPAND on / off) lays out again.
+    private var visibleAspect: CGFloat = 1.5
     /// Keys pressed since the last tick, held or not (a quick key press can fall between two refreshes).
     private var keyboardPressed: UInt32 = 0
     private var keyboardFF = false
@@ -135,13 +137,19 @@ final class GameViewController: UIViewController, MTKViewDelegate {
             let topH = b.height - controlsH - m
             let s = companionScale(b.width * 0.5 - 1.5 * m, topH)
             let cw = 320 * s, ch = 240 * s
-            let gw = b.width - cw - 3 * m
-            let gh = min(gw * 0.6, topH)
+            // The game by what shows of it (a GBA's 3:2 sits inside the 400x240 canvas, EXPAND fills it), so the
+            // left edge, the gap between and the right edge come out even.
+            let va = visibleAspect
+            let canvasAspect = CGFloat(PD_IOS_TOP_W) / CGFloat(PD_IOS_TOP_H)
+            let vw = min(b.width - cw - 3 * m, topH * va)
+            let gh = vw / va
+            let gap = (b.width - vw - cw) / 3
             let bandH = max(ch, gh)
             let bandY = b.minY + m + (topH - bandH) / 2
-            comp = CGRect(x: b.maxX - m - cw, y: bandY + (bandH - ch) / 2, width: cw, height: ch)
-            let gameW = gh / 0.6
-            game = CGRect(x: b.minX + m + (gw - gameW) / 2, y: bandY + (bandH - gh) / 2, width: gameW, height: gh)
+            let visibleX = b.minX + gap
+            comp = CGRect(x: visibleX + vw + gap, y: bandY + (bandH - ch) / 2, width: cw, height: ch)
+            let gameW = gh * canvasAspect
+            game = CGRect(x: visibleX + (vw - gameW) / 2, y: bandY + (bandH - gh) / 2, width: gameW, height: gh)
             let area = CGRect(x: b.minX + m, y: b.maxY - controlsH, width: b.width - 2 * m, height: controlsH - m)
             let cy = area.maxY - pad / 2
             buttons[.dpad] = CGRect(x: area.minX + m, y: cy - pad / 2, width: pad, height: pad)
@@ -311,6 +319,10 @@ final class GameViewController: UIViewController, MTKViewDelegate {
             return
         }
         renderer.upload()
+        if abs(renderer.visibleAspect - visibleAspect) > 0.001 {
+            visibleAspect = renderer.visibleAspect
+            relayout()
+        }
         renderer.draw(in: view, layout: layout)
     }
 }

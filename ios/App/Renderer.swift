@@ -104,6 +104,14 @@ final class Renderer {
     }
 
     private var frameW = 0, frameH = 0, frameFills = false, bar: UInt32 = 0
+
+    /// Width over height of what shows of the top screen: all of it with EXPAND's window or a Game Boy game's coloured
+    /// bars, else the game's frame (a GBA's 3:2) centred in it. The layout keeps even edges by this, not the canvas.
+    var visibleAspect: CGFloat {
+        let canvas = CGFloat(PD_IOS_TOP_W) / CGFloat(PD_IOS_TOP_H)
+        guard frameW > 0, frameH > 0, !frameFills, bar == 0 else { return canvas }
+        return min(canvas, CGFloat(frameW) / CGFloat(frameH))
+    }
     private var overlayShown = false, overlayDim = false
 
     /// Copies what changed since the last refresh out of the C side.
