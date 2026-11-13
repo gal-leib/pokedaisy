@@ -21,7 +21,7 @@ private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /** Runs [block] on an IO thread, as the `Thread(block, name).apply { isDaemon = true; start() }` it replaced; [name]
  * shows in a debugger. A throw ends that job alone. */
-fun background(name: String, block: () -> Unit): Job = backgroundScope.launch(CoroutineName(name)) { block() }
+internal fun background(name: String, block: () -> Unit): Job = backgroundScope.launch(CoroutineName(name)) { block() }
 
 /** Runs the jobs [post]ed to it one at a time, in order, on an IO thread: a single-thread executor's queue. */
 class SerialQueue(name: String) {
