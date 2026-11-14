@@ -2,7 +2,7 @@
 //
 // The GBA / Game Boy game itself - starting it, its frames, picture, sound, keys and memory reads - is pk_session.c,
 // behind the plain C API in pk_api.h that the iPad app calls too; the wrappers here add the DS games in front of it.
-// The rest (states, cheats, EXPAND, REWIND, the render core, the game calls...) still works on its state here as `g`
+// The rest (cheats, EXPAND, REWIND, the render core, the game calls...) still works on its state here as `g`
 // (pk_session.h) and moves under pk_api.h area by area.
 // Everything here is called from a single Kotlin "emu thread", which also copies
 // pkVideoBuffer()'s frames out for the GL thread (EmulatorView.publishFrame).
@@ -764,49 +764,10 @@ Java_com_pokedaisy_app_MgbaCore_pkSaveState(JNIEnv* env, jobject thiz, jstring j
         (*env)->ReleaseStringUTFChars(env, jPath, path);
         return ok ? JNI_TRUE : JNI_FALSE;
     }
-    if (!g.core) {
-        return JNI_FALSE;
-    }
     const char* path = (*env)->GetStringUTFChars(env, jPath, NULL);
-    // O_RDWR: the extended (mpack) state writer reads back parts of the VFile.
-    struct VFile* vf = VFileOpen(path, O_RDWR | O_CREAT | O_TRUNC);
+    bool ok = pk_api_save_state(path);
     (*env)->ReleaseStringUTFChars(env, jPath, path);
-    if (!vf) {
-        return JNI_FALSE;
-    }
-    bool ok = mCoreSaveStateNamed(g.core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC | SAVESTATE_METADATA);
-    vf->close(vf);
     return ok ? JNI_TRUE : JNI_FALSE;
-}
-
-// True if the save file holds exactly [data] (bytes it doesn't have yet count as
-// 0xFF, erased flash: mGBA fills a short file with that). Only the first
-// [size] bytes count, so mGBA's RTC footer on a .sav doesn't.
-static bool pk_save_file_equals(const uint8_t* data, size_t size) {
-    struct VFile* vf = g.saveVf;
-    if (!vf || g.saveReadOnly) {
-        return true;                    // no file a state load could overwrite
-    }
-    uint8_t buf[4096];
-    size_t off = 0;
-    vf->seek(vf, 0, SEEK_SET);
-    while (off < size) {
-        size_t want = size - off < sizeof(buf) ? size - off : sizeof(buf);
-        ssize_t n = vf->read(vf, buf, want);
-        if (n <= 0) {
-            break;
-        }
-        if (memcmp(buf, data + off, (size_t) n) != 0) {
-            return false;
-        }
-        off += (size_t) n;
-    }
-    for (; off < size; ++off) {
-        if (data[off] != 0xFF) {
-            return false;
-        }
-    }
-    return true;
 }
 
 // Does the save inside the state at [path] match the save file the game just
@@ -823,26 +784,9 @@ Java_com_pokedaisy_app_MgbaCore_pkStateMatchesSave(JNIEnv* env, jobject thiz, js
         (*env)->ReleaseStringUTFChars(env, jPath, path);
         return r;
     }
-    if (!g.core) {
-        return -1;
-    }
     const char* path = (*env)->GetStringUTFChars(env, jPath, NULL);
-    struct VFile* vf = VFileOpen(path, O_RDONLY);
+    int result = pk_api_state_matches_save(path);
     (*env)->ReleaseStringUTFChars(env, jPath, path);
-    if (!vf) {
-        return -1;
-    }
-    int result = -1;
-    struct mStateExtdata extdata;
-    mStateExtdataInit(&extdata);
-    if (mCoreExtractExtdata(g.core, vf, &extdata)) {
-        struct mStateExtdataItem item;
-        if (mStateExtdataGet(&extdata, EXTDATA_SAVEDATA, &item) && item.data && item.size > 0) {
-            result = pk_save_file_equals(item.data, (size_t) item.size) ? 1 : 0;
-        }
-    }
-    mStateExtdataDeinit(&extdata);
-    vf->close(vf);
     return result;
 }
 
@@ -856,19 +800,9 @@ Java_com_pokedaisy_app_MgbaCore_pkLoadState(JNIEnv* env, jobject thiz, jstring j
         (*env)->ReleaseStringUTFChars(env, jPath, path);
         return ok ? JNI_TRUE : JNI_FALSE;
     }
-    if (!g.core) {
-        return JNI_FALSE;
-    }
     const char* path = (*env)->GetStringUTFChars(env, jPath, NULL);
-    struct VFile* vf = VFileOpen(path, O_RDONLY);
+    bool ok = pk_api_load_state(path);
     (*env)->ReleaseStringUTFChars(env, jPath, path);
-    if (!vf) {
-        return JNI_FALSE;
-    }
-    bool ok = mCoreLoadStateNamed(g.core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
-    vf->close(vf);
-    if (ok) pk_heal_rtc(g.core);
-    pk_wide_reset();   // the RAM it kept from the last frame is another moment's
     return ok ? JNI_TRUE : JNI_FALSE;
 }
 

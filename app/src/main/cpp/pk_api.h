@@ -1,7 +1,7 @@
 // PokeDaisy's emulator core as a plain C API: what a host calls to run a GBA or Game Boy game on mGBA and read its
 // memory, with no JNI in it. Android's MgbaCore.kt reaches it through pokedaisy_jni.c (which adds the DS games on
 // melonDS / DSperate in front of it); the iPad app calls it straight from Kotlin / Swift. The rest of pokedaisy_jni.c
-// (states, cheats, EXPAND, REWIND, the render core, the game calls...) moves under here area by area.
+// (cheats, EXPAND, REWIND, the render core, the game calls...) moves under here area by area.
 //
 // Threads: the emu thread owns the game - init / deinit, frames, keys, audio. pk_api_read and the ROM reads may come
 // from any thread (they take the core lock); they return false with no game up. GPL-3.0 (see NOTICE).
@@ -56,6 +56,16 @@ void pk_api_set_audio_rate(double rate);
 /** Lets a save the game is writing finish before the game stops or a state is taken: runs up to [maxFrames] frames
  * unheard and unseen until it has (pk_host.h's pk_finish_save). Returns the frames run. */
 int pk_api_finish_save(int maxFrames);
+
+/** mGBA extended state with battery save, RTC and metadata. Game thread, between frames; false on failure.
+ * Saving truncates [path]: hosts should write a temporary file and atomically replace the destination.
+ * Loading intentionally restores the battery save too; make a backup before a manual load. */
+bool pk_api_save_state(const char* path);
+bool pk_api_load_state(const char* path);
+/** Compare the state's battery save with the opened save file before automatic resume: 1 = equal, 0 = changed,
+ * -1 = no embedded save or unreadable state. RTC footers are ignored; missing save bytes count as erased 0xFF.
+ * Call on the game thread. Hosts must skip automatic resume when they cannot establish a match. */
+int pk_api_state_matches_save(const char* path);
 
 /** [len] bytes of the game's memory at [addr] into [dst]: the GBA's bus, a GBA cart's ROM from its file, a Game Boy
  * Color's WRAM bank B as (B << 16) | D000-DFFF. False (and [dst] untouched) with no game up. Any thread. */

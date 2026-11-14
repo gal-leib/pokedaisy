@@ -14,3 +14,8 @@ add_test(NAME diagnostic-roms COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOU
 set_tests_properties(diagnostic-roms PROPERTIES FIXTURES_SETUP diagnostics)
 add_test(NAME pk_api COMMAND pk_api_test "${CMAKE_CURRENT_BINARY_DIR}")
 set_tests_properties(pk_api PROPERTIES FIXTURES_REQUIRED diagnostics TIMEOUT 60)
+
+add_executable(pk_state_test pk_state_test.c)
+target_link_libraries(pk_state_test PRIVATE pk_api)
+add_test(NAME pk_state COMMAND pk_state_test "${CMAKE_CURRENT_BINARY_DIR}")
+set_tests_properties(pk_state PROPERTIES FIXTURES_REQUIRED diagnostics TIMEOUT 60)
