@@ -1,8 +1,9 @@
-@file:OptIn(ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 
 package com.pokedaisy.app.game
 
 import com.pokedaisy.app.core.PkApiCore
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.addressOf
@@ -135,7 +136,7 @@ fragment float4 game_fragment(V in [[stage_in]], constant Quad& q [[buffer(0)]],
                 val desc = MTLRenderPipelineDescriptor()
                 desc.vertexFunction = library.newFunctionWithName("game_vertex")
                 desc.fragmentFunction = library.newFunctionWithName("game_fragment")
-                desc.colorAttachments.objectAtIndexedSubscript(0u)?.pixelFormat = pixelFormat
+                desc.colorAttachments.objectAtIndexedSubscript(0u).pixelFormat = pixelFormat
                 val pipeline = device.newRenderPipelineStateWithDescriptor(desc, error = error.ptr)
                 if (pipeline == null) {
                     NSLog("PokeDaisy: the game's pipeline didn't build: %@", error.value?.localizedDescription)
