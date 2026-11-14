@@ -3707,7 +3707,7 @@ The iPad battle controls use `IosBattleInput`, an adapter over the shared `Battl
 runs it before every emulated frame, after combining the touch, controller and keyboard input; scripted presses own
 those keys only while a sequence is active. Fast battle-state checks run every four game frames and request a full
 companion sample on a transition. Detected cursor and party-menu addresses configure its closed-loop navigation;
-without memory writes it walks the cursors. Party switching is offered only where the detected tables support it.
+without memory writes it walks the cursors. Party switching uses `battleSwitchAddrsFor`, the Android activity's verified mappings shared in place, including each hack's structure size and grid layout. It is offered only where those mappings support it.
 The shared battle view, style, focus, info and one-tap settings persist in `NSUserDefaults`.
 
 ## ScreenScraper and the dual-screen launcher
