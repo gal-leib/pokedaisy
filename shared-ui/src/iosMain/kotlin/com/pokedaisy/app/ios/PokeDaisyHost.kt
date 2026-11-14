@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package com.pokedaisy.app.ios
 
 import androidx.compose.runtime.collectAsState
