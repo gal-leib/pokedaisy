@@ -40,7 +40,7 @@ class CoopLobbyTest {
     }
 
     private fun lobby(fake: FakeLobby) =
-        CoopLobby(fake, "https://relay.example.com", { now }, CoopBackoff(java.util.Random(1)))
+        CoopLobby(fake, "https://relay.example.com", { now }, CoopBackoff(kotlin.random.Random(1)))
 
     private fun msg(vararg parts: Any): ByteArray {
         val out = ByteArrayOutputStream()
