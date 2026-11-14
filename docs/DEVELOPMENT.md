@@ -3699,7 +3699,7 @@ generated project stays out of git), whose build runs `./gradlew :shared-ui:embe
 The game's place lists the games added from Files (`PokeDaisyHost.games` / `addGames`, over `RomPicker`) until one is
 picked, then holds its `GameViewController` (`PokeDaisyHost.gameViewController`, GAMES closes it: `closeGame` writes the
 save). While a game runs `PokeDaisyHost` reads it into its `TelemetryStore` every half second off the main thread, and
-the companion follows it. The game's buttons are a strip under it: `PokeDaisyHost.touchControlsViewController` (the shared `TouchControls`, extras and X / Y off) or `GamepadView.swift`'s UIKit buttons (TOUCH switches; `setTouchKeys` for both), until a touch-delay test on the iPad picks one; a controller or a keyboard works too. The companion's SETTINGS there is `IosCompanionSettings`: only the rows the iPad does so far (`CompanionSettings.shownRows`: BATTLE HINTS, FOE IVS, TAB BAR, DARK MODE, THEME, LANGUAGE, HELP), kept in `NSUserDefaults` under the Android prefs' names; a game's start also runs RomArt / Gen1Art / Gen2Art's scan, as the Android activity does, so the MAP and party art draw. The game list's LOAD SAVE is `PokeDaisyHost.loadSave` (GameSaves.load's rules: the old save renamed to a dated backup first, put back if the write fails; RetroArch's rzip saves refused for now, RzipSave being JVM-only). The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
+the companion follows it. The game's buttons are a strip under it: `PokeDaisyHost.touchControlsViewController` (the shared `TouchControls`, extras and X / Y off) or `GamepadView.swift`'s UIKit buttons (TOUCH switches; `setTouchKeys` for both), until a touch-delay test on the iPad picks one; a controller or a keyboard works too. The companion's SETTINGS there is `IosCompanionSettings`: only the rows the iPad does so far (`CompanionSettings.shownRows`: battle options, FF / GAME SPEED, volume / mute, TAB BAR, DARK MODE, THEME, LANGUAGE, HELP), kept in `NSUserDefaults` under the Android prefs' names; a game's start also runs RomArt / Gen1Art / Gen2Art's scan, as the Android activity does, so the MAP and party art draw. The game list's LOAD SAVE is `PokeDaisyHost.loadSave` (GameSaves.load's rules: the old save renamed to a dated backup first, put back if the write fails; RetroArch's rzip saves refused for now, RzipSave being JVM-only). The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
 into the bundle's `fonts` folder. CI's "iPad app (simulator build)" job generates the project and builds it for the
 simulator without signing (advisory for now). `iosApp/README.md` has the steps for a Mac.
 
@@ -3709,6 +3709,12 @@ those keys only while a sequence is active. Fast battle-state checks run every f
 companion sample on a transition. Detected cursor and party-menu addresses configure its closed-loop navigation;
 without memory writes it walks the cursors. Party switching uses `battleSwitchAddrsFor`, the Android activity's verified mappings shared in place, including each hack's structure size and grid layout. It is offered only where those mappings support it.
 The shared battle view, style, focus, info and one-tap settings persist in `NSUserDefaults`.
+
+The iPad playback settings update `GameViewController` on the main thread: `FramePacer` scales emulated time for a
+capped speed, with real-time catch-up bounded before scaling; unlimited FF runs batches with an 8 ms budget.
+`pk_api_set_audio_rate` requests fewer samples per emulated frame during FF (pitched audio at the device's 48 kHz).
+`GameAudio` sets mixer volume for GAME VOLUME / MUTE GAME. Normal speed is per ROM path; FF and volume are app-wide.
+There is no SMART FF or steady music yet; those rows stay hidden.
 
 ## ScreenScraper and the dual-screen launcher
 

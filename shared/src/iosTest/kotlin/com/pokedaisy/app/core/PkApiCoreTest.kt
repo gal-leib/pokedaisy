@@ -83,6 +83,30 @@ class PkApiCoreTest {
     }
 
     @Test
+    fun audioRatesSupportSlowMotionAndFastForwardOnBothCores() {
+        val samples = ShortArray(16384)
+        for (rom in listOf("diagnostic.gba", "diagnostic.gb")) {
+            assertTrue(PkApiCore.start("$dir/$rom", null))
+            // Let the Game Boy boot and enable its LCD/audio before timing full frames.
+            repeat(60) { PkApiCore.runFrame() }
+            for (speed in listOf(0.25, 1.0, 2.0, 10.0)) {
+                PkApiCore.setAudioRate(PkApiCore.SAMPLE_RATE / speed)
+                repeat(4) { PkApiCore.runFrame() }
+                // The core mixes sound in blocks, so compare a half second rather than one frame's boundary.
+                var count = 0
+                repeat(30) {
+                    PkApiCore.runFrame()
+                    count += PkApiCore.audio(samples)
+                }
+                val expected = PkApiCore.SAMPLE_RATE / speed / com.pokedaisy.app.game.FramePacer.FPS * 2 * 30
+                assertTrue(kotlin.math.abs(count - expected) < expected * 0.01 + 128,
+                    "$rom at ${speed}x: $count samples, expected $expected")
+            }
+            PkApiCore.stop()
+        }
+    }
+
+    @Test
     fun noGameReadsNothing() {
         PkApiCore.stop()
         assertNull(PkApiCore.readBytes(0x02000000, 4))

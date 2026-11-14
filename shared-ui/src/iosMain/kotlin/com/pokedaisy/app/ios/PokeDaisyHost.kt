@@ -149,11 +149,12 @@ object PokeDaisyHost {
         val g = GameViewController(romPath, RomPicker.savePathFor(romPath), onFailed)
         game = g
         val (code, revision) = romHeader(romPath) ?: (null to 0)
-        settings = IosCompanionSettings(romPath, code, onClose = { onCloseRequested() }, onRestart = { onRestartRequested() })
+        settings = IosCompanionSettings(romPath, code, g, onClose = { onCloseRequested() }, onRestart = { onRestartRequested() })
             .also { L10n.apply(it.appLanguage, code) }
-        battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { false }).also { b ->
+        battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
+            g.quietPress = { b.quietPress }
         }
         prefetchArt(romPath)
         timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
