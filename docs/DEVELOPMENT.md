@@ -3647,6 +3647,14 @@ built pret decomp checkouts (`pokefirered/`, `pokeemerald/`, `pokeruby/`,
 `DECOMPS` environment variable. Machine-local paths go in an untracked
 `local.mk`, which the Makefile includes (see `local.mk.example`).
 
+### Shared state files
+
+`StateFiles` (the shared data module) owns the `ss0` to `ss9` layout, thumbnails, companion caches, one-level save
+undo and newest-state selection. Android's `SaveStates` keeps its File-based API and existing CRC directory names,
+over the same layout. New state blobs write to a temporary sibling before replacing the slot. Optional sidecars are
+removed when unavailable, so a new state cannot keep an old screenshot. The iPad host can use a ROM-content key
+rather than its changing app-container path. `backupBattery` keeps distinct copies before an explicit state load.
+
 ### The core's state API
 
 `pk_api_save_state`, `pk_api_load_state` and `pk_api_state_matches_save` are the GBA / Game Boy state functions,
