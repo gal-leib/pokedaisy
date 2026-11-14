@@ -3949,6 +3949,11 @@ decoded covers and native action callbacks. Its external-screen launcher uses th
 media fetching, permissions, scanning and launches stay outside shared UI. Both grid and list retain stable item keys
 and their existing UP-to-header focus behavior.
 
+`AppPages.kt` also shares Android's setup frame, ROM/save/button pages, progress bar and searchable app-settings home.
+Android retains its setup state, pickers and optional media services; the shared pages receive portable display models
+and callbacks. Hosts that copy picked games rather than linking folders can select that capability without presenting
+Android permission instructions. The settings host retains focus ownership and row actions while sharing the presenter.
+
 GamePanelLayout returns a TouchStage directly for the one-window game host and its touch editor. Portrait
 uses Android's PortraitLayout with no resize grip, the player's UNDER GAME / AT BOTTOM, and Android's controls area: with
 UNDER GAME a strip of `TouchGeometry.naturalHeight` along the bottom (`padStrip`, as `PokeDaisyActivity.syncTouchControls`
