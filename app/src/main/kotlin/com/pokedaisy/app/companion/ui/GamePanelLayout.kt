@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import com.pokedaisy.app.companion.TouchControlsStyle
@@ -46,7 +47,11 @@ fun GameScreen(
     stage: TouchStage, modifier: Modifier = Modifier,
     game: @Composable () -> Unit, companion: @Composable () -> Unit, controls: @Composable () -> Unit,
 ) {
-    Layout(content = { Box { game() }; Box { companion() }; Box { controls() } }, modifier = modifier.fillMaxSize()) { items, constraints ->
+    Layout(content = {
+        Box(Modifier.clipToBounds(), propagateMinConstraints = true) { game() }
+        Box(Modifier.clipToBounds(), propagateMinConstraints = true) { companion() }
+        Box(Modifier.clipToBounds(), propagateMinConstraints = true) { controls() }
+    }, modifier = modifier.fillMaxSize()) { items, constraints ->
         val rects = listOf(stage.game, stage.companion ?: Rect.Zero, stage.area)
         val placed = items.zip(rects).map { (item, rect) ->
             val left = rect.left.roundToInt().coerceIn(0, constraints.maxWidth)
