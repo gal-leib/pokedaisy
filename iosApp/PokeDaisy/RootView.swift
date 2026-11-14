@@ -8,6 +8,8 @@ import PokeDaisyUI
 struct RootView: View {
     @State private var playing: String?
     @State private var failed: String?
+    /** Bumped by RESTART GAME, so the game's view (and the game) is made again. */
+    @State private var restarts = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -21,6 +23,11 @@ struct RootView: View {
             }
         }
         .background(Color.black)
+        .onAppear {
+            // The companion's SETTINGS > CLOSE GAME / RESTART GAME.
+            PokeDaisyHost.shared.onCloseRequested = { stop() }
+            PokeDaisyHost.shared.onRestartRequested = { restarts += 1 }
+        }
     }
 
     @ViewBuilder private var gameArea: some View {
@@ -34,7 +41,7 @@ struct RootView: View {
                         }
                     })
                 })
-                .id(rom)
+                .id("\(rom)#\(restarts)")
                 Button("GAMES", action: stop)
                     .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .padding(8)

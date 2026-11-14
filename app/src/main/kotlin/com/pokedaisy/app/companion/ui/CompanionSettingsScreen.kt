@@ -159,6 +159,7 @@ fun CompanionSettingsScreen(
                     }.orEmpty() + homeRows(settings, barCount(settings, availableTabs), { tick++ }, { page = it }, { selector = it },
                         { c -> confirm = Confirm(c.title, c.message, c.confirmLabel, c.onConfirm).also { it.cancelLabel = c.cancelLabel; it.onCancel = c.onCancel } })
                         .let { if (settings.gameBlocked) withoutGameRows(it) else it }
+                        .let { rows -> settings.shownRows?.let { onlyRows(rows, it) } ?: rows }
                     Page.TABS -> COMPANION_TABS.map { id ->
                         val shown = id in settings.companionTabs
                         // A tab this game doesn't have (DEX, GUIDE) keeps its setting for the games that do.
@@ -475,6 +476,12 @@ private fun withoutGameRows(rows: List<SettingRow>): List<SettingRow> {
         if (r.header) skipping = r.label in BLOCKED_GROUPS
         !skipping && r.label !in BLOCKED_ROWS
     }
+}
+
+/** [rows] cut to the ones labelled in [shown], with the titles of the groups that still have one. */
+private fun onlyRows(rows: List<SettingRow>, shown: Set<String>): List<SettingRow> {
+    val kept = rows.filter { it.header || it.label in shown }
+    return kept.filterIndexed { i, r -> !r.header || kept.getOrNull(i + 1)?.header == false }
 }
 
 private fun homeRows(

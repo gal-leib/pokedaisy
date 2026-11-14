@@ -4,13 +4,23 @@ package com.pokedaisy.app.ios
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.ComposeUIViewController
 import com.pokedaisy.app.companion.TelemetryStore
+import com.pokedaisy.app.companion.data.Gen1Art
+import com.pokedaisy.app.companion.data.Gen2Art
+import com.pokedaisy.app.companion.data.RomArt
+import com.pokedaisy.app.companion.i18n.L10n
 import com.pokedaisy.app.companion.ui.CompanionScreen
 import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.game.GameViewController
 import com.pokedaisy.app.game.RomPicker
 import kotlinx.atomicfu.atomic
+import okio.FileSystem
+import okio.Path.Companion.toPath
+import okio.buffer
+import okio.use
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSTimer
 import platform.UIKit.UIViewController
@@ -32,6 +42,12 @@ object PokeDaisyHost {
     /** The companion's view of the running game; "starting…" until a game feeds it. */
     val telemetry = TelemetryStore()
 
+    /** Swift's: CLOSE GAME / RESTART GAME in the companion's SETTINGS (the game's place is SwiftUI's to change). */
+    var onCloseRequested: () -> Unit = {}
+    var onRestartRequested: () -> Unit = {}
+
+    // The running game's SETTINGS; null = NO GAME RUNNING.
+    private var settings by mutableStateOf<IosCompanionSettings?>(null)
     private var started = false
     private var game: GameViewController? = null
     private var timer: NSTimer? = null
@@ -51,7 +67,7 @@ object PokeDaisyHost {
         return ComposeUIViewController {
             AppTheme {
                 val snapshot by telemetry.snapshot.collectAsState()
-                CompanionScreen(snapshot)
+                CompanionScreen(snapshot, settings = settings)
             }
         }
     }
@@ -75,6 +91,10 @@ object PokeDaisyHost {
         telemetry.reset()
         val g = GameViewController(romPath, RomPicker.savePathFor(romPath), onFailed)
         game = g
+        val code = romCode(romPath)
+        settings = IosCompanionSettings(romPath, code, onClose = { onCloseRequested() }, onRestart = { onRestartRequested() })
+            .also { L10n.apply(it.appLanguage, code) }
+        prefetchArt(romPath)
         timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
         return g
     }
@@ -85,7 +105,33 @@ object PokeDaisyHost {
         timer = null
         game?.close()
         game = null
+        settings = null
         telemetry.reset()
+    }
+
+    /** The party art, region maps and card pieces the screens draw, rebuilt from the player's ROM the first time it
+     * runs (as the Android app does on launch; RomArt / Gen1Art / Gen2Art scan in the background). */
+    private fun prefetchArt(romPath: String) {
+        val files = appFilesDir()
+        val rom = romPath.toPath()
+        when (romPath.substringAfterLast('.', "").lowercase()) {
+            "gba" -> RomArt.prefetch(files, "${rom.name}-${FileSystem.SYSTEM.metadataOrNull(rom)?.size ?: 0}", rom)
+            "gb", "gbc" -> {
+                Gen1Art.prefetch(files, rom)
+                Gen2Art.prefetch(files, rom)
+            }
+        }
+    }
+
+    /** A GBA ROM's four-letter game code (header 0xAC), or null. */
+    private fun romCode(romPath: String): String? {
+        if (!romPath.lowercase().endsWith(".gba")) return null
+        return runCatching {
+            FileSystem.SYSTEM.source(romPath.toPath()).buffer().use { s ->
+                s.skip(0xAC)
+                s.readUtf8(4)
+            }
+        }.getOrNull()
     }
 
     private fun sample() {
