@@ -24,6 +24,9 @@ targets:
       path: PokeDaisy/Info.plist
       properties:
         CFBundleDisplayName: PokeDaisy
+        # The app's Documents (roms/, saves/) show in Files, so saves can be copied out and in.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UILaunchScreen: {}
         UIRequiresFullScreen: false
         UISupportedInterfaceOrientations~ipad:

@@ -3692,8 +3692,10 @@ The module links into one static framework, `PokeDaisyUI`.
 A SwiftUI shell over that framework: `xcodegen` in `iosApp/` makes `PokeDaisy.xcodeproj` from `project.yml` (the
 generated project stays out of git), whose build runs `./gradlew :shared-ui:embedAndSignAppleFrameworkForXcode` first.
 `RootView` puts the game left and the companion right when the iPad is sideways, the game over the companion upright.
-The game's place is `GameScreen.makeViewController`: the game side (the iOS core's Metal view, sound, input) sets it; a
-dark placeholder stands in until then. The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
+The game's place lists the games added from Files (`PokeDaisyHost.games` / `addGames`, over `RomPicker`) until one is
+picked, then holds its `GameViewController` (`PokeDaisyHost.gameViewController`, GAMES closes it: `closeGame` writes the
+save). While a game runs `PokeDaisyHost` reads it into its `TelemetryStore` every half second off the main thread, and
+the companion follows it. No on-screen buttons yet: a controller or a keyboard. The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
 into the bundle's `fonts` folder. CI's "iPad app (simulator build)" job generates the project and builds it for the
 simulator without signing (advisory for now). `iosApp/README.md` has the steps for a Mac.
 
