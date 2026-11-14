@@ -87,6 +87,8 @@ class PkApiCoreTest {
         val samples = ShortArray(16384)
         for (rom in listOf("diagnostic.gba", "diagnostic.gb")) {
             assertTrue(PkApiCore.start("$dir/$rom", null))
+            // Let the Game Boy boot and enable its LCD/audio before timing full frames.
+            repeat(60) { PkApiCore.runFrame() }
             for (speed in listOf(0.25, 1.0, 2.0, 10.0)) {
                 PkApiCore.setAudioRate(PkApiCore.SAMPLE_RATE / speed)
                 repeat(4) { PkApiCore.runFrame() }
