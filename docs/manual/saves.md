@@ -165,3 +165,13 @@ your last load. Hold a saved screenshot to delete its slot, then confirm.
 Loading a state also restores the battery save it contains. Your current save is copied into `saves/pokedaisy-backups`
 before a manual load. The latest ten distinct copies are kept. You can find both saves and `states` in the app's
 folder in Files. Keep saving through the game's own menu too.
+
+`RESUME GAMES` is on by default. You can change it in the companion's `SETTINGS`, under `APP`. Closing a game or
+putting the app in the background saves a resume snapshot. Opening that game again picks up from the snapshot only
+when its battery data still matches your save file. If the save changed, or the snapshot cannot be checked, the game
+starts from your save file instead. Returning to a game still open in memory carries on from its paused moment.
+
+`LOAD SAVE` and `RESTART GAME` always start from the battery save, even if an older snapshot has matching save data.
+With `RESUME GAMES` off, `GAMES` and `CLOSE GAME` warn before closing, because progress since your last in-game save
+will be lost. If resume data cannot be updated, `CLOSE GAME` and `RESTART GAME` leave the game open so you can save
+through its own menu before leaving.

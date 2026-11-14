@@ -28,6 +28,12 @@ MORE > STATES has ten slots, screenshots, delete and both undo actions, through 
 Files are in Documents/states/<ROM SHA-256>. A manual load restores battery data too, so the current save is backed
 up in Documents/saves/pokedaisy-backups first. State operations run between game frames and reset queued audio/input.
 
+RESUME GAMES (companion SETTINGS > APP, on by default) captures a resume state on background/close. An initial open
+loads the newest resume/manual snapshot only after the core verifies its embedded battery data matches the save.
+Changed/unverifiable automatic states are parked; normal foreground returns retain the paused core. Import and
+RESTART GAME commit a persistent fresh-boot marker before changing saves/opening the core, cleared only by a new
+successful resume capture. Turning resume off keeps this marker and removes its automatic snapshot.
+
 ## Build and run
 
 On a Mac with Xcode 16, a JDK 17 and the Android SDK (Gradle configures the shared modules' Android side too; `sdk.dir` in `local.properties`):

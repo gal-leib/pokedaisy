@@ -194,8 +194,10 @@ object NewFeatures {
     const val IPAD_PLAYBACK = "ipad_playback"
 
     const val IPAD_STATES = "ipad_states"
+    const val IPAD_RESUME = "ipad_resume"
 
     val ALL = listOf(
+        IPAD_RESUME,
         IPAD_STATES,
         IPAD_PLAYBACK,
         HUD, BATTLE_BUTTONS, GAME_HOTKEYS, COMPANION_WINDOW, HUD_PC, QUICK_MENU, HUD_REPEL, SINGLE_SCREEN, MORE_TAB, TOUCH_CONTROLS,

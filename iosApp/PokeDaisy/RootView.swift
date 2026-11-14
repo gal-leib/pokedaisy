@@ -64,7 +64,7 @@ struct RootView: View {
             })
             .id("\(rom)#\(restarts)")
             HStack(spacing: 0) {
-                chip("GAMES", action: stop)
+                chip("GAMES", action: { PokeDaisyHost.shared.requestCloseGame() })
                 chip(nativeControls ? "TOUCH: NATIVE" : "TOUCH: SHARED") {
                     PokeDaisyHost.shared.setTouchKeys(keys: 0)
                     nativeControls.toggle()
