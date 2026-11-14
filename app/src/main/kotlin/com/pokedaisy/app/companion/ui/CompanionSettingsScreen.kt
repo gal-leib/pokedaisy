@@ -600,7 +600,7 @@ private fun homeRows(
             SettingRow(tk("REWIND"), onOff(s.rewind)) { s.setRewind(!s.rewind); changed() }
         } else null,
         // SCENE SPEEDS, FF MODE and FF MUSIC: set once and rarely touched, on their own page.
-        SettingRow(tk("SPEED OPTIONS"), null, subtitle = "Scene speeds, FF mode and FF music", opensPage = true) { navigate(Page.SPEED) },
+        SettingRow(tk("SPEED OPTIONS"), null, labelBadge = s.speedOptionsBadge, subtitle = "Scene speeds, FF mode and FF music", opensPage = true) { navigate(Page.SPEED) },
         groupTitle(tk("SOUND")),
         // The game's loudness under the device's own volume (100% = the device's); MUTE GAME keeps it for after.
         SettingRow(tk("GAME VOLUME"), gameVolumeLabel(s.gameVolume),
@@ -1035,13 +1035,13 @@ private fun speedRows(s: CompanionSettings, changed: () -> Unit, select: (Select
     listOf(groupTitle(tk("SCENE SPEEDS"))) + sceneRows(s, changed, select) + listOf(
         groupTitle(tk("FAST-FORWARD")),
         // SMART: menus (party, bag, ... in battle too) and the region map at 1x; NORMAL: fast everywhere.
-        SettingRow(tk("FF MODE"), s.ffMode.label, subtitle = "SMART slows down for menus and the map") {
+        SettingRow(tk("FF MODE"), s.ffMode.label, labelBadge = s.speedOptionsBadge, subtitle = "SMART slows down for menus and the map") {
             val modes = FfMode.entries
             select(Selector(tk("FF MODE"), modes.map { it.label }, s.ffMode.label) { l -> s.setFfMode(modes.first { it.label == l }); changed() })
         },
         // STEADY / SPED-UP / OFF (FfMusicMode's order).
-        SettingRow(tk("FF MUSIC"), s.ffMusicMode.label, subtitle = "What you hear while fast-forwarding") {
-            val modes = FfMusicMode.entries
+        SettingRow(tk("FF MUSIC"), s.ffMusicMode.label, enabled = s.ffMusicModes.size > 1, subtitle = "What you hear while fast-forwarding") {
+            val modes = s.ffMusicModes
             select(Selector(tk("FF MUSIC"), modes.map { it.label }, s.ffMusicMode.label) { l -> s.setFfMusicMode(modes.first { it.label == l }); changed() })
         },
     )
@@ -1080,7 +1080,7 @@ private fun displayRows(s: CompanionSettings, changed: () -> Unit, navigate: (Pa
 private fun sceneRows(s: CompanionSettings, changed: () -> Unit, select: (Selector) -> Unit): List<SettingRow> {
     val labels = SCENE_SPEEDS.map(::sceneSpeedLabel)
     fun row(label: String, value: Float, enabled: Boolean = true, set: (Float) -> Unit) =
-        SettingRow(label, if (enabled) sceneSpeedLabel(value) else tk("N/A"), enabled = enabled) {
+        SettingRow(label, if (enabled) sceneSpeedLabel(value) else tk("N/A"), enabled = enabled, labelBadge = s.speedOptionsBadge) {
             if (enabled) select(Selector(label, labels, sceneSpeedLabel(value)) { l -> set(SCENE_SPEEDS[labels.indexOf(l)]); changed() })
         }
     return listOf(

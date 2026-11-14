@@ -82,6 +82,8 @@ class GameViewController(
     var muted: Boolean = false
     /** Shared battle automation runs once per emulated frame, on every input source. */
     var frameKeys: (Int) -> Int = { it }
+    var frameSpeed: () -> Double = { speed }
+    var afterFrame: () -> Unit = {}
     var holdPicture: () -> Boolean = { false }
     var quietPress: () -> Boolean = { false }
     private var audioSpeed = -1.0
@@ -188,7 +190,7 @@ class GameViewController(
 
     private fun refresh(view: MTKView) {
         if (!running) return
-        val rate = speed.takeIf { it.isFinite() && it in 0.0..64.0 } ?: 1.0
+        val rate = frameSpeed().takeIf { it.isFinite() && it in 0.0..64.0 } ?: 1.0
         val now = CACurrentMediaTime()
         if (rate != audioSpeed) {
             pacer.reset()
@@ -203,9 +205,12 @@ class GameViewController(
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
             PkApiCore.setKeys(frameKeys(input.keys()))
             PkApiCore.runFrame()
+            afterFrame()
             audio.volume = if (muted || rate == 0.0 || quietPress()) 0f else volume
             audio.push()
             ran = true
+            // A menu may open on the first uncapped frame. Do not spend the remaining fast batch inside it.
+            if (frameSpeed() != rate) break
         }
         if (ran && !holdPicture()) renderer?.upload()
         draw(view)

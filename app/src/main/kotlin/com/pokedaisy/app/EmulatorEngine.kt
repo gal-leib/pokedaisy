@@ -12,7 +12,8 @@ import android.util.Log
 import com.pokedaisy.app.achievements.RetroAchievements
 import com.pokedaisy.app.companion.FfMode
 import com.pokedaisy.app.companion.FfMusicMode
-import com.pokedaisy.app.companion.smartSlows
+import com.pokedaisy.app.companion.PlaybackPolicy
+import com.pokedaisy.app.companion.PlaybackPolicy.Scene
 import com.pokedaisy.app.companion.data.FfMenuWatch
 import com.pokedaisy.app.companion.data.FfMusicKey
 import com.pokedaisy.app.companion.data.InProcessReader
@@ -638,20 +639,9 @@ class EmulatorEngine(
         }
     }
 
-    private enum class Scene { FIELD, TEXT, BATTLE, MENU, BIKE, SURF }
-
     /** The speed for what's on screen with FF off: SCENE SPEEDS' pick for it, else GAME SPEED's step. */
-    private fun sceneSpeed(): Float {
-        val s = when (scene) {
-            Scene.BATTLE -> battleSpeed
-            Scene.TEXT -> textSpeed
-            Scene.MENU -> menuSpeed
-            Scene.BIKE -> bikeSpeed
-            Scene.SURF -> surfSpeed
-            Scene.FIELD -> 0f
-        }
-        return if (s > 0f) s else SPEED_STEPS[speedIdx]
-    }
+    private fun sceneSpeed(): Float = PlaybackPolicy.sceneSpeed(scene, SPEED_STEPS[speedIdx],
+        battleSpeed, textSpeed, menuSpeed, bikeSpeed, surfSpeed)
 
     /** The speed the player asked for (FF, slow-mo, the speed steps); Float.POSITIVE_INFINITY = "run uncapped". */
     private fun requestedSpeed(): Float = when {
@@ -677,7 +667,7 @@ class EmulatorEngine(
         // SMART: menus and the region map's cursor can't be steered sped up -
         // 1x while one is up, and FF (still on) picks up again when it closes.
         // A battle runs fast but where it waits for the player (its menus, bag and party).
-        return if (ffMode == FfMode.SMART && s > 1f && smartSlows(battleInput.gameState, menuOpen, mapOpen, battleWaiting)) 1f else s
+        return PlaybackPolicy.smartSpeed(s, ffMode == FfMode.SMART, battleInput.gameState, menuOpen, mapOpen, battleWaiting)
     }
 
     /** No hold carried past a core (a held touch screen would stay frozen in the next game). */
@@ -1478,21 +1468,7 @@ class EmulatorEngine(
                 val bike = MgbaCore.FIELD_AVATAR or MgbaCore.FIELD_BIKE
                 riding = (fieldState and bike) == bike
                 val battleState = battleInput.gameState
-                scene = when {
-                    // A battle's own bag and party screens count as menus, as SMART has them.
-                    battleState == com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN ||
-                        battleState == com.pokedaisy.app.companion.data.BATTLE_INPUT_BAG_OPEN || menuOpen || mapOpen ||
-                        fieldState and MgbaCore.FIELD_MENU != 0 -> Scene.MENU
-                    battleState != com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE || FfMenuWatch.battling ||
-                        fieldState and MgbaCore.FIELD_BATTLE != 0 -> Scene.BATTLE
-                    fieldState and MgbaCore.FIELD_TEXT != 0 -> Scene.TEXT
-                    // Riding / surfing on the field (a cutscene that holds the controls stays FIELD).
-                    fieldState and (MgbaCore.FIELD_LOCKED or MgbaCore.FIELD_AVATAR) == MgbaCore.FIELD_AVATAR &&
-                        fieldState and MgbaCore.FIELD_SURF != 0 -> Scene.SURF
-                    fieldState and (MgbaCore.FIELD_LOCKED or MgbaCore.FIELD_AVATAR) == MgbaCore.FIELD_AVATAR &&
-                        fieldState and MgbaCore.FIELD_BIKE != 0 -> Scene.BIKE
-                    else -> Scene.FIELD
-                }
+                scene = PlaybackPolicy.scene(battleState, menuOpen, mapOpen, FfMenuWatch.battling, fieldState)
                 // PLAYER LOOK: the player's sprite set up again once the field's own screen runs (never over a battle's
                 // sprites); the native side checks it's still the player's.
                 // Not done (the screen mid-fade, the palette buffers not agreeing yet): again on a later field frame, for

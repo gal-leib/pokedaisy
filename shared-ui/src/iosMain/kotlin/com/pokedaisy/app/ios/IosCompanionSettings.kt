@@ -40,6 +40,7 @@ internal class IosCompanionSettings(
     private val onEditTouch: () -> Unit,
     private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
     private val gameScreen: () -> IosGameScreen? = { null },
+    private val playback: () -> IosGamePlayback? = { null },
 ) : CompanionSettings {
     private val d = NSUserDefaults.standardUserDefaults
 
@@ -48,7 +49,7 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
 
     override val touchRevision get() = IosTouchPreferences.revision
@@ -118,6 +119,7 @@ internal class IosCompanionSettings(
     val ffActive get() = ffToggled || ffHeld
     fun holdFastForward(on: Boolean) { ffHeld = on; applyPlayback() }
 
+    var playbackChanged: () -> Unit = {}
     init { applyPlayback() }
 
     private fun applyPlayback() {
@@ -125,6 +127,7 @@ internal class IosCompanionSettings(
         game.speed = (if (ffActive) ffMaxSpeed else gameSpeed).toDouble()
         game.volume = gameVolume / 100f
         game.muted = gameMuted
+        playbackChanged()
     }
 
     override val ffMaxSpeed: Float get() = if (d.objectForKey("ff_max_speed") == null) 2f else d.floatForKey("ff_max_speed")
@@ -160,8 +163,27 @@ internal class IosCompanionSettings(
     // Not on the iPad yet: never shown (shownRows), so fixed values.
     override val ffMusicMode = FfMusicMode.SPED_UP
     override fun setFfMusicMode(mode: FfMusicMode) {}
-    override val ffMode = FfMode.NORMAL
-    override fun setFfMode(mode: FfMode) {}
+    override val ffMode get() = FfMode.entries.firstOrNull { it.name == d.stringForKey("ff_mode") } ?: FfMode.SMART
+    override fun setFfMode(mode: FfMode) { d.setObject(mode.name, "ff_mode"); applyPlayback() }
+    override val ffMusicModes = listOf(FfMusicMode.SPED_UP)
+    override val speedOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCENE_SPEEDS)
+    override val fieldReadable get() = playback()?.fieldReadable == true
+    override val fieldMovesReadable get() = playback()?.fieldMovesReadable == true
+    private fun sceneSpeed(key: String) = d.floatForKey("scene_speed_$key").takeIf { it in com.pokedaisy.app.companion.SCENE_SPEEDS } ?: 0f
+    private fun setSceneSpeed(key: String, speed: Float) {
+        if (speed !in com.pokedaisy.app.companion.SCENE_SPEEDS) return
+        d.setFloat(speed, "scene_speed_$key"); applyPlayback()
+    }
+    override val battleSpeed get() = sceneSpeed("battle")
+    override fun setBattleSpeed(v: Float) = setSceneSpeed("battle", v)
+    override val textSpeed get() = sceneSpeed("text")
+    override fun setTextSpeed(v: Float) = setSceneSpeed("text", v)
+    override val menuSpeed get() = sceneSpeed("menu")
+    override fun setMenuSpeed(v: Float) = setSceneSpeed("menu", v)
+    override val bikeSpeed get() = sceneSpeed("bike")
+    override fun setBikeSpeed(v: Float) = setSceneSpeed("bike", v)
+    override val surfSpeed get() = sceneSpeed("surf")
+    override fun setSurfSpeed(v: Float) = setSceneSpeed("surf", v)
     override fun gbaControlBindings(): Map<GbaControls.Btn, List<String>> = emptyMap()
     override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {}
     override val hotkeysEnabled = false

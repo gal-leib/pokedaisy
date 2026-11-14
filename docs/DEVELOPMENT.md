@@ -3729,7 +3729,15 @@ The iPad playback settings update `GameViewController` on the main thread: `Fram
 capped speed, with real-time catch-up bounded before scaling; unlimited FF runs batches with an 8 ms budget.
 `pk_api_set_audio_rate` requests fewer samples per emulated frame during FF (pitched audio at the device's 48 kHz).
 `GameAudio` sets mixer volume for GAME VOLUME / MUTE GAME. Normal speed is per ROM path; FF and volume are app-wide.
-There is no SMART FF or steady music yet; those rows stay hidden.
+`IosGamePlayback` runs the existing `FfMenuWatch`, `ShopWatch` and `RegionMapWatch` each game frame and uses
+`PlaybackPolicy`, the same scene priority and speed selection Android's engine calls. Learned menu callbacks are
+stored per ROM CRC under the existing v2 key. A map scan from a closed game cannot overwrite the next game's watch.
+`pk_api_field_configure` and `pk_api_field_state` expose the existing GBA field tables for observation with game patches
+disabled. Unknown CRCs and Game Boy return no field state, so TEXT / BIKE / SURF rows remain N/A there. Bike/surf
+become available after a trustworthy avatar read. No new ROM address tables are maintained by iOS.
+`GameViewController.frameSpeed` resolves speed at a display callback, and `afterFrame` updates observations after
+each game frame. A scene change ends the current batch immediately, including uncapped FF, so a newly opened menu
+does not consume the remaining fast frames. Steady music and speed hotkeys are still unavailable on iOS.
 
 The iPad STATES bridge is the common `StateSlotController` over `StateFiles`: slot saves, loads, delete and both
 undos, using the existing screen. The host supplies native read/write callbacks, a thumbnail and a cached companion

@@ -82,6 +82,7 @@ object PokeDaisyHost {
     private var game: GameViewController? = null
     private val touch = IosTouchControls({ game }, { settings }, { slots })
     private var screen: IosGameScreen? = null
+    private var playback: IosGamePlayback? = null
     private var timer: NSTimer? = null
     // 1 while a read is on its way, so a slow one never piles up behind the next.
     private val reading = atomic(false)
@@ -217,7 +218,7 @@ object PokeDaisyHost {
             matchesSave = { PkApiCore.stateMatchesSave(it.toString()) },
             enabled = { defaults.objectForKey("auto_resume") == null || defaults.boolForKey("auto_resume") },
             snapshot = stateSnapshot, loaded = stateLoaded)
-        g.onCoreStarted = { g.withState { resume.restore() } }
+        g.onCoreStarted = { playback?.start(); g.withState { resume.restore() } }
         g.beforeSuspend = {
             val saved = g.withState { resume.save() }
             if (!saved) resumeFailed()
@@ -229,12 +230,18 @@ object PokeDaisyHost {
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen })
+            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen }, playback = { playback })
             .also { L10n.apply(it.appLanguage, code) }
         battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
+        }
+        playback = IosGamePlayback(romPath, code, telemetry, battle!!).also { p ->
+            settings!!.playbackChanged = { settings?.let(p::settingsChanged) }
+            p.settingsChanged(settings!!)
+            g.frameSpeed = p::speed
+            g.afterFrame = p::tick
         }
         g.beforeStateChange = { battle?.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,
@@ -277,6 +284,8 @@ object PokeDaisyHost {
         stateError = null
         timer?.invalidate()
         timer = null
+        playback?.close()
+        playback = null
         battle?.cancel()
         battle = null
         screen?.close()
@@ -324,7 +333,7 @@ object PokeDaisyHost {
                 runCatching { telemetry.refresh() }.onSuccess {
                     dispatch_async(dispatch_get_main_queue()) {
                         // A slow sample from the previous game must never configure a newly opened one.
-                        if (game === current) battle?.sampled()
+                        if (game === current) { battle?.sampled(); playback?.sampled() }
                     }
                 }
             } finally {

@@ -7,6 +7,8 @@ import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.core.pkapi.pk_api_save_state
 import com.pokedaisy.app.core.pkapi.pk_api_load_state
 import com.pokedaisy.app.core.pkapi.pk_api_state_matches_save
+import com.pokedaisy.app.core.pkapi.pk_api_field_configure
+import com.pokedaisy.app.core.pkapi.pk_api_field_state
 import com.pokedaisy.app.core.pkapi.pk_api_audio
 import com.pokedaisy.app.core.pkapi.pk_api_deinit
 import com.pokedaisy.app.core.pkapi.pk_api_finish_save
@@ -115,6 +117,10 @@ object PkApiCore : EmulatorCore {
         }
         return RomArt.Image(tw, th, pixels).png()
     }
+
+    /** Read-only field observation for scene speeds; never enables patches or wild encounter changes. */
+    fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
+    fun fieldState(): Int = pk_api_field_state()
 
     /** Extended states include the battery save: a manual load rewinds it too. Game thread only. */
     fun saveState(path: String): Boolean = pk_api_save_state(path)

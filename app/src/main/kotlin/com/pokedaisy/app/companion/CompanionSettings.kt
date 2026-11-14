@@ -36,6 +36,8 @@ interface CompanionSettings {
 
     /** SCENE SPEEDS (GitHub #43 / #85): a battle's, a field text box's and a menu screen's speed while FF is off;
      * 0 = SAME (GAME SPEED's) - see [com.pokedaisy.app.Prefs.battleSpeed]. */
+    val speedOptionsBadge: String? get() = null
+    val ffMusicModes: List<FfMusicMode> get() = FfMusicMode.entries
     val battleSpeed: Float get() = 0f
     fun setBattleSpeed(v: Float) {}
     val textSpeed: Float get() = 0f

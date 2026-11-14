@@ -102,3 +102,11 @@ Game Boy games keep 10:9; GBA games keep 3:2. DS, shaders, skins and fold/device
 
 For XCUITest, launch with `POKEDAISY_UI_TEST=1` in the app's environment to synchronize Compose accessibility
 semantics without enabling VoiceOver. Normal launches keep Compose's service-driven accessibility synchronization.
+
+## Scene speeds and SMART fast-forward
+
+SPEED OPTIONS uses the shared settings page and `PlaybackPolicy` from Android. `IosGamePlayback` drives the same
+menu, shop and map watchers per emulated frame. The portable C API observes existing GBA field tables without
+enabling patches, for text, bike and surf speeds. Unknown field layouts remain N/A; Game Boy still supports battle
+speed through the shared battle controller. A scene change stops a fast frame batch immediately. Menu callback
+learning and scene-speed choices persist in NSUserDefaults. Steady music and speed hotkeys remain later work.

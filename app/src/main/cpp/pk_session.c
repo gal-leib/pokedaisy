@@ -40,6 +40,13 @@
 #endif
 
 _Static_assert(sizeof(color_t) == 4, "pk_api_video's pixels are 4 bytes");
+_Static_assert(PK_API_FIELD_KNOWN == PK_FIELD_KNOWN, "field bit KNOWN");
+_Static_assert(PK_API_FIELD_LOCKED == PK_FIELD_LOCKED, "field bit LOCKED");
+_Static_assert(PK_API_FIELD_BATTLE == PK_FIELD_BATTLE, "field bit BATTLE");
+_Static_assert(PK_API_FIELD_TEXT == PK_FIELD_TEXT, "field bit TEXT");
+_Static_assert(PK_API_FIELD_BIKE == PK_FIELD_BIKE, "field bit BIKE");
+_Static_assert(PK_API_FIELD_SURF == PK_FIELD_SURF, "field bit SURF");
+_Static_assert(PK_API_FIELD_AVATAR == PK_FIELD_AVATAR, "field bit AVATAR");
 
 struct pk_session pk_session;
 pthread_rwlock_t pk_coreLock = PTHREAD_RWLOCK_INITIALIZER;
@@ -163,6 +170,7 @@ void pk_api_deinit(void) {
     g.vw = g.vh = 0;
     g.audioAvail = 0;
     pk_wide_configure(0);
+    pk_field_configure(0);
     pk_wide_extras_reset();   // FOLLOWER and DAY AND NIGHT: the closed game's lead walked on in the next one
     pk_flight_configure(NULL, 0);   // FREE FLIGHT: the next game configures its own
     g.wideCrc = 0;
@@ -312,6 +320,14 @@ void pk_api_set_audio_rate(double rate) {
         blip_set_rates(g.core->getAudioChannel(g.core, 0), g.core->frequency(g.core), rate);
         blip_set_rates(g.core->getAudioChannel(g.core, 1), g.core->frequency(g.core), rate);
     }
+}
+
+bool pk_api_field_configure(uint32_t crc) {
+    return pk_field_configure(g.core && pk_is_gba(g.core) ? crc : 0) != 0;
+}
+
+int pk_api_field_state(void) {
+    return g.core && pk_is_gba(g.core) ? pk_field_state(g.core, 0, 100) : 0;
 }
 
 void pk_api_set_keys(uint32_t keys) {

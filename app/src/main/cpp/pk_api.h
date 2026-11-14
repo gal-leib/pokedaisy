@@ -44,6 +44,15 @@ const void* pk_api_video(void);
 int pk_api_video_width(void);
 int pk_api_video_height(void);
 
+/** Field observation only: configure the current GBA ROM by its CRC32 (zero disables), then read PK_API_FIELD_*.
+ * Game thread, between frames. Unknown games, Game Boy and no core return zero. Does not enable game patches. */
+bool pk_api_field_configure(uint32_t crc);
+int pk_api_field_state(void);
+enum {
+    PK_API_FIELD_KNOWN = 1, PK_API_FIELD_LOCKED = 2, PK_API_FIELD_BATTLE = 4, PK_API_FIELD_TEXT = 8,
+    PK_API_FIELD_BIKE = 16, PK_API_FIELD_SURF = 64, PK_API_FIELD_AVATAR = 128
+};
+
 /** Runs one frame: the picture into pk_api_video, its sound into pk_api_audio. */
 void pk_api_run_frame(void);
 /** The keys held from the next frame on (PK_API_KEY_* bits). */

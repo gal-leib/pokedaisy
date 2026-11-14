@@ -23,6 +23,7 @@ static void closed(void) {
     CHECK(!pk_api_read(0x02000000, &b, 1) && b == 0x5A, "a read with no game");
     CHECK(!pk_api_rom_code(code), "a ROM code with no game");
     CHECK(pk_api_rom_size() == 0, "a ROM size with no game");
+    CHECK(!pk_api_field_configure(0xDD88761C) && pk_api_field_state() == 0, "field observation without a game");
 }
 
 static void gameBoy(const char* dir) {
@@ -32,6 +33,7 @@ static void gameBoy(const char* dir) {
     unlink(save);
     CHECK(pk_api_init(rom, save), "init %s", rom);
     CHECK(pk_api_platform() == PK_API_PLATFORM_GB, "platform %d", pk_api_platform());
+    CHECK(!pk_api_field_configure(0xDD88761C) && pk_api_field_state() == 0, "GBA field table applied to Game Boy");
     CHECK(pk_api_video_width() == 160 && pk_api_video_height() == 144, "size %dx%d",
           pk_api_video_width(), pk_api_video_height());
     CHECK(pk_api_rom_size() == 32768, "ROM size %lld", (long long) pk_api_rom_size());
@@ -75,6 +77,9 @@ static void gba(const char* dir) {
     path(rom, sizeof rom, dir, "diagnostic.gba");
     CHECK(pk_api_init(rom, NULL), "init %s", rom);
     CHECK(pk_api_platform() == PK_API_PLATFORM_GBA, "platform %d", pk_api_platform());
+    CHECK(pk_api_field_configure(0xDD88761C), "known GBA field table");
+    CHECK(pk_api_field_state() & PK_API_FIELD_KNOWN, "field observer missing its known bit");
+    CHECK(!pk_api_field_configure(0x12345678) && pk_api_field_state() == 0, "unknown CRC retained a field table");
     char code[5] = "";
     CHECK(pk_api_rom_code(code) && !strcmp(code, "BPRE"), "game code \"%s\"", code);
     uint8_t header[4];

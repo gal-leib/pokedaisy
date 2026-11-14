@@ -32,6 +32,7 @@ internal class IosBattleInput(
     override val menuCursor get() = controller.menuCursor
     override val gameSilent get() = silent()
     override val canSwitch get() = controller.switchAddrs != null
+    val gameState get() = controller.gameState
     val holdPicture get() = controller.holdFrame
     val quietPress get() = controller.muteGame
 
