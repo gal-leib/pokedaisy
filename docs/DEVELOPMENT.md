@@ -3940,3 +3940,11 @@ The iPad's IosTouchPreferences supplies native storage, controller discovery and
 IosTouchControls hosts the shared pad and layout editor; it measures the real pad's window coordinates rather than
 inventing a second layout. Editing blocks foreground resume, releases held keys and restores normal playback on DONE.
 The shared settings accept a host's supported buttons without dropping stored choices for unsupported actions.
+
+### Shared library presentation
+
+`companion/ui/LibraryScreen.kt` contains the library frame/rail, header buttons, list/grid layout, game cards, cover
+well and game menus extracted from LibraryActivity. The Android activity supplies LibraryGame data, asynchronously
+decoded covers and native action callbacks. Its external-screen launcher uses the same cards and menus. Native files,
+media fetching, permissions, scanning and launches stay outside shared UI. Both grid and list retain stable item keys
+and their existing UP-to-header focus behavior.
