@@ -3648,6 +3648,21 @@ host set at start, as `EmulatorCore` does for the data code: `FontSource` (fonts
 `PokeDaisyApp`, ui-preview's `installPreviewHosts` and the screenshot tests' `installTestHosts`. CI's "Companion screens
 for iOS" job runs `./gradlew :shared-ui:compileKotlinIosArm64 :shared-ui:compileKotlinIosSimulatorArm64` (advisory for now).
 
+On iOS the hosts are `shared-ui/src/iosMain` (`IosHosts`: fonts from the app bundle, pictures through Skia, THEME / DARK
+MODE in NSUserDefaults, the manual kept in Application Support, NSDateFormatter's dates; CheatParser stays unset until the
+iOS core has mGBA's parser), and `PokeDaisyHost` is what Swift calls: `start()` once, then `companionViewController()`.
+The module links into one static framework, `PokeDaisyUI`.
+
+### The iPad app (`iosApp/`)
+
+A SwiftUI shell over that framework: `xcodegen` in `iosApp/` makes `PokeDaisy.xcodeproj` from `project.yml` (the
+generated project stays out of git), whose build runs `./gradlew :shared-ui:embedAndSignAppleFrameworkForXcode` first.
+`RootView` puts the game left and the companion right when the iPad is sideways, the game over the companion upright.
+The game's place is `GameScreen.makeViewController`: the game side (the iOS core's Metal view, sound, input) sets it; a
+dark placeholder stands in until then. The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
+into the bundle's `fonts` folder. CI's "iPad app (simulator build)" job generates the project and builds it for the
+simulator without signing (advisory for now). `iosApp/README.md` has the steps for a Mac.
+
 ## ScreenScraper and the dual-screen launcher
 
 Game media (box art, screenshots, title screens, wheel logos, fanart, cartridges, videos and the facts: synopsis,
