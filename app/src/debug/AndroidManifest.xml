@@ -9,6 +9,11 @@
          a release build). -->
     <!-- Debug only: plain HTTP to 127.0.0.1 / localhost, for a local co-op relay over `adb reverse`. -->
     <application android:networkSecurityConfig="@xml/network_security_config_debug">
+        <!-- Isolated developer experiment; no launcher entry and absent from release builds. -->
+        <activity
+            android:name=".ComposeStageProbeActivity"
+            android:exported="true"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode" />
         <activity
             android:name=".PokeDaisyActivity"
             android:exported="true"
