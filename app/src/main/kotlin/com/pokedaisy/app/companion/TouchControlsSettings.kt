@@ -270,6 +270,9 @@ data class TouchControlsStyle(
     )
 }
 
+/** The docked companion's first width, as a fraction of the window (Prefs.sidePanelWidth's default; the iPad's). */
+const val SIDE_PANEL_DEFAULT_WIDTH = 0.5f
+
 /**
  * The game screen as the touch controls see it, in px: its size, the game's picture, the companion (a phone held
  * upright) and the area the controls lie in. The game's activity measures the real one; SETTINGS (no game open)

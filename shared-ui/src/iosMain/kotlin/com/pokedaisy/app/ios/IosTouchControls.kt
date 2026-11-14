@@ -70,7 +70,7 @@ internal class IosTouchControls(
     /** A hidden pad still has an editable stand-in, using the same layout with controls enabled. */
     fun readStage(): TouchStage? = stage?.let {
         if (IosTouchPreferences.visible) it else
-            gamePanelLayout(it.w, it.h, it.dp, IosTouchPreferences.drawingStyle, gameBoy = it.gameBoy)
+            gamePanelLayout(it.w, it.h, it.dp, gameBoy = it.gameBoy, underGame = IosTouchPreferences.underGame)
     }
 
     fun edit() {

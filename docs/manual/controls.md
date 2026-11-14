@@ -288,8 +288,9 @@ This works from either screen. On a device with one screen, a tap also slides th
 Open the companion's `SETTINGS` > `TOUCH CONTROLS` to change the same layouts, size, look, colors, opacity and D-pad
 options as on Android. Changes apply to the controls straight away and are kept when you reopen the app.
 
-Hold the iPad upright to put the game at the top, the companion directly below it and the controls at the bottom.
-`POSITION` aligns the buttons within their controls area. Held sideways, the game is centered beside the companion, with touch controls over the game area.
+Hold the iPad upright to put the game at the top and the companion directly below it (or along the bottom: `COMPANION`
+on the same page). The iPad has no room left under the companion, so the controls sit over the game picture, as on an
+Android tablet: `POSITION` moves them to its top, middle or bottom, and `EDIT LAYOUT` can put each button anywhere over it. Held sideways, the game is centered beside the companion, with touch controls over the game area.
 The preview and `EDIT LAYOUT` use the same arrangement as the game screen.
 
 `EDIT LAYOUT` pauses the game and opens the shared editor over its picture. Drag controls, resize or hide them, then

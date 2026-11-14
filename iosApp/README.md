@@ -74,8 +74,8 @@ Android folder linking and platform-specific media/tool services remain outside 
 
 ## Game screen layout
 
-Upright, the game is above the companion and the controls are along the bottom, using Android's PortraitLayout
-UNDER GAME arrangement. Sideways, the game is centered beside the docked companion and the controls overlay its area, using Android's default panel
-width. The live screen, editor and both preview orientations use the same TouchStage bounds. Game Boy games keep their own aspect ratio. POSITION only
-aligns preset buttons within the controls' area. Return to the library through shared SETTINGS > CLOSE GAME; there
+Upright, the screen follows Android's PortraitLayout: the companion under the game (or along the bottom, the touch
+page's COMPANION row), the controls in the gap under it, or over the game where there is none (an iPad's case, as on an
+Android tablet), so POSITION and custom layouts reach the whole picture. Sideways, the game is centered beside the docked companion and the controls overlay its area, using Android's default panel
+width. The live screen, editor and both preview orientations use the same TouchStage bounds. Game Boy games keep their own aspect ratio. Return to the library through shared SETTINGS > CLOSE GAME; there
 is no separate GAMES overlay, toolbar controller or Swift panel-sizing bridge.
