@@ -858,7 +858,7 @@ fun withCheats(seeded: Boolean = true, make: () -> SettingsActivity): androidx.a
     val ctx = android.content.Context()
     val rom = File(ctx.filesDir, "roms/firered-hack.gba")
     val crc = SettingsActivity.cheatCrcOf(rom)!!
-    if (seeded) com.pokedaisy.app.cheats.CheatStore.forCrc(ctx.filesDir, crc).save(previewCheats())
+    if (seeded) com.pokedaisy.app.cheats.CheatStore.forCrc(okio.Path.Companion.run { ctx.filesDir.toOkioPath() }, crc).save(previewCheats())
     Prefs(ctx).cheatsEnabled = seeded
     return make().apply { intent.putExtra(SettingsActivity.EXTRA_CHEATS_ROM, rom.absolutePath) }
 }

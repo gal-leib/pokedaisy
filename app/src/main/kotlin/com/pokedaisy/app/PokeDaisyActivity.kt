@@ -3017,7 +3017,7 @@ class PokeDaisyActivity : Activity() {
 
     /** This ROM's cheats (by CRC, like its states); null before a ROM is loaded. */
     private fun cheatStore(): com.pokedaisy.app.cheats.CheatStore? =
-        romKey.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.cheats.CheatStore.forCrc(filesDir, it) }
+        romKey.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.cheats.CheatStore.forCrc(filesDir.toOkioPath(), it) }
 
     /** Hands the engine this ROM's enabled cheats (none with the master switch off); it loads
      * them before the first frame, or on the next one while the game runs. */
