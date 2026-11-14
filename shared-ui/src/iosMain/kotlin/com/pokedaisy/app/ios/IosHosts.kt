@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import com.pokedaisy.app.DocsApi
 import com.pokedaisy.app.companion.data.RomArt
+import com.pokedaisy.app.companion.data.BestEffortStore
 import com.pokedaisy.app.companion.data.isFile
 import com.pokedaisy.app.companion.data.mkdirs
 import com.pokedaisy.app.companion.data.readBytes
@@ -51,6 +52,7 @@ object IosHosts {
     fun install(filesDir: Path) {
         filesDir.mkdirs()
         RomArt.filesDir = filesDir
+        BestEffortStore.dir = filesDir
         ThemeStore.current = DefaultsThemeStore
         DocsSources.current = WebDocsSource(filesDir / "docs")
         FontSource.current = BundleFonts

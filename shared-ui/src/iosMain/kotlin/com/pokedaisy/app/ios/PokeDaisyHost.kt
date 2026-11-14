@@ -126,7 +126,7 @@ object PokeDaisyHost {
     private fun Companion() {
         val snapshot by telemetry.snapshot.collectAsState()
         Box(Modifier.fillMaxSize()) {
-            CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle)
+            CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle, gamePick = telemetry.gamePick)
             stateError?.let { message ->
                 OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
                     onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)

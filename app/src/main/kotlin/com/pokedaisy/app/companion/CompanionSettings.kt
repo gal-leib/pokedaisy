@@ -199,6 +199,9 @@ interface CompanionSettings {
     val touchSkinsSupported: Boolean get() = true
     val touchBadge: String? get() = NewFeatures.badge(NewFeatures.TOUCH_CONTROLS)
 
+    /** A host has newly enabled ROM-detection recovery through SETTINGS > PLAYS AS. */
+    val gamePickBadge: String? get() = null
+
     /** TOUCH CONTROLS > SKINS: the imported Delta skins (picked here, imported on the top screen). */
     val touchSkins: List<InstalledSkin> get() = emptyList()
 

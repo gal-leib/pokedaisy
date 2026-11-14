@@ -15,6 +15,14 @@ The companion's buttons drive the game's own menus in single battles (actions, m
 switch where its menu is mapped. SETTINGS has ONE-TAP MOVES, BATTLE VIEW, BATTLE STYLE, BATTLE INFO and BATTLE FOCUS.
 The controller is shared with Android; the iPad runs it once per game frame and navigates by key presses.
 
+## ROM-detection recovery
+
+On iPhone and iPad, the shared WHICH GAME IS THIS? picker, match notices and SETTINGS > PLAYS AS connect to
+TelemetryStore.gamePick. BestEffortStore uses the app's files directory, so automatic matches, manual picks and
+NONE OF THESE survive reopening, keyed by ROM-content SHA-1. The existing sampler still verifies choices and omits
+features it could not verify; blocked games retain their notice without a picker. Library INFO actions and report
+sharing are not connected on iOS.
+
 ## Speed and sound
 
 SETTINGS has FF (a persistent toggle), FF SPEED (including INFINITE), GAME SPEED (kept per game), GAME VOLUME and MUTE GAME.
