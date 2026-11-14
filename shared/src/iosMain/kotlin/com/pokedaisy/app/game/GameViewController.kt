@@ -58,6 +58,10 @@ class GameViewController(
             input.touchKeys = value
         }
 
+    /** Shared battle automation runs once per emulated frame, on every input source. */
+    var frameKeys: (Int) -> Int = { it }
+    var holdPicture: () -> Boolean = { false }
+
     /** Whether a game is open and running in this controller. */
     val isRunning: Boolean get() = running
 
@@ -133,12 +137,12 @@ class GameViewController(
         if (!running) return
         val frames = pacer.framesAt(CACurrentMediaTime())
         if (frames > 0) {
-            PkApiCore.setKeys(input.keys())
             repeat(frames) {
+                PkApiCore.setKeys(frameKeys(input.keys()))
                 PkApiCore.runFrame()
                 audio.push()
             }
-            renderer?.upload()
+            if (!holdPicture()) renderer?.upload()
         }
         draw(view)
     }
