@@ -266,6 +266,8 @@ There are step-by-step guides for [ES-DE](https://github.com/lidor30/pokedaisy/b
 
 ## On iPad
 
+On your Home Screen, look for the PokeDaisy flower icon on its blue patterned background to open the app.
+
 The library, setup and application settings use the same styled screens as Android. The library fills the window
 when no game is open. Use the header to add games from Files, search, change the order, switch between a list and a
 grid, or refresh after changing files. Hold a game to mark it as a favorite or choose `LOAD SAVE`.
