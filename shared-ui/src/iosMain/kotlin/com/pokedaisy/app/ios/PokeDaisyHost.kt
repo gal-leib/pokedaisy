@@ -2,7 +2,6 @@
 
 package com.pokedaisy.app.ios
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
@@ -10,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
 import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.StateSlotController
@@ -22,13 +20,10 @@ import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.OptionConfirm
 import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
-import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.data.Gen1Art
 import com.pokedaisy.app.companion.data.Gen2Art
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.i18n.L10n
-import com.pokedaisy.app.companion.ui.TouchControls
-import com.pokedaisy.app.companion.ui.TouchInput
 import com.pokedaisy.app.companion.ui.CompanionScreen
 import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.game.GameViewController
@@ -71,6 +66,8 @@ object PokeDaisyHost {
     /** Swift's: CLOSE GAME / RESTART GAME in the companion's SETTINGS (the game's place is SwiftUI's to change). */
     var onCloseRequested: () -> Unit = {}
     var onRestartRequested: () -> Unit = {}
+    /** The native shell only measures room; shared controls own their styling and preferences. */
+    var onTouchLayoutChanged: () -> Unit = {}
 
     // The running game's SETTINGS; null = NO GAME RUNNING.
     private var settings by mutableStateOf<IosCompanionSettings?>(null)
@@ -81,6 +78,7 @@ object PokeDaisyHost {
     private var restartFresh = false
     private var started = false
     private var game: GameViewController? = null
+    private val touch = IosTouchControls({ game }, { settings }, { slots })
     private var timer: NSTimer? = null
     // 1 while a read is on its way, so a slow one never piles up behind the next.
     private val reading = atomic(false)
@@ -90,6 +88,8 @@ object PokeDaisyHost {
         if (started) return
         started = true
         IosHosts.install(appFilesDir())
+        IosTouchPreferences.changed = { touch.releaseKeys(); onTouchLayoutChanged() }
+        IosTouchPreferences.install()
     }
 
     /** The companion (PARTY, BAG, MAP, ... SETTINGS) as a view controller, for any part of the window. */
@@ -211,14 +211,14 @@ object PokeDaisyHost {
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            })
+            }, onEditTouch = touch::edit, readTouchStage = touch::readStage)
             .also { L10n.apply(it.appLanguage, code) }
         battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
         }
-        g.beforeStateChange = { battle?.cancel() }
+        g.beforeStateChange = { battle?.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
@@ -232,23 +232,13 @@ object PokeDaisyHost {
         return g
     }
 
-    /**
-     * The on-screen buttons for the running game: the app's own touch controls (the Android app's drawing and hit
-     * test), laid out for a strip under the game. The extras (FF, QUICK MENU, states, turbo...) and X / Y stay off
-     * until the iPad app has what they press.
-     */
-    fun touchControlsViewController(gameBoy: Boolean): UIViewController {
+    /** Shared controls, measured and styled from the same settings page as Android. */
+    fun touchControlsViewController(gameBoy: Boolean, portrait: Boolean): UIViewController {
         start()
-        val style = TouchControlsStyle(extras = emptySet(), xyButtons = false)
-        val input = TouchInput(onKeys = { gba, _ -> setTouchKeys(gba) })
-        return ComposeUIViewController {
-            AppTheme {
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
-                    TouchControls(style, portrait = true, input = input, modifier = Modifier.fillMaxSize(), gameBoy = gameBoy)
-                }
-            }
-        }
+        return touch.controller(gameBoy, portrait)
     }
+
+    fun touchControlsHeight(width: Double, gameBoy: Boolean): Double = touch.height(width, gameBoy)
 
     /** The keys the on-screen buttons hold ([com.pokedaisy.app.core.PkApiCore.KEY_A] ...), on the main thread. */
     fun setTouchKeys(keys: Int) {
@@ -284,6 +274,7 @@ object PokeDaisyHost {
         timer = null
         battle?.cancel()
         battle = null
+        touch.close()
         game?.close()
         game = null
         slots = null

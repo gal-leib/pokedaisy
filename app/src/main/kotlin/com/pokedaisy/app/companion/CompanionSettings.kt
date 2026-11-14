@@ -192,6 +192,10 @@ interface CompanionSettings {
     /** SETTINGS > TOUCH CONTROLS - see [com.pokedaisy.app.Prefs.touchControlsStyle]. */
     val touchStyle: TouchControlsStyle
     fun setTouchStyle(style: TouchControlsStyle)
+    /** Controls and skin import supported by this host. Stored choices for other hosts are kept. */
+    val touchButtons: Set<TouchButton> get() = TouchButton.entries.toSet()
+    val touchSkinsSupported: Boolean get() = true
+    val touchBadge: String? get() = NewFeatures.badge(NewFeatures.TOUCH_CONTROLS)
 
     /** TOUCH CONTROLS > SKINS: the imported Delta skins (picked here, imported on the top screen). */
     val touchSkins: List<InstalledSkin> get() = emptyList()

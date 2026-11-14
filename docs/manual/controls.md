@@ -282,3 +282,16 @@ Some handhelds and controllers (Retroid's, for example) send their L2 and R2 tri
 - **A hold** leaves the game and returns to the library (or to the frontend that launched it).
 
 This works from either screen. On a device with one screen, a tap also slides the companion panel in and out; see [Devices](devices.md).
+
+## Touch controls on iPad
+
+Open the companion's `SETTINGS` > `TOUCH CONTROLS` to change the same layouts, size, look, colors, opacity and D-pad
+options as on Android. Changes apply to the controls straight away and are kept when you reopen the app.
+
+`EDIT LAYOUT` pauses the game and opens the shared editor over its picture. Drag controls, resize or hide them, then
+choose `DONE`. Upright and sideways layouts are kept separately. `SHOW` > `AUTO` hides the controls while a gamepad is
+connected; `ALWAYS` and `NEVER` let you choose for yourself.
+
+You can enable `FF`, `TURBO A`, `TURBO B`, `SAVE STATE` and `LOAD STATE` under `EXTRA BUTTONS`. A short tap on `FF`
+toggles it; holding it speeds up the game until you release it. The state buttons use the current slot in `STATES`.
+Skin import, the quick menu, zoom, rewind and X/Y bindings are not available on iPad yet.

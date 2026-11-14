@@ -2077,6 +2077,18 @@ open class CompanionScreenshotTest {
     @Test fun states() = tab("STATES")
     @Test fun settings() = tab("SETTINGS")
 
+    @Test fun ipadTouchSettings() = snapshot {
+        val settings = object : com.pokedaisy.app.companion.CompanionSettings by SampleCompanion.Settings() {
+            override val touchButtons = com.pokedaisy.app.companion.TouchButton.entries.toSet() - setOf(
+                com.pokedaisy.app.companion.TouchButton.X, com.pokedaisy.app.companion.TouchButton.Y,
+                com.pokedaisy.app.companion.TouchButton.QUICK_MENU, com.pokedaisy.app.companion.TouchButton.ZOOM,
+                com.pokedaisy.app.companion.TouchButton.REWIND)
+            override val touchSkinsSupported = false
+        }
+        CompanionScreen(SampleCompanion.snapshot, SampleCompanion.Slots, settings,
+            initialTab = "SETTINGS", initialSettingsPage = "TOUCH")
+    }
+
     @Test fun ipadResumeSettings() = snapshot {
         val settings = object : com.pokedaisy.app.companion.CompanionSettings by SampleCompanion.Settings() {
             override val resumeGamesEditable = true

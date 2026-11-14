@@ -1,5 +1,8 @@
 package com.pokedaisy.app.ios
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.pokedaisy.app.GbaControls
 import com.pokedaisy.app.Hotkeys
 import com.pokedaisy.app.companion.BattleStyle
@@ -34,13 +37,25 @@ internal class IosCompanionSettings(
     private val onClose: () -> Unit,
     private val onRestart: () -> Unit,
     private val onDisableResume: () -> Boolean,
+    private val onEditTouch: () -> Unit,
+    private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
 ) : CompanionSettings {
     private val d = NSUserDefaults.standardUserDefaults
 
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
 
     override val shownRows: Set<String> = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS")
+
+    override val touchStyle get() = IosTouchPreferences.style
+    override fun setTouchStyle(style: TouchControlsStyle) { IosTouchPreferences.style = style }
+    override val touchButtons get() = IosTouchPreferences.buttons
+    override val touchSkinsSupported = false
+    override val touchBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_TOUCH)
+    override val touchStage get() = readTouchStage()
+    override val touchControlsShown get() = IosTouchPreferences.visible
+    override fun editTouchLayout() = onEditTouch()
+    override fun feelVibration(strength: Int) = IosTouchPreferences.feel(strength)
 
     override val autoResume: Boolean get() = bool("auto_resume", true)
     override val resumeGamesEditable = true
@@ -82,10 +97,16 @@ internal class IosCompanionSettings(
 
     override val playbackBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_PLAYBACK)
 
+    private var ffToggle by mutableStateOf(bool("ff_toggled", false))
+    override val ffToggled get() = ffToggle
+    private var ffHeld by mutableStateOf(false)
+    val ffActive get() = ffToggled || ffHeld
+    fun holdFastForward(on: Boolean) { ffHeld = on; applyPlayback() }
+
     init { applyPlayback() }
 
     private fun applyPlayback() {
-        game.speed = (if (ffToggled) ffMaxSpeed else gameSpeed).toDouble()
+        game.speed = (if (ffActive) ffMaxSpeed else gameSpeed).toDouble()
         game.volume = gameVolume / 100f
         game.muted = gameMuted
     }
@@ -95,8 +116,7 @@ internal class IosCompanionSettings(
         if (v !in listOf(0f, 1.5f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)) return
         d.setFloat(v, "ff_max_speed"); applyPlayback()
     }
-    override val ffToggled: Boolean get() = bool("ff_toggled", false)
-    override fun setFfToggled(on: Boolean) { d.setBool(on, "ff_toggled"); applyPlayback() }
+    override fun setFfToggled(on: Boolean) { ffToggle = on; d.setBool(on, "ff_toggled"); applyPlayback() }
     override val gameSpeed: Float get() = d.floatForKey("game_speed:$romPath").takeIf { it in gameSpeeds } ?: 1f
     override fun setGameSpeed(v: Float) {
         if (v !in gameSpeeds) return
@@ -126,8 +146,6 @@ internal class IosCompanionSettings(
     override fun setFfMusicMode(mode: FfMusicMode) {}
     override val ffMode = FfMode.NORMAL
     override fun setFfMode(mode: FfMode) {}
-    override val touchStyle = TouchControlsStyle()
-    override fun setTouchStyle(style: TouchControlsStyle) {}
     override fun gbaControlBindings(): Map<GbaControls.Btn, List<String>> = emptyMap()
     override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {}
     override val hotkeysEnabled = false

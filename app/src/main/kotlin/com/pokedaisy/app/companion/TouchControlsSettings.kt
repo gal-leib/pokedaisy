@@ -263,6 +263,11 @@ data class TouchControlsStyle(
         /** FF and the QUICK MENU to start with (a phone has no other way to open it), ZOOM and REWIND (no R3, no hotkey). */
         val DEFAULT_EXTRAS = setOf(TouchButton.FF, TouchButton.QUICK_MENU, TouchButton.ZOOM, TouchButton.REWIND)
     }
+
+    /** Draw only controls a host can act on, preserving the stored choices for future capabilities. */
+    fun forButtons(available: Set<TouchButton>) = copy(
+        extras = extras.intersect(available), xyButtons = xyButtons && TouchButton.X in available && TouchButton.Y in available,
+    )
 }
 
 /**

@@ -55,3 +55,11 @@ From the command line (no signing, the simulator):
 xcodebuild -project iosApp/PokeDaisy.xcodeproj -scheme PokeDaisy -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
+
+## Shared touch customization
+
+The companion's TOUCH CONTROLS page, preview and EDIT LAYOUT are the existing shared Compose screens. Preferences use
+TouchStyleCodec, also used by Android, backed by NSUserDefaults. The Swift shell only provides the controls' room and
+orientation; it no longer offers a second native pad. An editor uses the measured window/controls bounds, pauses the
+core and keeps separate orientation layouts. Controller connection changes update AUTO visibility. FF (tap/hold),
+turbo and state buttons use the existing playback/slot bridges; unsupported actions and skins are omitted.

@@ -3935,3 +3935,8 @@ pushing a different file (only one at a time for now). SRAM persists to
 legacy vibration and extra-button migrations in one place, including the per-orientation custom layouts. Android
 `Prefs` supplies SharedPreferences callbacks and batches writes in one editor; other hosts can use their native
 preferences without duplicating the settings model or inventing a second encoding.
+
+The iPad's IosTouchPreferences supplies native storage, controller discovery and haptics to the shared model.
+IosTouchControls hosts the shared pad and layout editor; it measures the real pad's window coordinates rather than
+inventing a second layout. Editing blocks foreground resume, releases held keys and restores normal playback on DONE.
+The shared settings accept a host's supported buttons without dropping stored choices for unsupported actions.

@@ -11,18 +11,18 @@ struct RootView: View {
     @State private var failed: String?
     /** Bumped by RESTART GAME, so the game's view (and the game) is made again. */
     @State private var restarts = 0
-    /// The proof of concept's UIKit buttons in place of the app's own, to time the two against each other.
-    @AppStorage("native_touch_controls") private var nativeControls = false
-
-    /// How tall the buttons' strip under the game is, at the least.
-    private let strip: CGFloat = 220
+    @State private var touchRevision = 0
 
     var body: some View {
         GeometryReader { geo in
+            let _ = touchRevision
             let wide = geo.size.width > geo.size.height
+            let gameBoy = playing.map { ["gb", "gbc"].contains(($0 as NSString).pathExtension.lowercased()) } ?? false
+            let strip = playing == nil ? 0 : CGFloat(PokeDaisyHost.shared.touchControlsHeight(
+                width: Double(geo.size.width * (wide ? 0.6 : 1)), gameBoy: gameBoy))
             let layout = wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
             layout {
-                gameColumn
+                gameColumn(strip: strip, portrait: !wide)
                     .frame(width: wide ? min(geo.size.width * 0.6, (geo.size.height - strip) * 1.5) : nil,
                            height: wide ? nil : (playing == nil ? geo.size.width / 1.5 : geo.size.width / 1.5 + strip))
                 ViewControllerView(make: { PokeDaisyHost.shared.companionViewController() })
@@ -33,15 +33,16 @@ struct RootView: View {
             // The companion's SETTINGS > CLOSE GAME / RESTART GAME.
             PokeDaisyHost.shared.onCloseRequested = { stop() }
             PokeDaisyHost.shared.onRestartRequested = { restarts += 1 }
+            PokeDaisyHost.shared.onTouchLayoutChanged = { touchRevision += 1 }
         }
     }
 
-    @ViewBuilder private var gameColumn: some View {
+    @ViewBuilder private func gameColumn(strip: CGFloat, portrait: Bool) -> some View {
         if let rom = playing {
             GeometryReader { col in
                 VStack(spacing: 0) {
                     game(rom).frame(height: col.size.width / 1.5)
-                    controls(rom)
+                    if strip > 0 { controls(rom, portrait: portrait).frame(height: strip) }
                 }
             }
         } else {
@@ -65,22 +66,16 @@ struct RootView: View {
             .id("\(rom)#\(restarts)")
             HStack(spacing: 0) {
                 chip("GAMES", action: { PokeDaisyHost.shared.requestCloseGame() })
-                chip(nativeControls ? "TOUCH: NATIVE" : "TOUCH: SHARED") {
-                    PokeDaisyHost.shared.setTouchKeys(keys: 0)
-                    nativeControls.toggle()
-                }
+
             }
         }
     }
 
-    @ViewBuilder private func controls(_ rom: String) -> some View {
-        if nativeControls {
-            NativeGamepad()
-        } else {
-            let gameBoy = ["gb", "gbc"].contains((rom as NSString).pathExtension.lowercased())
-            ViewControllerView(make: { PokeDaisyHost.shared.touchControlsViewController(gameBoy: gameBoy) })
-                .id(rom)
-        }
+    private func controls(_ rom: String, portrait: Bool) -> some View {
+        let gameBoy = ["gb", "gbc"].contains((rom as NSString).pathExtension.lowercased())
+        return ViewControllerView(make: {
+            PokeDaisyHost.shared.touchControlsViewController(gameBoy: gameBoy, portrait: portrait)
+        }).id("\(rom)#\(portrait)")
     }
 
     private func chip(_ title: String, action: @escaping () -> Void) -> some View {

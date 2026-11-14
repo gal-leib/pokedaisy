@@ -59,6 +59,13 @@ class GameViewController(
             input.touchKeys = value
         }
 
+    var touchTurbo: Int
+        get() = input.touchTurbo
+        set(value) { input.touchTurbo = value }
+
+    /** A modal editor is open: foreground notifications must not start frames underneath it. */
+    var uiPaused: Boolean = false
+
     /** Per-game pace, or zero for unlimited FF (bounded work per display refresh). Main thread. */
     var speed: Double = 1.0
     var volume: Float = 1f
@@ -133,7 +140,7 @@ class GameViewController(
 
     /** Runs again after [pause]. */
     fun resume() {
-        if (!running) return
+        if (!running || uiPaused) return
         active = true
         pacer.reset()
         audio.start()
@@ -147,6 +154,7 @@ class GameViewController(
         return try {
             beforeStateChange()
             input.touchKeys = 0
+            input.touchTurbo = 0
             PkApiCore.setKeys(0)
             if (PkApiCore.finishSave(600) >= 600) false else operation()
         } finally {

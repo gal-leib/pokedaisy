@@ -195,8 +195,10 @@ object NewFeatures {
 
     const val IPAD_STATES = "ipad_states"
     const val IPAD_RESUME = "ipad_resume"
+    const val IPAD_TOUCH = "ipad_touch"
 
     val ALL = listOf(
+        IPAD_TOUCH,
         IPAD_RESUME,
         IPAD_STATES,
         IPAD_PLAYBACK,
