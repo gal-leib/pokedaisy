@@ -48,7 +48,6 @@ import com.pokedaisy.app.companion.ui.rememberArtGeneration
 import com.pokedaisy.app.companion.ui.soundClickable
 import com.pokedaisy.app.companion.data.isGameBoyGame
 import com.pokedaisy.app.companion.i18n.tk
-import okio.Path.Companion.toOkioPath
 
 /**
  * A theme (Settings > THEME on both screens): the app's and the companion's look in its colours, the way DARK MODE

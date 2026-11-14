@@ -70,6 +70,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.IO
 
 /**
  * Achievement badges (64x64 PNGs on RetroAchievements' media server), fetched

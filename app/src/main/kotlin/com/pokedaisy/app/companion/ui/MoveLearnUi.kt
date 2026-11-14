@@ -39,6 +39,7 @@ import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.IO
 
 /**
  * What the move advice needs from the running game: its dex / guide [tables] (learnsets, TMs),
