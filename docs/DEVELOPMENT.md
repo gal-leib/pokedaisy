@@ -3928,3 +3928,10 @@ pushing a different file (only one at a time for now). SRAM persists to
 | `scripts/capture_fixture.sh`, `scripts/roms.conf`       | Captures a live EWRAM+IWRAM memory fixture for one ROM off the device.                                                                                             |
 | `app/src/test/resources/fixtures/<key>/`                | Captured `{ewram,iwram}.bin` + `README.txt` per ROM — replayed by the JVM decode tests, not committed ROMs/saves themselves.                                       |
 | `app/src/test/kotlin/.../companion/data/*DecodeTest.kt` | One regression test per supported ROM, decoding its fixture and asserting the known-real values.                                                                   |
+
+### Shared touch-control preferences
+
+`TouchStyleCodec` reads and writes the existing Android touch keys through small typed storage callbacks. It keeps
+legacy vibration and extra-button migrations in one place, including the per-orientation custom layouts. Android
+`Prefs` supplies SharedPreferences callbacks and batches writes in one editor; other hosts can use their native
+preferences without duplicating the settings model or inventing a second encoding.
