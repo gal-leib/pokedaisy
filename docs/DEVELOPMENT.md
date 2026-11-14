@@ -3960,8 +3960,9 @@ title chrome and the about footer are shared too. Application-mode settings use 
 searchable home; hosts can omit game-only controls when no core is open.
 
 GamePanelLayout returns a TouchStage directly for the one-window game host and the standalone editor. Portrait
-uses Android's PortraitLayout with no resize grip, the player's UNDER GAME / AT BOTTOM, and Android's controls area: the
-gap under the companion, else the game itself (a strip of the buttons' height once locked custom layouts to the bottom).
+uses Android's PortraitLayout with no resize grip, the player's UNDER GAME / AT BOTTOM, and Android's controls area: with
+UNDER GAME a strip of `TouchGeometry.naturalHeight` along the bottom (`padStrip`, as `PokeDaisyActivity.syncTouchControls`
+sets it), with AT BOTTOM the gap above the companion, else the game itself.
 Landscape uses the shared default side-panel width, centers the game in its area and overlays the controls there, without a separate strip. LibraryPreferences stores
 portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
 

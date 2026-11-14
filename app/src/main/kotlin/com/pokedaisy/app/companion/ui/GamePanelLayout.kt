@@ -9,26 +9,30 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import com.pokedaisy.app.companion.SIDE_PANEL_DEFAULT_WIDTH
+import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.TouchStage
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The game's screen on a one-screen tablet laid out by Android's own rules: upright [PortraitLayout] (the companion
- * under the game when [underGame], else along the bottom; the touch controls in the gap they leave, or over the game
- * when there's none, as on an Android tablet), sideways a docked companion with the controls over the game's column.
+ * The game's screen on one screen laid out by Android's own rules: upright [PortraitLayout] (the companion under the
+ * game when [underGame], the touch controls in a strip of their own along the bottom, [style]'s natural height, as
+ * PokeDaisyActivity gives them; along the bottom, the gap the companion leaves, or over the game when there's none),
+ * sideways a docked companion with the controls over the game's column.
  */
 fun gamePanelLayout(
     width: Float, height: Float, dp: Float,
     controlsVisible: Boolean = true, gameBoy: Boolean = false, underGame: Boolean = true,
+    style: TouchControlsStyle? = null,
 ): TouchStage {
     val w = width.coerceAtLeast(0f)
     val h = height.coerceAtLeast(0f)
     val portrait = h >= w
     val aspect = if (gameBoy) 160f / 144 else 1.5f
     if (portrait) {
+        val strip = if (controlsVisible && underGame && style != null && w > 0f) TouchGeometry.naturalHeight(style, w, dp, gameBoy) else 0
         val a = PortraitLayout.arrange(w.roundToInt(), h.roundToInt(), (w / aspect).roundToInt(),
-            gripH = 0, ratio = PortraitLayout.DEFAULT_RATIO, underGame = underGame)
+            gripH = 0, ratio = PortraitLayout.DEFAULT_RATIO, underGame = underGame, padStrip = strip)
         val gh = min(w / aspect, a.gameBottom.toFloat()).coerceAtLeast(0f)
         val gw = gh * aspect
         val area = if (controlsVisible) Rect(0f, a.padTop.toFloat(), w, a.padBottom.toFloat()) else Rect(0f, h, w, h)
