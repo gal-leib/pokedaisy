@@ -29,7 +29,10 @@ import okio.FileSystem
 import okio.Path.Companion.toPath
 import okio.buffer
 import okio.use
+import platform.Foundation.NSDate
+import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSLocale
 import platform.Foundation.NSTimer
 import platform.UIKit.UIViewController
 import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
@@ -38,6 +41,9 @@ import platform.darwin.dispatch_get_global_queue
 
 /** How often the companion reads the running game (Android's sampler runs about this often too). */
 private const val SAMPLE_SECONDS = 0.5
+
+/** A save larger than this isn't one (a GBA flash chip is 128 KB; a Game Boy cart's RAM less). */
+private const val MAX_SAVE_BYTES = 1 shl 20
 
 /**
  * What the iPad app's Swift side calls (as `PokeDaisyHost.shared` in Swift; not `PokeDaisy`, which is the app's own
@@ -92,6 +98,46 @@ object PokeDaisyHost {
 
     /** Files' picker over [from]; [onAdded] gets the games it copied in (none if cancelled). */
     fun addGames(from: UIViewController, onAdded: (List<String>) -> Unit) = RomPicker.pick(from, onAdded)
+
+    /**
+     * LOAD SAVE (the Android library's, for the iPad's game list): the save picked in Files at [fromPath] becomes
+     * [romPath]'s battery save, the one before kept beside it as `<name>.backup-<yyyyMMdd-HHmmss>.sav`. The game must
+     * not be running. Null when it worked, else what went wrong, for the player.
+     */
+    fun loadSave(romPath: String, fromPath: String): String? {
+        val fs = FileSystem.SYSTEM
+        val bytes = runCatching { fs.read(fromPath.toPath()) { readByteArray() } }.getOrNull()
+            ?: return "Can't read that file"
+        if (bytes.isEmpty() || bytes.size > MAX_SAVE_BYTES) return "That isn't a game save"
+        // RetroArch's compressed saves start "#RZIPv": the Android app unpacks them, the iPad app can't yet.
+        if (bytes.size >= 6 && bytes.copyOfRange(0, 6).decodeToString() == "#RZIPv") {
+            return "That save is compressed: turn off RetroArch's save compression and save again"
+        }
+        val current = RomPicker.savePathFor(romPath).toPath()
+        val dir = current.parent ?: return "Can't write the save"
+        val backup = dir / backupName(current.name)
+        val tmp = dir / "${current.name}.tmp"
+        return runCatching {
+            fs.createDirectories(dir)
+            if (fs.exists(current)) fs.atomicMove(current, backup)
+            fs.write(tmp) { write(bytes) }
+            fs.atomicMove(tmp, current)
+            null
+        }.getOrElse {
+            // Put the old save back.
+            runCatching { fs.delete(tmp) }
+            if (!fs.exists(current) && fs.exists(backup)) runCatching { fs.atomicMove(backup, current) }
+            "Can't write the save"
+        }
+    }
+
+    private fun backupName(saveName: String): String {
+        val f = NSDateFormatter().apply {
+            dateFormat = "yyyyMMdd-HHmmss"
+            locale = NSLocale(localeIdentifier = "en_US_POSIX")
+        }
+        return "${saveName.substringBeforeLast('.')}.backup-${f.stringFromDate(NSDate())}.${saveName.substringAfterLast('.')}"
+    }
 
     /** The game at [romPath] running, its battery save beside the others; closes the one before. [onFailed] hears a
      * game that won't open. */
