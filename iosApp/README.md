@@ -3,8 +3,9 @@
 The iPad app: a SwiftUI app with the game (the iOS core's `GameViewController`: Metal, sound, controllers and a
 hardware keyboard) beside the companion's shared screens (`shared-ui`, Compose Multiplatform). With no game running, the
 game's place lists the games added from Files (ADD GAMES); a game is copied into the app's `Documents/roms/` and keeps its
-save in `Documents/saves/`, both visible in Files. There are no on-screen buttons yet: play with a controller or a
-keyboard.
+save in `Documents/saves/`, both visible in Files. A game's menu (the circle beside it) has Load a save from Files, which puts the picked save in its place and keeps
+the one before as `<name>.backup-<date>.sav` (RetroArch's compressed saves aren't read yet). There are no on-screen buttons yet: play with a
+controller or a keyboard.
 
 ## Build and run
 
