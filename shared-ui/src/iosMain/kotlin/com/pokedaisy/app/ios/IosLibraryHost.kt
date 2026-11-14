@@ -80,7 +80,7 @@ internal class IosLibraryHost(
     private fun settingsStage(): com.pokedaisy.app.companion.TouchStage? {
         if (screen.width.value <= 0 || screen.height.value <= 0) return null
         return gamePanelLayout(screen.width.value * scale, screen.height.value * scale, scale,
-            IosTouchPreferences.drawingStyle)
+            underGame = IosTouchPreferences.underGame)
     }
 
     private fun key(path: String) = path.substringAfterLast('/')

@@ -42,6 +42,15 @@ internal object IosTouchPreferences {
             changed()
         }
 
+    /** Upright, the companion right under the game (Android's UNDER GAME, the default) or along the bottom. */
+    var underGame by mutableStateOf(d.objectForKey(UNDER_GAME) == null || d.boolForKey(UNDER_GAME))
+        private set
+    fun setUnderGame(on: Boolean) {
+        d.setBool(on, UNDER_GAME)
+        underGame = on
+        revision++
+    }
+
     var changed: () -> Unit = {}
     private var controllerConnected by mutableStateOf(GCController.controllers().isNotEmpty())
     val visible: Boolean get() = when (style.show) {
@@ -64,6 +73,9 @@ internal object IosTouchPreferences {
     val buttons = TouchButton.entries.toSet() - setOf(TouchButton.QUICK_MENU, TouchButton.ZOOM,
         TouchButton.REWIND, TouchButton.X, TouchButton.Y)
     val drawingStyle: TouchControlsStyle get() = style.forButtons(buttons)
+
+    /** Android's key (Prefs.portraitCompanionUnderGame). */
+    private const val UNDER_GAME = "portrait_companion_under_game"
 
     fun feel(strength: Int) {
         val style = when (strength) {

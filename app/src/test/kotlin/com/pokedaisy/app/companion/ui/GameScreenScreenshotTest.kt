@@ -37,7 +37,7 @@ class GameScreenScreenshotTest {
             val style = TouchControlsStyle(xyButtons = false, extras = setOf(TouchButton.FF))
             BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
                 val dp = LocalDensity.current.density
-                val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp, style, visible, gameBoy)
+                val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp, visible, gameBoy)
                 GameScreen(stage,
                     game = { Box(Modifier.fillMaxSize().background(Color(0xFF38684B))) },
                     companion = { CompanionScreen(SampleCompanion.snapshot, settings = SampleCompanion.Settings()) },
