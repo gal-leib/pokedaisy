@@ -1,7 +1,12 @@
 package com.pokedaisy.app.cheats
 
 import com.pokedaisy.app.companion.i18n.tk
-import java.io.File
+import com.pokedaisy.app.companion.data.delete
+import com.pokedaisy.app.companion.data.isFile
+import com.pokedaisy.app.companion.data.mkdirs
+import com.pokedaisy.app.companion.data.readLines
+import com.pokedaisy.app.companion.data.writeTextAtomically
+import okio.Path
 
 /**
  * One cheat: its [name], its code [lines] as mGBA reads them ("82025838 FFFF"),
@@ -240,16 +245,15 @@ object CheatCheck {
  * saves folder. [Prefs.cheatsEnabled][com.pokedaisy.app.Prefs.cheatsEnabled] is the
  * master switch over all of them.
  */
-class CheatStore(val file: File) {
+class CheatStore(val file: Path) {
     fun load(): List<Cheat> =
         runCatching { if (file.isFile) CheatFiles.parseMgba(file.readLines(), "CHEAT") else emptyList() }.getOrDefault(emptyList())
 
     fun save(cheats: List<Cheat>) {
-        file.parentFile?.mkdirs()
+        file.parent?.mkdirs()
         if (cheats.isEmpty()) { file.delete(); return }
-        val tmp = File(file.path + ".tmp")
-        tmp.writeText(CheatFiles.write(cheats))
-        if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
+        // To a .tmp beside it, then moved over the old file in one step.
+        file.writeTextAtomically(CheatFiles.write(cheats))
     }
 
     /** What imported: [added] cheats (all OFF), [badLines] code lines mGBA couldn't
@@ -277,8 +281,8 @@ class CheatStore(val file: File) {
     }
 
     companion object {
-        fun dir(filesDir: File) = File(filesDir, "cheats")
-        fun forCrc(filesDir: File, crc: String) = CheatStore(File(dir(filesDir), "$crc.cheats"))
+        fun dir(filesDir: Path) = filesDir / "cheats"
+        fun forCrc(filesDir: Path, crc: String) = CheatStore(dir(filesDir) / "$crc.cheats")
     }
 }
 
