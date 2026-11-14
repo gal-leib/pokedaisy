@@ -991,6 +991,7 @@ fun installPreviewHosts() {
     com.pokedaisy.app.companion.ui.theme.FontSource.current = com.pokedaisy.app.PreviewFonts(context)
     // The app's own codec, over the android.graphics shims.
     com.pokedaisy.app.companion.ui.PictureCodec.current = com.pokedaisy.app.AndroidPictures
+    com.pokedaisy.app.companion.ui.DeviceDates.current = com.pokedaisy.app.JvmDeviceDates
     com.pokedaisy.app.cheats.CheatParser.current = com.pokedaisy.app.cheats.PreviewCheatParser
 }
 
