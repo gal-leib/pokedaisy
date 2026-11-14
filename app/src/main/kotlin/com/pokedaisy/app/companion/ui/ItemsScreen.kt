@@ -1666,7 +1666,7 @@ private fun ItemDescriptionBar(
 
 /** What a USE / GIVE did, in the companion's words: [mon] the Pokémon it went to, [item] the item, [held]
  * what the Pokémon held before. */
-internal fun itemUseMessage(o: ItemUseOutcome, mon: String = "", item: String = "", held: Int = 0): String = when (o.result) {
+fun itemUseMessage(o: ItemUseOutcome, mon: String = "", item: String = "", held: Int = 0): String = when (o.result) {
     ItemUseResult.USED -> if (o.steps > 0) tr("Used! It lasts {0} steps.", o.steps) else tr("Used on {0}.", mon)
     ItemUseResult.STILL_ACTIVE -> tr("The last one is still working.")
     ItemUseResult.NOT_NOW -> tr("Not now: close the game's menus and battles first.")

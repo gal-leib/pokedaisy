@@ -541,8 +541,8 @@ object AchievementPopupRoute {
 
     private val companions = LinkedHashSet<() -> Boolean>()
 
-    internal fun add(shown: () -> Boolean) { companions += shown }
-    internal fun remove(shown: () -> Boolean) { companions -= shown }
+    fun add(shown: () -> Boolean) { companions += shown }
+    fun remove(shown: () -> Boolean) { companions -= shown }
 
     /** A companion's popup host is on screen now. */
     fun companionSeen(): Boolean = companions.any { it() }
