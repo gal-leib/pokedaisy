@@ -69,10 +69,8 @@ kotlin {
                 api("org.jetbrains.compose.ui:ui-text:1.7.3")
             }
         }
-        iosTest {
-            dependencies {
-                implementation(kotlin("test"))
-            }
+        commonTest {
+            dependencies { implementation(kotlin("test")) }
         }
         androidUnitTest {
             kotlin.srcDir(appTest.resolve("data"))
@@ -106,8 +104,6 @@ tasks.withType<Test> {
     // One fresh JVM per test class: NativeReader's bag cache is process-global (see app/build.gradle.kts).
     forkEvery = 1
     System.getenv("POKEDAISY_ROM_DIR")?.takeIf { it.isNotBlank() }?.let { systemProperty("romDir", it) }
-    // `--tests` picks across both modules (the Makefile passes it to both): no match here is fine.
-    filter.isFailOnNoMatchingTests = false
     // `make test-quick` (-Pquick): BestEffortTest scans 26 whole ROMs; the forks run side by side.
     if (project.hasProperty("quick")) {
         filter { excludeTestsMatching("*BestEffortTest") }

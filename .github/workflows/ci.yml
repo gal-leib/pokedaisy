@@ -104,7 +104,8 @@ jobs:
       - name: Compile for iOS (iPad, iPad simulator), the core included
         run: ./gradlew :shared:compileKotlinIosArm64 :shared:compileKotlinIosSimulatorArm64 --stacktrace
 
-      - name: The core in the iPad simulator
+      # Also commonTest's portable platform checks: a KLIB compile alone doesn't exercise Native APIs.
+      - name: The core and the platform checks in the iPad simulator
         run: ./gradlew :shared:iosSimulatorArm64Test --stacktrace
 
       - name: Test reports
