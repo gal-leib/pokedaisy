@@ -3637,7 +3637,9 @@ bilinear, its shape kept, a shader compiled at run time), `GameAudio` plays the 
 lock-free `AudioRing`, `GameInput` reads controllers (GameController) and a hardware keyboard and adds the shell's
 `touchKeys`. The display's refreshes drive the game on the main thread, `FramePacer` keeping its 59.73 frames a second
 on a 60 or 120 Hz screen. Their tests run in the simulator with the core's (`GameRendererTest` draws the diagnostic
-frame offscreen and checks every pixel, skipped where the machine has no Metal device).
+frame offscreen and checks every pixel, skipped where the machine has no Metal device). `RomPicker` adds games from Files
+(the system's document picker, .gba / .gb / .gbc), copying them into the app's `Documents/roms/`; a game's save is
+`Documents/saves/<name>.sav`.
 
 The generator scripts under `scripts/` and ui-preview's ROM-art rendering read
 built pret decomp checkouts (`pokefirered/`, `pokeemerald/`, `pokeruby/`,
