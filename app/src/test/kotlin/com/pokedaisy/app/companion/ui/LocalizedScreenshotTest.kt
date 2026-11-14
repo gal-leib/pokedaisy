@@ -31,7 +31,7 @@ class LocalizedScreenshotTest(private val lang: AppLanguage) {
         fun languages() = AppLanguage.entries.filter { it != AppLanguage.EN }
     }
 
-    @Before fun fonts() = installTestFonts(paparazzi.context)
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(

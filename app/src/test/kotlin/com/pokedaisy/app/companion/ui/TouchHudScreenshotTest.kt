@@ -31,7 +31,7 @@ import org.junit.Test
  *     ./gradlew :app:recordPaparazziDebug --tests '*TouchHud*ScreenshotTest'
  */
 class TouchHudScreenshotTest {
-    @Before fun fonts() = installTestFonts(paparazzi.context)
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 2460, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE),
@@ -78,7 +78,7 @@ class TouchHudScreenshotTest {
 
 /** 16:9 (1920x1080): SIDES gives way to CLASSIC, whose D-pad and A / B reach into the picture. */
 class TouchHud169ScreenshotTest {
-    @Before fun fonts() = installTestFonts(paparazzi.context)
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 1920, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE),
