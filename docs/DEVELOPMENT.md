@@ -3668,6 +3668,10 @@ ui-preview still compiles the same files straight into its desktop build.
 
 ### The companion's screens (`shared-ui/`)
 
+The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/`, in place. Its `ScriptInput`
+interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
+multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
+
 `shared-ui/` compiles the companion's screens for Android and iOS the same way, where they live: `companion/ui`, the
 `companion/*.kt` settings and state beside them, the co-op screens' model (`companion/coop`, without the transport and
 session files, which are Android / JVM only: sockets, Android NSD, Bouncy Castle, OkHttp), the manual reader

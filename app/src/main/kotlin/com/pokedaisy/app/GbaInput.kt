@@ -11,7 +11,7 @@ import kotlin.math.abs
  * shoulder / menu buttons are remappable via [setControls] (GbaControls); the
  * D-pad and analog stick are fixed.
  */
-class GbaInput : Hotkeys.GameKeys {
+class GbaInput : Hotkeys.GameKeys, ScriptInput {
     @Volatile
     var mask: Int = 0
         private set
@@ -121,7 +121,7 @@ class GbaInput : Hotkeys.GameKeys {
      * buttons, D-pad, touch controls - are ignored, so they can't knock the
      * sequence off course; they count again the moment it ends.
      */
-    fun setScript(bits: Int, exclusive: Boolean) {
+    override fun setScript(bits: Int, exclusive: Boolean) {
         scriptBits = bits
         scriptExclusive = exclusive
         recompute()
