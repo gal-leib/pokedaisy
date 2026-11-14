@@ -126,7 +126,7 @@ Small `L` and `R` keys at both ends of the tab bar remind you which buttons chan
 - **Lock it beside the game:** tap the padlock tab on the panel's left edge. The game moves over to make room, and both stay on screen as you play. Tap the padlock again and the panel goes back to sliding over the game. A locked panel stays open when you press `BACK` with nothing to go back from, and it comes back the next time you start a game.
 - **Resize it:** drag the padlock tab sideways. The panel starts at half the screen, which shows the game at exactly 4x on a 1080p screen. While you drag, it snaps when the game lands close to a whole-number size, so the pixels stay even.
 
-While the panel is locked, the open and close tabs turn see-through so they don't get in the way. The touch controls stay on the game's side whenever the panel is open.
+While the panel is locked, the open and close tabs turn see-through so they don't get in the way. The touch controls stay on the game's side whenever the panel is open. You can tap or drag the padlock tab while touch controls are showing.
 
 Hold `BACK` to leave the game, as always.
 

@@ -2311,6 +2311,7 @@ class PokeDaisyActivity : Activity() {
                 }
             }
         }
+        touchControls.inputExclusions = { sidePanel.inputExclusions() + portraitPanel.inputExclusions() }
         // Two screens: the game stays on the landscape top one. One screen (a phone): it turns
         // with the device (the user's rotation setting), the companion under the game upright.
         syncOrientation(secondScreen() != null)

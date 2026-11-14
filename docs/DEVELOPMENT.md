@@ -3970,8 +3970,9 @@ input and overlays the full stage. Android retains preferences, focus, animation
 `PanelResizeHandle` handles the side lock and portrait grip's gestures in Compose, accumulating pointer deltas
 because the handle moves during a drag. Taps reach the existing shared buttons; a drag consumes the gesture after
 touch slop, and release/cancellation finishes the resize. Android's former `DragFrame` wrapper is removed.
-The native pad's input-window rectangles can overlap part of the side grip when the pad is visible. Gesture smoke
-checks use its exposed edge; the outer-stage migration must reserve chrome from those windows as well as modal overlays.
+The Android adapter supplies the grips and panel tabs' measured window bounds. `excludeTouchRegions` subtracts these
+from native pad windows, and `TouchHitModel.excluded` releases a held game button when its finger moves over UI. The same
+common geometry can reserve chrome when the outer-stage layout moves to Compose.
 `GamePanelLayout` accepts this state and the portrait size/hidden choice; hosts without those controls retain the docked
 default. `GameScreen` draws the companion above the controls so a window's scrim owns its whole overlay. The policy and
 geometry tests are `SidePanelStateTest` and `GamePanelLayoutTest`; the renderer and input adapters stay native.

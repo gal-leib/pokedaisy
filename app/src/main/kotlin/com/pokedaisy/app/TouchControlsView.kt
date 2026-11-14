@@ -123,6 +123,9 @@ class TouchControlsView(context: Context) : FrameLayout(context) {
     /** Nothing is open over the game (UI thread, asked before every draw): the input windows may take the fingers. */
     var inputAllowed: () -> Boolean = { false }
 
+    /** UI controls to leave clear, in window coordinates; native hosts supply their current measured bounds. */
+    var inputExclusions: () -> List<androidx.compose.ui.unit.IntRect> = { emptyList() }
+
     /** Before each draw of the window this is in: the input windows follow the buttons, and step aside under an overlay. */
     private val preDraw = android.view.ViewTreeObserver.OnPreDrawListener { syncInputWindows(); true }
     private var observer: android.view.ViewTreeObserver? = null
@@ -147,7 +150,7 @@ class TouchControlsView(context: Context) : FrameLayout(context) {
         val show = visibility == VISIBLE && isAttachedToWindow
         if (!show && inputWindows == null) return
         val windows = inputWindows ?: TouchInputWindows(this, tracker).also { inputWindows = it }
-        windows.sync(hitModel.takeIf { show }, show && inputAllowed())
+        windows.sync(hitModel.takeIf { show }, show && inputAllowed(), if (show) inputExclusions() else emptyList())
     }
 
     /** UI thread, from the activity's onConfigurationChanged: new input windows start from the new configuration

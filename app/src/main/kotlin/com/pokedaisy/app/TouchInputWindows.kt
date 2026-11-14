@@ -22,6 +22,8 @@ import com.pokedaisy.app.companion.ui.TouchHitModel
 import com.pokedaisy.app.companion.ui.TouchHits
 import com.pokedaisy.app.companion.ui.TouchPressTracker
 import com.pokedaisy.app.companion.ui.touchHits
+import com.pokedaisy.app.companion.ui.excludeTouchRegions
+import androidx.compose.ui.unit.IntRect
 import kotlin.math.roundToInt
 
 /**
@@ -67,6 +69,7 @@ class TouchInputWindows(private val anchor: View, private val tracker: TouchPres
     private var sentY = 0
     private var sentOn = false
     private var sentModel: TouchHitModel? = null
+    private var sentExcluded: List<IntRect> = emptyList()
     private var released = false
 
     // [thread] only from here down.
@@ -107,18 +110,25 @@ class TouchInputWindows(private val anchor: View, private val tracker: TouchPres
     }
 
     /** UI thread: the windows for [model] (null: none), letting touches through unless [allowed]. Cheap when nothing changed. */
-    fun sync(model: TouchHitModel?, allowed: Boolean) {
+    fun sync(model: TouchHitModel?, allowed: Boolean, reservedInWindow: List<IntRect> = emptyList()) {
         if (released) return
         val token = if (anchor.isAttachedToWindow) anchor.windowToken else null
         val loc = IntArray(2)
         if (token != null) anchor.getLocationInWindow(loc)
-        val rects = if (token != null && model != null) clusters(model, anchor.width, anchor.height) else emptyList()
+        val reserved = reservedInWindow.map { IntRect(it.left - loc[0], it.top - loc[1], it.right - loc[0], it.bottom - loc[1]) }
+        val excluded = if (model?.excluded.isNullOrEmpty()) reserved else model!!.excluded + reserved
+        val raw = if (token != null && model != null) clusters(model, anchor.width, anchor.height) else emptyList()
+        val rects = if (excluded.isEmpty()) raw else excludeTouchRegions(
+            raw.map { IntRect(it.left, it.top, it.right, it.bottom) }, excluded,
+        ).map { Rect(it.left, it.top, it.right, it.bottom) }
         val on = allowed && token != null && rects.isNotEmpty() && anchor.isShown
-        if (token == sentToken && rects == sentRects && loc[0] == sentX && loc[1] == sentY && on == sentOn && model === sentModel) return
+        if (token == sentToken && rects == sentRects && loc[0] == sentX && loc[1] == sentY && on == sentOn && model === sentModel && excluded == sentExcluded) return
         sentToken = token; sentRects = rects; sentX = loc[0]; sentY = loc[1]; sentOn = on; sentModel = model
+        sentExcluded = excluded
+        val hitModel = model?.let { if (excluded.isEmpty()) it else TouchHitModel(it.placed, it.fit, it.eightWay, excluded) }
         val x = loc[0]
         val y = loc[1]
-        handler.post { apply(token, model, rects, x, y, on) }
+        handler.post { apply(token, hitModel, rects, x, y, on) }
     }
 
     /** UI thread: every window gone, the thread ended (the activity's going). */
@@ -248,4 +258,12 @@ class TouchInputWindows(private val anchor: View, private val tracker: TouchPres
 
         private const val MERGE_DP = 8f
     }
+}
+
+/** The native host's geometry bridge; shared hit testing and input-window clipping consume the result. */
+internal fun View.touchExclusionInWindow(): IntRect? {
+    if (!isAttachedToWindow || !isShown || width <= 0 || height <= 0) return null
+    val at = IntArray(2)
+    getLocationInWindow(at)
+    return IntRect(at[0], at[1], at[0] + width, at[1] + height)
 }

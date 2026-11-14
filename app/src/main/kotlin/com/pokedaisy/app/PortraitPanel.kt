@@ -186,6 +186,8 @@ class PortraitPanel(
         return androidx.compose.ui.geometry.Rect(0f, lp.topMargin.toFloat(), screenW.toFloat(), (lp.topMargin + lp.height).toFloat())
     }
 
+    fun inputExclusions() = listOfNotNull(gripView?.touchExclusionInWindow())
+
     /** A BACK tap; false = not ours (held sideways, or a second screen has the companion). */
     fun onBack(): Boolean {
         if (!enabled) return false

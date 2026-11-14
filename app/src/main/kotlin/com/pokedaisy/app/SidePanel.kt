@@ -149,6 +149,9 @@ class SidePanel(
     private val rootHeight get() = root.height.takeIf { it > 0 } ?: context.resources.displayMetrics.heightPixels
     private val panelWidth get() = state.arrange(rootWidth).panelWidth
 
+    /** Panel controls have priority over any game button beneath them. */
+    fun inputExclusions() = listOfNotNull(handle?.touchExclusionInWindow(), closeTab?.touchExclusionInWindow(), openTab?.touchExclusionInWindow())
+
     private val relayout = View.OnLayoutChangeListener { _, l, _, r, _, _, _, _, _ ->
         if (r - l != lastRootWidth) {
             lastRootWidth = r - l
