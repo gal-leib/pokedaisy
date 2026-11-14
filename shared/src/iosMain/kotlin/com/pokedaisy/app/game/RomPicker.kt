@@ -51,6 +51,9 @@ object RomPicker {
     /** The app's folder of games. */
     val romsDir: String get() = documents("roms")
 
+    /** State files, visible in Files alongside battery saves. */
+    val statesDir: String get() = documents("states")
+
     /** Where the game at [romPath] keeps its battery save: `Documents/saves/<name>.sav`. */
     fun savePathFor(romPath: String): String {
         val name = romPath.substringAfterLast('/').substringBeforeLast('.')

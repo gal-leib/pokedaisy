@@ -193,7 +193,10 @@ object NewFeatures {
     /** The iPad game loop now supports fast-forward and per-game speed. */
     const val IPAD_PLAYBACK = "ipad_playback"
 
+    const val IPAD_STATES = "ipad_states"
+
     val ALL = listOf(
+        IPAD_STATES,
         IPAD_PLAYBACK,
         HUD, BATTLE_BUTTONS, GAME_HOTKEYS, COMPANION_WINDOW, HUD_PC, QUICK_MENU, HUD_REPEL, SINGLE_SCREEN, MORE_TAB, TOUCH_CONTROLS,
         COMPANION_TAB, REUSABLE_TMS, SHINY_ODDS, UNLIT_SCREEN, LIGHT_COMPANION, X_COMPANION, PLAYER_LOOK, RIVAL_LOOK, TEXT_LOOK, DAY_NIGHT,

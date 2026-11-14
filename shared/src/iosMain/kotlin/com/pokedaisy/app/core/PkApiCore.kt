@@ -3,6 +3,7 @@
 package com.pokedaisy.app.core
 
 import com.pokedaisy.app.companion.data.EmulatorCore
+import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.core.pkapi.pk_api_save_state
 import com.pokedaisy.app.core.pkapi.pk_api_load_state
 import com.pokedaisy.app.core.pkapi.pk_api_state_matches_save
@@ -98,6 +99,22 @@ object PkApiCore : EmulatorCore {
 
     /** Lets a save the game is writing finish (up to [maxFrames] frames): before [stop] or a state. */
     fun finishSave(maxFrames: Int): Int = pk_api_finish_save(maxFrames)
+
+    /** A small opaque screenshot for the shared STATES cards, made only on a state save. */
+    fun stateThumbnail(): ByteArray? {
+        val src = video()?.reinterpret<ByteVar>() ?: return null
+        val width = videoWidth
+        val height = videoHeight
+        if (width <= 0 || height <= 0) return null
+        val tw = 160
+        val th = tw * height / width
+        val pixels = IntArray(tw * th) { i ->
+            val at = (((i / tw) * height / th) * width + (i % tw) * width / tw) * 4
+            (0xFF shl 24) or ((src[at].toInt() and 0xFF) shl 16) or
+                ((src[at + 1].toInt() and 0xFF) shl 8) or (src[at + 2].toInt() and 0xFF)
+        }
+        return RomArt.Image(tw, th, pixels).png()
+    }
 
     /** Extended states include the battery save: a manual load rewinds it too. Game thread only. */
     fun saveState(path: String): Boolean = pk_api_save_state(path)

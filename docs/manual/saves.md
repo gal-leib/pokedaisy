@@ -155,3 +155,13 @@ Walked into the wrong trainer, or picked the wrong move? With rewind on, you can
 On a keyboard, `REWIND HOLD` is R. It has no controller button until you pick one under `HOTKEYS` (see [Controls](controls.md)). The sound is muted while you rewind, and when you reach the oldest moment it keeps, the picture stops there.
 
 Rewinding never touches your save file: it only moves the game back in time, and whatever you saved in the game stays saved until the game saves again.
+
+## On iPad
+
+Open `STATES` from `MORE`, or put it on your tab bar in `SETTINGS` > `TAB BAR`. You have ten slots with screenshots.
+Use `SAVE` or `LOAD`, `UNDO SAVE` to restore a slot's previous contents, and `UNDO LOAD` to return to the moment before
+your last load. Hold a saved screenshot to delete its slot, then confirm.
+
+Loading a state also restores the battery save it contains. Your current save is copied into `saves/pokedaisy-backups`
+before a manual load. The latest ten distinct copies are kept. You can find both saves and `states` in the app's
+folder in Files. Keep saving through the game's own menu too.
