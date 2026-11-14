@@ -97,8 +97,6 @@ tasks.withType<KotlinCompile>().configureEach {
 java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 dependencies {
     api("org.jetbrains.compose.desktop:desktop-jvm-$desktopTarget:$cmp")
-    // The co-op invite as a QR code (CoopQr).
-    implementation("com.google.zxing:core:3.5.3")
     // DeltaSkin and CoopLockStore read JSON.
     implementation("org.json:json:20240303")
     // CoopPairs reads and writes pairs.json.
