@@ -3631,6 +3631,14 @@ On iOS the shared module (`shared/`) reaches it through Kotlin/Native cinterop: 
 runs a game through it and is the data code's `EmulatorCore` there. `./gradlew :shared:iosSimulatorArm64Test` runs it
 in the iPad simulator on the same diagnostic ROMs (CI's "Shared code for iOS" job, on macOS).
 
+The game on the iPad is `GameViewController` (`shared/src/iosMain/.../game/`), a UIKit view controller in Kotlin
+the app shell embeds wherever the game goes, its own controls over it: `GameRenderer` draws the frame with Metal (sharp
+bilinear, its shape kept, a shader compiled at run time), `GameAudio` plays the sound through AVAudioEngine from a
+lock-free `AudioRing`, `GameInput` reads controllers (GameController) and a hardware keyboard and adds the shell's
+`touchKeys`. The display's refreshes drive the game on the main thread, `FramePacer` keeping its 59.73 frames a second
+on a 60 or 120 Hz screen. Their tests run in the simulator with the core's (`GameRendererTest` draws the diagnostic
+frame offscreen and checks every pixel, skipped where the machine has no Metal device).
+
 The generator scripts under `scripts/` and ui-preview's ROM-art rendering read
 built pret decomp checkouts (`pokefirered/`, `pokeemerald/`, `pokeruby/`,
 `pokehns/`, each built at its pinned commit) from the directory in the
