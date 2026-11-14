@@ -3016,7 +3016,7 @@ RetroAchievements' views are the file.
   also when the player is more than 1 tile (Chebyshev) from the recorded one, an OBJECT when his tile or facing changed.
   A held player is never stuck: he can walk away, change map or close the game.
 - **JNI**: `pk_coop_lock_jni.c` (`Java_com_pokedaisy_app_CoopLockNative_*`) takes the core through `pk_core_access.h`
-  (`pkMainCore`, `pk_core_rdlock` / `wrlock`, `pk_core_call`: one block in `pokedaisy_jni.c`): install / uninstall under the
+  (`pkMainCore`, `pk_core_rdlock` / `wrlock`, `pk_core_call`: one block in `pk_session.c`): install / uninstall under the
   write lock, the rest under the read lock like the other co-op JNI calls. `pokedaisy_jni.c` ticks it (`pk_coop_lock_tick`) after every frame and uninstalls it
   wherever co-op is (teardown, `pkRomUnpatch`, `pkRomBlocks`, `pkRomUnblock`).
 - **Tests**: `native-capture/coop/lock_*.txt` (`scripts/coop_headless_check.sh lock_install ...`; each names its events in its
@@ -3609,6 +3609,28 @@ NDK `28.2.13676358` and CMake `3.22.1` (both installable via `sdkmanager`).
 `make help` lists the other workflows (install, Paparazzi shots, ui-preview,
 headless captures).
 
+### The core's C API (`pk_api.h`)
+
+The GBA / Game Boy game itself (starting and closing it, its frames, picture, sound, keys, memory and ROM reads) is a
+plain C API with no JNI in it: `pk_api.h`, implemented by `pk_session.c`. `pokedaisy_jni.c` calls it (and puts the DS
+games in front of it); the iPad app will call the same functions. `pk_api.cmake` builds it, mGBA included, as the
+static library `pk_api`, which the app's `CMakeLists.txt` links and any other host can too. The rest of the native code
+(states, cheats, EXPAND, REWIND, the render core, the game calls...) still reaches into its state as `g`
+(`pk_session.h`, a transitional header) and moves under `pk_api.h` one area at a time.
+
+Its host test runs it off Android on `linux/make_diagnostic.py`'s ROMs (CI's "Core C API (host)" job):
+
+```bash
+cmake -S app/src/main/cpp/test -B build/pk_api_test && cmake --build build/pk_api_test -j4
+ctest --test-dir build/pk_api_test --output-on-failure
+```
+
+On iOS the shared module (`shared/`) reaches it through Kotlin/Native cinterop: `shared/native/build_ios_core.sh`
+(Gradle's `buildIosCore`, on a Mac with Xcode) builds `pk_api` for the iPad and the iPad simulator into
+`shared/build/pkcore/` (one `libpkcore.a` per slice, plus `PkCore.xcframework` for Xcode), and `PkApiCore` (iosMain)
+runs a game through it and is the data code's `EmulatorCore` there. `./gradlew :shared:iosSimulatorArm64Test` runs it
+in the iPad simulator on the same diagnostic ROMs (CI's "Shared code for iOS" job, on macOS).
+
 The generator scripts under `scripts/` and ui-preview's ROM-art rendering read
 built pret decomp checkouts (`pokefirered/`, `pokeemerald/`, `pokeruby/`,
 `pokehns/`, each built at its pinned commit) from the directory in the
@@ -3625,9 +3647,10 @@ okio. What differs by platform comes in from outside: the emulator through `Emul
 `MgbaEmulatorCore` in `PokeDaisyApp`), logging through `Logs`' sink. Their tests stay in `app/src/test` too and run as
 `:shared:testDebugUnitTest` (from `app/`, as before), except the few that also use the app's classes (the root
 build's `appOnlyTests`), which run with the app's. Something the app uses from those folders must be public, not
-`internal` (another module now). `./gradlew :shared:compileKotlinIosArm64` compiles it for an iPad, on Linux too; CI's
-"Shared code for iOS" job does. The macOS "Shared code on the iOS simulator" job also links and runs the
-portable smoke tests in `shared/src/commonTest`: files, PNGs, background work / locks and a fake emulator.
+`internal` (another module now). `./gradlew :shared:compileKotlinIosArm64` compiles it for an iPad; since the
+emulator core comes in through cinterop (see "The core's C API"), that needs a Mac with Xcode. CI's macOS "Shared code
+for iOS" job compiles both iOS targets, then links and runs the iOS tests in the simulator: the core's (`PkApiCoreTest`)
+and the portable smoke tests in `shared/src/commonTest` (files, PNGs, background work / locks and a fake emulator).
 Run them locally with `./gradlew :shared:iosSimulatorArm64Test` on an Apple Silicon Mac with Xcode and an iOS simulator.
 For focused JVM tests, use `make test-quick MODULE=shared T='*RomFilesTest'` (`MODULE=app` for app tests).
 A filter must match a test in that module; unfiltered `make test-quick` still runs both modules.
