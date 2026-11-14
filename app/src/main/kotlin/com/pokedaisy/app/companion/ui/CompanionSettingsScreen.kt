@@ -570,12 +570,12 @@ private fun homeRows(
     return makeover + listOfNotNull(
         groupTitle(tk("FF / SPEED")),
         // On / off - the group's title already says fast-forward.
-        SettingRow("FF", onOff(s.ffToggled)) { s.setFfToggled(!s.ffToggled); changed() },
-        SettingRow(tk("FF SPEED"), rateLabel(s.ffMaxSpeed)) {
+        SettingRow("FF", onOff(s.ffToggled), labelBadge = s.playbackBadge) { s.setFfToggled(!s.ffToggled); changed() },
+        SettingRow(tk("FF SPEED"), rateLabel(s.ffMaxSpeed), labelBadge = s.playbackBadge) {
             select(Selector(tk("FF SPEED"), rateLabels, rateLabel(s.ffMaxSpeed)) { s.setFfMaxSpeed(FF_RATES[rateLabels.indexOf(it)]) })
         },
         // The game's own pace, kept per game: slow-motion that stays (0.5x, 0.25x) up to 4x. FF, when on, wins.
-        SettingRow(tk("GAME SPEED"), speedLabel(s.gameSpeed), subtitle = "The pace with FF off, kept per game") {
+        SettingRow(tk("GAME SPEED"), speedLabel(s.gameSpeed), labelBadge = s.playbackBadge, subtitle = "The pace with FF off, kept per game") {
             val speeds = s.gameSpeeds
             val labels = speeds.map(::speedLabel)
             select(Selector(tk("GAME SPEED"), labels, speedLabel(s.gameSpeed)) { l -> s.setGameSpeed(speeds[labels.indexOf(l)]) })

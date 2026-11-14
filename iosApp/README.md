@@ -15,6 +15,13 @@ The companion's buttons drive the game's own menus in single battles (actions, m
 switch where its menu is mapped. SETTINGS has ONE-TAP MOVES, BATTLE VIEW, BATTLE STYLE, BATTLE INFO and BATTLE FOCUS.
 The controller is shared with Android; the iPad runs it once per game frame and navigates by key presses.
 
+## Speed and sound
+
+SETTINGS has FF (a persistent toggle), FF SPEED (including INFINITE), GAME SPEED (kept per game), GAME VOLUME and MUTE GAME.
+Fast-forward runs everywhere for now, with pitched, sped-up sound; INFINITE is silent and yields between bounded batches
+of frames so the main thread still handles touch and the companion. SMART mode, scene speeds, steady music and speed
+hotkeys wait for later PRs.
+
 ## Build and run
 
 On a Mac with Xcode 16, a JDK 17 and the Android SDK (Gradle configures the shared modules' Android side too; `sdk.dir` in `local.properties`):
