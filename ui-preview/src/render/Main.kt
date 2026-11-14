@@ -1125,9 +1125,9 @@ private val COOP_TICKET = com.pokedaisy.app.companion.coop.CoopTicket(
 private val COOP_CHOICES by lazy {
     val dir = File(android.content.Context().filesDir, "coop-saves").apply { mkdirs() }
     listOf(
-        com.pokedaisy.app.companion.ui.CoopSaveChoice(File(dir, "a.gba"), File(dir, "a.sav"), "Pokémon Emerald", coopSave("RED", 12345), null),
-        com.pokedaisy.app.companion.ui.CoopSaveChoice(File(dir, "b.gba"), File(dir, "b.sav"), "Pokémon Emerald (second copy)", coopSave("MAY", 777), "LEAF"),
-        com.pokedaisy.app.companion.ui.CoopSaveChoice(File(dir, "c.gba"), File(dir, "c.sav"), "Pokémon Emerald (never saved)", null, null),
+        com.pokedaisy.app.companion.ui.CoopSaveChoice(okio.Path.Companion.run { File(dir, "a.sav").toOkioPath() }, "Pokémon Emerald", coopSave("RED", 12345), null),
+        com.pokedaisy.app.companion.ui.CoopSaveChoice(okio.Path.Companion.run { File(dir, "b.sav").toOkioPath() }, "Pokémon Emerald (second copy)", coopSave("MAY", 777), "LEAF"),
+        com.pokedaisy.app.companion.ui.CoopSaveChoice(okio.Path.Companion.run { File(dir, "c.sav").toOkioPath() }, "Pokémon Emerald (never saved)", null, null),
     )
 }
 
