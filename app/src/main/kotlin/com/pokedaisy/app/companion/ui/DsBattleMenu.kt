@@ -76,7 +76,6 @@ import com.pokedaisy.app.companion.i18n.tr
 class DsBattleMenuState {
     /** 0 nothing up (the keys go to the game), 1 the actions, 2 the moves. */
     var mode by mutableIntStateOf(0)
-        internal set
     /** FIGHT 0, BAG 1, POKéMON 2, RUN 3 (2 x 2: FIGHT BAG / POKéMON RUN). */
     var actionCursor by mutableIntStateOf(0)
     var moveCursor by mutableIntStateOf(0)
