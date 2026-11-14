@@ -1,7 +1,7 @@
 package com.pokedaisy.app.companion.coop
 
 import java.io.File
-import java.util.Random
+import kotlin.random.Random
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
