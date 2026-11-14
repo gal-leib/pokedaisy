@@ -37,6 +37,7 @@ import platform.Foundation.NSTimer
 import platform.UIKit.UIViewController
 import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
 import platform.darwin.dispatch_get_global_queue
 
 /** How often the companion reads the running game (Android's sampler runs about this often too). */
@@ -63,6 +64,7 @@ object PokeDaisyHost {
 
     // The running game's SETTINGS; null = NO GAME RUNNING.
     private var settings by mutableStateOf<IosCompanionSettings?>(null)
+    private var battle by mutableStateOf<IosBattleInput?>(null)
     private var started = false
     private var game: GameViewController? = null
     private var timer: NSTimer? = null
@@ -82,7 +84,7 @@ object PokeDaisyHost {
         return ComposeUIViewController {
             AppTheme {
                 val snapshot by telemetry.snapshot.collectAsState()
-                CompanionScreen(snapshot, settings = settings)
+                CompanionScreen(snapshot, settings = settings, battleInput = battle)
             }
         }
     }
@@ -146,9 +148,13 @@ object PokeDaisyHost {
         telemetry.reset()
         val g = GameViewController(romPath, RomPicker.savePathFor(romPath), onFailed)
         game = g
-        val code = romCode(romPath)
+        val (code, revision) = romHeader(romPath) ?: (null to 0)
         settings = IosCompanionSettings(romPath, code, onClose = { onCloseRequested() }, onRestart = { onRestartRequested() })
             .also { L10n.apply(it.appLanguage, code) }
+        battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { false }).also { b ->
+            g.frameKeys = b::keys
+            g.holdPicture = { b.holdPicture }
+        }
         prefetchArt(romPath)
         timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
         return g
@@ -181,6 +187,8 @@ object PokeDaisyHost {
     fun closeGame() {
         timer?.invalidate()
         timer = null
+        battle?.cancel()
+        battle = null
         game?.close()
         game = null
         settings = null
@@ -201,22 +209,30 @@ object PokeDaisyHost {
         }
     }
 
-    /** A GBA ROM's four-letter game code (header 0xAC), or null. */
-    private fun romCode(romPath: String): String? {
+    /** A GBA ROM's game code (header 0xAC) and revision (0xBC), or null. */
+    private fun romHeader(romPath: String): Pair<String, Int>? {
         if (!romPath.lowercase().endsWith(".gba")) return null
         return runCatching {
             FileSystem.SYSTEM.source(romPath.toPath()).buffer().use { s ->
                 s.skip(0xAC)
-                s.readUtf8(4)
+                val code = s.readUtf8(4)
+                s.skip(0xBC - 0xB0L)
+                code to (s.readByte().toInt() and 0xFF)
             }
         }.getOrNull()
     }
 
     private fun sample() {
-        if (game?.isRunning != true || !reading.compareAndSet(false, true)) return
+        val current = game ?: return
+        if (!current.isRunning || !reading.compareAndSet(false, true)) return
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
             try {
-                runCatching { telemetry.refresh() }
+                runCatching { telemetry.refresh() }.onSuccess {
+                    dispatch_async(dispatch_get_main_queue()) {
+                        // A slow sample from the previous game must never configure a newly opened one.
+                        if (game === current) battle?.sampled()
+                    }
+                }
             } finally {
                 reading.value = false
             }

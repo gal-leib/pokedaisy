@@ -2,6 +2,7 @@ package com.pokedaisy.app.ios
 
 import com.pokedaisy.app.GbaControls
 import com.pokedaisy.app.Hotkeys
+import com.pokedaisy.app.companion.BattleStyle
 import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
 import com.pokedaisy.app.companion.FfMode
@@ -36,7 +37,8 @@ internal class IosCompanionSettings(
 
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
 
-    override val shownRows: Set<String> = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP")
+    override val shownRows: Set<String> = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
+        "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS")
 
     override val showHints: Boolean get() = bool("show_hints", true)
     override fun setShowHints(on: Boolean) = d.setBool(on, "show_hints")
@@ -65,6 +67,20 @@ internal class IosCompanionSettings(
 
     override fun closeGame() = onClose()
     override fun restartGame() = onRestart()
+
+    override val battleInfo: Boolean get() = bool("battle_info", true)
+    override fun setBattleInfo(on: Boolean) = d.setBool(on, "battle_info")
+    override val oneTapMoves: Boolean get() = bool("one_tap_moves", false)
+    override fun setOneTapMoves(on: Boolean) = d.setBool(on, "one_tap_moves")
+
+    override val battleInfoFirst: Boolean get() = bool("battle_info_first", false)
+    override fun setBattleInfoFirst(on: Boolean) = d.setBool(on, "battle_info_first")
+    override val battleSuggestionsFirst: Boolean get() = bool("battle_suggestions_first", false)
+    override fun setBattleSuggestionsFirst(on: Boolean) = d.setBool(on, "battle_suggestions_first")
+    override val battleFocus: Boolean get() = bool("battle_focus", false)
+    override fun setBattleFocus(on: Boolean) = d.setBool(on, "battle_focus")
+    override val battleStyle: BattleStyle get() = BattleStyle.entries.firstOrNull { it.name == d.stringForKey("battle_style") } ?: BattleStyle.GEN4
+    override fun setBattleStyle(style: BattleStyle) = d.setObject(style.name, "battle_style")
 
     // Not on the iPad yet: never shown (shownRows), so fixed values.
     override val ffMaxSpeed = 2f

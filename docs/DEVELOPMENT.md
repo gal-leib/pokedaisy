@@ -3703,6 +3703,13 @@ the companion follows it. The game's buttons are a strip under it: `PokeDaisyHos
 into the bundle's `fonts` folder. CI's "iPad app (simulator build)" job generates the project and builds it for the
 simulator without signing (advisory for now). `iosApp/README.md` has the steps for a Mac.
 
+The iPad battle controls use `IosBattleInput`, an adapter over the shared `BattleInputController`. `GameViewController.frameKeys`
+runs it before every emulated frame, after combining the touch, controller and keyboard input; scripted presses own
+those keys only while a sequence is active. Fast battle-state checks run every four game frames and request a full
+companion sample on a transition. Detected cursor and party-menu addresses configure its closed-loop navigation;
+without memory writes it walks the cursors. Party switching uses `battleSwitchAddrsFor`, the Android activity's verified mappings shared in place, including each hack's structure size and grid layout. It is offered only where those mappings support it.
+The shared battle view, style, focus, info and one-tap settings persist in `NSUserDefaults`.
+
 ## ScreenScraper and the dual-screen launcher
 
 Game media (box art, screenshots, title screens, wheel logos, fanart, cartridges, videos and the facts: synopsis,

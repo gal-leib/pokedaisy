@@ -56,6 +56,14 @@ object IosHosts {
         FontSource.current = BundleFonts
         PictureCodec.current = SkiaPictures
         DeviceDates.current = FoundationDates
+        val defaults = NSUserDefaults.standardUserDefaults
+        val seen = defaults.stringForKey("new_feature_since").orEmpty().split(",").mapNotNull { entry ->
+            val parts = entry.split(":", limit = 2)
+            parts.getOrNull(1)?.toLongOrNull()?.let { parts[0] to it }
+        }.toMap()
+        com.pokedaisy.app.companion.NewFeatures.init(seen, save = { dates ->
+            defaults.setObject(dates.entries.joinToString(",") { "${it.key}:${it.value}" }, "new_feature_since")
+        })
     }
 }
 
