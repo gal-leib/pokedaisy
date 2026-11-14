@@ -3647,9 +3647,10 @@ okio. What differs by platform comes in from outside: the emulator through `Emul
 `MgbaEmulatorCore` in `PokeDaisyApp`), logging through `Logs`' sink. Their tests stay in `app/src/test` too and run as
 `:shared:testDebugUnitTest` (from `app/`, as before), except the few that also use the app's classes (the root
 build's `appOnlyTests`), which run with the app's. Something the app uses from those folders must be public, not
-`internal` (another module now). `./gradlew :shared:compileKotlinIosArm64` compiles it for an iPad, on Linux too; CI's
-"Shared code for iOS" job does. The macOS "Shared code on the iOS simulator" job also links and runs the
-portable smoke tests in `shared/src/commonTest`: files, PNGs, background work / locks and a fake emulator.
+`internal` (another module now). `./gradlew :shared:compileKotlinIosArm64` compiles it for an iPad; since the
+emulator core comes in through cinterop (see "The core's C API"), that needs a Mac with Xcode. CI's macOS "Shared code
+for iOS" job compiles both iOS targets, then links and runs the iOS tests in the simulator: the core's (`PkApiCoreTest`)
+and the portable smoke tests in `shared/src/commonTest` (files, PNGs, background work / locks and a fake emulator).
 Run them locally with `./gradlew :shared:iosSimulatorArm64Test` on an Apple Silicon Mac with Xcode and an iOS simulator.
 For focused JVM tests, use `make test-quick MODULE=shared T='*RomFilesTest'` (`MODULE=app` for app tests).
 A filter must match a test in that module; unfiltered `make test-quick` still runs both modules.
