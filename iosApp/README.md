@@ -1,5 +1,8 @@
 # PokeDaisy for iPad
 
+The Home Screen icon uses the existing PokeDaisy flower and blue lattice. Its opaque 1024px asset is copied from
+`docs/brand/avatar.png` by `node scripts/gen_brand_images.mjs`; Xcode supplies the icon sizes and corner mask.
+
 The iPad app hosts the native Metal game surface, audio, controllers and keyboard with the same Compose library,
 setup, settings and companion screens Android uses. The library fills the window when no game is running. Games
 picked from Files are copied into Documents/roms, with battery saves in Documents/saves; both are visible in Files.
