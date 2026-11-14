@@ -56,19 +56,28 @@ class GameScreenScreenshotTest {
             val style = TouchControlsStyle(xyButtons = false, extras = setOf(TouchButton.FF))
             BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
                 val dp = LocalDensity.current.density
-                val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp, visible, gameBoy,
-                    style = TouchControlsStyle(), sidePanel = sidePanel, portraitHidden = portraitHidden)
+                val portrait = maxHeight >= maxWidth && sidePanel.book == null
+                val state = androidx.compose.runtime.remember { GameScreenState(side = sidePanel,
+                    portrait = PortraitPanelState(enabled = portrait, hidden = portraitHidden,
+                        padStrip = if (visible) TouchGeometry.naturalHeight(style, maxWidth.value * dp, dp, gameBoy) else 0)) }
                 val content: @Composable () -> Unit = {
                     CompanionScreen(SampleCompanion.snapshot, settings = SampleCompanion.Settings())
                 }
-                GameScreen(stage,
-                    game = { Box(Modifier.fillMaxSize().background(Color(0xFF38684B))) },
-                    companion = {
-                        if (sidePanel.isWindow && !stage.portrait) SidePanelHost(window = true, onClose = {}, content = content)
-                        else content()
+                GameScreen(state, gameHeight = { (it / if (gameBoy) (160f / 144) else 1.5f).toInt() },
+                    game = {
+                        BoxWithConstraints(Modifier.fillMaxSize()) {
+                            val aspect = if (gameBoy) 160f / 144 else 1.5f
+                            val width = minOf(maxWidth, maxHeight * aspect)
+                            Box(Modifier.size(width, width / aspect).align(if (portrait) androidx.compose.ui.Alignment.TopCenter else androidx.compose.ui.Alignment.Center)
+                                .background(Color(0xFF38684B)))
+                        }
                     },
-                    controls = { if (visible) TouchControls(style, stage.portrait, TouchInput(), Modifier.fillMaxSize(),
-                        gameAspect = stage.gameAspect, gameBoy = gameBoy) })
+                    companion = {
+                        if (!portrait) SidePanelHost(window = sidePanel.isWindow, onClose = state::hide, content = content)
+                        else SidePanelCompanion(content = content)
+                    },
+                    controls = { if (visible) TouchControls(style, portrait, TouchInput(), Modifier.fillMaxSize(),
+                        gameAspect = if (gameBoy) 160f / 144 else 1.5f, gameBoy = gameBoy) })
             }
         }
     }

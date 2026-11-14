@@ -2118,7 +2118,7 @@ only keeps a 256x256 ring of tiles in VRAM (`field_camera.c`), so the rest would
   first-time setup), and once more on the companion the first time a game EXPAND knows opens while it's still off
   (`Prefs.expandGameOfferSeen`, `CompanionSettings.expandOffer`) - "NOT NOW" on the Library doesn't stop that one, but
   any answer to it settles both. TURN ON sets ASPECT > EXPAND. ui-preview: `library-expand-intro`, `*-expand-offer`.
-- **A phone upright** (`PortraitPanel.expand`, `GameStageLayout.expand`, `PortraitLayout.arrange(expand)`): the game
+- **A phone upright** (`PortraitPanel.expand`, `GameViewportView.expand`, `PortraitLayout.arrange(expand)`): the game
   takes everything above the companion (COMPANION's AT BOTTOM / UNDER GAME land in the same place then) and the touch
   pad lies over it; 1x is the frame at the view's full width (`levelsFor` takes the smaller fit), so the window goes
   on above and below it (a 1080-wide phone: 4.5 -> 3 / 2).
@@ -2567,7 +2567,7 @@ built-in frames, storage + import - ui-preview compiles it, `OverlaysTest` cover
 - **Drawing** (`EmulatorView.FrameRenderer`): the overlay is a second texture, blended over the game
   (premultiplied, `GL_ONE, GL_ONE_MINUS_SRC_ALPHA`) or drawn before it when it's a background; the game's
   quad is its place in the window, so SHADERS' prescale and the companion's grid cell (`onGamePixel`)
-  follow the game's real size. With an overlay `GameStageLayout` gives the view all the room under the
+  follow the game's real size. With an overlay `GameViewportView` gives the view all the room under the
   status bar. Off on a phone held upright (`topAligned`), where the game is its own shape across the top.
 - **Previews**: `gradle render -Ponly=overlay` in ui-preview draws each built-in frame (Thor, Game Boy,
   half-screen side panel, 4:3) and an import of a drawn wooden frame (window found from alpha) around a
@@ -3263,7 +3263,7 @@ follow (engine A's registers, palettes, OAM) is a snapshot taken as line 192 sta
 the frame, it was already the game's VBlank handler's next frame - a battle's fade-in a step brighter than the screen,
 scroll and sprites a step on. `nds_dump`'s `look DX DY` moves the window a frame at a time, as the look-around does.
 
-**DS LAYOUT (one screen).** With no second screen, held sideways, `GameStageLayout.dsArrange` places the two screens by
+**DS LAYOUT (one screen).** With no second screen, held sideways, `GameViewportView.dsArrange` places the two screens by
 `DsLayouts.arrange` (the game in the top box, `NdsTouchScreenView` in the touch box, edge to edge; behind both the game's own
 picture, `DsShots`: a PixelCopy of the game view about once a second, the overworld kept apart while a menu screen is up and
 drawn sharp under its dim, else the newest drawn blurred; the HUD over the whole area, its rects moved by `dsGameOffset`). ONE SCREEN and PICTURE IN PICTURE float the touch
@@ -3307,7 +3307,7 @@ field, B to the menu (headless: the card's Cancel, the menu back for 11 frames, 
 screen), the screen's closing fade - black after it was lit, `menuLitFrames` - sets it to buttons
 (`pk_nds_field_keep_start_menu`), so the menu comes back with its cursor; the screen itself still opens as it was opened. LARGE + SMALL and PICTURE IN PICTURE give
 the HUD's CORNERS `DsCornerLayout` (FieldHud's `dsCorner`: the buttons bottom left, the party in two columns under the
-minimap, three to a row where `GameStageLayout.dsTouchOverGame` says PIP's inset would meet it). Outside the field and battles
+minimap, three to a row where `GameViewportView.dsTouchOverGame` says PIP's inset would meet it). Outside the field and battles
 (`EmulatorEngine.dsWideScene` off) EXPAND has nothing to widen, so the stage keeps the game's 4:3 with the backdrop beside it. A game without rules (the German HeartGold / SoulSilver) gets ONE SCREEN as PICTURE IN PICTURE (`DsLayout.forGame`).
 
 **Platinum's and Black / White's rules (2026-11-01).** Platinum (a new game played headless, given two Pokémon and a wild
@@ -3959,23 +3959,33 @@ header, quick views, empty states, search strip and collection. Hosts supply dat
 title chrome and the about footer are shared too. Application-mode settings use the companion's page catalog and
 searchable home; hosts can omit game-only controls when no core is open.
 
-GamePanelLayout returns a TouchStage directly for the one-window game host and the standalone editor. Portrait
-uses Android's PortraitLayout with no resize grip, the player's UNDER GAME / AT BOTTOM, and Android's controls area: with
-UNDER GAME a strip of `TouchGeometry.naturalHeight` along the bottom (`padStrip`, as `PokeDaisyActivity.syncTouchControls`
-sets it), with AT BOTTOM the gap above the companion, else the game itself.
-Landscape uses `SidePanelState`, the same policy the Android `SidePanel` adapter consumes. It owns window/docked/hidden
-state, the temporary full-screen and book-hinge overrides, width bounds and integer-scale snapping. Its arrangement
-reserves game space only for a docked panel and controls space for any open side panel; an open window owns game-button
-input and overlays the full stage. Android retains preferences, focus, animation and native input-window dispatch.
-`PanelResizeHandle` handles the side lock and portrait grip's gestures in Compose, accumulating pointer deltas
-because the handle moves during a drag. Taps reach the existing shared buttons; a drag consumes the gesture after
-touch slop, and release/cancellation finishes the resize. Android's former `DragFrame` wrapper is removed.
-The Android adapter supplies the grips and panel tabs' measured window bounds. `excludeTouchRegions` subtracts these
-from native pad windows, and `TouchHitModel.excluded` releases a held game button when its finger moves over UI. The same
-common geometry can reserve chrome when the outer-stage layout moves to Compose.
-`GamePanelLayout` accepts this state and the portrait size/hidden choice; hosts without those controls retain the docked
-default. `GameScreen` draws the companion above the controls so a window's scrim owns its whole overlay. The policy and
-geometry tests are `SidePanelStateTest` and `GamePanelLayoutTest`; the renderer and input adapters stay native.
+`GameScreen(GameScreenState, ...)` owns Android's one-screen composition: portrait/tabletop companion sizing,
+landscape/book/window placement, resize grips, open/close tabs, animation and layer order. It reuses `PortraitLayout`,
+`SidePanelState` and `PanelResizeHandle`; a hidden companion remains composed at a positive size without placement,
+so closing/reopening preserves navigation and does not feed zero dimensions into window typography.
+`GameScreenState` owns interaction and calls host callbacks for saved choices and modal input ownership. Renderer,
+controls and optional underlay/HUD/key-capture slots keep their identity while geometry changes. The root composes the
+existing HUD, DS window and performance presenters directly, avoiding full-screen native overlay interop views that
+would obscure the common chrome's accessibility semantics.
+
+Android's `GameScreenView` is an adapter around this shared root; the old `GameStageLayout` is removed. `SidePanel` and `PortraitPanel` retain only
+preferences, DS content, hardware keys and native focus/shader isolation; they contain no panel measurement, placement
+or resize implementation. `GameViewportView` fits the native GL surface/status strip and DS/skin pictures within the
+assigned renderer viewport. It measures each nested Compose leaf once per pass; measuring it full-size and then fitted
+inside interop causes repeated outer-layout invalidation. Its picture rectangle positions the shared HUD and key
+capture. Touch editing converts native view locations to stage pixels rather than assuming direct FrameLayout children.
+
+The Compose root and isolated companion views use the activity's recomposer and lifecycle, surviving a display swap
+or temporary window detach. The Android touch pad remains `TouchControlsView`, including its native urgent-thread
+`TouchInputWindows` and Samsung fallback. Common chrome reserves its actual minimum touch-target bounds; the adapter
+translates those into window coordinates. The pad windows also follow the anchor display and its manager across SWAP and display removal. `excludeTouchRegions` removes them from pad windows, and the common hit model
+releases held game keys when a finger enters a reserved area. `CompanionColors` applies the same shader to Compose-owned
+HUD/chrome layers while leaving native game rendering and controls independent.
+
+Tests cover state/input ownership, saved choices, viewport exclusions, folds and portrait grip/strip geometry in
+`GameScreenStateTest`, `SidePanelStateTest`, `GamePanelLayoutTest` and `PortraitLayoutTest`. The targeted
+`GameScreenScreenshotTest` renders the real shared root with a stand-in game surface. `GamePanelLayout` remains the
+TouchStage helper for the existing iOS host and standalone previews until that host switches to the complete screen.
 LibraryPreferences stores
 portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
 
