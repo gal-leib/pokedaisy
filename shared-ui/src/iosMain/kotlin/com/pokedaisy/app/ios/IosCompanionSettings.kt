@@ -82,6 +82,7 @@ internal class IosCompanionSettings(
     override val hotkeysEnabled = false
     override fun setHotkeysEnabled(on: Boolean) {}
     override fun hotkeyBindings(): Map<Hotkeys.Action, List<String>> = emptyMap()
+    override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {}
     override val clickSound = false
     override fun setClickSound(on: Boolean) {}
     override val statusBar = false
