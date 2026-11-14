@@ -153,8 +153,16 @@ object PokeDaisyHost {
      */
     fun loadSave(romPath: String, fromPath: String): String? {
         val fs = FileSystem.SYSTEM
-        val bytes = runCatching { fs.read(fromPath.toPath()) { readByteArray() } }.getOrNull()
-            ?: return "Can't read that file"
+        val source = fromPath.toPath()
+        val size = fs.metadataOrNull(source)?.size ?: return "Can't read that file"
+        if (size !in 1L..MAX_SAVE_BYTES.toLong()) return "That isn't a game save"
+        val bytes = runCatching { fs.read(source) { readByteArray() } }.getOrNull() ?: return "Can't read that file"
+        return loadSave(romPath, bytes)
+    }
+
+    /** The shared import dialog retains a bounded copy until the player confirms. */
+    fun loadSave(romPath: String, bytes: ByteArray): String? {
+        val fs = FileSystem.SYSTEM
         if (bytes.isEmpty() || bytes.size > MAX_SAVE_BYTES) return "That isn't a game save"
         // RetroArch's compressed saves start "#RZIPv": the Android app unpacks them, the iPad app can't yet.
         if (bytes.size >= 6 && bytes.copyOfRange(0, 6).decodeToString() == "#RZIPv") {
@@ -248,6 +256,12 @@ object PokeDaisyHost {
         prefetchArt(romPath)
         timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
         return g
+    }
+
+    /** Full-window shared library, setup and application settings. */
+    fun libraryViewController(failed: String?, onPlay: (String) -> Unit): UIViewController {
+        start()
+        return IosLibraryHost(touch, onPlay, failed).controller()
     }
 
     private fun finishClose() {

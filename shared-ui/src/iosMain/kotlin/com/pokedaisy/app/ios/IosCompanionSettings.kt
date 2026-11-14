@@ -30,10 +30,10 @@ import com.pokedaisy.app.game.GameViewController
  * app's defaults. Only supported rows are shown ([shownRows]); shaders, EXPAND and key bindings wait for later ports.
  */
 internal class IosCompanionSettings(
-    private val romPath: String,
+    private val romPath: String?,
     /** The ROM header's game code (BPEE...), for LANGUAGE's AUTO; null for a Game Boy cart. */
     private val romCode: String?,
-    private val game: GameViewController,
+    private val game: GameViewController?,
     private val onClose: () -> Unit,
     private val onRestart: () -> Unit,
     private val onDisableResume: () -> Boolean,
@@ -44,8 +44,10 @@ internal class IosCompanionSettings(
 
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
 
-    override val shownRows: Set<String> = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
+    override val hasRunningGame get() = game != null
+    override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
         "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS")
+        .let { if (game == null) it - "GAME SPEED" - "FF" else it }
 
     override val touchRevision get() = IosTouchPreferences.revision
     override val touchStyle get() = IosTouchPreferences.style
@@ -93,8 +95,8 @@ internal class IosCompanionSettings(
     override fun guideNoticeAccepted(game: String) = game in guideNotices()
     override fun acceptGuideNotice(game: String) = d.setObject((guideNotices() + game).joinToString(","), "guide_notice_ok")
 
-    override val gameName: String get() = activeGame.displayName()
-    override val romFileName: String get() = romPath.substringAfterLast('/')
+    override val gameName: String get() = if (game == null) "" else activeGame.displayName()
+    override val romFileName: String get() = romPath.orEmpty().substringAfterLast('/')
 
     override fun closeGame() = onClose()
     override fun restartGame() = onRestart()
@@ -112,6 +114,7 @@ internal class IosCompanionSettings(
     init { applyPlayback() }
 
     private fun applyPlayback() {
+        val game = game ?: return
         game.speed = (if (ffActive) ffMaxSpeed else gameSpeed).toDouble()
         game.volume = gameVolume / 100f
         game.muted = gameMuted
@@ -123,9 +126,9 @@ internal class IosCompanionSettings(
         d.setFloat(v, "ff_max_speed"); applyPlayback()
     }
     override fun setFfToggled(on: Boolean) { ffToggle = on; d.setBool(on, "ff_toggled"); applyPlayback() }
-    override val gameSpeed: Float get() = d.floatForKey("game_speed:$romPath").takeIf { it in gameSpeeds } ?: 1f
+    override val gameSpeed: Float get() = if (romPath == null) 1f else d.floatForKey("game_speed:$romPath").takeIf { it in gameSpeeds } ?: 1f
     override fun setGameSpeed(v: Float) {
-        if (v !in gameSpeeds) return
+        if (romPath == null || v !in gameSpeeds) return
         d.setFloat(v, "game_speed:$romPath"); applyPlayback()
     }
     override val gameVolume: Int get() = if (d.objectForKey("game_volume") == null) 100 else d.integerForKey("game_volume").toInt().coerceIn(0, 100)

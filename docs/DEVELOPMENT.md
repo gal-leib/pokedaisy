@@ -3966,11 +3966,13 @@ sets it), with AT BOTTOM the gap above the companion, else the game itself.
 Landscape uses the shared default side-panel width, centers the game in its area and overlays the controls there, without a separate strip. LibraryPreferences stores
 portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
 
-On the iPad one Compose game host embeds the Metal controller through UIKitViewController and places the shared
-companion and controls through GameScreen. Resizing moves the existing controller without restarting the core. Layout
-and editor bounds are safe-area pixels throughout; there is no UIKit window-coordinate conversion or separate GAMES
-toolbar. In-game touch editing uses the shared editor, with a settings revision published after layout writes so the
-preview and rows refresh when the editor closes.
+The iPad uses these presenters for its full-window library, Files-based setup and application settings. Its native
+adapter supplies file operations, preferences and launch actions; Swift only switches application/game controllers.
+One Compose game host embeds the Metal controller through UIKitViewController and places the shared companion and
+controls through GameScreen. Resizing moves the existing controller without restarting the core. Layout and editor
+bounds are safe-area pixels throughout; there is no UIKit window-coordinate conversion or separate GAMES toolbar.
+Both global and in-game touch editing use the shared editor, with a settings revision published
+after layout writes so the preview and rows refresh when the editor closes.
 
 Hosts can supply touchStageInOtherOrientation when their rotated layout differs from the phone stand-in. The iPad
 uses GamePanelLayout there too, so the rotated touch preview retains the docked companion and matches the live screen.

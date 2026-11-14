@@ -1,11 +1,10 @@
 # PokeDaisy for iPad
 
-The iPad app hosts the native Metal game surface, audio, controllers and keyboard with the same Compose companion
-screens and touch controls Android uses. With no game running, the app lists the games added from Files (ADD GAMES); a
-game is copied into the app's `Documents/roms/` and keeps its save in `Documents/saves/`, both visible in Files. A
-game's menu (the circle beside it) has Load a save from Files, which puts the picked save in its place and keeps the one
-before as `<name>.backup-<date>.sav` (RetroArch's compressed saves aren't read yet). A controller or a keyboard works
-too.
+The iPad app hosts the native Metal game surface, audio, controllers and keyboard with the same Compose library,
+setup, settings and companion screens Android uses. The library fills the window when no game is running. Games
+picked from Files are copied into Documents/roms, with battery saves in Documents/saves; both are visible in Files.
+LOAD SAVE uses a shared confirmation and keeps the previous save as a dated backup. The on-screen pad and its editor
+are shared too; there is no separate UIKit pad or Swift game list.
 
 ## Battles
 
@@ -58,14 +57,22 @@ xcodebuild -project iosApp/PokeDaisy.xcodeproj -scheme PokeDaisy -sdk iphonesimu
 
 The companion's TOUCH CONTROLS page, preview and EDIT LAYOUT are the existing shared Compose screens. Preferences use
 TouchStyleCodec, also used by Android, backed by NSUserDefaults. The game, controls and companion share one Compose host;
-Swift only switches between the game list and the game screen. An editor uses the same safe-area layout bounds as the
+Swift only switches between the library and game controllers. An editor uses the same safe-area layout bounds as the
 game screen, pauses the core and keeps separate orientation layouts. Controller connection changes update AUTO visibility. FF (tap/hold),
 turbo and state buttons use the existing playback/slot bridges; unsupported actions and skins are omitted.
+
+## Shared application screens
+
+The library, setup and app-settings presenters are the same Compose components Android uses. Swift switches between
+controllers; Compose embeds the native Metal game surface and owns the panel layout. There is no separate Swift list,
+menus, settings UI or touch pad. The library is full-window when no game is open, with grid/list, search, sorting, favorites/recent views and save import. Settings
+and touch layout editing work before a game starts. Setup uses Files to copy games and keeps saves in Documents/saves;
+Android folder linking and platform-specific media/tool services remain outside shared UI.
 
 ## Game screen layout
 
 Upright, the screen follows Android's PortraitLayout: with the touch page's COMPANION at UNDER GAME (the default) the
 companion sits under the game and the controls get a strip of their own along the bottom, as on an Android phone; with
 AT BOTTOM the companion is along the bottom and the controls take the gap above it, or the game where there is none. Sideways, the game is centered beside the docked companion and the controls overlay its area, using Android's default panel
-width. The live screen, editor and both preview orientations use the same TouchStage bounds. Game Boy games keep their own aspect ratio. Return to the game list through shared SETTINGS > CLOSE GAME; there
+width. The live screen, editor and both preview orientations use the same TouchStage bounds. Game Boy games keep their own aspect ratio. Return to the library through shared SETTINGS > CLOSE GAME; there
 is no separate GAMES overlay, toolbar controller or Swift panel-sizing bridge.

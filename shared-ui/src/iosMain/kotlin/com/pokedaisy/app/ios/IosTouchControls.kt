@@ -84,6 +84,11 @@ internal class IosTouchControls(
         presentEditor(from, measured, current, PkApiCore.stateThumbnail()?.let(::decodeImage))
     }
 
+    fun editStandalone(from: UIViewController, stage: TouchStage? = null) {
+        if (editor != null || stage == null) return
+        presentEditor(from, stage, null, null)
+    }
+
     private fun presentEditor(from: UIViewController, measured: TouchStage, current: GameViewController?,
                               shot: androidx.compose.ui.graphics.ImageBitmap?) {
         val view = ComposeUIViewController {
