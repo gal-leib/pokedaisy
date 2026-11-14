@@ -22,6 +22,12 @@ Fast-forward runs everywhere for now, with pitched, sped-up sound; INFINITE is s
 of frames so the main thread still handles touch and the companion. SMART mode, scene speeds, steady music and speed
 hotkeys wait for later PRs.
 
+## Save states
+
+MORE > STATES has ten slots, screenshots, delete and both undo actions, through the shared screen and slot controller.
+Files are in Documents/states/<ROM SHA-256>. A manual load restores battery data too, so the current save is backed
+up in Documents/saves/pokedaisy-backups first. State operations run between game frames and reset queued audio/input.
+
 ## Build and run
 
 On a Mac with Xcode 16, a JDK 17 and the Android SDK (Gradle configures the shared modules' Android side too; `sdk.dir` in `local.properties`):

@@ -17,6 +17,9 @@ import com.pokedaisy.app.companion.i18n.tk
  * ([keyCapture]) and the game's screen asks for the keys while a row here waits.
  */
 interface CompanionSettings {
+    /** Optional NEW tag when a host first gains state slots. */
+    val statesBadge: String? get() = null
+
     /** Optional NEW tag when a host first gains playback controls. */
     val playbackBadge: String? get() = null
 

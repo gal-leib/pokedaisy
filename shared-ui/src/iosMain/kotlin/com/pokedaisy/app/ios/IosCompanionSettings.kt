@@ -69,6 +69,8 @@ internal class IosCompanionSettings(
     override fun closeGame() = onClose()
     override fun restartGame() = onRestart()
 
+    override val statesBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_STATES)
+
     override val playbackBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_PLAYBACK)
 
     init { applyPlayback() }

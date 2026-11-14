@@ -80,6 +80,10 @@ class PkApiCoreTest {
         assertEquals(160, PkApiCore.videoHeight)
         // Mode 3 stripes: the first two pixels differ.
         assertNotEquals((0..2).map { px[it] }, (4..6).map { px[it] })
+        val thumbnail = assertNotNull(com.pokedaisy.app.companion.data.RomArt.Image.decodePng(assertNotNull(PkApiCore.stateThumbnail())))
+        assertEquals(160, thumbnail.width)
+        assertTrue(thumbnail.argb.all { it ushr 24 == 255 }, "state thumbnails must be opaque")
+        assertNotEquals(thumbnail.argb[0], thumbnail.argb[1])
     }
 
     @Test

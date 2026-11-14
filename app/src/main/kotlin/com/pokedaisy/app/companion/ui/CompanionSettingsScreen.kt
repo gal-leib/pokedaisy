@@ -166,7 +166,7 @@ fun CompanionSettingsScreen(
                         if (id !in availableTabs) return@map SettingRow(companionTabLabel(id), tk("N/A")) {}
                         SettingRow(
                             companionTabLabel(id), if (shown) tk("SHOWN") else tk("HIDDEN"),
-                            labelBadge = if (id == "BOXES") NewFeatures.badge(NewFeatures.BOXES_TAB) else null,
+                            labelBadge = when (id) { "BOXES" -> NewFeatures.badge(NewFeatures.BOXES_TAB); "STATES" -> settings.statesBadge; else -> null },
                         ) {
                             val now = settings.companionTabs
                             when {

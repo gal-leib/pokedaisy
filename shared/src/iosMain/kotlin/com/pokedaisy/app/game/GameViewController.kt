@@ -49,6 +49,7 @@ class GameViewController(
     private val pacer = FramePacer()
     private val observers = mutableListOf<NSObjectProtocol>()
     private var running = false
+    private var active = false
     private lateinit var gameView: MTKView
 
     /** The keys the app's on-screen controls hold ([PkApiCore.KEY_A] ...), main thread. */
@@ -67,6 +68,9 @@ class GameViewController(
     var holdPicture: () -> Boolean = { false }
     var quietPress: () -> Boolean = { false }
     private var audioSpeed = -1.0
+
+    /** Releases scripted input before a state changes the running game. */
+    var beforeStateChange: () -> Unit = {}
 
     /** Whether a game is open and running in this controller. */
     val isRunning: Boolean get() = running
@@ -102,6 +106,7 @@ class GameViewController(
             return
         }
         running = true
+        active = true
         audio.start()
         val center = NSNotificationCenter.defaultCenter
         observers += center.addObserverForName(UIApplicationWillResignActiveNotification, null, NSOperationQueue.mainQueue) {
@@ -116,15 +121,33 @@ class GameViewController(
     fun pause() {
         if (!running) return
         gameView.paused = true
+        active = false
         audio.stop()
     }
 
     /** Runs again after [pause]. */
     fun resume() {
         if (!running) return
+        active = true
         pacer.reset()
         audio.start()
         gameView.paused = false
+    }
+
+    /** Main/game thread, between display callbacks: no frames or queued sound cross a state operation. */
+    fun withState(operation: () -> Boolean): Boolean {
+        if (!running) return false
+        audio.stop()
+        return try {
+            beforeStateChange()
+            input.touchKeys = 0
+            PkApiCore.setKeys(0)
+            if (PkApiCore.finishSave(600) >= 600) false else operation()
+        } finally {
+            pacer.reset()
+            audioSpeed = -1.0
+            if (active && running) audio.start()
+        }
     }
 
     /** Writes the game's save and closes it; the controller then shows nothing. */
@@ -133,6 +156,7 @@ class GameViewController(
         observers.clear()
         if (!running) return
         running = false
+        active = false
         gameView.paused = true
         audio.release()
         PkApiCore.finishSave(FINISH_SAVE_FRAMES)

@@ -13,6 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
 import com.pokedaisy.app.companion.TelemetryStore
+import com.pokedaisy.app.companion.StateSlotController
+import com.pokedaisy.app.companion.data.StateFiles
+import com.pokedaisy.app.companion.data.SnapshotCache
+import com.pokedaisy.app.companion.data.hasData
+import com.pokedaisy.app.core.PkApiCore
+import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.companion.ui.OptionConfirm
+import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
 import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.data.Gen1Art
 import com.pokedaisy.app.companion.data.Gen2Art
@@ -65,6 +73,8 @@ object PokeDaisyHost {
     // The running game's SETTINGS; null = NO GAME RUNNING.
     private var settings by mutableStateOf<IosCompanionSettings?>(null)
     private var battle by mutableStateOf<IosBattleInput?>(null)
+    private var slots by mutableStateOf<StateSlotController?>(null)
+    private var stateError by mutableStateOf<String?>(null)
     private var started = false
     private var game: GameViewController? = null
     private var timer: NSTimer? = null
@@ -84,7 +94,13 @@ object PokeDaisyHost {
         return ComposeUIViewController {
             AppTheme {
                 val snapshot by telemetry.snapshot.collectAsState()
-                CompanionScreen(snapshot, settings = settings, battleInput = battle)
+                Box(Modifier.fillMaxSize()) {
+                    CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle)
+                    stateError?.let { message ->
+                        OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
+                            onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
+                    }
+                }
             }
         }
     }
@@ -146,7 +162,12 @@ object PokeDaisyHost {
     fun gameViewController(romPath: String, onFailed: () -> Unit): UIViewController {
         closeGame()
         telemetry.reset()
-        val g = GameViewController(romPath, RomPicker.savePathFor(romPath), onFailed)
+        val savePath = RomPicker.savePathFor(romPath)
+        val files = runCatching {
+            StateFiles.backupBattery(savePath.toPath())
+            StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath()))
+        }.getOrElse { onFailed(); return UIViewController() }
+        val g = GameViewController(romPath, savePath, onFailed)
         game = g
         val (code, revision) = romHeader(romPath) ?: (null to 0)
         settings = IosCompanionSettings(romPath, code, g, onClose = { onCloseRequested() }, onRestart = { onRestartRequested() })
@@ -156,6 +177,21 @@ object PokeDaisyHost {
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
         }
+        g.beforeStateChange = { battle?.cancel() }
+        val defaults = platform.Foundation.NSUserDefaults.standardUserDefaults
+        slots = StateSlotController(files, onCore = g::withState,
+            write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
+            beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
+            thumbnail = { PkApiCore.stateThumbnail() },
+            snapshot = { telemetry.forState()?.takeIf { it.hasData && !it.unsupported }?.let(SnapshotCache::encode) },
+            loaded = { state ->
+                telemetry.reset()
+                SnapshotCache.read(state)?.let(telemetry::showCached)
+                sample()
+            },
+            failed = { stateError = it },
+            initialIndex = defaults.integerForKey("state_slot").toInt(),
+            selected = { defaults.setInteger(it.toLong(), "state_slot") })
         prefetchArt(romPath)
         timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
         return g
@@ -192,6 +228,8 @@ object PokeDaisyHost {
         battle = null
         game?.close()
         game = null
+        slots = null
+        stateError = null
         settings = null
         telemetry.reset()
     }

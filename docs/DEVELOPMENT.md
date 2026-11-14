@@ -3733,6 +3733,12 @@ capped speed, with real-time catch-up bounded before scaling; unlimited FF runs 
 `GameAudio` sets mixer volume for GAME VOLUME / MUTE GAME. Normal speed is per ROM path; FF and volume are app-wide.
 There is no SMART FF or steady music yet; those rows stay hidden.
 
+The iPad STATES bridge is the common `StateSlotController` over `StateFiles`: slot saves, loads, delete and both
+undos, using the existing screen. The host supplies native read/write callbacks, a thumbnail and a cached companion
+snapshot. `GameViewController.withState` stops queued audio, finishes a battery save, releases scripted input, then
+runs the operation between display callbacks. Loads require a battery backup and an undo snapshot before changing
+memory. Files live in Documents/states/<ROM SHA-256>, so a reinstall's new container path does not lose their identity.
+
 ## ScreenScraper and the dual-screen launcher
 
 Game media (box art, screenshots, title screens, wheel logos, fanart, cartridges, videos and the facts: synopsis,
