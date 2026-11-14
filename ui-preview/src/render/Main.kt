@@ -988,6 +988,7 @@ fun installPreviewHosts() {
         override var darkMode by prefs::darkMode
     }
     com.pokedaisy.app.companion.ui.DocsSources.current = com.pokedaisy.app.StoreDocsSource(context)
+    com.pokedaisy.app.companion.ui.theme.FontSource.current = com.pokedaisy.app.PreviewFonts(context)
 }
 
 /** Saves and puts on [t]; for a limited-time one the theme clock moves into its window (so it isn't put away). */
