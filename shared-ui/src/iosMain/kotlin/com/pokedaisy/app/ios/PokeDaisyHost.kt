@@ -2,10 +2,18 @@
 
 package com.pokedaisy.app.ios
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
 import com.pokedaisy.app.companion.TelemetryStore
+import com.pokedaisy.app.companion.TouchControlsStyle
+import com.pokedaisy.app.companion.ui.TouchControls
+import com.pokedaisy.app.companion.ui.TouchInput
 import com.pokedaisy.app.companion.ui.CompanionScreen
 import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.game.GameViewController
@@ -24,7 +32,8 @@ private const val SAMPLE_SECONDS = 0.5
 /**
  * What the iPad app's Swift side calls (as `PokeDaisyHost.shared` in Swift; not `PokeDaisy`, which is the app's own
  * Swift module): [start] once at launch, [companionViewController] for the companion's screens, [games] /
- * [addGames] for the games added from Files, and [gameViewController] / [closeGame] to play one. While a game runs,
+ * [addGames] for the games added from Files, [gameViewController] / [closeGame] to play one and
+ * [touchControlsViewController] (or [setTouchKeys], for the app's own Swift buttons) to press its keys. While a game runs,
  * [telemetry] reads it every half second, off the main thread (the core's reads may come from any thread), and the
  * companion follows it.
  */
@@ -77,6 +86,29 @@ object PokeDaisyHost {
         game = g
         timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
         return g
+    }
+
+    /**
+     * The on-screen buttons for the running game: the app's own touch controls (the Android app's drawing and hit
+     * test), laid out for a strip under the game. The extras (FF, QUICK MENU, states, turbo...) and X / Y stay off
+     * until the iPad app has what they press.
+     */
+    fun touchControlsViewController(gameBoy: Boolean): UIViewController {
+        start()
+        val style = TouchControlsStyle(extras = emptySet(), xyButtons = false)
+        val input = TouchInput(onKeys = { gba, _ -> setTouchKeys(gba) })
+        return ComposeUIViewController {
+            AppTheme {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    TouchControls(style, portrait = true, input = input, modifier = Modifier.fillMaxSize(), gameBoy = gameBoy)
+                }
+            }
+        }
+    }
+
+    /** The keys the on-screen buttons hold ([com.pokedaisy.app.core.PkApiCore.KEY_A] ...), on the main thread. */
+    fun setTouchKeys(keys: Int) {
+        game?.touchKeys = keys
     }
 
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
