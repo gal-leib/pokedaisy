@@ -39,6 +39,7 @@ internal class IosCompanionSettings(
     private val onDisableResume: () -> Boolean,
     private val onEditTouch: () -> Unit,
     private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
+    private val gameScreen: () -> IosGameScreen? = { null },
 ) : CompanionSettings {
     private val d = NSUserDefaults.standardUserDefaults
 
@@ -47,7 +48,7 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
 
     override val touchRevision get() = IosTouchPreferences.revision
@@ -55,10 +56,15 @@ internal class IosCompanionSettings(
     override fun setTouchStyle(style: TouchControlsStyle) { IosTouchPreferences.style = style }
     override val touchButtons get() = IosTouchPreferences.buttons
     override val touchSkinsSupported = false
-    override val touchBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_TOUCH)
+    override val touchBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
+        ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_TOUCH)
+    override val companionViewBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
+    override val companionWindow get() = gameScreen()?.takeUnless { it.portrait }?.window
+    override fun setCompanionWindow(on: Boolean) { gameScreen()?.window = on }
     override val touchStage get() = readTouchStage()
     override val touchStageInOtherOrientation get() = touchStage?.let {
-        com.pokedaisy.app.companion.ui.gamePanelLayout(it.h, it.w, it.dp, gameBoy = it.gameBoy, underGame = IosTouchPreferences.underGame, style = IosTouchPreferences.style)
+        gameScreen()?.previewStage(otherOrientation = true) ?:
+            com.pokedaisy.app.companion.ui.gamePanelLayout(it.h, it.w, it.dp, gameBoy = it.gameBoy, underGame = IosTouchPreferences.underGame, style = IosTouchPreferences.style)
     }
     override val touchControlsShown get() = IosTouchPreferences.visible
     override fun setPortraitUnderGame(on: Boolean) = IosTouchPreferences.setUnderGame(on)

@@ -29,11 +29,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
@@ -149,9 +151,21 @@ fun SidePanelHost(
     val starts = remember { FocusStarts() }
     val overlays = remember { OverlayStack() }
     var hasFocus by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
     // Registered before the companion's own handlers, so it gets only what they leave.
     keys?.Handler(enabled = window) { key, repeat ->
-        focusKeys?.invoke(key, repeat) { if (!hasFocus) starts.focusNewest() } ?: false
+        if (focusKeys != null) focusKeys(key, repeat) { if (!hasFocus) starts.focusNewest() }
+        else {
+            if (!hasFocus) starts.focusNewest()
+            when (key) {
+                MenuKey.UP -> focus.moveFocus(FocusDirection.Up)
+                MenuKey.DOWN -> focus.moveFocus(FocusDirection.Down)
+                MenuKey.LEFT -> focus.moveFocus(FocusDirection.Left)
+                MenuKey.RIGHT -> focus.moveFocus(FocusDirection.Right)
+                MenuKey.A -> repeat || starts.activateFocused()
+                else -> false
+            }
+        }
     }
     BoxWithConstraints(
         Modifier.fillMaxSize().then(

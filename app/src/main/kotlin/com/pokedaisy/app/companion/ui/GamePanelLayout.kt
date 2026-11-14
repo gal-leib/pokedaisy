@@ -1,13 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Constraints
 import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.TouchStage
 import kotlin.math.min
@@ -54,33 +47,4 @@ fun gamePanelLayout(
     return TouchStage(w, h, dp, false, Rect((column - gw) / 2, (h - gh) / 2, (column + gw) / 2, (h + gh) / 2),
         Rect(0f, 0f, (w - side.controlsRightMargin).coerceAtLeast(0f), if (controlsVisible) h else 0f),
         companion, aspect, gameBoy)
-}
-
-/** Shared layout slots around a platform's game surface. Repositioning never replaces the game controller. */
-@Composable
-fun GameScreen(
-    stage: TouchStage, modifier: Modifier = Modifier,
-    game: @Composable () -> Unit, companion: @Composable () -> Unit, controls: @Composable () -> Unit,
-) {
-    Layout(content = {
-        Box(Modifier.clipToBounds(), propagateMinConstraints = true) { game() }
-        Box(Modifier.clipToBounds(), propagateMinConstraints = true) { controls() }
-        Box(Modifier.clipToBounds(), propagateMinConstraints = true) {
-            // Hidden companions must release their focus/input handlers and never measure a window at 0 x 0.
-            if (stage.companion?.let { it.width > 0f && it.height > 0f } == true) companion()
-        }
-    }, modifier = modifier.fillMaxSize()) { items, constraints ->
-        // An open companion window owns the overlay, including the scrim above the game's controls.
-        val rects = listOf(stage.game, stage.area, stage.companion ?: Rect.Zero)
-        val placed = items.zip(rects).map { (item, rect) ->
-            val left = rect.left.roundToInt().coerceIn(0, constraints.maxWidth)
-            val top = rect.top.roundToInt().coerceIn(0, constraints.maxHeight)
-            val right = rect.right.roundToInt().coerceIn(left, constraints.maxWidth)
-            val bottom = rect.bottom.roundToInt().coerceIn(top, constraints.maxHeight)
-            Triple(item.measure(Constraints.fixed(right - left, bottom - top)), left, top)
-        }
-        layout(constraints.maxWidth, constraints.maxHeight) {
-            placed.forEach { (item, left, top) -> item.place(left, top) }
-        }
-    }
 }

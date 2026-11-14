@@ -514,6 +514,7 @@ interface CompanionSettings {
      * One screen held sideways: the companion as a window in the middle over the game (true) or the side panel -
      * see [com.pokedaisy.app.Prefs.companionWindow]. Null when the companion isn't on the game's screen sideways: no row.
      */
+    val companionViewBadge: String? get() = NewFeatures.badge(NewFeatures.COMPANION_WINDOW)
     val companionWindow: Boolean? get() = null
     fun setCompanionWindow(on: Boolean) {}
 

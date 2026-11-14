@@ -3711,14 +3711,12 @@ The module links into one static framework, `PokeDaisyUI`.
 ### The iPad app (`iosApp/`)
 
 A SwiftUI shell over that framework: `xcodegen` in `iosApp/` makes `PokeDaisy.xcodeproj` from `project.yml` (the
-generated project stays out of git), whose build runs `./gradlew :shared-ui:embedAndSignAppleFrameworkForXcode` first.
-`RootView` puts the game left and the companion right when the iPad is sideways, the game over the companion upright.
-The game's place lists the games added from Files (`PokeDaisyHost.games` / `addGames`, over `RomPicker`) until one is
-picked, then holds its `GameViewController` (`PokeDaisyHost.gameViewController`, GAMES closes it: `closeGame` writes the
-save). While a game runs `PokeDaisyHost` reads it into its `TelemetryStore` every half second off the main thread, and
-the companion follows it. The game's buttons are a strip under it: `PokeDaisyHost.touchControlsViewController` (the shared `TouchControls`, extras and X / Y off) or `GamepadView.swift`'s UIKit buttons (TOUCH switches; `setTouchKeys` for both), until a touch-delay test on the iPad picks one; a controller or a keyboard works too. The companion's SETTINGS there is `IosCompanionSettings`: only the rows the iPad does so far (`CompanionSettings.shownRows`: battle options, FF / GAME SPEED, volume / mute, TAB BAR, DARK MODE, THEME, LANGUAGE, HELP), kept in `NSUserDefaults` under the Android prefs' names; a game's start also runs RomArt / Gen1Art / Gen2Art's scan, as the Android activity does, so the MAP and party art draw. The game list's LOAD SAVE is `PokeDaisyHost.loadSave` (GameSaves.load's rules: the old save renamed to a dated backup first, put back if the write fails; RetroArch's rzip saves refused for now, RzipSave being JVM-only). The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
-into the bundle's `fonts` folder. CI's "iPad app (simulator build)" job generates the project and builds it for the
-simulator without signing (advisory for now). `iosApp/README.md` has the steps for a Mac.
+generated project stays out of git), whose build runs `:shared-ui:embedAndSignAppleFrameworkForXcode`. Swift switches
+between the shared full-window library and shared game-screen controllers. `PokeDaisyHost.gameScreenViewController`
+embeds one native Metal `GameViewController` in the common `GameScreen`; rotating, hiding and resizing panels move
+that controller without replacing it. Files-based games/saves, the shared library/setup/settings, touch editor and
+resume/state bridges live in the Kotlin hosts. Settings expose only supported capabilities. Fonts come from the app's
+own assets. CI generates and builds the simulator app without signing; `iosApp/README.md` describes local builds.
 
 The iPad battle controls use `IosBattleInput`, an adapter over the shared `BattleInputController`. `GameViewController.frameKeys`
 runs it before every emulated frame, after combining the touch, controller and keyboard input; scripted presses own
@@ -3984,18 +3982,24 @@ HUD/chrome layers while leaving native game rendering and controls independent.
 
 Tests cover state/input ownership, saved choices, viewport exclusions, folds and portrait grip/strip geometry in
 `GameScreenStateTest`, `SidePanelStateTest`, `GamePanelLayoutTest` and `PortraitLayoutTest`. The targeted
-`GameScreenScreenshotTest` renders the real shared root with a stand-in game surface. `GamePanelLayout` remains the
-TouchStage helper for the existing iOS host and standalone previews until that host switches to the complete screen.
+`GameScreenScreenshotTest` renders the real shared root with a stand-in game surface. `GamePicture` shares intrinsic
+picture fitting between the Android renderer adapter and the native UIKit controller slot. `GamePanelLayout` remains
+only the stand-in geometry helper for application settings before a game is running; the legacy three-slot screen is removed.
 LibraryPreferences stores
 portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
 
 The iPad uses these presenters for its full-window library, Files-based setup and application settings. Its native
 adapter supplies file operations, preferences and launch actions; Swift only switches application/game controllers.
-One Compose game host embeds the Metal controller through UIKitViewController and places the shared companion and
-controls through GameScreen. Resizing moves the existing controller without restarting the core. Layout and editor
+`IosGameScreen` supplies preferences and input/focus callbacks to the same `GameScreenState` and `GameScreen` used by
+Android, including modal/docked/unlocked/hidden landscape panels, portrait hiding/sizing and common chrome. Choices
+persist under Android's keys, retaining the established iOS docked default. `ManualInputGate` independently captures
+window/editor owners and quarantines held keys until released; the native input poll applies it before scripted battle
+input. Controller buttons steer common companion keys/focus actions, while keyboard letters remain text input. Pointer
+ownership changes restart only the controls' gesture tracker. The native Metal controller is never replaced by a panel
+change. The open tab remains available because iOS has no hardware BACK recovery route. Layout and editor
 bounds are safe-area pixels throughout; there is no UIKit window-coordinate conversion or separate GAMES toolbar.
 Both global and in-game touch editing use the shared editor, with a settings revision published
 after layout writes so the preview and rows refresh when the editor closes.
 
 Hosts can supply touchStageInOtherOrientation when their rotated layout differs from the phone stand-in. The iPad
-uses GamePanelLayout there too, so the rotated touch preview retains the docked companion and matches the live screen.
+uses its saved common panel state and measured screen/grip dimensions there too, so the rotated in-game preview matches the current layout.

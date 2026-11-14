@@ -16,14 +16,35 @@ class GameInput {
     var touchTurbo: Int = 0
     private var frame = 0L
 
-    fun keys(): Int {
-        var keys = touchKeys or (if ((frame++ / 2) % 2 == 0L) touchTurbo else 0)
+    private val gate = ManualInputGate()
+    var companionCaptured = false
+        set(value) {
+            if (field == value) return
+            field = value
+            gate.setBlocked(ManualInputGate.Owner.COMPANION, value, heldKeys())
+        }
+    var onCompanionButtons: (Int) -> Unit = {}
+    fun editorCaptured(on: Boolean) = gate.setBlocked(ManualInputGate.Owner.EDITOR, on, heldKeys())
+
+    fun controllerKeys(): Int {
+        var keys = 0
         for (c in GCController.controllers()) {
             val pad = (c as? GCController)?.extendedGamepad ?: continue
             keys = keys or padKeys(pad)
         }
-        GCKeyboard.coalescedKeyboard()?.keyboardInput?.let { keys = keys or keyboardKeys(it) }
         return keys
+    }
+    private fun keyboardKeys() = GCKeyboard.coalescedKeyboard()?.keyboardInput?.let(::keyboardKeys) ?: 0
+    private fun heldKeys() = touchKeys or touchTurbo or controllerKeys() or keyboardKeys()
+
+    fun keys(): Int {
+        val controllers = controllerKeys()
+        // Keyboard letters continue to belong to text fields; they never become companion controller shortcuts.
+        if (companionCaptured) onCompanionButtons(controllers)
+        val hardware = controllers or keyboardKeys()
+        val allowed = gate.filter(touchKeys or touchTurbo or hardware)
+        val turbo = if ((frame++ / 2) % 2 == 0L) touchTurbo else 0
+        return (touchKeys or turbo or hardware) and allowed
     }
 
     private fun padKeys(pad: GCExtendedGamepad): Int {

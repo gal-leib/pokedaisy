@@ -65,6 +65,16 @@ class GameViewController(
 
     /** A modal editor is open: foreground notifications must not start frames underneath it. */
     var uiPaused: Boolean = false
+        set(value) { field = value; input.editorCaptured(value) }
+
+    /** A companion window owns manual input while emulation and scripted battle input continue. */
+    var companionInputCaptured: Boolean
+        get() = input.companionCaptured
+        set(value) { input.companionCaptured = value }
+    var onCompanionButtons: (Int) -> Unit
+        get() = input.onCompanionButtons
+        set(value) { input.onCompanionButtons = value }
+    val controllerButtons: Int get() = input.controllerKeys()
 
     /** Per-game pace, or zero for unlimited FF (bounded work per display refresh). Main thread. */
     var speed: Double = 1.0

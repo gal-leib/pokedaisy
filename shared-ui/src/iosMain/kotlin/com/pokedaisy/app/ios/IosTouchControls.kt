@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,8 +42,12 @@ internal class IosTouchControls(
     var stage by mutableStateOf<TouchStage?>(null)
     private var editor: UIViewController? = null
     private var ffDownAt: Double? = null
+    private var inputEpoch by mutableIntStateOf(0)
+    var previewStage: ((Boolean) -> TouchStage?)? = null
+    var beforeEdit: () -> Unit = {}
 
     fun releaseKeys() {
+        inputEpoch++
         game()?.let { it.touchKeys = 0; it.touchTurbo = 0 }
         settings()?.holdFastForward(false)
         ffDownAt = null
@@ -63,19 +69,23 @@ internal class IosTouchControls(
                 onPress = { IosTouchPreferences.feel(IosTouchPreferences.style.vibration) })
         }
         DisposableEffect(Unit) { onDispose { releaseKeys() } }
-        TouchControls(IosTouchPreferences.drawingStyle, portrait, input, Modifier.fillMaxSize(),
-            gameAspect = if (gameBoy) 160f / 144 else 1.5f, gameBoy = gameBoy, ffOn = settings()?.ffActive == true)
+        // Changing ownership cancels existing fingers; only a new DOWN may play after a modal closes.
+        key(inputEpoch) {
+            TouchControls(IosTouchPreferences.drawingStyle, portrait, input, Modifier.fillMaxSize(),
+                gameAspect = if (gameBoy) 160f / 144 else 1.5f, gameBoy = gameBoy, ffOn = settings()?.ffActive == true)
+        }
     }
 
     /** A hidden pad still has an editable stand-in, using the same layout with controls enabled. */
     fun readStage(): TouchStage? = stage?.let {
-        if (IosTouchPreferences.visible) it else
+        previewStage?.invoke(false) ?: if (IosTouchPreferences.visible) it else
             gamePanelLayout(it.w, it.h, it.dp, gameBoy = it.gameBoy, underGame = IosTouchPreferences.underGame, style = IosTouchPreferences.style)
     }
 
     fun edit() {
         if (editor != null) return
         val current = game() ?: return
+        beforeEdit()
         val measured = readStage() ?: return
         val from = current.view.window?.rootViewController ?: return
         releaseKeys()
@@ -91,7 +101,7 @@ internal class IosTouchControls(
 
     private fun presentEditor(from: UIViewController, measured: TouchStage, current: GameViewController?,
                               shot: androidx.compose.ui.graphics.ImageBitmap?) {
-        val view = ComposeUIViewController {
+        val view = ComposeUIViewController(configure = { configureUiAutomation() }) {
             AppTheme {
                 Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
                     TouchLayoutEditor(measured, IosTouchPreferences.drawingStyle, rememberGbaTextMetrics(),
@@ -113,7 +123,7 @@ internal class IosTouchControls(
     }
 
     private fun action(button: TouchButton, down: Boolean) {
-        if (game()?.let { it.isRunning && !it.uiPaused } != true) return
+        if (game()?.let { it.isRunning && !it.uiPaused && !it.companionInputCaptured } != true) return
         val s = settings() ?: return
         when (button) {
             TouchButton.FF -> if (down) {

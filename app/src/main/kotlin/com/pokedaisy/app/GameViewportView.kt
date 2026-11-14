@@ -5,7 +5,7 @@ import android.graphics.Rect
 import android.view.View
 import android.widget.FrameLayout
 import com.pokedaisy.app.companion.DsArrangement
-import kotlin.math.min
+import com.pokedaisy.app.companion.ui.fittedGamePicture
 
 /**
  * Native renderer adapter: fits the GL surface/status strip or the DS/skin pictures inside the viewport assigned
@@ -67,7 +67,7 @@ class GameViewportView(context: Context, private val game: View, private val bar
             estimate != null -> estimate.top.width
             skin != null -> skin.width.toInt()
             stretch && !topAligned || expand && topAligned -> aw
-            bar.visibility != GONE || topAligned -> min(aw.toFloat(), (ah - oldBar).coerceAtLeast(0) * aspect).toInt()
+            bar.visibility != GONE || topAligned -> fittedGamePicture(aw.toFloat(), (ah - oldBar).toFloat(), aspect).width.toInt()
             else -> aw
         }
         barHeight = if (bar.visibility == GONE) 0 else {
@@ -90,7 +90,7 @@ class GameViewportView(context: Context, private val game: View, private val bar
             }
             else -> {
                 val fit = (bar.visibility != GONE || topAligned) && !((stretch && !topAligned) || (expand && topAligned))
-                val gw = if (fit) min(aw.toFloat(), (ah - barHeight).coerceAtLeast(0) * aspect).toInt() else aw
+                val gw = if (fit) fittedGamePicture(aw.toFloat(), (ah - barHeight).toFloat(), aspect).width.toInt() else aw
                 val gh = if (fit) (gw / aspect).toInt() else (ah - barHeight).coerceAtLeast(0)
                 val x = originX + (aw - gw) / 2
                 val y = originY + if (topAligned) 0 else (ah - barHeight - gh) / 2

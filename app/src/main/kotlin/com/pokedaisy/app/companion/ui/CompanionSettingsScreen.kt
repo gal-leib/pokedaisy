@@ -804,7 +804,7 @@ private fun homeRows(
         s.companionWindow?.let { window ->
             SettingRow(
                 tk("COMPANION VIEW"), companionViewLabel(window),
-                labelBadge = NewFeatures.badge(NewFeatures.COMPANION_WINDOW), subtitle = "A window over the game, or a side panel",
+                labelBadge = s.companionViewBadge, subtitle = "A window over the game, or a side panel",
             ) { s.setCompanionWindow(!window); changed() }
         },
         // A foldable half open: the game on one side of the hinge, the companion on the other.

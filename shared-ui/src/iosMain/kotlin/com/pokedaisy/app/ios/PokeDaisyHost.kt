@@ -5,16 +5,11 @@ package com.pokedaisy.app.ios
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.UIKitViewController
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
-import com.pokedaisy.app.companion.ui.GameScreen
-import com.pokedaisy.app.companion.ui.gamePanelLayout
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +81,7 @@ object PokeDaisyHost {
     private var started = false
     private var game: GameViewController? = null
     private val touch = IosTouchControls({ game }, { settings }, { slots })
+    private var screen: IosGameScreen? = null
     private var timer: NSTimer? = null
     // 1 while a read is on its way, so a slow one never piles up behind the next.
     private val reading = atomic(false)
@@ -104,29 +100,25 @@ object PokeDaisyHost {
         start()
         val current = createGameController(romPath, onFailed)
         val gameBoy = romPath.substringAfterLast('.').lowercase() in listOf("gb", "gbc")
-        return ComposeUIViewController {
+        val panels = IosGameScreen(game, touch, gameBoy).also { screen = it }
+        return ComposeUIViewController(configure = { configureUiAutomation() }) {
             AppTheme {
-                BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
-                    val dp = LocalDensity.current.density
-                    val visible = IosTouchPreferences.visible
-                    val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp,
-                        visible, gameBoy, IosTouchPreferences.underGame, IosTouchPreferences.style)
-                    SideEffect { touch.stage = stage }
-                    GameScreen(stage,
-                        game = { UIKitViewController(factory = { current }, modifier = Modifier.fillMaxSize(),
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
+                    panels.Content(
+                        gameContent = { UIKitViewController(factory = { current }, modifier = Modifier.fillMaxSize(),
                             properties = UIKitInteropProperties(interactionMode = null)) },
-                        companion = { Companion() },
-                        controls = { if (visible) touch.Controls(gameBoy, stage.portrait) })
+                        companion = { Companion(panels) })
                 }
             }
         }
     }
 
     @Composable
-    private fun Companion() {
+    private fun Companion(panels: IosGameScreen) {
         val snapshot by telemetry.snapshot.collectAsState()
         Box(Modifier.fillMaxSize()) {
-            CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle, gamePick = telemetry.gamePick)
+            CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle, gamePick = telemetry.gamePick,
+                back = panels.back, keys = panels.keys)
             stateError?.let { message ->
                 OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
                     onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
@@ -237,7 +229,7 @@ object PokeDaisyHost {
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            }, onEditTouch = touch::edit, readTouchStage = touch::readStage)
+            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen })
             .also { L10n.apply(it.appLanguage, code) }
         battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
@@ -287,6 +279,8 @@ object PokeDaisyHost {
         timer = null
         battle?.cancel()
         battle = null
+        screen?.close()
+        screen = null
         touch.close()
         game?.close()
         game = null

@@ -82,8 +82,23 @@ Android folder linking and platform-specific media/tool services remain outside 
 
 ## Game screen layout
 
-Upright, the screen follows Android's PortraitLayout: with the touch page's COMPANION at UNDER GAME (the default) the
-companion sits under the game and the controls get a strip of their own along the bottom, as on an Android phone; with
-AT BOTTOM the companion is along the bottom and the controls take the gap above it, or the game where there is none. Sideways, the game is centered beside the docked companion and the controls overlay its area, using Android's default panel
-width. The live screen, editor and both preview orientations use the same TouchStage bounds. Game Boy games keep their own aspect ratio. Return to the library through shared SETTINGS > CLOSE GAME; there
-is no separate GAMES overlay, toolbar controller or Swift panel-sizing bridge.
+Android and iOS now run the same `GameScreen(GameScreenState, ...)` composition. Swift only switches library/game
+controllers; UIKit embeds the existing Metal controller in the common `GamePicture` slot. There is no separate Swift
+panel layout or legacy three-slot game-screen assembly.
+
+Portrait reuses `PortraitLayout`, including the resize grip, size cycling/hiding, UNDER GAME / AT BOTTOM and the controls'
+own strip. Landscape reuses window, unlocked/docked panel, open/close tabs, resizing and snapping. iOS preserves its
+existing docked default and stores choices in NSUserDefaults under Android's preference keys. The edge open button
+cannot be disabled on iOS because it is the touch recovery path when the companion is hidden.
+
+`IosGameScreen` supplies preferences, native controller input and focus ownership; it does not reimplement panel
+placement or gestures. Modal windows block manual controller/keyboard/touch keys while the core and scripted battle
+input keep running. Held keys remain suppressed until released after closing. The editor is a separate input owner,
+so closing a window cannot release its capture; touch ownership changes cancel old pointer gestures. Controllers use
+the shared companion keys and focus actions. Keyboard letters remain text input, rather than controller shortcuts.
+
+The live screen and in-game editor/rotated preview use measured common frames, including saved sizes and hidden state.
+Game Boy games keep 10:9; GBA games keep 3:2. DS, shaders, skins and fold/device-window features remain Android-only.
+
+For XCUITest, launch with `POKEDAISY_UI_TEST=1` in the app's environment to synchronize Compose accessibility
+semantics without enabling VoiceOver. Normal launches keep Compose's service-driven accessibility synchronization.

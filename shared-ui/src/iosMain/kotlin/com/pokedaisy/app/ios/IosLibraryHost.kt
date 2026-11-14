@@ -61,7 +61,7 @@ internal class IosLibraryHost(
             onClose = {}, onRestart = {}, onDisableResume = ::disableResume,
             onEditTouch = { touch.editStandalone(host, settingsStage()) }, readTouchStage = ::settingsStage)
         L10n.apply(appSettings.appLanguage, null)
-        host = ComposeUIViewController {
+        host = ComposeUIViewController(configure = { configureUiAutomation() }) {
             AppTheme { CompactTextOnSmallWindows {
                 CompositionLocalProvider(LocalCompanionBack provides back) {
                     val density = androidx.compose.ui.platform.LocalDensity.current.density

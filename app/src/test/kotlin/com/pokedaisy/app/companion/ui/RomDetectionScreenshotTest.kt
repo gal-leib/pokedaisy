@@ -48,12 +48,15 @@ class RomDetectionScreenshotTest {
             }
             BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
                 val dp = LocalDensity.current.density
-                val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp, style = style)
-                GameScreen(stage,
-                    game = { Box(Modifier.fillMaxSize().background(Color(0xFF38684B))) },
-                    companion = { CompanionScreen(snapshot, settings = settings, gamePick = SamplePicker.actions,
-                        initialTab = if (showSettings) "SETTINGS" else "PARTY") },
-                    controls = { TouchControls(style, stage.portrait, TouchInput(), Modifier.fillMaxSize()) })
+                val upright = maxHeight >= maxWidth
+                val state = androidx.compose.runtime.remember { GameScreenState(
+                    side = SidePanelState(enabled = !upright, open = true, window = false, docked = true),
+                    portrait = PortraitPanelState(enabled = upright, padStrip = TouchGeometry.naturalHeight(style, maxWidth.value * dp, dp))) }
+                GameScreen(state, gameHeight = { (it / 1.5f).toInt() },
+                    game = { GamePicture(1.5f, upright, Modifier.fillMaxSize()) { Box(Modifier.fillMaxSize().background(Color(0xFF38684B))) } },
+                    companion = { SidePanelCompanion { CompanionScreen(snapshot, settings = settings, gamePick = SamplePicker.actions,
+                        initialTab = if (showSettings) "SETTINGS" else "PARTY") } },
+                    controls = { TouchControls(style, upright, TouchInput(), Modifier.fillMaxSize()) })
             }
         }
     }
