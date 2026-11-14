@@ -11,7 +11,7 @@ class GamePanelLayoutTest {
     @Test fun panelsFitTabletsAndSmallMultitaskingWindows() {
         for ((w, h) in listOf(744f to 1134f, 1134f to 744f, 1366f to 1024f, 400f to 180f, 180f to 400f, 400f to 400f, 0f to 0f)) {
             for (visible in listOf(true, false)) for (gb in listOf(true, false)) for (under in listOf(true, false)) {
-                val stage = gamePanelLayout(w, h, 1f, visible, gameBoy = gb, underGame = under)
+                val stage = gamePanelLayout(w, h, 1f, visible, gameBoy = gb, underGame = under, style = TouchControlsStyle())
                 val companion = stage.companion!!
                 for (r in listOf(stage.game, stage.area, companion)) {
                     assertTrue("$r in $w x $h", r.left >= 0f && r.top >= 0f && r.right <= w && r.bottom <= h)
@@ -25,27 +25,30 @@ class GamePanelLayoutTest {
         }
     }
 
-    /** An iPad mini upright has no gap under the companion: the controls get the game, as on an Android tablet,
-     * so POSITION and a custom layout can put them anywhere over it - not only along the bottom. */
-    @Test fun uprightTabletControlsLieOverTheGame() {
-        for (under in listOf(true, false)) {
-            val stage = gamePanelLayout(744f, 1100f, 1f, underGame = under)
+    /** UNDER GAME (the default), as on Android: the controls get their own strip along the bottom, their natural
+     * height, and the companion gives up the room - on an iPad mini and an iPhone alike, never over the game. */
+    @Test fun uprightUnderGameKeepsAStripAlongTheBottom() {
+        val style = TouchControlsStyle()
+        for ((w, h) in listOf(744f to 1100f, 402f to 778f, 400f to 1000f)) {
+            val stage = gamePanelLayout(w, h, 1f, underGame = true, style = style)
             val companion = stage.companion!!
-            assertEquals(744f / 1.5f, stage.game.height, 0.5f)
-            assertEquals(0f, stage.area.top, 0f)
-            assertEquals(stage.game.bottom, stage.area.bottom, 0.5f)
-            if (under) assertEquals(stage.game.bottom, companion.top, 0.5f) else assertEquals(1100f, companion.bottom, 0.5f)
-            val top = TouchGeometry.place(TouchControlsStyle(position = TouchPosition.TOP), stage.area.width, stage.area.height, 1f, true)
-            val bottom = TouchGeometry.place(TouchControlsStyle(position = TouchPosition.BOTTOM), stage.area.width, stage.area.height, 1f, true)
-            assertTrue(top.items.minOf { it.top } < bottom.items.minOf { it.top })
+            assertEquals("$w x $h", h, stage.area.bottom, 0f)
+            assertEquals("$w x $h", companion.bottom, stage.area.top, 0.5f)
+            assertTrue(stage.area.height >= TouchGeometry.naturalHeight(style, w, 1f) - 1)
+            assertFalse(stage.area.overlaps(stage.game))
+            assertEquals(stage.game.bottom, companion.top, 0.5f)
         }
     }
 
-    @Test fun uprightPhoneControlsTakeTheGapUnderTheCompanion() {
-        val stage = gamePanelLayout(400f, 1000f, 1f)
-        assertEquals(stage.companion!!.bottom, stage.area.top, 0.5f)
-        assertEquals(1000f, stage.area.bottom, 0f)
-        assertFalse(stage.area.overlaps(stage.game))
+    /** AT BOTTOM on a screen with no gap under the game: the controls lie over the game, as on an Android tablet. */
+    @Test fun uprightAtBottomWithNoGapLiesOverTheGame() {
+        val stage = gamePanelLayout(744f, 1100f, 1f, underGame = false, style = TouchControlsStyle())
+        assertEquals(0f, stage.area.top, 0f)
+        assertEquals(stage.game.bottom, stage.area.bottom, 0.5f)
+        assertEquals(1100f, stage.companion!!.bottom, 0.5f)
+        val top = TouchGeometry.place(TouchControlsStyle(position = TouchPosition.TOP), stage.area.width, stage.area.height, 1f, true)
+        val bottom = TouchGeometry.place(TouchControlsStyle(position = TouchPosition.BOTTOM), stage.area.width, stage.area.height, 1f, true)
+        assertTrue(top.items.minOf { it.top } < bottom.items.minOf { it.top })
     }
 
     @Test fun sidewaysControlsUseGameAreaWithoutAnExtraStrip() {

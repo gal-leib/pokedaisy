@@ -57,7 +57,7 @@ internal class IosCompanionSettings(
     override val touchBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_TOUCH)
     override val touchStage get() = readTouchStage()
     override val touchStageInOtherOrientation get() = touchStage?.let {
-        com.pokedaisy.app.companion.ui.gamePanelLayout(it.h, it.w, it.dp, gameBoy = it.gameBoy, underGame = IosTouchPreferences.underGame)
+        com.pokedaisy.app.companion.ui.gamePanelLayout(it.h, it.w, it.dp, gameBoy = it.gameBoy, underGame = IosTouchPreferences.underGame, style = IosTouchPreferences.style)
     }
     override val touchControlsShown get() = IosTouchPreferences.visible
     override fun setPortraitUnderGame(on: Boolean) = IosTouchPreferences.setUnderGame(on)

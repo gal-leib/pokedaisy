@@ -110,7 +110,7 @@ object PokeDaisyHost {
                     val dp = LocalDensity.current.density
                     val visible = IosTouchPreferences.visible
                     val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp,
-                        visible, gameBoy, IosTouchPreferences.underGame)
+                        visible, gameBoy, IosTouchPreferences.underGame, IosTouchPreferences.style)
                     SideEffect { touch.stage = stage }
                     GameScreen(stage,
                         game = { UIKitViewController(factory = { current }, modifier = Modifier.fillMaxSize(),
