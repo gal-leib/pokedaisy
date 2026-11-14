@@ -991,7 +991,6 @@ class SettingsActivity : ComponentActivity() {
             SettingRow(tk("HELP"), null, opensPage = true) { screen = Screen.HELP },
         )
         // Search: every row whose name, value or keywords (SETTING_KEYWORDS: "rebind", "keybinds"...) match.
-        val shown = filterRows(rows, searchQuery)
         // D-pad focus starts on the first setting (it used to land on the search box first), once per visit to Settings;
         // B / BACK in the search box comes back there too.
         val firstRow = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -1009,38 +1008,9 @@ class SettingsActivity : ComponentActivity() {
             inputMode.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
             if (runCatching { firstRow.requestFocus() }.isSuccess) homeFocused = true
         }
-        val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
-        Column(Modifier.fillMaxSize().onFocusChanged { homeHasFocus = it.hasFocus }) {
-            OptionTextField(
-                searchQuery, { searchQuery = it }, m,
-                Modifier.fillMaxWidth().onPreviewKeyEvent { e ->
-                    val back = e.key == androidx.compose.ui.input.key.Key.Back || e.key == androidx.compose.ui.input.key.Key.ButtonB
-                    if (!back) return@onPreviewKeyEvent false
-                    if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
-                        keyboard?.hide()
-                        runCatching { firstRow.requestFocus() }
-                    }
-                    true
-                },
-                placeholder = tr("SEARCH SETTINGS (e.g. KEY BINDINGS)"),
-                leadingIcon = PixelIcons.search,
-            )
-            Spacer(Modifier.height(m.u * 4))
-            RailedWindow(m, Modifier.fillMaxWidth().weight(1f), rail = shown.isNotEmpty()) {
-                if (shown.isEmpty()) {
-                    GbaText(
-                        tr("NOTHING MATCHES \"{0}\"", searchQuery.trim()), OptionColors.muted, OptionColors.mutedShadow, m,
-                        modifier = Modifier.padding(horizontal = m.u * 8, vertical = m.u * 4),
-                    )
-                } else if (searchQuery.isBlank()) {
-                    GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() }, scroll = homeScroll, firstRowFocus = firstRow, groupTabs = true)
-                } else {
-                    GroupedRows(shown, m, cursor = -1, onClick = { shown[it].onClick() }, firstRowFocus = firstRow)
-                }
-            }
-            Spacer(Modifier.height(m.u * 4))
-            AboutFooter(m)
-        }
+        com.pokedaisy.app.companion.ui.AppSettingsHome(rows, m, searchQuery, { searchQuery = it },
+            modifier = Modifier.onFocusChanged { homeHasFocus = it.hasFocus }, scroll = homeScroll,
+            firstRowFocus = firstRow, footer = { AboutFooter(m) })
     }
 
     /** SHADERS: what the game is drawn through, like the companion's page; the game picks it up on resume. */
