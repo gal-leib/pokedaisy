@@ -5,6 +5,7 @@ import okio.HashingSource
 import okio.Path
 import okio.blackholeSink
 import okio.buffer
+import okio.use
 
 /** State-file layout shared by Android and iPad. State blobs publish atomically; pictures/data are optional. */
 class StateFiles(val directory: Path) {
