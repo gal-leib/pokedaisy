@@ -22,6 +22,10 @@ import platform.UIKit.UIViewController
 import platform.darwin.NSObject
 import platform.darwin.NSObjectProtocol
 
+/** Up to 5 s of frames for a save the game is writing (pk_api_finish_save); top level, as a Kotlin subclass of an
+ * Objective-C class can't have a companion with fields. */
+private const val FINISH_SAVE_FRAMES = 300
+
 /**
  * A running game for the iPad app: the game drawn with Metal ([GameRenderer]), heard ([GameAudio]) and played with
  * controllers, a keyboard or [touchKeys] ([GameInput]). The app shell embeds its view wherever the game goes (full
@@ -148,10 +152,5 @@ class GameViewController(
         encoder.endEncoding()
         buffer.presentDrawable(drawable)
         buffer.commit()
-    }
-
-    private companion object {
-        /** Up to 5 s of frames for a save the game is writing (pk_api_finish_save). */
-        const val FINISH_SAVE_FRAMES = 300
     }
 }
