@@ -1,6 +1,9 @@
 package com.pokedaisy.app
 
-import android.util.Log
+import com.pokedaisy.app.companion.data.Logs
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlin.concurrent.Volatile
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_BUSY
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_MOVE_SELECT
@@ -13,10 +16,15 @@ import com.pokedaisy.app.companion.data.Gfx
 import com.pokedaisy.app.companion.data.InProcessReader
 import com.pokedaisy.app.companion.data.MemoryReader
 
+/** The battle controller's synthetic key channel, implemented by each platform's game input. */
+fun interface ScriptInput {
+    fun setScript(bits: Int, exclusive: Boolean)
+}
+
 /**
  * Drives the real in-game battle menu (FIGHT/BAG/POKEMON/RUN, then a move, or
  * a Pokémon to switch to) via synthetic button presses injected through
- * [GbaInput.setScript] - exclusively: while a sequence runs, the player's own
+ * [ScriptInput.setScript] - exclusively: while a sequence runs, the player's own
  * keys are ignored so they can't throw it off. No ROM patch involved: this
  * just presses buttons a real player could press. See PLAN.md
  * Phase 5 for the full design (why this works unchanged under any GAME SPEED /
@@ -31,9 +39,9 @@ import com.pokedaisy.app.companion.data.MemoryReader
  * on different threads.
  */
 class BattleInputController(
-    private val input: GbaInput,
+    private val input: ScriptInput,
     private val reader: MemoryReader = InProcessReader,
-    private val log: (String) -> Unit = { Log.i("pokedaisy-battle", it) },
+    private val log: (String) -> Unit = { Logs.i(it, "pokedaisy-battle") },
     /** Writes the game's RAM (the emu thread, between frames): a pick puts the menu's cursor on its cell and presses A
      * once, so the game plays one select sound, not one per cursor step too. Null = the cursor is walked there. */
     private val writer: ((addr: Long, bytes: ByteArray) -> Boolean)? = null,
@@ -157,7 +165,7 @@ class BattleInputController(
 
     private data class Step(val bits: Int, val frames: Int)
 
-    private val lock = Any()
+    private val lock = SynchronizedObject()
     private val queue = ArrayDeque<Step>()
     private var currentBits = 0
     private var framesLeft = 0

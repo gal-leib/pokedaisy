@@ -38,6 +38,7 @@ val sharedUiSources by extra(
         "com/pokedaisy/app/DocsSearch.kt",
         "com/pokedaisy/app/GbaControls.kt",
         "com/pokedaisy/app/Hotkeys.kt",
+        "com/pokedaisy/app/BattleInputController.kt",
     ),
 )
 val sharedUiAppOnly by extra(
