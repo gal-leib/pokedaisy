@@ -23,6 +23,13 @@ class GameAudio {
     private var engine: AVAudioEngine? = null
     private var node: AVAudioSourceNode? = null
 
+    /** Game loudness under the device volume, including mute and quiet automated presses. */
+    var volume: Float = 1f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            engine?.mainMixerNode?.outputVolume = field
+        }
+
     fun start() {
         if (engine != null) return
         val session = AVAudioSession.sharedInstance()
@@ -50,6 +57,7 @@ class GameAudio {
         val engine = AVAudioEngine()
         engine.attachNode(node)
         engine.connect(node, to = engine.mainMixerNode, format = format)
+        engine.mainMixerNode.outputVolume = volume
         engine.prepare()
         if (!engine.startAndReturnError(null)) NSLog("PokeDaisy: the game's sound didn't start")
         this.engine = engine

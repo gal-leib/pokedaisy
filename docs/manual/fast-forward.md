@@ -117,3 +117,12 @@ A save copied off a real cartridge can carry that cartridge's clock with it, and
 ## Rewind
 
 Missed a jump or walked into the wrong trainer? With `REWIND` on, holding the `REWIND HOLD` hotkey plays the last 20 seconds or so backwards. It's off by default and never touches your save file. It works in Game Boy, Game Boy Color and Game Boy Advance games, not DS games. See [Saves](saves.md) for how it works.
+
+## On iPad
+
+Use `FF` and `FF SPEED` in the companion's `SETTINGS` to switch fast-forward on and choose its pace. `GAME SPEED`
+sets your pace with FF off and remembers it for each game. You can also change `GAME VOLUME` or `MUTE GAME` there.
+Muting keeps your volume choice for when you turn the sound back on.
+
+For now fast-forward applies everywhere on iPad. Sound speeds up with the game; `INFINITE` is silent. `SMART`,
+steady music, scene speeds and speed hotkeys are not available yet.

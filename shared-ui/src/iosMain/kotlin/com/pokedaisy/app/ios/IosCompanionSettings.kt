@@ -20,16 +20,17 @@ import com.pokedaisy.app.companion.ui.theme.ThemeStore
 import com.pokedaisy.app.companion.ui.theme.pickTheme
 import com.pokedaisy.app.companion.ui.theme.themeById
 import platform.Foundation.NSUserDefaults
+import com.pokedaisy.app.game.GameViewController
 
 /**
- * The companion's SETTINGS on the iPad: what the companion itself does (BATTLE HINTS, FOE IVS, TAB BAR, DARK MODE,
- * THEME, LANGUAGE, HELP) kept in the app's defaults under the Android app's pref names, and only those rows shown
- * ([shownRows]) - the rest (FF, shaders, EXPAND, key bindings...) wait for the iPad game to have them.
+ * The companion's SETTINGS on the iPad: shared battle and appearance options, playback and sound, kept in the
+ * app's defaults. Only supported rows are shown ([shownRows]); shaders, EXPAND and key bindings wait for later ports.
  */
 internal class IosCompanionSettings(
     private val romPath: String,
     /** The ROM header's game code (BPEE...), for LANGUAGE's AUTO; null for a Game Boy cart. */
     private val romCode: String?,
+    private val game: GameViewController,
     private val onClose: () -> Unit,
     private val onRestart: () -> Unit,
 ) : CompanionSettings {
@@ -38,7 +39,7 @@ internal class IosCompanionSettings(
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
 
     override val shownRows: Set<String> = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS")
 
     override val showHints: Boolean get() = bool("show_hints", true)
     override fun setShowHints(on: Boolean) = d.setBool(on, "show_hints")
@@ -68,6 +69,33 @@ internal class IosCompanionSettings(
     override fun closeGame() = onClose()
     override fun restartGame() = onRestart()
 
+    override val playbackBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_PLAYBACK)
+
+    init { applyPlayback() }
+
+    private fun applyPlayback() {
+        game.speed = (if (ffToggled) ffMaxSpeed else gameSpeed).toDouble()
+        game.volume = gameVolume / 100f
+        game.muted = gameMuted
+    }
+
+    override val ffMaxSpeed: Float get() = if (d.objectForKey("ff_max_speed") == null) 2f else d.floatForKey("ff_max_speed")
+    override fun setFfMaxSpeed(v: Float) {
+        if (v !in listOf(0f, 1.5f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)) return
+        d.setFloat(v, "ff_max_speed"); applyPlayback()
+    }
+    override val ffToggled: Boolean get() = bool("ff_toggled", false)
+    override fun setFfToggled(on: Boolean) { d.setBool(on, "ff_toggled"); applyPlayback() }
+    override val gameSpeed: Float get() = d.floatForKey("game_speed:$romPath").takeIf { it in gameSpeeds } ?: 1f
+    override fun setGameSpeed(v: Float) {
+        if (v !in gameSpeeds) return
+        d.setFloat(v, "game_speed:$romPath"); applyPlayback()
+    }
+    override val gameVolume: Int get() = if (d.objectForKey("game_volume") == null) 100 else d.integerForKey("game_volume").toInt().coerceIn(0, 100)
+    override fun setGameVolume(percent: Int) { d.setInteger(percent.coerceIn(0, 100).toLong(), "game_volume"); applyPlayback() }
+    override val gameMuted: Boolean get() = bool("game_muted", false)
+    override fun setGameMuted(on: Boolean) { d.setBool(on, "game_muted"); applyPlayback() }
+
     override val battleInfo: Boolean get() = bool("battle_info", true)
     override fun setBattleInfo(on: Boolean) = d.setBool(on, "battle_info")
     override val oneTapMoves: Boolean get() = bool("one_tap_moves", false)
@@ -83,13 +111,9 @@ internal class IosCompanionSettings(
     override fun setBattleStyle(style: BattleStyle) = d.setObject(style.name, "battle_style")
 
     // Not on the iPad yet: never shown (shownRows), so fixed values.
-    override val ffMaxSpeed = 2f
-    override fun setFfMaxSpeed(v: Float) {}
-    override val ffToggled = false
-    override fun setFfToggled(on: Boolean) {}
-    override val ffMusicMode = FfMusicMode.STEADY
+    override val ffMusicMode = FfMusicMode.SPED_UP
     override fun setFfMusicMode(mode: FfMusicMode) {}
-    override val ffMode = FfMode.SMART
+    override val ffMode = FfMode.NORMAL
     override fun setFfMode(mode: FfMode) {}
     override val touchStyle = TouchControlsStyle()
     override fun setTouchStyle(style: TouchControlsStyle) {}

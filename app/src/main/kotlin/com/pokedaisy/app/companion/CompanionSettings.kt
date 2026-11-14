@@ -17,6 +17,9 @@ import com.pokedaisy.app.companion.i18n.tk
  * ([keyCapture]) and the game's screen asks for the keys while a row here waits.
  */
 interface CompanionSettings {
+    /** Optional NEW tag when a host first gains playback controls. */
+    val playbackBadge: String? get() = null
+
     /** Fast-forward speed cap. 0 = unlimited. */
     val ffMaxSpeed: Float
     fun setFfMaxSpeed(v: Float)

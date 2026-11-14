@@ -211,7 +211,9 @@ bool pk_api_init(const char* romPath, const char* savePath) {
     color_t* video = calloc((size_t) w * h, sizeof(color_t));
     core->setVideoBuffer(core, video, w);
 
-    core->setAudioBufferSize(core, 2048);
+    // A quarter-speed host requests 192 kHz: about 3,215 samples per game frame. Keep enough room before
+    // pkDrainAudio runs at the frame boundary (the old 2,048-sample buffer overflowed in slow motion).
+    core->setAudioBufferSize(core, PK_AUDIO_SCRATCH_SAMPLES);
     blip_set_rates(core->getAudioChannel(core, 0), core->frequency(core), PK_SAMPLE_RATE);
     blip_set_rates(core->getAudioChannel(core, 1), core->frequency(core), PK_SAMPLE_RATE);
 

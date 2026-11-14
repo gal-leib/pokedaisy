@@ -58,9 +58,15 @@ class GameViewController(
             input.touchKeys = value
         }
 
+    /** Per-game pace, or zero for unlimited FF (bounded work per display refresh). Main thread. */
+    var speed: Double = 1.0
+    var volume: Float = 1f
+    var muted: Boolean = false
     /** Shared battle automation runs once per emulated frame, on every input source. */
     var frameKeys: (Int) -> Int = { it }
     var holdPicture: () -> Boolean = { false }
+    var quietPress: () -> Boolean = { false }
+    private var audioSpeed = -1.0
 
     /** Whether a game is open and running in this controller. */
     val isRunning: Boolean get() = running
@@ -135,15 +141,26 @@ class GameViewController(
 
     private fun refresh(view: MTKView) {
         if (!running) return
-        val frames = pacer.framesAt(CACurrentMediaTime())
-        if (frames > 0) {
-            repeat(frames) {
-                PkApiCore.setKeys(frameKeys(input.keys()))
-                PkApiCore.runFrame()
-                audio.push()
-            }
-            if (!holdPicture()) renderer?.upload()
+        val rate = speed.takeIf { it.isFinite() && it in 0.0..64.0 } ?: 1.0
+        val now = CACurrentMediaTime()
+        if (rate != audioSpeed) {
+            pacer.reset()
+            // Fewer samples per emulated frame give pitched, sped-up sound at the device's fixed 48 kHz.
+            PkApiCore.setAudioRate(PkApiCore.SAMPLE_RATE / rate.coerceAtLeast(0.25))
+            audioSpeed = rate
         }
+        val frames = if (rate == 0.0) 64 else pacer.framesAt(now, rate)
+        var ran = false
+        for (frame in 0 until frames) {
+            // Unlimited FF still leaves time for the companion and touch events on the main thread.
+            if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
+            PkApiCore.setKeys(frameKeys(input.keys()))
+            PkApiCore.runFrame()
+            audio.volume = if (muted || rate == 0.0 || quietPress()) 0f else volume
+            audio.push()
+            ran = true
+        }
+        if (ran && !holdPicture()) renderer?.upload()
         draw(view)
     }
 
