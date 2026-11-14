@@ -23,8 +23,14 @@ kotlin {
     androidTarget {
         compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
     }
-    iosArm64()
-    iosSimulatorArm64()
+    // The iPad app (iosApp/) links the screens as one static framework, PokeDaisyUI: its Swift side calls
+    // `PokeDaisyHost.shared` (src/iosMain: the iOS hosts and the companion's view controller).
+    listOf(iosArm64(), iosSimulatorArm64()).forEach {
+        it.binaries.framework {
+            baseName = "PokeDaisyUI"
+            isStatic = true
+        }
+    }
 
     sourceSets {
         commonMain {
