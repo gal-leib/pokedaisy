@@ -19,6 +19,7 @@ import com.pokedaisy.app.companion.ui.SidePanelHandle
 import com.pokedaisy.app.companion.ui.SidePanelHost
 import com.pokedaisy.app.companion.ui.SidePanelOpenTab
 import com.pokedaisy.app.companion.ui.SidePanelState
+import com.pokedaisy.app.companion.ui.PanelResizeHandle
 import com.pokedaisy.app.companion.ui.COMPACT_TEXT_INCHES
 import kotlin.math.roundToInt
 
@@ -173,14 +174,14 @@ class SidePanel(
                     }
                 }
             }.also { root.addView(it, at, FrameLayout.LayoutParams(panelWidth, -1, Gravity.END)) }
-            handle = DragFrame(context, vertical = false, ::onDragStart, ::onDrag, ::onDragEnd).apply {
-                addView(CompanionColors.track(ComposeView(context)).apply {
-                    setContent {
-                        CompositionLocalProvider(LocalClickSound provides clickSound) {
+            handle = CompanionColors.track(ComposeView(context)).apply {
+                setContent {
+                    CompositionLocalProvider(LocalClickSound provides clickSound) {
+                        PanelResizeHandle(vertical = false, ::onDragStart, ::onDrag, ::onDragEnd) {
                             SidePanelHandle(state.docked, ::toggleDock)
                         }
                     }
-                })
+                }
             }.also {
                 root.addView(it, at + 1, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
                     topMargin = (HANDLE_TOP_DP * context.resources.displayMetrics.density).roundToInt()

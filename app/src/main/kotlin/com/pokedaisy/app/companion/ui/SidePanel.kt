@@ -265,8 +265,8 @@ internal fun WindowCloseButton(onClose: () -> Unit, alpha: Float = 1f, descripti
  * The tab on the side panel's edge: a white title-window tab running into the
  * panel (like a folder tab) with a padlock - open = the panel lies over the
  * game, shut = locked beside it - in OPTION's grey / red, with the text's
- * shadow. A tap locks / unlocks; dragging it sideways (handled by the view
- * around it, in screen coordinates, since the tab moves with the finger)
+ * shadow. A tap locks / unlocks; dragging it sideways (handled by [PanelResizeHandle]
+ * using accumulated pointer deltas, since the tab moves with the finger)
  * resizes the panel.
  */
 @Composable

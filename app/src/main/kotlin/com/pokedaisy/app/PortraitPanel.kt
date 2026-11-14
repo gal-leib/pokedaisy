@@ -13,6 +13,7 @@ import com.pokedaisy.app.companion.ui.CompanionBack
 import com.pokedaisy.app.companion.ui.LocalClickSound
 import com.pokedaisy.app.companion.ui.LocalCompanionTopInset
 import com.pokedaisy.app.companion.ui.PortraitGrip
+import com.pokedaisy.app.companion.ui.PanelResizeHandle
 import com.pokedaisy.app.companion.ui.PortraitLayout
 import com.pokedaisy.app.companion.ui.SidePanelCompanion
 
@@ -142,12 +143,14 @@ class PortraitPanel(
                     CompositionLocalProvider(LocalCompanionTopInset provides topInset.intValue) { SidePanelCompanion(content = companion) }
                 }
             }.also { root.addView(it, at, FrameLayout.LayoutParams(-1, 0, Gravity.TOP)) }
-            gripView = DragFrame(context, vertical = true, ::onDragStart, ::onDrag, ::onDragEnd).apply {
-                addView(CompanionColors.track(ComposeView(context)).apply {
-                    setContent {
-                        CompositionLocalProvider(LocalClickSound provides clickSound) { PortraitGrip(grip.value, ::stepSize) }
+            gripView = CompanionColors.track(ComposeView(context)).apply {
+                setContent {
+                    CompositionLocalProvider(LocalClickSound provides clickSound) {
+                        PanelResizeHandle(vertical = true, ::onDragStart, ::onDrag, ::onDragEnd) {
+                            PortraitGrip(grip.value, ::stepSize)
+                        }
                     }
-                })
+                }
             }.also {
                 root.addView(it, at + 1, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
             }
