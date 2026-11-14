@@ -5,12 +5,14 @@ package com.pokedaisy.app.ios
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -20,6 +22,8 @@ import com.pokedaisy.app.companion.data.EmulatorCore
 import com.pokedaisy.app.companion.StateSlotController
 import com.pokedaisy.app.companion.TouchButton
 import com.pokedaisy.app.companion.TouchStage
+import com.pokedaisy.app.companion.ui.gamePanelLayout
+import com.pokedaisy.app.companion.ui.GamePanelLayout
 import com.pokedaisy.app.companion.ui.TouchControls
 import com.pokedaisy.app.companion.ui.TouchGeometry
 import com.pokedaisy.app.companion.ui.TouchInput
@@ -45,8 +49,16 @@ internal class IosTouchControls(
     private var editor: UIViewController? = null
     private var ffDownAt: Double? = null
 
-    fun height(width: Double, gameBoy: Boolean): Double = if (!IosTouchPreferences.visible) 0.0 else
-        TouchGeometry.naturalHeight(IosTouchPreferences.drawingStyle, width.toFloat(), 1f, gameBoy).coerceAtLeast(220).toDouble()
+    fun layout(width: Double, height: Double, gameBoy: Boolean): GamePanelLayout = gamePanelLayout(
+        width.toFloat(), height.toFloat(), 1f, IosTouchPreferences.drawingStyle, IosTouchPreferences.visible, gameBoy)
+
+    fun standaloneStage(from: UIViewController): TouchStage {
+        val dp = from.view.contentScaleFactor.toFloat()
+        return from.view.bounds.useContents {
+            gamePanelLayout(size.width.toFloat() * dp, size.height.toFloat() * dp, dp,
+                IosTouchPreferences.drawingStyle).touchStage(dp)
+        }
+    }
 
     fun releaseKeys() {
         game()?.let { it.touchKeys = 0; it.touchTurbo = 0 }
@@ -82,8 +94,10 @@ internal class IosTouchControls(
                                     (origin.x + size.width).toFloat() * dp, (origin.y + size.height).toFloat() * dp)
                             }
                         } ?: Rect.Zero
-                        stage = TouchStage(bounds.width, bounds.height, dp, portrait, picture,
-                            Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height),
+                        val area = Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height)
+                        stage = TouchStage(bounds.width, bounds.height, dp, portrait, picture, area,
+                            companion = if (portrait) Rect(0f, area.bottom, bounds.right, bounds.bottom)
+                                else Rect(area.right, picture.top, bounds.right, bounds.bottom),
                             gameAspect = if (gameBoy) 160f / 144 else 1.5f, gameBoy = gameBoy)
                     }
                 }) {
@@ -123,22 +137,41 @@ internal class IosTouchControls(
         val current = game() ?: return
         val measured = readStage() ?: return
         val from = current.view.window?.rootViewController ?: return
+        val window = current.view.window ?: return
+        // The measured stage is in window pixels. The editor's body excludes the same safe-area insets.
+        val inset = window.safeAreaInsets.useContents {
+            floatArrayOf(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat()).map { it * measured.dp }
+        }
+        val offset = Offset(-inset[0], -inset[1])
+        val safe = measured.copy(w = measured.w - inset[0] - inset[2], h = measured.h - inset[1] - inset[3],
+            game = measured.game.translate(offset), area = measured.area.translate(offset),
+            companion = measured.companion?.translate(offset))
         releaseKeys()
         current.uiPaused = true
         current.pause()
-        val shot = PkApiCore.stateThumbnail()?.let(::decodeImage)
+        presentEditor(from, safe, current, PkApiCore.stateThumbnail()?.let(::decodeImage))
+    }
+
+    fun editStandalone(from: UIViewController, stage: TouchStage? = null) {
+        if (editor == null) presentEditor(from, stage ?: standaloneStage(from), null, null)
+    }
+
+    private fun presentEditor(from: UIViewController, measured: TouchStage, current: GameViewController?,
+                              shot: androidx.compose.ui.graphics.ImageBitmap?) {
         val view = ComposeUIViewController {
             AppTheme {
-                TouchLayoutEditor(measured, IosTouchPreferences.drawingStyle, rememberGbaTextMetrics(),
-                    shot = shot, drawBackdrop = true,
-                    onDone = { layout ->
-                        IosTouchPreferences.style = IosTouchPreferences.style.withLayout(measured.portrait, layout)
-                        editor?.dismissViewControllerAnimated(true) {
-                            editor = null
-                            current.uiPaused = false
-                            current.resume()
-                        }
-                    })
+                Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
+                    TouchLayoutEditor(measured, IosTouchPreferences.drawingStyle, rememberGbaTextMetrics(),
+                        shot = shot, drawBackdrop = true,
+                        onDone = { layout ->
+                            IosTouchPreferences.style = IosTouchPreferences.style.withLayout(measured.portrait, layout)
+                            editor?.dismissViewControllerAnimated(true) {
+                                editor = null
+                                current?.uiPaused = false
+                                current?.resume()
+                            }
+                        })
+                }
             }
         }
         view.modalPresentationStyle = UIModalPresentationFullScreen

@@ -1,13 +1,10 @@
 # PokeDaisy for iPad
 
-The iPad app: a SwiftUI app with the game (the iOS core's `GameViewController`: Metal, sound, controllers and a
-hardware keyboard) beside the companion's shared screens (`shared-ui`, Compose Multiplatform). With no game running, the
-game's place lists the games added from Files (ADD GAMES); a game is copied into the app's `Documents/roms/` and keeps its
-save in `Documents/saves/`, both visible in Files. A game's menu (the circle beside it) has Load a save from Files, which puts the picked save in its place and keeps
-the one before as `<name>.backup-<date>.sav` (RetroArch's compressed saves aren't read yet). The game's buttons sit in a strip under it: the app's own touch
-controls (`TouchControls`, shared with Android) or, after a tap on TOUCH, the proof of concept's UIKit buttons
-(`GamepadView.swift`), kept until touch delay has been timed on a real iPad and one of the two is picked. A controller
-or a keyboard works too.
+The iPad app hosts the native Metal game surface, audio, controllers and keyboard with the same Compose library,
+setup, settings and companion screens Android uses. The library fills the window when no game is running. Games
+picked from Files are copied into Documents/roms, with battery saves in Documents/saves; both are visible in Files.
+LOAD SAVE uses a shared confirmation and keeps the previous save as a dated backup. The on-screen pad and its editor
+are shared too; there is no separate UIKit pad or Swift game list.
 
 ## Battles
 
@@ -63,3 +60,11 @@ TouchStyleCodec, also used by Android, backed by NSUserDefaults. The Swift shell
 orientation; it no longer offers a second native pad. An editor uses the measured window/controls bounds, pauses the
 core and keeps separate orientation layouts. Controller connection changes update AUTO visibility. FF (tap/hold),
 turbo and state buttons use the existing playback/slot bridges; unsupported actions and skins are omitted.
+
+## Shared application screens
+
+The library, setup and app-settings presenters are the same Compose components Android uses. Swift hosts controllers
+and the native Metal game surface; it no longer defines a separate list, menus, settings UI or touch pad. The library
+is full-window when no game is open, with grid/list, search, sorting, favorites/recent views and save import. Settings
+and touch layout editing work before a game starts. Setup uses Files to copy games and keeps saves in Documents/saves;
+Android folder linking and platform-specific media/tool services remain outside shared UI.

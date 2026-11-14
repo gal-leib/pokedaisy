@@ -1,9 +1,11 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, androidx.compose.runtime.ExperimentalComposeApi::class)
 
 package com.pokedaisy.app.ios
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,7 +57,7 @@ private const val MAX_SAVE_BYTES = 1 shl 20
  * What the iPad app's Swift side calls (as `PokeDaisyHost.shared` in Swift; not `PokeDaisy`, which is the app's own
  * Swift module): [start] once at launch, [companionViewController] for the companion's screens, [games] /
  * [addGames] for the games added from Files, [gameViewController] / [closeGame] to play one and
- * [touchControlsViewController] (or [setTouchKeys], for the app's own Swift buttons) to press its keys. While a game runs,
+ * [touchControlsViewController] to press its keys. While a game runs,
  * [telemetry] reads it every half second, off the main thread (the core's reads may come from any thread), and the
  * companion follows it.
  */
@@ -135,8 +137,16 @@ object PokeDaisyHost {
      */
     fun loadSave(romPath: String, fromPath: String): String? {
         val fs = FileSystem.SYSTEM
-        val bytes = runCatching { fs.read(fromPath.toPath()) { readByteArray() } }.getOrNull()
-            ?: return "Can't read that file"
+        val source = fromPath.toPath()
+        val size = fs.metadataOrNull(source)?.size ?: return "Can't read that file"
+        if (size !in 1L..MAX_SAVE_BYTES.toLong()) return "That isn't a game save"
+        val bytes = runCatching { fs.read(source) { readByteArray() } }.getOrNull() ?: return "Can't read that file"
+        return loadSave(romPath, bytes)
+    }
+
+    /** The shared import dialog retains a bounded copy until the player confirms. */
+    fun loadSave(romPath: String, bytes: ByteArray): String? {
+        val fs = FileSystem.SYSTEM
         if (bytes.isEmpty() || bytes.size > MAX_SAVE_BYTES) return "That isn't a game save"
         // RetroArch's compressed saves start "#RZIPv": the Android app unpacks them, the iPad app can't yet.
         if (bytes.size >= 6 && bytes.copyOfRange(0, 6).decodeToString() == "#RZIPv") {
@@ -238,14 +248,24 @@ object PokeDaisyHost {
         return touch.controller(gameBoy, portrait)
     }
 
-    fun touchControlsHeight(width: Double, gameBoy: Boolean): Double = touch.height(width, gameBoy)
+    fun gamePanelLayout(width: Double, height: Double, gameBoy: Boolean) = touch.layout(width, height, gameBoy)
 
-    /** The keys the on-screen buttons hold ([com.pokedaisy.app.core.PkApiCore.KEY_A] ...), on the main thread. */
-    fun setTouchKeys(keys: Int) {
-        game?.touchKeys = keys
+    /** Full-window shared library, setup and application settings. */
+    fun libraryViewController(failed: String?, onPlay: (String) -> Unit): UIViewController {
+        start()
+        return IosLibraryHost(touch, onPlay, failed).controller()
     }
 
-    /** The native GAMES chip follows the same progress warning as companion SETTINGS > CLOSE GAME. */
+    /** Styled game action; the native shell only positions its controller. */
+    fun gameToolbarViewController(): UIViewController = ComposeUIViewController(configure = { opaque = false }) {
+        AppTheme {
+            Box(Modifier.fillMaxSize().padding(4.dp)) {
+                com.pokedaisy.app.companion.ui.OptionButton(tr("GAMES"), rememberGbaTextMetrics(), onClick = ::requestCloseGame)
+            }
+        }
+    }
+
+    /** The shared GAMES button follows the same progress warning as companion SETTINGS > CLOSE GAME. */
     fun requestCloseGame() {
         if (settings?.autoResume == false) confirmingClose = true else finishClose()
     }

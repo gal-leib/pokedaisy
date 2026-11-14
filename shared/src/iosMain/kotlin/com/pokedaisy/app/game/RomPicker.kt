@@ -29,15 +29,23 @@ object RomPicker {
 
     fun pick(from: UIViewController, onPicked: (List<String>) -> Unit) {
         val types = EXTENSIONS.mapNotNull { UTType.typeWithFilenameExtension(it, conformingToType = UTTypeData) }
+        present(from, types, multiple = true) { urls -> onPicked(urls.mapNotNull(::keep)) }
+    }
+
+    /** A copied data file from Files; read it during [onPicked]. Cancelled = null. */
+    fun pickSave(from: UIViewController, onPicked: (String?) -> Unit) {
+        present(from, listOf(UTTypeData), multiple = false) { urls -> onPicked(urls.firstOrNull()?.path) }
+    }
+
+    private fun present(from: UIViewController, types: List<UTType>, multiple: Boolean, onPicked: (List<NSURL>) -> Unit) {
+        if (delegate != null) return
         val picker = UIDocumentPickerViewController(forOpeningContentTypes = types, asCopy = true)
-        picker.allowsMultipleSelection = true
-        // The picker holds its delegate weakly: kept here until it answers.
+        picker.allowsMultipleSelection = multiple
         val d = object : NSObject(), UIDocumentPickerDelegateProtocol {
             override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
                 delegate = null
-                onPicked(didPickDocumentsAtURLs.mapNotNull { (it as? NSURL)?.let(::keep) })
+                onPicked(didPickDocumentsAtURLs.filterIsInstance<NSURL>())
             }
-
             override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
                 delegate = null
                 onPicked(emptyList())

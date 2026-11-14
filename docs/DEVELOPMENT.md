@@ -3961,3 +3961,8 @@ searchable home; hosts can omit game-only controls when no core is open.
 
 GamePanelLayout measures a one-window game host and the standalone touch editor's preview. LibraryPreferences stores
 portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
+
+The iPad uses these presenters for its full-window library, Files-based setup and application settings. Its native
+adapter supplies file operations, preferences and launch actions; Swift only positions the Metal game surface and
+shared controllers. Both global and in-game touch editing use the shared editor, with a settings revision published
+after layout writes so the preview and rows refresh when the editor closes.

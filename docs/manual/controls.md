@@ -295,3 +295,6 @@ connected; `ALWAYS` and `NEVER` let you choose for yourself.
 You can enable `FF`, `TURBO A`, `TURBO B`, `SAVE STATE` and `LOAD STATE` under `EXTRA BUTTONS`. A short tap on `FF`
 toggles it; holding it speeds up the game until you release it. The state buttons use the current slot in `STATES`.
 Skin import, the quick menu, zoom, rewind and X/Y bindings are not available on iPad yet.
+
+You can also open `TOUCH CONTROLS` from the library's `SETTINGS`, with no game running. The editor uses a stand-in of
+the same game and controls panels. It keeps the layout for the orientation you are editing, ready for your next game.

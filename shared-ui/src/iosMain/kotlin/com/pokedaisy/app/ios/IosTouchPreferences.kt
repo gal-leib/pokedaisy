@@ -3,6 +3,7 @@
 package com.pokedaisy.app.ios
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.companion.TouchButton
@@ -28,6 +29,8 @@ internal object IosTouchPreferences {
         text = d::stringForKey,
         int = { k, fallback -> if (d.objectForKey(k) == null) fallback else d.integerForKey(k).toInt() },
         bool = { k, fallback -> if (d.objectForKey(k) == null) fallback else d.boolForKey(k) }))
+    var revision by mutableIntStateOf(0)
+        private set
     var style: TouchControlsStyle
         get() = current
         set(value) {
@@ -35,6 +38,7 @@ internal object IosTouchPreferences {
                 text = { k, v -> if (v == null) d.removeObjectForKey(k) else d.setObject(v, k) },
                 int = { k, v -> d.setInteger(v.toLong(), k) }, bool = { k, v -> d.setBool(v, k) })
             current = value
+            revision++
             changed()
         }
 
