@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.DsCore
 import com.pokedaisy.app.companion.ui.theme.DarkMode
 import com.pokedaisy.app.companion.i18n.L10n
 import com.pokedaisy.app.companion.i18n.tk
@@ -206,7 +207,7 @@ class SettingsActivity : ComponentActivity() {
     /** DS RESOLUTION's GPU renderer can run here (OpenGL ES 3.2). */
     private val dsGpu by lazy { GlCaps.gles32(this) }
     /** DS games start on DSperate (DS CORE): DS RESOLUTION and DS CPU BOOST are melonDS's, greyed out then. */
-    private val dsOnDsperate get() = prefs.dsCore.runs() == MgbaCore.NDS_CORE_DSPERATE
+    private val dsOnDsperate get() = prefs.dsCore.runs() == DsCore.CORE_DSPERATE
 
     private val updates by lazy { AppUpdateFlow(this) }
 

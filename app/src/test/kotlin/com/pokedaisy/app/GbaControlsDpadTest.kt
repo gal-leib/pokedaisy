@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.CoreKey
 import okio.Path
 import okio.Path.Companion.toOkioPath
 import android.view.KeyEvent
@@ -25,7 +26,7 @@ class GbaControlsDpadTest {
         val raw = GbaControls.rawBindings(dir)
         for (b in listOf(Btn.UP, Btn.DOWN, Btn.LEFT, Btn.RIGHT)) assertEquals(emptyList<String>(), raw[b])
         val gba = input(dir, ds = false)
-        assertEquals(MgbaCore.Key.UP, gba.buttonFor(KeyEvent.KEYCODE_DPAD_UP))
+        assertEquals(CoreKey.UP, gba.buttonFor(KeyEvent.KEYCODE_DPAD_UP))
         assertNull(gba.buttonFor(KeyEvent.KEYCODE_C))
     }
 
@@ -37,12 +38,12 @@ class GbaControlsDpadTest {
         GbaControls.setBindingNamed(dir, Btn.RIGHT, "F")
         for (ds in listOf(false, true)) {
             val i = input(dir, ds)
-            assertEquals(MgbaCore.Key.UP, i.buttonFor(KeyEvent.KEYCODE_C))
-            assertEquals(MgbaCore.Key.DOWN, i.buttonFor(KeyEvent.KEYCODE_D))
-            assertEquals(MgbaCore.Key.LEFT, i.buttonFor(KeyEvent.KEYCODE_E))
-            assertEquals(MgbaCore.Key.RIGHT, i.buttonFor(KeyEvent.KEYCODE_F))
+            assertEquals(CoreKey.UP, i.buttonFor(KeyEvent.KEYCODE_C))
+            assertEquals(CoreKey.DOWN, i.buttonFor(KeyEvent.KEYCODE_D))
+            assertEquals(CoreKey.LEFT, i.buttonFor(KeyEvent.KEYCODE_E))
+            assertEquals(CoreKey.RIGHT, i.buttonFor(KeyEvent.KEYCODE_F))
             // The D-pad itself is unchanged.
-            assertEquals(MgbaCore.Key.UP, i.buttonFor(KeyEvent.KEYCODE_DPAD_UP))
+            assertEquals(CoreKey.UP, i.buttonFor(KeyEvent.KEYCODE_DPAD_UP))
         }
     }
 

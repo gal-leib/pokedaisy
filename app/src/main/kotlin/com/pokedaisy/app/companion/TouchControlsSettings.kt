@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion
 
+import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.data.fixed
 import androidx.compose.ui.geometry.Rect
 import com.pokedaisy.app.companion.i18n.tk
@@ -98,7 +99,7 @@ enum class TouchButton(val label: String, val gba: Int, val extra: Boolean = fal
     START(tk("START"), 8), SELECT(tk("SELECT"), 4),
     /** The DS's own X and Y in a DS game; elsewhere the device's X / Y keys ([TouchControlsStyle.xyButtons]): whatever
      * GAME BUTTONS and HOTKEYS put on them (START 2, SELECT 2, TO COMPANION, a hotkey). */
-    X("X", com.pokedaisy.app.MgbaCore.Key.X), Y("Y", com.pokedaisy.app.MgbaCore.Key.Y),
+    X("X", CoreKey.X), Y("Y", CoreKey.Y),
     /** A tap turns FF on / off, held = fast while held. */
     FF(tk("FF"), 0, extra = true),
     /** Opens the QUICK MENU (a phone has no L3). */
