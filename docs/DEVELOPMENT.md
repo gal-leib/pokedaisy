@@ -3963,7 +3963,14 @@ GamePanelLayout returns a TouchStage directly for the one-window game host and t
 uses Android's PortraitLayout with no resize grip, the player's UNDER GAME / AT BOTTOM, and Android's controls area: with
 UNDER GAME a strip of `TouchGeometry.naturalHeight` along the bottom (`padStrip`, as `PokeDaisyActivity.syncTouchControls`
 sets it), with AT BOTTOM the gap above the companion, else the game itself.
-Landscape uses the shared default side-panel width, centers the game in its area and overlays the controls there, without a separate strip. LibraryPreferences stores
+Landscape uses `SidePanelState`, the same policy the Android `SidePanel` adapter consumes. It owns window/docked/hidden
+state, the temporary full-screen and book-hinge overrides, width bounds and integer-scale snapping. Its arrangement
+reserves game space only for a docked panel and controls space for any open side panel; an open window owns game-button
+input and overlays the full stage. Android retains preferences, focus, animation and native input-window dispatch.
+`GamePanelLayout` accepts this state and the portrait size/hidden choice; hosts without those controls retain the docked
+default. `GameScreen` draws the companion above the controls so a window's scrim owns its whole overlay. The policy and
+geometry tests are `SidePanelStateTest` and `GamePanelLayoutTest`; the renderer and input adapters stay native.
+LibraryPreferences stores
 portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
 
 The iPad uses these presenters for its full-window library, Files-based setup and application settings. Its native

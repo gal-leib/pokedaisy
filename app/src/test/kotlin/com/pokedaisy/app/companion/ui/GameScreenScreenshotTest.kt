@@ -31,16 +31,42 @@ class GameScreenScreenshotTest {
         paparazzi.unsafeUpdateConfig(deviceConfig = upright.copy(orientation = ScreenOrientation.LANDSCAPE))
         paparazzi.snapshot { Scene() }
     }
+    @Test fun window() {
+        paparazzi.unsafeUpdateConfig(deviceConfig = upright.copy(orientation = ScreenOrientation.LANDSCAPE))
+        paparazzi.snapshot { Scene(sidePanel = SidePanelState(enabled = true, open = true)) }
+    }
+    @Test fun unlockedSidePanel() {
+        paparazzi.unsafeUpdateConfig(deviceConfig = upright.copy(orientation = ScreenOrientation.LANDSCAPE))
+        paparazzi.snapshot { Scene(sidePanel = SidePanelState(enabled = true, open = true, window = false, widthFraction = .4f)) }
+    }
+    @Test fun hiddenSidePanel() {
+        paparazzi.unsafeUpdateConfig(deviceConfig = upright.copy(orientation = ScreenOrientation.LANDSCAPE))
+        paparazzi.snapshot { Scene(sidePanel = SidePanelState(enabled = true)) }
+    }
+    @Test fun hiddenPortraitCompanion() = paparazzi.snapshot { Scene(portraitHidden = true) }
+    @Test fun tallBook() = paparazzi.snapshot {
+        Scene(sidePanel = SidePanelState().withEnabled(true).withBook(740..796))
+    }
 
-    @Composable private fun Scene(visible: Boolean = true, gameBoy: Boolean = false) {
+    @Composable private fun Scene(
+        visible: Boolean = true, gameBoy: Boolean = false, portraitHidden: Boolean = false,
+        sidePanel: SidePanelState = SidePanelState(enabled = true, open = true, window = false, docked = true),
+    ) {
         AppTheme {
             val style = TouchControlsStyle(xyButtons = false, extras = setOf(TouchButton.FF))
             BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
                 val dp = LocalDensity.current.density
-                val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp, visible, gameBoy, style = com.pokedaisy.app.companion.TouchControlsStyle())
+                val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp, visible, gameBoy,
+                    style = TouchControlsStyle(), sidePanel = sidePanel, portraitHidden = portraitHidden)
+                val content: @Composable () -> Unit = {
+                    CompanionScreen(SampleCompanion.snapshot, settings = SampleCompanion.Settings())
+                }
                 GameScreen(stage,
                     game = { Box(Modifier.fillMaxSize().background(Color(0xFF38684B))) },
-                    companion = { CompanionScreen(SampleCompanion.snapshot, settings = SampleCompanion.Settings()) },
+                    companion = {
+                        if (sidePanel.isWindow && !stage.portrait) SidePanelHost(window = true, onClose = {}, content = content)
+                        else content()
+                    },
                     controls = { if (visible) TouchControls(style, stage.portrait, TouchInput(), Modifier.fillMaxSize(),
                         gameAspect = stage.gameAspect, gameBoy = gameBoy) })
             }

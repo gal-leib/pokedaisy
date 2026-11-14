@@ -3,6 +3,7 @@ package com.pokedaisy.app
 import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.TouchPosition
 import com.pokedaisy.app.companion.ui.TouchGeometry
+import com.pokedaisy.app.companion.ui.SidePanelState
 import com.pokedaisy.app.companion.ui.gamePanelLayout
 import org.junit.Assert.*
 import org.junit.Test
@@ -58,5 +59,43 @@ class GamePanelLayoutTest {
         assertEquals(stage.area.right, stage.companion!!.left, 0f)
         assertEquals(stage.area.center, stage.game.center)
         assertEquals(stage.game, gamePanelLayout(1100f, 744f, 1f, controlsVisible = false).game)
+    }
+
+    @Test fun sharedSideLayoutUsesAndroidsGameAndControlsExclusions() {
+        for (window in listOf(false, true)) for (docked in listOf(false, true)) for (open in listOf(false, true)) {
+            val state = SidePanelState(enabled = true, open = open, window = window, docked = docked, widthFraction = .4f)
+            val stage = gamePanelLayout(1200f, 700f, 1f, sidePanel = state)
+            val native = state.arrange(1200)
+            assertEquals(1200f - native.controlsRightMargin, stage.area.right, 0f)
+            assertEquals((1200f - native.gameRightMargin) / 2, stage.game.center.x, .001f)
+            when {
+                !open -> assertNull(stage.companion)
+                window -> assertEquals(androidx.compose.ui.geometry.Rect(0f, 0f, 1200f, 700f), stage.companion)
+                else -> assertEquals(720f, stage.companion!!.left, 0f)
+            }
+        }
+    }
+
+    @Test fun foldedBookReservesTheHingeBetweenGameAndCompanion() {
+        val state = SidePanelState().withEnabled(true).withBook(570..630)
+        val stage = gamePanelLayout(1200f, 700f, 1f, sidePanel = state)
+        assertEquals(570f, stage.area.right, 0f)
+        assertTrue(stage.game.right <= 570)
+        assertEquals(630f, stage.companion!!.left, 0f)
+        val tallBook = gamePanelLayout(700f, 1200f, 1f, sidePanel = state.withBook(330..370))
+        assertFalse(tallBook.portrait)
+        assertEquals(330f, tallBook.area.right, 0f)
+        assertTrue(tallBook.game.right <= 330)
+        assertEquals(370f, tallBook.companion!!.left, 0f)
+    }
+
+    @Test fun sharedPortraitLayoutRespectsSavedSizeAndHiddenChoice() {
+        val small = gamePanelLayout(400f, 1000f, 1f, portraitRatio = .6f)
+        val large = gamePanelLayout(400f, 1000f, 1f, portraitRatio = 1.2f)
+        assertTrue(small.companion!!.height < large.companion!!.height)
+        val hidden = gamePanelLayout(400f, 1000f, 1f, portraitHidden = true, style = TouchControlsStyle())
+        assertNull(hidden.companion)
+        assertTrue(hidden.game.height > 0)
+        assertEquals(1000f, hidden.area.bottom, 0f)
     }
 }

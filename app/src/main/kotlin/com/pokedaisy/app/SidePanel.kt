@@ -6,6 +6,8 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import com.pokedaisy.app.companion.ui.CompanionBack
@@ -16,8 +18,8 @@ import com.pokedaisy.app.companion.ui.SidePanelCloseTab
 import com.pokedaisy.app.companion.ui.SidePanelHandle
 import com.pokedaisy.app.companion.ui.SidePanelHost
 import com.pokedaisy.app.companion.ui.SidePanelOpenTab
+import com.pokedaisy.app.companion.ui.SidePanelState
 import com.pokedaisy.app.companion.ui.COMPACT_TEXT_INCHES
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -70,67 +72,42 @@ class SidePanel(
 ) {
     private val context: Context get() = root.context
 
+    private var state by mutableStateOf(SidePanelState(
+        window = prefs.companionWindow, docked = prefs.sidePanelDocked,
+        widthFraction = prefs.sidePanelWidth.coerceIn(SidePanelState.MIN_FRACTION, SidePanelState.MAX_FRACTION),
+    ))
     /** No second screen: the companion lives here. */
-    var enabled = false
-        private set
-    private var open = false
-    private val docked = mutableStateOf(prefs.sidePanelDocked)
-    /** The window on a tall screen ([COMPACT_TEXT_INCHES]): the companion's main text a step smaller (Compose state, set
-     * in [apply]). Not the side panel: its [sidePanelDensity] already sets its text smaller than the window's. */
+    val enabled: Boolean get() = state.enabled
+    private val open: Boolean get() = state.open
+    private val isWindow: Boolean get() = state.isWindow
+    private val isDocked: Boolean get() = state.isDocked
+    /** The window on a tall screen: its companion text is a step smaller. */
     private val compactText = mutableStateOf(false)
-
-    /** A window in the middle rather than the side panel (Compose state: the panel's content draws it). */
-    private val window = mutableStateOf(prefs.companionWindow)
-    private var fraction = prefs.sidePanelWidth.coerceIn(MIN_FRACTION, MAX_FRACTION)
-
-    /** On and closed: a tap could open it (the FIELD HUD's button for it shows then). Compose state. */
+    /** On and closed: the FIELD HUD can offer its companion button. */
     val closed = mutableStateOf(false)
-
-    /** SETTINGS > COMPANION VIEW is WINDOW (Compose state): the HUD keeps its COMPANION button while the window is up. */
     val windowMode: Boolean get() = isWindow
 
-    /**
-     * The companion fills the screen (Compose state): the game's screen of a two-screen device whose companion was closed
-     * while swapped - the companion's own screen-sized look, as a window (its keys, B / START / the X close it) whatever
-     * COMPANION VIEW says.
-     */
-    private val fullScreen = mutableStateOf(false)
-
-    /**
-     * Book mode: where a foldable's hinge runs down the screen (px, left to right of it, in the root's coordinates), or
-     * null. See the class comment.
-     */
+    /** A foldable's right page, in stage coordinates; it overrides the saved window and docking choices. */
     var book: IntRange?
-        // Compose state: the panel's content reads [isWindow].
-        get() = bookState.value
+        get() = state.book
         set(v) {
-            if (bookState.value == v) return
-            bookState.value = v
-            if (enabled) {
-                open = v != null || (!isWindow && isDocked)
-                apply()
-            }
+            val next = state.withBook(v)
+            if (next == state) return
+            state = next
+            if (enabled) apply()
         }
 
-    private val bookState = mutableStateOf<IntRange?>(null)
-
-    /** Opens as a window: COMPANION VIEW's WINDOW, or [fullScreen]; never in book mode. */
-    private val isWindow: Boolean get() = (window.value || fullScreen.value) && book == null
-
-    /** Locked beside the game (the lock tab's, or book mode's). */
-    private val isDocked: Boolean get() = docked.value || book != null
-
     fun setFullScreen(on: Boolean) {
-        if (fullScreen.value == on) return
-        fullScreen.value = on
-        if (enabled) { open = book != null || (!isWindow && isDocked); apply() }
+        val next = state.withFullScreen(on)
+        if (next == state) return
+        state = next
+        if (enabled) apply()
     }
 
-    /** Over the game where a touch could land on it: the window, or a panel slid in unlocked (a locked one sits beside
-     * the game, the touch controls moved clear of it). TouchInputWindows step aside meanwhile. */
-    val overGame: Boolean get() = enabled && open && (isWindow || !isDocked)
+    /** Native input windows step aside while the companion lies over the game. */
+    val overGame: Boolean get() = state.overGame
 
-    /** The window is up: the game's buttons are the companion's ([menuKey]). */
+    /** Last state reported to the native window/input host. */
     var windowOpen = false
         private set
 
@@ -169,7 +146,7 @@ class SidePanel(
 
     private val rootWidth get() = root.width.takeIf { it > 0 } ?: context.resources.displayMetrics.widthPixels
     private val rootHeight get() = root.height.takeIf { it > 0 } ?: context.resources.displayMetrics.heightPixels
-    private val panelWidth get() = book?.let { (rootWidth - it.last).coerceAtLeast(0) } ?: (rootWidth * fraction).roundToInt()
+    private val panelWidth get() = state.arrange(rootWidth).panelWidth
 
     private val relayout = View.OnLayoutChangeListener { _, l, _, r, _, _, _, _, _ ->
         if (r - l != lastRootWidth) {
@@ -181,11 +158,8 @@ class SidePanel(
     /** On with no second screen, off when one shows up (the companion moves there). */
     fun setEnabled(on: Boolean) {
         if (on == enabled) return
-        enabled = on
+        state = state.withEnabled(on, window = prefs.companionWindow, docked = prefs.sidePanelDocked)
         if (on) {
-            docked.value = prefs.sidePanelDocked
-            window.value = prefs.companionWindow
-            open = book != null || (!isWindow && isDocked)
             outside = View(context).apply { setOnTouchListener { _, e -> catchOutside(e) } }
                 .also { root.addView(it, root.indexOfChild(under) + 1, FrameLayout.LayoutParams(-1, -1)) }
             val at = root.indexOfChild(under) + 2
@@ -193,7 +167,7 @@ class SidePanel(
                 setContent {
                     CompositionLocalProvider(LocalClickSound provides clickSound) {
                         SidePanelHost(
-                            isWindow, fullScreen = fullScreen.value, onClose = ::hide, keys = keys, focusKeys = ::focusKey, compactText = compactText.value,
+                            isWindow, fullScreen = state.fullScreen, onClose = ::hide, keys = keys, focusKeys = ::focusKey, compactText = compactText.value,
                             content = companion,
                         )
                     }
@@ -203,7 +177,7 @@ class SidePanel(
                 addView(CompanionColors.track(ComposeView(context)).apply {
                     setContent {
                         CompositionLocalProvider(LocalClickSound provides clickSound) {
-                            SidePanelHandle(docked.value, ::toggleDock)
+                            SidePanelHandle(state.docked, ::toggleDock)
                         }
                     }
                 })
@@ -231,7 +205,6 @@ class SidePanel(
             handle = null
             closeTab = null
             openTab = null
-            open = false
         }
         apply()
     }
@@ -279,8 +252,8 @@ class SidePanel(
 
     /** SETTINGS > COMPANION VIEW: the window or the side panel, at once (the companion asking stays open). */
     fun setWindow(on: Boolean) {
-        if (window.value == on) return
-        window.value = on
+        if (state.window == on) return
+        state = state.copy(window = on)
         apply()
     }
 
@@ -307,8 +280,9 @@ class SidePanel(
     fun openPanel() = show()
 
     private fun show() {
-        if (open) return
-        open = true
+        val next = state.show()
+        if (next == state) return
+        state = next
         apply()
         if (isWindow) {
             panel?.let { v ->
@@ -328,8 +302,9 @@ class SidePanel(
     }
 
     private fun hide() {
-        if (!open || book != null) return
-        open = false
+        val next = state.hide()
+        if (next == state) return
+        state = next
         if (isWindow) {
             // The buttons are the game's again now; the window fades out over it. Its focus goes: the next opening
             // starts from the cursor, and nothing in it stays lit.
@@ -361,14 +336,14 @@ class SidePanel(
     }
 
     private fun toggleDock() {
-        docked.value = !docked.value
-        prefs.sidePanelDocked = docked.value
+        state = state.copy(docked = !state.docked)
+        prefs.sidePanelDocked = state.docked
         apply()
     }
 
     /** Tells [onWindow] when the window comes up or goes away. */
     private fun syncWindow() {
-        val up = enabled && open && isWindow
+        val up = state.windowOpen
         if (up == windowOpen) return
         windowOpen = up
         onWindow(up)
@@ -385,12 +360,13 @@ class SidePanel(
     private fun apply() {
         syncWindow()
         compactText.value = isWindow && screenHeightInches() >= COMPACT_TEXT_INCHES
-        val w = panelWidth
-        val shown = enabled && open
+        val arrangement = state.arrange(rootWidth)
+        val w = arrangement.panelWidth
+        val shown = state.shown
         val win = isWindow
         // The window: the panel's view is the whole screen (its dim), the companion drawn in the middle, no tabs.
-        val side = shown && !win
-        val tabs = side && book == null
+        val side = state.sideShown
+        val tabs = state.tabsShown
         outside?.visibility = if (side && !isDocked) View.VISIBLE else View.GONE
         panel?.apply {
             visibility = if (shown) View.VISIBLE else View.GONE
@@ -406,13 +382,13 @@ class SidePanel(
         closeTab?.apply {
             visibility = if (tabs) View.VISIBLE else View.GONE
             translationX = 0f
-            alpha = if (docked.value) LOCKED_TAB_ALPHA else 1f
+            alpha = if (state.docked) LOCKED_TAB_ALPHA else 1f
             setRightMargin(this, w)
         }
-        closed.value = enabled && !open
+        closed.value = state.closed
         openTab?.apply {
             visibility = if (enabled && !open && !tabInHud && openTabShown && book == null) View.VISIBLE else View.GONE
-            alpha = if (docked.value && !win) LOCKED_TAB_ALPHA else 1f
+            alpha = if (state.docked && !win) LOCKED_TAB_ALPHA else 1f
             val lp = layoutParams as FrameLayout.LayoutParams
             val gravity = Gravity.END or if (tabRaised) Gravity.TOP else Gravity.BOTTOM
             if (lp.gravity != gravity) {
@@ -423,10 +399,8 @@ class SidePanel(
                 layoutParams = lp
             }
         }
-        // Book mode: the game's page ends at the hinge, not at the companion's edge.
-        val gameEdge = book?.let { (rootWidth - it.first).coerceAtLeast(0) } ?: w
-        setRightMargin(game, if (side && isDocked) gameEdge else 0)
-        setRightMargin(touchControls, if (side) gameEdge else 0)
+        setRightMargin(game, arrangement.gameRightMargin)
+        setRightMargin(touchControls, arrangement.controlsRightMargin)
     }
 
     private fun setRightMargin(v: View, margin: Int) {
@@ -446,34 +420,23 @@ class SidePanel(
 
     private fun onDrag(dx: Float) {
         if (book != null) return
-        fraction = ((dragStartWidth - dx) / rootWidth).coerceIn(MIN_FRACTION, MAX_FRACTION)
+        state = state.resized(dragStartWidth, dx, rootWidth)
         apply()
     }
 
     private fun onDragEnd() {
         if (book != null) return
-        // A game area within a few pixels of a whole-number scale snaps to it (half a 1080p
-        // screen is exactly 4x already).
-        val area = rootWidth - panelWidth
-        val n = (area / GBA_W.toFloat()).roundToInt()
-        if (n >= 1 && GBA_H * n <= rootHeight && abs(GBA_W * n - area) <= SNAP_PX) {
-            fraction = ((rootWidth - GBA_W * n).toFloat() / rootWidth).coerceIn(MIN_FRACTION, MAX_FRACTION)
-        }
-        prefs.sidePanelWidth = fraction
+        state = state.snapped(rootWidth, rootHeight)
+        prefs.sidePanelWidth = state.widthFraction
         apply()
     }
 
     private companion object {
-        const val MIN_FRACTION = 0.3f
-        const val MAX_FRACTION = 0.75f
         const val HANDLE_TOP_DP = 12
         const val TAB_MARGIN_DP = 12
         /** The open / close tabs while the panel is locked: there, but out of the way. */
         const val LOCKED_TAB_ALPHA = 0.35f
         const val SLIDE_MS = 160L
         const val FADE_MS = 120L
-        const val GBA_W = 240
-        const val GBA_H = 160
-        const val SNAP_PX = 48
     }
 }
