@@ -71,5 +71,5 @@ internal fun batteryBitmap(percent: Int): List<String> {
         val ny = y + dy
         if (nx < w && ny < h && g[ny][nx] == '.') g[ny][nx] = 's'
     }
-    return g.map { String(it) }
+    return g.map { it.concatToString() }
 }

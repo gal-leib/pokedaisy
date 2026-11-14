@@ -362,7 +362,7 @@ internal fun BoxSwapAnimation(anim: BoxSwapAnim, dex: PokedexTables?, onDone: ()
                     for (k in 3 downTo 0) {
                         val back = (e - k * 0.05f).coerceAtLeast(0f)
                         val alpha = if (k == 0) 1f else 0.5f / k
-                        val arc = kotlin.math.sin(Math.PI.toFloat() * back)
+                        val arc = kotlin.math.sin(kotlin.math.PI.toFloat() * back)
                         val twinkle = k == 0 && (t / 80) % 2 == 0L
                         if (out) swapSpark(snap(lx + (rx - lx) * back), snap(cy + outLift * arc), p, alpha, twinkle)
                         if (into) swapSpark(snap(rx + (lx - rx) * back), snap(cy + inLift * arc), p, alpha, if (out) !twinkle && k == 0 else twinkle)

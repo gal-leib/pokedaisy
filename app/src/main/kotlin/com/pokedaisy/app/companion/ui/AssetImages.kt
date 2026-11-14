@@ -24,7 +24,7 @@ import com.pokedaisy.app.companion.data.UnboundIconSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.pokedaisy.app.companion.data.readBytes
-import okio.Path.Companion.toOkioPath
+import kotlinx.coroutines.IO
 
 /**
  * Art images by path, decoded once: what [RomArt] rebuilt from a ROM the

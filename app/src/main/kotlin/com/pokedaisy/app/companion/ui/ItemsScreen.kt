@@ -880,7 +880,7 @@ fun ItemsScreen(
     // repeated key.
     val keys = remember(sorted) {
         val seen = HashMap<Int, Int>()
-        sorted.map { "${it.itemId}#${seen.merge(it.itemId, 1, Int::plus)!! - 1}" }
+        sorted.map { val n = seen[it.itemId] ?: 0; seen[it.itemId] = n + 1; "${it.itemId}#$n" }
     }
 
     // Keep the tapped row on screen once the window shrinks for the

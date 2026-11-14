@@ -3633,6 +3633,19 @@ For focused JVM tests, use `make test-quick MODULE=shared T='*RomFilesTest'` (`M
 A filter must match a test in that module; unfiltered `make test-quick` still runs both modules.
 ui-preview still compiles the same files straight into its desktop build.
 
+### The companion's screens for iOS (`shared-ui/`)
+
+`shared-ui/` compiles the companion's screens for iOS the same way, where they live: `companion/ui`, the
+`companion/*.kt` settings and state beside them, the co-op screens' model (`companion/coop`, without the transport and
+session files, which are Android / JVM only: sockets, Android NSD, Bouncy Castle, OkHttp), the manual reader
+(`DocsApi.kt`, `DocsSearch.kt`), `cheats/Cheats.kt` and the controls' bindings (`GbaControls.kt`, `Hotkeys.kt`), against
+`:shared` and Compose Multiplatform 1.7. It has iOS targets only: the Android app still compiles these files itself, and
+ui-preview too. The same rule holds there (no `java.*` / `android.*`); what only the platform can do comes in through a
+host set at start, as `EmulatorCore` does for the data code: `FontSource` (fonts), `PictureCodec` (images), `ThemeStore`,
+`DocsSources`, `CheatParser` (mGBA's code check), `DeviceDates` (the device's date format). A new host is set in
+`PokeDaisyApp`, ui-preview's `installPreviewHosts` and the screenshot tests' `installTestHosts`. CI's "Companion screens
+for iOS" job runs `./gradlew :shared-ui:compileKotlinIosArm64 :shared-ui:compileKotlinIosSimulatorArm64` (advisory for now).
+
 ## ScreenScraper and the dual-screen launcher
 
 Game media (box art, screenshots, title screens, wheel logos, fanart, cartridges, videos and the facts: synopsis,

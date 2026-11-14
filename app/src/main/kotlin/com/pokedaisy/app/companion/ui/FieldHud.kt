@@ -107,6 +107,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.IO
 
 /*
  * FIELD HUD (SETTINGS > HUD, on by default): a modern game's heads-up display over the overworld - the party
