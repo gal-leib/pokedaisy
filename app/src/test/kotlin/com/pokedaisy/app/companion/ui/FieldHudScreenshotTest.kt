@@ -73,7 +73,7 @@ import okio.Path.Companion.toOkioPath
  *     ./gradlew :app:recordPaparazziDebug --tests '*FieldHudScreenshotTest'
  */
 class FieldHudScreenshotTest {
-    @Before fun fonts() = installTestFonts(paparazzi.context)
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(
@@ -450,7 +450,7 @@ private fun GameFrame(name: String, expand: Boolean) {
  *     ./gradlew :app:recordPaparazziDebug --tests '*FieldHudCloseUpScreenshotTest'
  */
 class FieldHudCloseUpScreenshotTest {
-    @Before fun fonts() = installTestFonts(paparazzi.context)
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(
