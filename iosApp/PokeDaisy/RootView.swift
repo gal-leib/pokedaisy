@@ -8,6 +8,8 @@ import PokeDaisyUI
 struct RootView: View {
     @State private var playing: String?
     @State private var failed: String?
+    /** Bumped by RESTART GAME, so the game's view (and the game) is made again. */
+    @State private var restarts = 0
     /// The proof of concept's UIKit buttons in place of the app's own, to time the two against each other.
     @AppStorage("native_touch_controls") private var nativeControls = false
 
@@ -26,6 +28,11 @@ struct RootView: View {
             }
         }
         .background(Color.black)
+        .onAppear {
+            // The companion's SETTINGS > CLOSE GAME / RESTART GAME.
+            PokeDaisyHost.shared.onCloseRequested = { stop() }
+            PokeDaisyHost.shared.onRestartRequested = { restarts += 1 }
+        }
     }
 
     @ViewBuilder private var gameColumn: some View {
@@ -54,7 +61,7 @@ struct RootView: View {
                     }
                 })
             })
-            .id(rom)
+            .id("\(rom)#\(restarts)")
             HStack(spacing: 0) {
                 chip("GAMES", action: stop)
                 chip(nativeControls ? "TOUCH: NATIVE" : "TOUCH: SHARED") {
