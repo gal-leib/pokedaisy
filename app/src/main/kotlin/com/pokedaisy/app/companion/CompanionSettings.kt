@@ -17,6 +17,8 @@ import com.pokedaisy.app.companion.i18n.tk
  * ([keyCapture]) and the game's screen asks for the keys while a row here waits.
  */
 interface CompanionSettings {
+    /** Application settings can use the shared pages without a running game or game-only actions. */
+    val hasRunningGame: Boolean get() = true
     /** Optional NEW tag when a host first gains state slots. */
     val statesBadge: String? get() = null
 

@@ -328,22 +328,9 @@ class SettingsActivity : ComponentActivity() {
             Column(Modifier.weight(1f).fillMaxHeight()) {
             Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp)) {
                 if (tab && screen == Screen.HOME) LibraryLook { nm, _ ->
-                    // The library's header in place of HOME's SETTINGS title, as on GAMES and TOOLS.
-                    OptionTitleWindow(
-                        // One button beside it: the name always fits (the games' header drops it on a phone held upright).
-                        "POKéDAISY",
-                        nm,
-                        leading = { com.pokedaisy.app.companion.ui.PixelArt(com.pokedaisy.app.companion.ui.LOGO_ROWS, com.pokedaisy.app.companion.ui.LOGO_PALETTE, Modifier.size(nm.lineHeight)) },
-                    ) {
-                        Spacer(Modifier.width(nm.u * 4))
-                        com.pokedaisy.app.companion.ui.OptionButton(
-                            null, nm, onClick = { screen = Screen.HELP },
-                            icon = Icons.AutoMirrored.Filled.HelpOutline, contentDescription = tr("Help"),
-                        )
-                    }
-                    Spacer(Modifier.height(nm.u * 8))
+                    com.pokedaisy.app.companion.ui.AppPageTitle(tk("SETTINGS"), nm, home = true, onHelp = { screen = Screen.HELP })
                 } else {
-                OptionTitleWindow(
+                com.pokedaisy.app.companion.ui.AppPageTitle(
                     title = when (screen) {
                         Screen.HOME -> tk("SETTINGS")
                         Screen.SPEED -> tk("SPEED OPTIONS")
@@ -379,7 +366,6 @@ class SettingsActivity : ComponentActivity() {
                         goBack()
                     },
                 )
-                Spacer(Modifier.height(m.u * 4))
                 }
                 when (screen) {
                     Screen.HOME -> HomeScreen(m)
@@ -1330,40 +1316,7 @@ class SettingsActivity : ComponentActivity() {
 
     /** Version, author, Buy Me a Coffee, the Discord and the repo, under the settings list. */
     @Composable
-    private fun AboutFooter(m: GbaTextMetrics) {
-        val small = rememberGbaTextMetrics(textScale = 1f)
-        OptionListWindow(m, Modifier.fillMaxWidth()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = m.u * 8, vertical = m.u * 3),
-            ) {
-                GbaText(
-                    tr("POKéDAISY {0}  ·  by {1}", BuildConfig.VERSION_NAME, "Lidor Itzhari (@lidor30)"),
-                    OptionColors.label, OptionColors.labelShadow, small, modifier = Modifier.weight(1f),
-                )
-                FooterLink(tr("Buy me a coffee"), m, small, Modifier.padding(start = m.u * 6), { CoffeeCup() }) {
-                    openUrl(COFFEE_URL)
-                }
-                GbaText("  ·  ", OptionColors.label, OptionColors.labelShadow, small)
-                FooterLink("Discord", m, small, icon = { DiscordMark() }) { openUrl(Discord.URL) }
-                GbaText("  ·  ", OptionColors.label, OptionColors.labelShadow, small)
-                FooterLink("GitHub", m, small, icon = { GitHubMark() }) { openUrl(REPO_URL) }
-            }
-        }
-    }
-
-    /** A pixel [icon] then [text] in the value red, the whole of it one tap target. */
-    @Composable
-    private fun FooterLink(
-        text: String, m: GbaTextMetrics, small: GbaTextMetrics, modifier: Modifier = Modifier,
-        icon: @Composable () -> Unit, onClick: () -> Unit,
-    ) {
-        Row(modifier.clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(small.lineHeight)) { icon() }
-            Spacer(Modifier.width(m.u * 3))
-            GbaText(text, OptionColors.value, OptionColors.valueShadow, small)
-        }
-    }
+    private fun AboutFooter(m: GbaTextMetrics) = com.pokedaisy.app.companion.ui.AppAboutFooter(BuildConfig.VERSION_NAME, m, ::openUrl)
 
     private fun openUrl(url: String) {
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
@@ -2305,7 +2258,7 @@ class SettingsActivity : ComponentActivity() {
     companion object {
         private val FOLDER_PAGES = setOf(Screen.ROMS_FOLDERS, Screen.SAVES_FOLDER, Screen.SAVE_SEARCH, Screen.STATES_FOLDER, Screen.BACKUPS)
         val RATES = floatArrayOf(0f, 1.5f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)
-        const val REPO_URL = "https://github.com/lidor30/pokedaisy"
+        const val REPO_URL = com.pokedaisy.app.companion.ui.AppLinks.REPO_URL
         /** A ROM path: open straight on that game's CHEATS (its library menu). */
         const val EXTRA_CHEATS_ROM = "cheats_rom"
         /** Opens one page alone ([SCREEN_HELP]: the manual); BACK finishes. */
@@ -2347,7 +2300,7 @@ class SettingsActivity : ComponentActivity() {
                 tr("{0} were already in the list.", r.duplicates).takeIf { r.duplicates > 0 },
             ).joinToString(" ")
         }
-        const val COFFEE_URL = "https://buymeacoffee.com/lidor30g"
+        const val COFFEE_URL = com.pokedaisy.app.companion.ui.AppLinks.COFFEE_URL
 
         fun rateLabel(v: Float) = if (v <= 0f) tk("INFINITE") else if (v % 1f == 0f) "${v.toInt()}×" else "$v×"
 

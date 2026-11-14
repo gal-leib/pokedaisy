@@ -3953,3 +3953,11 @@ and their existing UP-to-header focus behavior.
 Android retains its setup state, pickers and optional media services; the shared pages receive portable display models
 and callbacks. Hosts that copy picked games rather than linking folders can select that capability without presenting
 Android permission instructions. The settings host retains focus ownership and row actions while sharing the presenter.
+
+`LibraryScreen` is the shared presenter as well as the widgets: its display model, actions and focus record drive the
+header, quick views, empty states, search strip and collection. Hosts supply data and card/menu callbacks. App-settings
+title chrome and the about footer are shared too. Application-mode settings use the companion's page catalog and
+searchable home; hosts can omit game-only controls when no core is open.
+
+GamePanelLayout measures a one-window game host and the standalone touch editor's preview. LibraryPreferences stores
+portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.

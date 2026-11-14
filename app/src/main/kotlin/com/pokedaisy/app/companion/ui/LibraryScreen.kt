@@ -16,6 +16,14 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.GridView
+import com.pokedaisy.app.companion.data.LibraryView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.VideogameAsset
@@ -28,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
@@ -266,7 +275,7 @@ fun LibraryCover(bitmap: ImageBitmap?, category: RomCategory?, m: GbaTextMetrics
 fun LibraryFrame(
     section: LibrarySection, m: GbaTextMetrics, small: GbaTextMetrics,
     onSection: (LibrarySection) -> Unit, modifier: Modifier = Modifier,
-    toolsBadge: Boolean = false, compactTitle: Boolean = false, headerGap: Dp = m.u * 8,
+    toolsBadge: Boolean = false, compactTitle: Boolean = false, headerGap: Dp = m.u * 8, showHeader: Boolean = true,
     header: @Composable RowScope.() -> Unit,
     overlays: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
@@ -277,10 +286,12 @@ fun LibraryFrame(
         Row(Modifier.fillMaxSize()) {
             if (wide) LibraryNav(section, vertical = true, m, small, toolsBadge = toolsBadge, top = 16.dp, onPick = onSection)
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                OptionTitleWindow(if (compactTitle) "" else "POKéDAISY", m,
-                    Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
-                    leading = { PixelArt(LOGO_ROWS, LOGO_PALETTE, Modifier.size(m.lineHeight)) }, actions = header)
-                Spacer(Modifier.height(headerGap))
+                if (showHeader) {
+                    OptionTitleWindow(if (compactTitle) "" else "POKéDAISY", m,
+                        Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                        leading = { PixelArt(LOGO_ROWS, LOGO_PALETTE, Modifier.size(m.lineHeight)) }, actions = header)
+                    Spacer(Modifier.height(headerGap))
+                }
                 content()
                 if (!wide) LibraryNav(section, vertical = false, m, small, toolsBadge = toolsBadge, onPick = onSection)
             }
@@ -396,5 +407,123 @@ fun <T> LibraryCollection(
                 item(game) { headerUp().takeIf { index == 0 } }
             }
         }
+    }
+}
+
+/** Display state for one library screen, independent of each host's file and preference types. */
+data class LibraryPresentation<T>(
+    val games: List<T>, val grid: Boolean, val section: LibrarySection,
+    val views: List<LibraryView>, val view: LibraryView, val counts: Map<LibraryView, Int>,
+    val hasCatalog: Boolean, val query: String, val emptyText: String,
+    val tools: List<LibraryTool> = emptyList(),
+)
+
+class LibraryActions(
+    val add: () -> Unit, val refresh: () -> Unit, val search: () -> Unit, val sort: () -> Unit,
+    val toggleGrid: () -> Unit, val help: () -> Unit, val query: (String) -> Unit,
+    val view: (LibraryView) -> Unit, val section: (LibrarySection) -> Unit,
+)
+
+class LibraryFocus(val header: FocusRequester = FocusRequester(), val views: FocusRequester = FocusRequester()) {
+    var headerAttached = false
+    var viewsAttached = false
+    val up get() = views.takeIf { viewsAttached } ?: header.takeIf { headerAttached }
+}
+
+/** One library screen on every platform. Hosts supply data, supported actions, native settings and card callbacks. */
+@Composable
+fun <T> LibraryScreen(
+    state: LibraryPresentation<T>, actions: LibraryActions, m: GbaTextMetrics, small: GbaTextMetrics,
+    key: (T) -> String, modifier: Modifier = Modifier, focus: LibraryFocus = remember { LibraryFocus() },
+    overlays: @Composable () -> Unit = {}, settings: @Composable ColumnScope.() -> Unit = {},
+    item: @Composable (T, () -> FocusRequester?) -> Unit,
+) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val compact = maxWidth < 600.dp
+        val toolsOpen = state.section == LibrarySection.TOOLS
+        LibraryFrame(state.section, m, small, actions.section,
+            toolsBadge = state.tools.any { it.newBadge != null } && !toolsOpen, showHeader = state.section != LibrarySection.SETTINGS,
+            compactTitle = compact && !toolsOpen && state.section == LibrarySection.GAMES,
+            headerGap = m.u * if (state.hasCatalog || state.section != LibrarySection.GAMES) 8 else 4,
+            header = {
+                if (state.section == LibrarySection.GAMES) {
+                    LibraryHeaderIcon(Icons.AutoMirrored.Filled.Sort, tr("Sort"), m,
+                        Modifier.focusRequester(focus.header), compact = compact, onClick = actions.sort)
+                    DisposableEffect(focus) { focus.headerAttached = true; onDispose { focus.headerAttached = false } }
+                    LibraryHeaderIcon(Icons.Filled.Search, tr("SEARCH"), m, compact = compact, onClick = actions.search)
+                    LibraryHeaderIcon(if (state.grid) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                        tr("Toggle view"), m, compact = compact, onClick = actions.toggleGrid)
+                    LibraryHeaderIcon(Icons.Filled.Add, tr("Add games"), m, compact = compact, onClick = actions.add)
+                    LibraryHeaderIcon(Icons.Filled.Refresh, tr("Refresh"), m, compact = compact, onClick = actions.refresh)
+                }
+                LibraryHeaderIcon(Icons.AutoMirrored.Filled.HelpOutline, tr("Help"), m, compact = compact, onClick = actions.help)
+            }, overlays = overlays,
+        ) {
+            when (state.section) {
+                LibrarySection.SETTINGS -> settings()
+                LibrarySection.TOOLS -> ToolsPage(state.tools, m, small,
+                    PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp), Modifier.weight(1f))
+                LibrarySection.GAMES -> {
+                    LibrarySearchStrip(state.query, m, actions.search, actions.query)
+                    if (state.hasCatalog) {
+                        QuickViewPills(state.views, state.view, state.counts, m, small, actions.view,
+                            contentPadding = PaddingValues(horizontal = 16.dp), focusRequester = focus.views)
+                        DisposableEffect(focus) { focus.viewsAttached = true; onDispose { focus.viewsAttached = false } }
+                        Spacer(Modifier.height(m.u * 8))
+                    }
+                    if (state.games.isEmpty()) {
+                        OptionListWindow(m, Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                            GbaText(if (state.hasCatalog) libraryEmptyViewText(state.view)
+                                else if (state.query.isNotBlank()) tr("No games match your search.") else state.emptyText,
+                                OptionColors.label, OptionColors.labelShadow, small, maxLines = Int.MAX_VALUE,
+                                modifier = Modifier.padding(m.u * 4))
+                        }
+                    } else androidx.compose.runtime.key(state.view) {
+                        LibraryCollection(state.games, state.grid, m, key, Modifier.weight(1f), headerUp = { focus.up }, item = item)
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun libraryEmptyViewText(view: LibraryView) =
+    if (view == LibraryView.FAVORITES) tr("No favorites yet. Long press a game and pick FAVORITE to keep it here.")
+    else tr("No games played yet. The games you play show here, the last one first.")
+
+@Composable
+fun LibrarySearchDialog(query: String, onQuery: (String) -> Unit, m: GbaTextMetrics, small: GbaTextMetrics, onDismiss: () -> Unit) {
+    val focus = remember { FocusRequester() }
+    // A text field taking the focus brings the keyboard up by itself.
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    OptionOverlay(onDismiss, Modifier.widthIn(max = 520.dp)) {
+        Column {
+            OptionTitleWindow(tr("SEARCH"), m)
+            Spacer(Modifier.height(m.u * 4))
+            OptionListWindow(m, Modifier.fillMaxWidth()) {
+                Column {
+                    OptionTextField(
+                        query, onQuery, small,
+                        Modifier.padding(horizontal = m.u * 8, vertical = m.u * 2).focusRequester(focus),
+                        placeholder = tr("SEARCH GAMES"), leadingIcon = com.pokedaisy.app.companion.ui.PixelIcons.search,
+                    )
+                    OptionLine(tr("CLEAR"), null, selected = false, m, height = m.rowHeight * 1.3f) { onQuery(""); onDismiss() }
+                    OptionLine(tr("DONE"), null, selected = true, m, height = m.rowHeight * 1.3f, onClick = onDismiss)
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun LibrarySearchStrip(query: String, m: GbaTextMetrics, onSearch: () -> Unit, onQuery: (String) -> Unit) {
+    if (query.isBlank()) return
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = m.u * 4),
+        horizontalArrangement = Arrangement.spacedBy(m.u * 4),
+    ) {
+        OptionButton(tr("SEARCH") + ": " + query, m, modifier = Modifier.weight(1f, fill = false), onClick = onSearch)
+        OptionButton(tr("CLEAR"), m, onClick = { onQuery("") })
     }
 }

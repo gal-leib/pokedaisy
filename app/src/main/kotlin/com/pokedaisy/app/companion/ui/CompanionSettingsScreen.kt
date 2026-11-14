@@ -92,11 +92,16 @@ fun CompanionSettingsScreen(
     /** A ROM the app doesn't know: the game it's read as (BEST EFFORT), a GAME row at the top; [onPlaysAs] opens the picker. */
     playsAs: String? = null,
     onPlaysAs: () -> Unit = {},
+    /** The application uses the same page catalog with its searchable home and library header. */
+    application: Boolean = false,
+    homeExtras: List<SettingRow> = emptyList(),
+    applicationFooter: @Composable () -> Unit = {},
 ) {
     val m = rememberGbaTextMetrics()
     var page by ui::page
     // Settings aren't Compose state: bump this after each change to redraw the values.
     var tick by remember { mutableStateOf(0) }
+    var appSearch by remember { mutableStateOf("") }
     // HOME starts with a group title, so its first row is index 1. HOME's cursor and
     // scroll outlive its sub-pages: coming back lands on the row that opened one.
     var homeCursor by ui::homeCursor
@@ -127,11 +132,15 @@ fun CompanionSettingsScreen(
                 statusBarShown -> null
                 else -> gameName.ifEmpty { null }
             }
-            if (!(statusBarShown && page == Page.HOME)) {
+            if (application) {
+                AppPageTitle(page.title, m, home = page == Page.HOME,
+                    onBack = if (page != Page.HOME) ({ if (page != Page.HELP || !ui.docs.back()) page = page.parent }) else null,
+                    onHelp = { page = Page.HELP })
+            } else if (!(statusBarShown && page == Page.HOME)) {
                 // A sub-page's arrow (and BACK, through it) returns to the options.
                 val titleM = rememberGbaTextMetrics()
                 OptionTitleWindow(page.title, titleM, trailing = trailing, onBack = if (page != Page.HOME) ({ if (page != Page.HELP || !ui.docs.back()) page = page.parent }) else null) {
-                    if (!statusBarShown) {
+                    if (!statusBarShown && !application) {
                         Spacer(Modifier.width(titleM.u * 8))
                         BatteryIndicator(titleM)
                     }
@@ -159,7 +168,7 @@ fun CompanionSettingsScreen(
                     }.orEmpty() + homeRows(settings, barCount(settings, availableTabs), { tick++ }, { page = it }, { selector = it },
                         { c -> confirm = Confirm(c.title, c.message, c.confirmLabel, c.onConfirm).also { it.cancelLabel = c.cancelLabel; it.onCancel = c.onCancel } })
                         .let { if (settings.gameBlocked) withoutGameRows(it) else it }
-                        .let { rows -> settings.shownRows?.let { onlyRows(rows, it) } ?: rows }
+                        .let { rows -> settings.shownRows?.let { onlyRows(rows, it) } ?: rows } + homeExtras
                     Page.TABS -> COMPANION_TABS.map { id ->
                         val shown = id in settings.companionTabs
                         // A tab this game doesn't have (DEX, GUIDE) keeps its setting for the games that do.
@@ -280,7 +289,10 @@ fun CompanionSettingsScreen(
                 // HELP: the manual, read from the docs API (no search box: the bottom screen can't host a keyboard).
                 if (page == Page.HELP) {
                     val source = remember { DocsSources.get() }
-                    DocsReader(ui.docs, m, source, Modifier.fillMaxWidth().weight(1f), searchable = false)
+                    DocsReader(ui.docs, m, source, Modifier.fillMaxWidth().weight(1f), searchable = application)
+                } else if (application && page == Page.HOME) {
+                    AppSettingsHome(rows, m, appSearch, { appSearch = it },
+                        Modifier.fillMaxWidth().weight(1f), scroll = homeScroll, footer = applicationFooter)
                 } else if (page == Page.TOUCH && settings != null) {
                     // The preview beside / above the rows; it follows each change (tick).
                     @Suppress("UNUSED_EXPRESSION") tick
@@ -315,7 +327,7 @@ fun CompanionSettingsScreen(
                             labelWeight = when (page) { Page.TWEAKS -> 0.8f; Page.CHEATS -> 0.75f; else -> 0.58f }, reveal = reveal, onRevealed = { ui.revealRow = null },
                             onFocused = ::moveCursor, groupTabs = page == Page.HOME) {
                             // Actions, not settings: the list's last line, out of the way of the options.
-                            if (page == Page.HOME && settings != null) {
+                            if (page == Page.HOME && settings != null && settings.hasRunningGame) {
                                 // A summary-window line sets them apart from the last group.
                                 Separator(m, Modifier.fillMaxWidth().padding(start = m.u * 4, end = m.u * 4, top = m.u * 8))
                                 // Room around them, so they don't read as one more row of the list.
