@@ -43,9 +43,6 @@ import com.pokedaisy.app.companion.i18n.tr
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Initial docked companion width as a fraction of the window, shared by the one-window hosts. */
-const val SIDE_PANEL_DEFAULT_WIDTH = 0.5f
-
 /**
  * The companion on a single-screen device: a panel beside (or over) the game
  * instead of a second screen. The companion's layouts are made for the Thor's

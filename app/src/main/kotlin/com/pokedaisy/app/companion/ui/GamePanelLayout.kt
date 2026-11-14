@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
+import com.pokedaisy.app.companion.SIDE_PANEL_DEFAULT_WIDTH
 import com.pokedaisy.app.companion.TouchStage
 import kotlin.math.min
 import kotlin.math.roundToInt
