@@ -237,7 +237,7 @@ object CoopSession {
     private fun pairsOf(app: Context): CoopPairs {
         pairsStore?.let { return it }
         val tr = transportOf(app)
-        val p = CoopPairs(File(File(app.filesDir, "coop"), "pairs.json"))
+        val p = CoopPairs(File(File(app.filesDir, "coop"), "pairs.json").toOkioPath())
         pairsStore = p
         val l = CoopLinkImpl(tr, p, ownHello, clock, CoopBackoff())
         impl = l
