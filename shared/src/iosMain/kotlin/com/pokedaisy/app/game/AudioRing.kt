@@ -67,5 +67,5 @@ class AudioRing(val capacityFrames: Int) {
     }
 
     /** Frees the samples; nothing may use the ring after. */
-    fun free() = nativeHeap.free(samples)
+    fun free() = nativeHeap.free(samples.rawValue)
 }
