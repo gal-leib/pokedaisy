@@ -332,6 +332,10 @@ interface CompanionSettings {
 
     /** Whether a launch picks up where the game was left - see [Prefs.autoResume]; off, CLOSE GAME warns. */
     val autoResume: Boolean get() = true
+    /** Hosts with resume controls on the companion (Android keeps its control in library settings). */
+    val resumeGamesEditable: Boolean get() = false
+    val resumeBadge: String? get() = null
+    fun setAutoResume(on: Boolean) {}
 
     /** Stores a SETTINGS > TWEAKS switch ([com.pokedaisy.app.companion.ui.CompanionTweaks]) by its key. */
     fun setTweak(key: String, on: Boolean) {}

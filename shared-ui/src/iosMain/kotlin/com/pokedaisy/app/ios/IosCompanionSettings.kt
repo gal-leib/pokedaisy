@@ -33,13 +33,22 @@ internal class IosCompanionSettings(
     private val game: GameViewController,
     private val onClose: () -> Unit,
     private val onRestart: () -> Unit,
+    private val onDisableResume: () -> Boolean,
 ) : CompanionSettings {
     private val d = NSUserDefaults.standardUserDefaults
 
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
 
     override val shownRows: Set<String> = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES")
+
+    override val autoResume: Boolean get() = bool("auto_resume", true)
+    override val resumeGamesEditable = true
+    override val resumeBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_RESUME)
+    override fun setAutoResume(on: Boolean) {
+        if (on == autoResume) return
+        if (on || onDisableResume()) d.setBool(on, "auto_resume")
+    }
 
     override val showHints: Boolean get() = bool("show_hints", true)
     override fun setShowHints(on: Boolean) = d.setBool(on, "show_hints")

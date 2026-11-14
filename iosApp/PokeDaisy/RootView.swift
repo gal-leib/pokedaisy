@@ -43,7 +43,7 @@ struct RootView: View {
                     })
                 })
                 .id("\(rom)#\(restarts)")
-                Button("GAMES", action: stop)
+                Button("GAMES", action: { PokeDaisyHost.shared.requestCloseGame() })
                     .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .padding(8)
                     .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))

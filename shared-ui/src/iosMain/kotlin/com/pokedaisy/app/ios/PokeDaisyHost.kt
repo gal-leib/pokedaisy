@@ -13,6 +13,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.StateSlotController
 import com.pokedaisy.app.companion.data.StateFiles
+import com.pokedaisy.app.companion.data.StateResume
 import com.pokedaisy.app.companion.data.SnapshotCache
 import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.core.PkApiCore
@@ -29,6 +30,7 @@ import com.pokedaisy.app.game.GameViewController
 import com.pokedaisy.app.game.RomPicker
 import kotlinx.atomicfu.atomic
 import okio.FileSystem
+import okio.Path
 import okio.Path.Companion.toPath
 import okio.buffer
 import okio.use
@@ -69,6 +71,8 @@ object PokeDaisyHost {
     private var battle by mutableStateOf<IosBattleInput?>(null)
     private var slots by mutableStateOf<StateSlotController?>(null)
     private var stateError by mutableStateOf<String?>(null)
+    private var confirmingClose by mutableStateOf(false)
+    private var restartFresh = false
     private var started = false
     private var game: GameViewController? = null
     private var timer: NSTimer? = null
@@ -93,6 +97,13 @@ object PokeDaisyHost {
                     stateError?.let { message ->
                         OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
                             onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
+                    }
+                    if (confirmingClose) {
+                        OptionConfirm(tr("CLOSE GAME"),
+                            tr("Returns to the ROM list. RESUME GAMES is off: progress since your last in-game save will be lost."),
+                            tr("CLOSE GAME"), rememberGbaTextMetrics(),
+                            onConfirm = { confirmingClose = false; finishClose() },
+                            onDismiss = { confirmingClose = false })
                     }
                 }
             }
@@ -131,6 +142,9 @@ object PokeDaisyHost {
         val tmp = dir / "${current.name}.tmp"
         return runCatching {
             fs.createDirectories(dir)
+            StateFiles.backupBattery(current)
+            // Commit this before replacing the save: neither a crash nor a matching old slot may undo the import.
+            StateResume.startFresh(StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath())))
             if (fs.exists(current)) fs.atomicMove(current, backup)
             fs.write(tmp) { write(bytes) }
             fs.atomicMove(tmp, current)
@@ -154,17 +168,44 @@ object PokeDaisyHost {
     /** The game at [romPath] running, its battery save beside the others; closes the one before. [onFailed] hears a
      * game that won't open. */
     fun gameViewController(romPath: String, onFailed: () -> Unit): UIViewController {
+        val fresh = restartFresh
+        restartFresh = false
         closeGame()
         telemetry.reset()
         val savePath = RomPicker.savePathFor(romPath)
         val files = runCatching {
             StateFiles.backupBattery(savePath.toPath())
-            StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath()))
+            StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath())).also {
+                if (fresh) StateResume.startFresh(it)
+            }
         }.getOrElse { onFailed(); return UIViewController() }
         val g = GameViewController(romPath, savePath, onFailed)
         game = g
+        val defaults = platform.Foundation.NSUserDefaults.standardUserDefaults
+        val stateSnapshot = { telemetry.forState()?.takeIf { it.hasData && !it.unsupported }?.let(SnapshotCache::encode) }
+        val stateLoaded: (Path) -> Unit = { state ->
+            telemetry.reset()
+            SnapshotCache.read(state)?.let(telemetry::showCached)
+            sample()
+        }
+        val resume = StateResume(files,
+            write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
+            matchesSave = { PkApiCore.stateMatchesSave(it.toString()) },
+            enabled = { defaults.objectForKey("auto_resume") == null || defaults.boolForKey("auto_resume") },
+            snapshot = stateSnapshot, loaded = stateLoaded)
+        g.onCoreStarted = { g.withState { resume.restore() } }
+        g.beforeSuspend = {
+            val saved = g.withState { resume.save() }
+            if (!saved) resumeFailed()
+            saved
+        }
         val (code, revision) = romHeader(romPath) ?: (null to 0)
-        settings = IosCompanionSettings(romPath, code, g, onClose = { onCloseRequested() }, onRestart = { onRestartRequested() })
+        settings = IosCompanionSettings(romPath, code, g,
+            onClose = { finishClose() },
+            onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
+            onDisableResume = {
+                runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
+            })
             .also { L10n.apply(it.appLanguage, code) }
         battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
@@ -172,17 +213,11 @@ object PokeDaisyHost {
             g.quietPress = { b.quietPress }
         }
         g.beforeStateChange = { battle?.cancel() }
-        val defaults = platform.Foundation.NSUserDefaults.standardUserDefaults
         slots = StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
             thumbnail = { PkApiCore.stateThumbnail() },
-            snapshot = { telemetry.forState()?.takeIf { it.hasData && !it.unsupported }?.let(SnapshotCache::encode) },
-            loaded = { state ->
-                telemetry.reset()
-                SnapshotCache.read(state)?.let(telemetry::showCached)
-                sample()
-            },
+            snapshot = stateSnapshot, loaded = stateLoaded,
             failed = { stateError = it },
             initialIndex = defaults.integerForKey("state_slot").toInt(),
             selected = { defaults.setInteger(it.toLong(), "state_slot") })
@@ -191,8 +226,31 @@ object PokeDaisyHost {
         return g
     }
 
+    /** The native GAMES chip follows the same progress warning as companion SETTINGS > CLOSE GAME. */
+    fun requestCloseGame() {
+        if (settings?.autoResume == false) confirmingClose = true else finishClose()
+    }
+
+    private fun finishClose() {
+        if (prepareClose()) onCloseRequested()
+    }
+
+    private fun prepareClose(): Boolean {
+        if (game?.pause() != false) return true
+        // A background capture may fail too, but an explicit close can keep the running moment available.
+        game?.resume()
+        return false
+    }
+
+    private fun resumeFailed() {
+        stateError = tr("Couldn't update resume data. Keep an in-game save too.")
+        platform.Foundation.NSLog("PokeDaisy: couldn't update resume data")
+    }
+
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
+        stateError = null
+        confirmingClose = false
         timer?.invalidate()
         timer = null
         battle?.cancel()
@@ -200,7 +258,6 @@ object PokeDaisyHost {
         game?.close()
         game = null
         slots = null
-        stateError = null
         settings = null
         telemetry.reset()
     }

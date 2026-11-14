@@ -71,6 +71,10 @@ class GameViewController(
 
     /** Releases scripted input before a state changes the running game. */
     var beforeStateChange: () -> Unit = {}
+    /** Initial open only; a normal foreground return keeps the paused core in memory. */
+    var onCoreStarted: () -> Unit = {}
+    /** Main thread, after pausing frames/audio but while state operations can still use the core. */
+    var beforeSuspend: () -> Boolean = { true }
 
     /** Whether a game is open and running in this controller. */
     val isRunning: Boolean get() = running
@@ -106,6 +110,7 @@ class GameViewController(
             return
         }
         running = true
+        onCoreStarted()
         active = true
         audio.start()
         val center = NSNotificationCenter.defaultCenter
@@ -118,11 +123,12 @@ class GameViewController(
     }
 
     /** Stops running (the app went to the background, or the shell asks); the game stays open. */
-    fun pause() {
-        if (!running) return
+    fun pause(): Boolean {
+        if (!running || !active) return true
         gameView.paused = true
         active = false
         audio.stop()
+        return beforeSuspend()
     }
 
     /** Runs again after [pause]. */
@@ -155,9 +161,8 @@ class GameViewController(
         observers.forEach { NSNotificationCenter.defaultCenter.removeObserver(it) }
         observers.clear()
         if (!running) return
+        pause()
         running = false
-        active = false
-        gameView.paused = true
         audio.release()
         PkApiCore.finishSave(FINISH_SAVE_FRAMES)
         PkApiCore.stop()
