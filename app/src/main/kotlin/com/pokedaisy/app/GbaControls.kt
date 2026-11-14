@@ -1,10 +1,13 @@
 package com.pokedaisy.app
 
-import android.util.Log
-import android.view.KeyEvent
+import com.pokedaisy.app.companion.data.KeyCodes
+import com.pokedaisy.app.companion.data.Logs
+import com.pokedaisy.app.companion.data.PropertiesText
+import com.pokedaisy.app.companion.data.isFile
+import com.pokedaisy.app.companion.data.readText
+import com.pokedaisy.app.companion.data.writeText
 import com.pokedaisy.app.companion.i18n.tk
-import java.io.File
-import java.util.Properties
+import okio.Path
 
 /**
  * Remappable mapping of physical keys/buttons to GBA buttons, from
@@ -105,30 +108,31 @@ object GbaControls {
     /** keycode -> button bits, for the GBA / Game Boy games ([gba]) and the DS games ([ds]). */
     class KeyMaps(val gba: Map<Int, Int>, val ds: Map<Int, Int>)
 
-    private fun file(dir: File) = File(dir, "controls.properties")
+    private fun file(dir: Path) = dir / "controls.properties"
 
-    private fun readProps(dir: File): Properties {
-        val p = Properties()
+    private fun readProps(dir: Path): MutableMap<String, String> {
         val f = file(dir)
-        if (f.isFile) runCatching { f.inputStream().use(p::load) }
+        val p = if (f.isFile) runCatching { PropertiesText.parse(f.readText()) }.getOrNull() ?: LinkedHashMap() else LinkedHashMap()
         var changed = false
         // A file from before the split rows: start2 / select2 were X / Y, so they had keys if anything did.
-        if (p.containsKey("start2")) for ((k, from) in SPLIT_FROM) if (!p.containsKey(k)) { p.setProperty(k, p.getProperty(from) ?: DEFAULTS.getValue(from)); changed = true }
-        for ((k, v) in DEFAULTS) if (!p.containsKey(k)) { p.setProperty(k, v); changed = true }
-        if (changed) runCatching {
-            f.outputStream().use { p.store(it, "PokeDaisy GBA button map — Android key names, comma-separated") }
-        }
+        if ("start2" in p) for ((k, from) in SPLIT_FROM) if (k !in p) { p[k] = p[from] ?: DEFAULTS.getValue(from); changed = true }
+        for ((k, v) in DEFAULTS) if (k !in p) { p[k] = v; changed = true }
+        if (changed) writeProps(dir, p, "PokeDaisy GBA button map — Android key names, comma-separated")
         return p
+    }
+
+    private fun writeProps(dir: Path, p: Map<String, String>, comment: String = "PokeDaisy GBA button map") {
+        runCatching { file(dir).writeText(PropertiesText.format(p, comment)) }
     }
 
     /** keycode -> button bits per [Group] ([TURBO] set for TURBO A / B, [COMPANION] added to a key's button). A key
      * bound twice in one map takes the later button. */
-    fun load(dir: File): KeyMaps {
+    fun load(dir: Path): KeyMaps {
         val props = readProps(dir)
         val gba = HashMap<Int, Int>()
         val ds = HashMap<Int, Int>()
         for (btn in Btn.entries) {
-            props.getProperty(btn.prop).orEmpty().split(',').forEach { n ->
+            props[btn.prop].orEmpty().split(',').forEach { n ->
                 val key = resolveKey(n.trim()) ?: return@forEach
                 if (btn == Btn.TO_COMPANION) gba[key] = (gba[key] ?: 0) or COMPANION
                 else {
@@ -140,42 +144,41 @@ object GbaControls {
         return KeyMaps(gba, ds)
     }
 
-    fun rawBindings(dir: File): Map<Btn, List<String>> {
+    fun rawBindings(dir: Path): Map<Btn, List<String>> {
         val props = readProps(dir)
         return Btn.entries.associateWith {
-            props.getProperty(it.prop).orEmpty().split(',').map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+            props[it.prop].orEmpty().split(',').map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
         }
     }
 
     /** [btn] is [keyCode] now - and that key leaves any other button it was on in the same games (else the later
      * button kept it); a DS row and a GBA / Game Boy row can share one, and TO COMPANION shares with anything. */
-    fun setBinding(dir: File, btn: Btn, keyCode: Int) = setBindingNamed(dir, btn, Hotkeys.keyName(keyCode))
+    fun setBinding(dir: Path, btn: Btn, keyCode: Int) = setBindingNamed(dir, btn, Hotkeys.keyName(keyCode))
 
     /** [setBinding] by the key's name (no "KEYCODE_" prefix). */
-    fun setBindingNamed(dir: File, btn: Btn, name: String) {
+    fun setBindingNamed(dir: Path, btn: Btn, name: String) {
         val props = readProps(dir)
         for (other in Btn.entries) if (!btn.sharesKeyWith(other)) {
-            val keys = props.getProperty(other.prop).orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
-            if (name in keys) props.setProperty(other.prop, (keys - name).joinToString(", "))
+            val keys = props[other.prop].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            if (name in keys) props[other.prop] = (keys - name).joinToString(", ")
         }
-        props.setProperty(btn.prop, name)
-        runCatching { file(dir).outputStream().use { props.store(it, "PokeDaisy GBA button map") } }
+        props[btn.prop] = name
+        writeProps(dir, props)
         // A D-pad key goes to the D-pad alone: a hotkey that was only this key loses it (else the hotkey kept it - the
         // 8BitDo Micro's UP is ZOOM's C).
         if (btn.dpad) Hotkeys.releaseKey(dir, name)
     }
 
     /** Leaves [btn] unbound - TURBO A / B and the GBA / Game Boy rows only ([Btn.canClear]). */
-    fun clearBinding(dir: File, btn: Btn) {
+    fun clearBinding(dir: Path, btn: Btn) {
         if (!btn.canClear) return
         val props = readProps(dir)
-        props.setProperty(btn.prop, "")
-        runCatching { file(dir).outputStream().use { props.store(it, "PokeDaisy GBA button map") } }
+        props[btn.prop] = ""
+        writeProps(dir, props)
     }
 
     private fun resolveKey(name: String): Int? {
         if (name.isEmpty()) return null
-        return runCatching { KeyEvent::class.java.getField("KEYCODE_$name").getInt(null) }
-            .onFailure { Log.w("pokedaisy", "unknown control key: $name") }.getOrNull()
+        return KeyCodes.code(name) ?: null.also { Logs.w("unknown control key: $name") }
     }
 }

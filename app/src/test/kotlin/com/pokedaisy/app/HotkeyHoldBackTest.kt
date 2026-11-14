@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import okio.Path.Companion.toOkioPath
 import android.view.KeyEvent
 import com.pokedaisy.app.Hotkeys.Action
 import org.junit.Assert.assertEquals
@@ -27,7 +28,7 @@ class HotkeyHoldBackTest {
     private val fired = ArrayList<Action>()
 
     /** The defaults: EXIT GAME = SELECT + START, SAVE STATE = SELECT + R1. */
-    private val hotkeys by lazy { Hotkeys.load(tmp.newFolder()) }
+    private val hotkeys by lazy { Hotkeys.load(tmp.newFolder().toOkioPath()) }
 
     /** What dispatchKeyEvent does with a key: the hotkeys first, then the game. */
     private fun key(code: Int, down: Boolean) {
