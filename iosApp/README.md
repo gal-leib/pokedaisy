@@ -1,8 +1,10 @@
 # PokeDaisy for iPad
 
-The iPad app's shell: a SwiftUI app that shows the companion's shared screens (`shared-ui`, Compose
-Multiplatform) beside the game. The game itself (the iOS core, its Metal view, sound and input) plugs in through
-`GameScreen.makeViewController` in `RootView.swift`; until then a dark placeholder stands in.
+The iPad app: a SwiftUI app with the game (the iOS core's `GameViewController`: Metal, sound, controllers and a
+hardware keyboard) beside the companion's shared screens (`shared-ui`, Compose Multiplatform). With no game running, the
+game's place lists the games added from Files (ADD GAMES); a game is copied into the app's `Documents/roms/` and keeps its
+save in `Documents/saves/`, both visible in Files. There are no on-screen buttons yet: play with a controller or a
+keyboard.
 
 ## Build and run
 
