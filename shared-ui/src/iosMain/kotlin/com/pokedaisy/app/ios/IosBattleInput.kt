@@ -2,6 +2,7 @@ package com.pokedaisy.app.ios
 
 import com.pokedaisy.app.BattleInputController
 import com.pokedaisy.app.ScriptInput
+import com.pokedaisy.app.battleSwitchAddrsFor
 import com.pokedaisy.app.companion.BattleInput
 import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.data.GameKind
@@ -11,6 +12,8 @@ import com.pokedaisy.app.companion.data.isGen2
 /** The shared battle menu driver on the iPad. Called on the main/game thread, once per emulated frame. */
 internal class IosBattleInput(
     private val telemetry: TelemetryStore,
+    private val romCode: String?,
+    private val romRev: Int,
     private val changed: () -> Unit,
     private val silent: () -> Boolean,
 ) : BattleInput {
@@ -57,11 +60,7 @@ internal class IosBattleInput(
                 if (snapshot.game == GameKind.ELITE_REDUX) BattleInputController.MenuCells.ELITE_REDUX
                 else BattleInputController.MenuCells.GEN3)
         }
-        controller.switchAddrs = telemetry.gbPartySwitch()?.let { BattleInputController.SwitchAddrs(gb = it) }
-            ?: telemetry.knownPartyMenu()?.let { (menu, party) ->
-                BattleInputController.SwitchAddrs(partyMenu = menu, party = party,
-                    gridOption = telemetry.knownPartyMenuStyle()?.let { (ptr, off) -> BattleInputController.GridOption(ptr, off) })
-            }
+        controller.switchAddrs = battleSwitchAddrsFor(telemetry, snapshot.game, romCode, romRev)
     }
 
     override fun selectAction(actionIndex: Int) = controller.selectAction(actionIndex)

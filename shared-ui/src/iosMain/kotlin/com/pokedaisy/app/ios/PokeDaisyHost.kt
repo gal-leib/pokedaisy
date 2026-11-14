@@ -148,10 +148,10 @@ object PokeDaisyHost {
         telemetry.reset()
         val g = GameViewController(romPath, RomPicker.savePathFor(romPath), onFailed)
         game = g
-        val code = romCode(romPath)
+        val (code, revision) = romHeader(romPath) ?: (null to 0)
         settings = IosCompanionSettings(romPath, code, g, onClose = { onCloseRequested() }, onRestart = { onRestartRequested() })
             .also { L10n.apply(it.appLanguage, code) }
-        battle = IosBattleInput(telemetry, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
+        battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
@@ -210,13 +210,15 @@ object PokeDaisyHost {
         }
     }
 
-    /** A GBA ROM's four-letter game code (header 0xAC), or null. */
-    private fun romCode(romPath: String): String? {
+    /** A GBA ROM's game code (header 0xAC) and revision (0xBC), or null. */
+    private fun romHeader(romPath: String): Pair<String, Int>? {
         if (!romPath.lowercase().endsWith(".gba")) return null
         return runCatching {
             FileSystem.SYSTEM.source(romPath.toPath()).buffer().use { s ->
                 s.skip(0xAC)
-                s.readUtf8(4)
+                val code = s.readUtf8(4)
+                s.skip(0xBC - 0xB0L)
+                code to (s.readByte().toInt() and 0xFF)
             }
         }.getOrNull()
     }
