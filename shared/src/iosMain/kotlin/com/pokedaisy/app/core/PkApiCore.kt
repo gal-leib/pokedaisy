@@ -7,6 +7,9 @@ import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.core.pkapi.pk_api_save_state
 import com.pokedaisy.app.core.pkapi.pk_api_load_state
 import com.pokedaisy.app.core.pkapi.pk_api_state_matches_save
+import com.pokedaisy.app.core.pkapi.pk_api_rom_patch
+import com.pokedaisy.app.core.pkapi.pk_api_rom_unpatch
+import com.pokedaisy.app.companion.data.RomOptionPatcher
 import com.pokedaisy.app.core.pkapi.pk_api_field_configure
 import com.pokedaisy.app.core.pkapi.pk_api_field_state
 import com.pokedaisy.app.core.pkapi.pk_api_audio
@@ -46,7 +49,7 @@ import kotlinx.cinterop.value
  *
  * Threads, as pk_api.h says: one thread (the game's) starts, runs and stops it; the reads may come from any thread.
  */
-object PkApiCore : EmulatorCore {
+object PkApiCore : EmulatorCore, RomOptionPatcher {
     /** The keys as [setKeys] takes them (pk_api.h's PK_API_KEY_*; a Game Boy game ignores L / R). */
     const val KEY_A = 1 shl 0
     const val KEY_B = 1 shl 1
@@ -116,6 +119,15 @@ object PkApiCore : EmulatorCore {
                 ((src[at + 1].toInt() and 0xFF) shl 8) or (src[at + 2].toInt() and 0xFF)
         }
         return RomArt.Image(tw, th, pixels).png()
+    }
+
+    override fun unpatch() = pk_api_rom_unpatch()
+    override fun patch(expectAt: Long, expect: ByteArray, at: Long, value: ByteArray): Boolean {
+        if (expect.size !in 1..64 || value.size !in 1..4 || expectAt !in 0x08000000L..0x0DFFFFFFL || at !in 0x08000000L..0x0DFFFFFFL) return false
+        return expect.usePinned { expected -> value.usePinned { replacement ->
+            pk_api_rom_patch(expectAt.toUInt(), expected.addressOf(0).reinterpret(), expect.size,
+                at.toUInt(), replacement.addressOf(0).reinterpret(), value.size)
+        } }
     }
 
     /** Read-only field observation for scene speeds; never enables patches or wild encounter changes. */

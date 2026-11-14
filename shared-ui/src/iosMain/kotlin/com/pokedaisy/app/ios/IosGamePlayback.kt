@@ -21,7 +21,8 @@ internal class IosGamePlayback(
     private var menu = false
     private var map = false
     private var field = 0
-    private var blocked = false
+    var blocked = false
+        private set
     private var base = 1f
     private var ff = false
     private var ffSpeed = 2f

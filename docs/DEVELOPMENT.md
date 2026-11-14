@@ -3725,6 +3725,13 @@ companion sample on a transition. Detected cursor and party-menu addresses confi
 without memory writes it walks the cursors. Party switching uses `battleSwitchAddrsFor`, the Android activity's verified mappings shared in place, including each hack's structure size and grid layout. It is offered only where those mappings support it.
 The shared battle view, style, focus, info and one-tap settings persist in `NSUserDefaults`.
 
+`IosGameOptions` schedules the existing `InstantText` and `ReusableTms` finders off the main thread. It discards
+results after closing or blocking a game, then applies changes between frames through `GameOptionPatches`, which
+Android's engine also calls. The shared transaction owns rollback for their combined patch set. Both JNI and
+Kotlin/Native reach `pk_api_rom_patch` / `pk_api_rom_unpatch`; those functions own the core write lock, validate
+expected and replacement byte ranges, and preserve the existing co-op uninstall behavior. Identity reads still
+see the original file bytes. Fault-injection tests cover partial edits and failed restoration of the other feature.
+
 The iPad playback settings update `GameViewController` on the main thread: `FramePacer` scales emulated time for a
 capped speed, with real-time catch-up bounded before scaling; unlimited FF runs batches with an 8 ms budget.
 `pk_api_set_audio_rate` requests fewer samples per emulated frame during FF (pitched audio at the device's 48 kHz).

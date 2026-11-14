@@ -41,6 +41,7 @@ internal class IosCompanionSettings(
     private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
     private val gameScreen: () -> IosGameScreen? = { null },
     private val playback: () -> IosGamePlayback? = { null },
+    private val options: () -> IosGameOptions? = { null },
 ) : CompanionSettings {
     private val d = NSUserDefaults.standardUserDefaults
 
@@ -49,8 +50,18 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
+
+    var optionsChanged: () -> Unit = {}
+    override val instantText get() = bool("instant_text", false)
+    override fun setInstantText(on: Boolean) { d.setBool(on, "instant_text"); optionsChanged() }
+    override val instantTextSupported get() = options()?.instantTextSupported == true
+    override val reusableTms get() = bool("reusable_tms", false)
+    override fun setReusableTms(on: Boolean) { d.setBool(on, "reusable_tms"); optionsChanged() }
+    override val reusableTmsSupported get() = options()?.reusableTmsSupported == true
+    override val reusableTmsBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.ReusableTms.BUILT_IN
+    override val gameOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_OPTIONS)
 
     override val touchRevision get() = IosTouchPreferences.revision
     override val touchStyle get() = IosTouchPreferences.style

@@ -626,7 +626,7 @@ private fun homeRows(
         // A text box's words appear at once, nothing else sped up (InstantText.kt: the game's text routine patched).
         SettingRow(
             tk("INSTANT TEXT"), if (s.instantTextSupported) onOff(s.instantText) else tk("N/A"),
-            enabled = s.instantTextSupported, labelBadge = NewFeatures.badge(NewFeatures.INSTANT_TEXT),
+            enabled = s.instantTextSupported, labelBadge = s.gameOptionsBadge ?: NewFeatures.badge(NewFeatures.INSTANT_TEXT),
         ) {
             if (s.instantTextSupported) { s.setInstantText(!s.instantText); changed() }
         },
@@ -657,7 +657,7 @@ private fun homeRows(
             tk("REUSABLE TMS"),
             when { s.reusableTmsBuiltIn -> tk("ON"); s.reusableTmsSupported -> onOff(s.reusableTms); else -> tk("N/A") },
             enabled = s.reusableTmsSupported && !s.reusableTmsBuiltIn,
-            labelBadge = NewFeatures.badge(NewFeatures.REUSABLE_TMS),
+            labelBadge = s.gameOptionsBadge ?: NewFeatures.badge(NewFeatures.REUSABLE_TMS),
             subtitle = if (s.reusableTmsBuiltIn) "This game's TMs never run out" else null,
         ) {
             if (s.reusableTmsSupported) { s.setReusableTms(!s.reusableTms); changed() }

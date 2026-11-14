@@ -88,6 +88,7 @@ interface CompanionSettings {
 
     /** REUSABLE TMS - see [com.pokedaisy.app.Prefs.reusableTms]; [reusableTmsSupported]: the ROM's code that uses a TM
      * up is known ([com.pokedaisy.app.companion.data.ReusableTms]). */
+    val gameOptionsBadge: String? get() = null
     val reusableTms: Boolean get() = false
     fun setReusableTms(on: Boolean) {}
     val reusableTmsSupported: Boolean get() = false

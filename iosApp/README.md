@@ -110,3 +110,12 @@ menu, shop and map watchers per emulated frame. The portable C API observes exis
 enabling patches, for text, bike and surf speeds. Unknown field layouts remain N/A; Game Boy still supports battle
 speed through the shared battle controller. A scene change stops a fast frame batch immediately. Menu callback
 learning and scene-speed choices persist in NSUserDefaults. Steady music and speed hotkeys remain later work.
+
+## Game-option patches
+
+INSTANT TEXT and REUSABLE TMS use the existing shared code finders, followed by `GameOptionPatches`, which Android
+also runs. File scanning happens off the main thread; results from a closed game are discarded. Applying or
+removing edits happens between frames through the same locked, expected-byte-checked native patch API as Android.
+The two features share rollback rules, so a failed text patch preserves a valid TM patch and partial features are
+removed. ROM files are never rewritten. Unsupported and blocked games remain unavailable; games with their own
+reusable TMs show the existing built-in state. Choices persist in NSUserDefaults.

@@ -322,6 +322,27 @@ void pk_api_set_audio_rate(double rate) {
     }
 }
 
+bool pk_api_rom_patch(uint32_t expectAddr, const uint8_t* expect, int expectLen,
+                      uint32_t addr, const uint8_t* value, int len) {
+    if (!expect || !value || expectLen < 1 || expectLen > 64 || len < 1 || len > 4 ||
+        expectAddr < 0x08000000u || (uint64_t) expectAddr + expectLen > 0x0E000000u ||
+        addr < 0x08000000u || (uint64_t) addr + len > 0x0E000000u) return false;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    bool ok = g.core && pk_cheats_patch(g.core, expectAddr, expect, expectLen, addr, value, len);
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok;
+}
+
+void pk_api_rom_unpatch(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core) {
+        pk_coop_uninstall(g.core);
+        pk_coop_lock_uninstall(g.core);
+        pk_cheats_unpatch(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
 bool pk_api_field_configure(uint32_t crc) {
     return pk_field_configure(g.core && pk_is_gba(g.core) ? crc : 0) != 0;
 }

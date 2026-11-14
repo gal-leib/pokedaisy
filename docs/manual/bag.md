@@ -67,6 +67,10 @@ Like the other items, it only works while you're walking around, with no menu, c
 
 Normally a TM is gone once it teaches a move, so you think twice before using a rare one. Turn on `REUSABLE TMS` in the companion's `SETTINGS`, `GAMEPLAY` group, and a TM stays in your bag after it teaches a move, just like an HM. It's `OFF` until you turn it on.
 
+The same option works on iPhone and iPad. PokeDaisy checks the game's code first, so it may briefly show `N/A`
+while the game opens. Your choice is remembered and never changes the ROM file. A game that already keeps its
+TMs shows `ON` with the option greyed out.
+
 Everything else about TMs works as the game has it: which Pokémon can learn one, forgetting a move to make room, selling one at a shop. The change applies at once, no restart needed, and turning it off makes TMs single use again.
 
 > [!NOTE]

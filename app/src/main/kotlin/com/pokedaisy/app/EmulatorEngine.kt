@@ -1928,29 +1928,20 @@ class EmulatorEngine(
         runCatching { RetroAchievements.setCheatsActive(n > 0) }
     }
 
-    /** REUSABLE TMS and INSTANT TEXT onto the ROM (emu thread): what's on patched, the rest the file's bytes. */
+    private val optionPatcher = object : com.pokedaisy.app.companion.data.RomOptionPatcher {
+        override fun unpatch() = MgbaCore.pkRomUnpatch()
+        override fun patch(expectAt: Long, expect: ByteArray, at: Long, value: ByteArray) =
+            MgbaCore.pkRomPatch(expectAt, expect, at, value)
+    }
+
+    /** Both platforms use the same rollback rules for the shared native ROM patch set. */
     private fun applyTmPatch() {
         tmPatchDirty = false
-        MgbaCore.pkRomUnpatch()
-        if (!gba) return
-        val text = textPatch.takeIf { instantText }
-        // All or none, each: a ROM that only matched in part would still use TMs up on the other paths, and half a text
-        // routine can't run. pkRomUnpatch takes everything, so text that fails puts the TMs' back.
-        val sites = tmSites
-        val tms = reusableTms && sites.isNotEmpty() && sites.all {
-            MgbaCore.pkRomPatch(it.at, it.expect, it.branch, com.pokedaisy.app.companion.data.ReusableTms.ALWAYS_SKIP)
-        }
-        if (reusableTms && sites.isNotEmpty()) {
-            if (!tms) MgbaCore.pkRomUnpatch()
-            Log.i("pokedaisy", "reusable TMs: ${if (tms) "${sites.size} site(s) patched" else "code didn't match"}")
-        }
-        if (text != null && !text.writes.all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }) {
-            MgbaCore.pkRomUnpatch()
-            if (tms) sites.forEach {
-                MgbaCore.pkRomPatch(it.at, it.expect, it.branch, com.pokedaisy.app.companion.data.ReusableTms.ALWAYS_SKIP)
-            }
-            Log.i("pokedaisy", "instant text: code didn't match")
-        } else if (text != null) Log.i("pokedaisy", "instant text: ${text.writes.size} piece(s) patched")
+        val sites = tmSites.takeIf { gba && reusableTms }.orEmpty()
+        val text = textPatch.takeIf { gba && instantText }
+        val result = com.pokedaisy.app.companion.data.GameOptionPatches.apply(optionPatcher, sites, text)
+        if (sites.isNotEmpty()) Log.i("pokedaisy", "reusable TMs: ${if (result.tms) "${sites.size} site(s) patched" else "code didn't match"}")
+        if (text != null) Log.i("pokedaisy", "instant text: ${if (result.text) "${text.writes.size} piece(s) patched" else "code didn't match"}")
     }
 
     /** PLAYER LOOK onto the ROM (emu thread): the last look's blocks out, this one's in (all or none), then the palettes. */

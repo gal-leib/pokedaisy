@@ -44,6 +44,14 @@ const void* pk_api_video(void);
 int pk_api_video_width(void);
 int pk_api_video_height(void);
 
+/** Reversible GBA game-option patches, game thread between frames. New edits require matching expected bytes (1..64);
+ * replacement is 1..4 bytes at a ROM address. Never changes the file. False for invalid input or no GBA core.
+ * Repeating an already patched address is idempotent; unpatch before replacing the set of edits.
+ * unpatch restores all game-option edits (and uninstalls co-op edits sharing that patch set). */
+bool pk_api_rom_patch(uint32_t expectAddr, const uint8_t* expect, int expectLen,
+                      uint32_t addr, const uint8_t* value, int len);
+void pk_api_rom_unpatch(void);
+
 /** Field observation only: configure the current GBA ROM by its CRC32 (zero disables), then read PK_API_FIELD_*.
  * Game thread, between frames. Unknown games, Game Boy and no core return zero. Does not enable game patches. */
 bool pk_api_field_configure(uint32_t crc);

@@ -75,6 +75,10 @@ It changes the game while it runs, never your ROM file or your save, and you can
 > [!NOTE]
 > `INSTANT TEXT` works in FireRed, LeafGreen, Emerald, Ruby and Sapphire and in many hacks built on their code. Where it can't work the row shows `N/A`.
 
+On iPhone and iPad, `INSTANT TEXT` is available in the same `GAMEPLAY` group. PokeDaisy checks the game's code
+before enabling it, so the row can briefly say `N/A` while a game opens. Your choice is remembered. Turning it off
+restores the game's normal text routine; the ROM file stays unchanged.
+
 ## Slow motion
 
 Hold the `SLOWMO HOLD` hotkey and the game runs at half speed until you let go, with the sound muted. It's handy for a tricky moment, like timing a button press or watching an animation you'd otherwise miss. On a keyboard it's the minus key; it has no controller button by default, so give it one under `HOTKEYS` if you want it.

@@ -1012,22 +1012,13 @@ Java_com_pokedaisy_app_MgbaCore_pkRomPatch(JNIEnv* env, jobject thiz, jlong expe
     }
     (*env)->GetByteArrayRegion(env, jExpect, 0, expectLen, (jbyte*) expect);
     (*env)->GetByteArrayRegion(env, jValue, 0, len, (jbyte*) value);
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core ? pk_cheats_patch(g.core, (uint32_t) expectAddr, expect, expectLen, (uint32_t) addr, value, len) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return pk_api_rom_patch((uint32_t) expectAddr, expect, expectLen, (uint32_t) addr, value, len) ? JNI_TRUE : JNI_FALSE;
 }
 
 // Emu thread: takes every game option's ROM patch out again.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRomUnpatch(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core) {
-        pk_coop_uninstall(g.core);   // its patches go with all the rest
-        pk_coop_lock_uninstall(g.core);   // coop-lock (plan 5 Task 5)
-        pk_cheats_unpatch(g.core);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
+    pk_api_rom_unpatch();
 }
 
 // Emu thread: PLAYER LOOK's blocks (PlayerLook.kt) in place of any before - block i is

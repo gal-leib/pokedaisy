@@ -203,7 +203,12 @@ class GameViewController(
         for (frame in 0 until frames) {
             // Unlimited FF still leaves time for the companion and touch events on the main thread.
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
-            PkApiCore.setKeys(frameKeys(input.keys()))
+            // A companion controller action can close/restart the game or open the editor from keys().
+            val held = input.keys()
+            if (!running || !active || uiPaused) break
+            val keys = frameKeys(held)
+            if (!running || !active || uiPaused) break
+            PkApiCore.setKeys(keys)
             PkApiCore.runFrame()
             afterFrame()
             audio.volume = if (muted || rate == 0.0 || quietPress()) 0f else volume
@@ -212,6 +217,7 @@ class GameViewController(
             // A menu may open on the first uncapped frame. Do not spend the remaining fast batch inside it.
             if (frameSpeed() != rate) break
         }
+        if (!running || !active || uiPaused) return
         if (ran && !holdPicture()) renderer?.upload()
         draw(view)
     }
