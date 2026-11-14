@@ -3,58 +3,32 @@ import UniformTypeIdentifiers
 import UIKit
 import PokeDaisyUI
 
-/// Sideways: the game left at the GBA's 3:2, the companion right in the rest. Upright: the game across the top,
-/// the companion under it - the Android app's layouts on one screen. With no game running the game's place lists
-/// the games added from Files.
+/// The games added from Files until one is picked, then the shared game screen: the game, its touch controls and the
+/// companion, laid out by the shared UI.
 struct RootView: View {
     @State private var playing: String?
     @State private var failed: String?
-    /** Bumped by RESTART GAME, so the game's view (and the game) is made again. */
     @State private var restarts = 0
 
     var body: some View {
-        GeometryReader { geo in
-            let wide = geo.size.width > geo.size.height
-            let layout = wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
-            layout {
-                gameArea
-                    .frame(width: wide ? min(geo.size.width * 0.6, geo.size.height * 1.5) : nil,
-                           height: wide ? nil : geo.size.width / 1.5)
-                ViewControllerView(make: { PokeDaisyHost.shared.companionViewController() })
+        Group {
+            if let rom = playing {
+                ViewControllerView(make: {
+                    PokeDaisyHost.shared.gameScreenViewController(romPath: rom, onFailed: {
+                        DispatchQueue.main.async { failed = rom; stop() }
+                    })
+                }).id("\(rom)#\(restarts)")
+            } else {
+                GamesList(failed: failed) { rom in
+                    failed = nil
+                    playing = rom
+                }
             }
         }
         .background(Color.black)
         .onAppear {
-            // The companion's SETTINGS > CLOSE GAME / RESTART GAME.
             PokeDaisyHost.shared.onCloseRequested = { stop() }
             PokeDaisyHost.shared.onRestartRequested = { restarts += 1 }
-        }
-    }
-
-    @ViewBuilder private var gameArea: some View {
-        if let rom = playing {
-            ZStack(alignment: .topLeading) {
-                ViewControllerView(make: {
-                    PokeDaisyHost.shared.gameViewController(romPath: rom, onFailed: {
-                        DispatchQueue.main.async {
-                            failed = rom
-                            stop()
-                        }
-                    })
-                })
-                .id("\(rom)#\(restarts)")
-                Button("GAMES", action: { PokeDaisyHost.shared.requestCloseGame() })
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .padding(8)
-                    .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
-                    .foregroundStyle(.white)
-                    .padding(8)
-            }
-        } else {
-            GamesList(failed: failed) { rom in
-                failed = nil
-                playing = rom
-            }
         }
     }
 
@@ -142,7 +116,6 @@ private func topViewController() -> UIViewController? {
     return top
 }
 
-/// A UIKit view controller inside SwiftUI, made once.
 struct ViewControllerView: UIViewControllerRepresentable {
     let make: () -> UIViewController
     func makeUIViewController(context: Context) -> UIViewController { make() }

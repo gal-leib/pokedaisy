@@ -3716,7 +3716,7 @@ generated project stays out of git), whose build runs `./gradlew :shared-ui:embe
 The game's place lists the games added from Files (`PokeDaisyHost.games` / `addGames`, over `RomPicker`) until one is
 picked, then holds its `GameViewController` (`PokeDaisyHost.gameViewController`, GAMES closes it: `closeGame` writes the
 save). While a game runs `PokeDaisyHost` reads it into its `TelemetryStore` every half second off the main thread, and
-the companion follows it. No on-screen buttons yet: a controller or a keyboard. The companion's SETTINGS there is `IosCompanionSettings`: only the rows the iPad does so far (`CompanionSettings.shownRows`: battle options, FF / GAME SPEED, volume / mute, TAB BAR, DARK MODE, THEME, LANGUAGE, HELP), kept in `NSUserDefaults` under the Android prefs' names; a game's start also runs RomArt / Gen1Art / Gen2Art's scan, as the Android activity does, so the MAP and party art draw. The game list's LOAD SAVE is `PokeDaisyHost.loadSave` (GameSaves.load's rules: the old save renamed to a dated backup first, put back if the write fails; RetroArch's rzip saves refused for now, RzipSave being JVM-only). The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
+the companion follows it. The game's buttons are a strip under it: `PokeDaisyHost.touchControlsViewController` (the shared `TouchControls`, extras and X / Y off) or `GamepadView.swift`'s UIKit buttons (TOUCH switches; `setTouchKeys` for both), until a touch-delay test on the iPad picks one; a controller or a keyboard works too. The companion's SETTINGS there is `IosCompanionSettings`: only the rows the iPad does so far (`CompanionSettings.shownRows`: battle options, FF / GAME SPEED, volume / mute, TAB BAR, DARK MODE, THEME, LANGUAGE, HELP), kept in `NSUserDefaults` under the Android prefs' names; a game's start also runs RomArt / Gen1Art / Gen2Art's scan, as the Android activity does, so the MAP and party art draw. The game list's LOAD SAVE is `PokeDaisyHost.loadSave` (GameSaves.load's rules: the old save renamed to a dated backup first, put back if the write fails; RetroArch's rzip saves refused for now, RzipSave being JVM-only). The fonts are the Android app's own files (`app/src/main/assets/fonts`), copied
 into the bundle's `fonts` folder. CI's "iPad app (simulator build)" job generates the project and builds it for the
 simulator without signing (advisory for now). `iosApp/README.md` has the steps for a Mac.
 
@@ -3928,3 +3928,30 @@ pushing a different file (only one at a time for now). SRAM persists to
 | `scripts/capture_fixture.sh`, `scripts/roms.conf`       | Captures a live EWRAM+IWRAM memory fixture for one ROM off the device.                                                                                             |
 | `app/src/test/resources/fixtures/<key>/`                | Captured `{ewram,iwram}.bin` + `README.txt` per ROM — replayed by the JVM decode tests, not committed ROMs/saves themselves.                                       |
 | `app/src/test/kotlin/.../companion/data/*DecodeTest.kt` | One regression test per supported ROM, decoding its fixture and asserting the known-real values.                                                                   |
+
+### Shared touch-control preferences
+
+`TouchStyleCodec` reads and writes the existing Android touch keys through small typed storage callbacks. It keeps
+legacy vibration and extra-button migrations in one place, including the per-orientation custom layouts. Android
+`Prefs` supplies SharedPreferences callbacks and batches writes in one editor; other hosts can use their native
+preferences without duplicating the settings model or inventing a second encoding.
+
+The iPad's IosTouchPreferences supplies native storage, controller discovery and haptics to the shared model.
+IosTouchControls hosts the shared pad and layout editor; it measures the real pad's window coordinates rather than
+inventing a second layout. Editing blocks foreground resume, releases held keys and restores normal playback on DONE.
+The shared settings accept a host's supported buttons without dropping stored choices for unsupported actions.
+
+GamePanelLayout returns a TouchStage directly for the one-window game host and its touch editor. Portrait
+uses Android's PortraitLayout with no resize grip, the player's UNDER GAME / AT BOTTOM, and Android's controls area: with
+UNDER GAME a strip of `TouchGeometry.naturalHeight` along the bottom (`padStrip`, as `PokeDaisyActivity.syncTouchControls`
+sets it), with AT BOTTOM the gap above the companion, else the game itself.
+Landscape uses the shared default side-panel width, centers the game in its area and overlays the controls there, without a separate strip.
+
+On the iPad one Compose game host embeds the Metal controller through UIKitViewController and places the shared
+companion and controls through GameScreen. Resizing moves the existing controller without restarting the core. Layout
+and editor bounds are safe-area pixels throughout; there is no UIKit window-coordinate conversion or separate GAMES
+toolbar. In-game touch editing uses the shared editor, with a settings revision published after layout writes so the
+preview and rows refresh when the editor closes.
+
+Hosts can supply touchStageInOtherOrientation when their rotated layout differs from the phone stand-in. The iPad
+uses GamePanelLayout there too, so the rotated touch preview retains the docked companion and matches the live screen.

@@ -246,9 +246,10 @@ fun CompanionSettingsScreen(
                         onEdit = settings::editTouchLayout,
                         underGame = settings.uprightUnderGame, setUnderGame = { settings.setPortraitUnderGame(it); tick++ },
                         expand = settings.gameAspect == GameAspect.WIDE && settings.wideSupported, touchShown = settings.touchControlsShown,
-                        skins = touchSkins, skinUi = touchSkinUi,
+                        skins = touchSkins, skinUi = touchSkinUi.takeIf { settings.touchSkinsSupported },
                         skinSystem = settings.touchStage?.let { if (it.ds) SkinSystem.DS else if (it.gameBoy) SkinSystem.GB else SkinSystem.GBA } ?: SkinSystem.GBA,
                         feel = settings::feelVibration,
+                        buttons = settings.touchButtons,
                     ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
@@ -284,14 +285,15 @@ fun CompanionSettingsScreen(
                     // The preview beside / above the rows; it follows each change (tick).
                     @Suppress("UNUSED_EXPRESSION") tick
                     @Suppress("UNUSED_EXPRESSION") touchRevision
-                    val style = settings.touchStyle
+                    val style = settings.touchStyle.forButtons(settings.touchButtons)
                     val density = androidx.compose.ui.platform.LocalDensity.current.density
                     val stage = settings.touchStage ?: remember(density) { simulateTouchStage(2400f, 1080f, density.coerceAtLeast(2f)) }
                     val shot = remember(settings) { settings.touchPreviewShot() }
                     TouchControlsPage(
                         stage, style, shot, m, Modifier.fillMaxWidth().weight(1f), underGame = settings.uprightUnderGame == true,
                         expand = settings.gameAspect == GameAspect.WIDE && settings.wideSupported, touchShown = settings.touchControlsShown,
-                        skins = touchSkins, skinUi = touchSkinUi, setStyle = { settings.setTouchStyle(it); tick++ },
+                        skins = touchSkins, skinUi = touchSkinUi.takeIf { settings.touchSkinsSupported }, setStyle = { settings.setTouchStyle(it); tick++ },
+                        otherStage = settings.touchStageInOtherOrientation,
                     ) { mod ->
                         OptionListWindow(m, mod) {
                             GroupedRows(rows, m, cursor, onClick = { i -> moveCursor(i); rows[i].onClick() }, onFocused = ::moveCursor)
@@ -903,7 +905,7 @@ private fun homeRows(
         // PC, FLY, a Repel, the bike, a rod, states, FF... on a held button (L3 by default): its own page.
         SettingRow(tk("QUICK MENU"), null, subtitle = "Actions on a held button", labelBadge = quickMenuBadge(), opensPage = true) { navigate(Page.QUICK_MENU) },
         // The on-screen buttons: when they show, layouts, size, extras, EDIT LAYOUT - its own page, with a preview.
-        SettingRow(tk("TOUCH CONTROLS"), s.touchStyle.show.label, labelBadge = touchControlsBadge(), opensPage = true, subtitle = "The on-screen buttons: layout, look, skins") { navigate(Page.TOUCH) },
+        SettingRow(tk("TOUCH CONTROLS"), s.touchStyle.show.label, labelBadge = s.touchBadge, opensPage = true, subtitle = "The on-screen buttons: layout, look, skins") { navigate(Page.TOUCH) },
         groupTitle(tk("APP")),
         SettingRow(tk("RESUME GAMES"), onOff(s.autoResume), labelBadge = s.resumeBadge) {
             s.setAutoResume(!s.autoResume); changed()

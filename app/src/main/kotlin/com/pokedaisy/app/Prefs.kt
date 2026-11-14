@@ -264,65 +264,18 @@ class Prefs(context: Context) {
         get() = p.getInt("touch_controls", 0)
         set(v) = p.edit().putInt("touch_controls", v).apply()
 
-    /** The extras there were before ZOOM and REWIND (a set saved then didn't say which it knew). */
-    private val EXTRAS_BEFORE_ZOOM = setOf("FF", "QUICK_MENU", "TURBO_A", "TURBO_B", "SAVE_STATE", "LOAD_STATE")
-
-    /** SETTINGS > TOUCH CONTROLS: when they show ([touchControlsMode]), the layout, size, opacity, extras and the
-     * player's own layouts per orientation ([com.pokedaisy.app.companion.TouchLayout.encode]). */
+    /** Touch preferences use the same keys and migrations on every host. */
     var touchControlsStyle: com.pokedaisy.app.companion.TouchControlsStyle
-        get() {
-            val d = com.pokedaisy.app.companion.TouchControlsStyle()
-            fun <T : Enum<T>> pick(all: Array<T>, key: String, default: T) = p.getString(key, null)?.let { n -> all.firstOrNull { it.name == n } } ?: default
-            val oldVibration = p.getInt("touch_vibration_level", if (p.getBoolean("touch_vibration", false)) 1 else 0)
-            return com.pokedaisy.app.companion.TouchControlsStyle(
-                show = com.pokedaisy.app.companion.TouchShow.entries.getOrElse(touchControlsMode) { d.show },
-                preset = pick(com.pokedaisy.app.companion.TouchPreset.values(), "touch_preset", d.preset),
-                size = pick(com.pokedaisy.app.companion.TouchSize.values(), "touch_size", d.size),
-                look = pick(com.pokedaisy.app.companion.TouchLook.values(), "touch_look", d.look),
-                colors = pick(com.pokedaisy.app.companion.TouchColors.values(), "touch_colors", d.colors),
-                skinGba = p.getString("touch_skin_gba", null),
-                skinGb = p.getString("touch_skin_gb", null),
-                position = pick(com.pokedaisy.app.companion.TouchPosition.values(), "touch_position", d.position),
-                opacity = p.getInt("touch_opacity", d.opacity),
-                extras = p.getString("touch_extras", null)?.let { s ->
-                    val saved = s.split(',').mapNotNull { n -> com.pokedaisy.app.companion.TouchButton.values().firstOrNull { it.name == n && it.extra } }.toSet()
-                    // Extras that came after this set was saved (ZOOM, REWIND) start as their default, on.
-                    val known = p.getString("touch_extras_known", null)?.split(',')?.toSet() ?: EXTRAS_BEFORE_ZOOM
-                    saved + d.extras.filter { it.name !in known }
-                } ?: d.extras,
-                xyButtons = p.getBoolean("touch_xy", d.xyButtons),
-                eightWay = p.getBoolean("touch_eight_way", d.eightWay),
-                fadeIdle = p.getBoolean("touch_fade_idle", d.fadeIdle),
-                // VIBRATION was one row of OFF / LIGHT / MEDIUM / STRONG (touch_vibration_level), and a switch before that.
-                vibrate = p.getBoolean("touch_vibrate", oldVibration > 0),
-                vibrationStrength = p.getInt("touch_vibration_strength", if (oldVibration > 0) oldVibration else d.vibrationStrength),
-                useCustom = p.getBoolean("touch_use_custom", d.useCustom),
-                portrait = com.pokedaisy.app.companion.TouchLayout.decode(p.getString("touch_layout_portrait", null)),
-                landscape = com.pokedaisy.app.companion.TouchLayout.decode(p.getString("touch_layout_landscape", null)),
-            )
-        }
+        get() = com.pokedaisy.app.companion.TouchStyleCodec.read(
+            text = { p.getString(it, null) }, int = p::getInt, bool = p::getBoolean,
+        )
         set(v) {
-            touchControlsMode = v.show.ordinal
-            p.edit()
-                .putString("touch_preset", v.preset.name)
-                .putString("touch_size", v.size.name)
-                .putString("touch_look", v.look.name)
-                .putString("touch_colors", v.colors.name)
-                .putString("touch_skin_gba", v.skinGba)
-                .putString("touch_skin_gb", v.skinGb)
-                .putString("touch_position", v.position.name)
-                .putInt("touch_opacity", v.opacity)
-                .putString("touch_extras", v.extras.joinToString(",") { it.name })
-                .putString("touch_extras_known", com.pokedaisy.app.companion.TouchButton.extras.joinToString(",") { it.name })
-                .putBoolean("touch_xy", v.xyButtons)
-                .putBoolean("touch_eight_way", v.eightWay)
-                .putBoolean("touch_fade_idle", v.fadeIdle)
-                .putBoolean("touch_vibrate", v.vibrate)
-                .putInt("touch_vibration_strength", v.vibrationStrength)
-                .putBoolean("touch_use_custom", v.useCustom)
-                .putString("touch_layout_portrait", v.portrait.encode())
-                .putString("touch_layout_landscape", v.landscape.encode())
-                .apply()
+            val edit = p.edit()
+            com.pokedaisy.app.companion.TouchStyleCodec.write(v,
+                text = { k, value -> edit.putString(k, value) },
+                int = { k, value -> edit.putInt(k, value) },
+                bool = { k, value -> edit.putBoolean(k, value) })
+            edit.apply()
         }
 
     /** Whether battle-only strategic hints (move effectiveness chips, the
@@ -698,7 +651,7 @@ class Prefs(context: Context) {
 
     /** Single-screen devices: the side panel's width, as a fraction of the screen's (see [SidePanel]). */
     var sidePanelWidth: Float
-        get() = p.getFloat("side_panel_width", 0.5f)
+        get() = p.getFloat("side_panel_width", com.pokedaisy.app.companion.SIDE_PANEL_DEFAULT_WIDTH)
         set(v) = p.edit().putFloat("side_panel_width", v).apply()
 
     /** One screen held sideways: the companion opens as a window in the middle, over the game (true), or in the side

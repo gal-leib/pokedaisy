@@ -13,9 +13,11 @@ import platform.GameController.*
 class GameInput {
     /** The keys the on-screen controls hold (set on the main thread, the game's). */
     var touchKeys: Int = 0
+    var touchTurbo: Int = 0
+    private var frame = 0L
 
     fun keys(): Int {
-        var keys = touchKeys
+        var keys = touchKeys or (if ((frame++ / 2) % 2 == 0L) touchTurbo else 0)
         for (c in GCController.controllers()) {
             val pad = (c as? GCController)?.extendedGamepad ?: continue
             keys = keys or padKeys(pad)

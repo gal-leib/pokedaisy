@@ -1,9 +1,20 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 
 package com.pokedaisy.app.ios
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.viewinterop.UIKitViewController
+import androidx.compose.ui.viewinterop.UIKitInteropProperties
+import com.pokedaisy.app.companion.ui.GameScreen
+import com.pokedaisy.app.companion.ui.gamePanelLayout
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,8 +64,8 @@ private const val MAX_SAVE_BYTES = 1 shl 20
 
 /**
  * What the iPad app's Swift side calls (as `PokeDaisyHost.shared` in Swift; not `PokeDaisy`, which is the app's own
- * Swift module): [start] once at launch, [companionViewController] for the companion's screens, [games] /
- * [addGames] for the games added from Files, and [gameViewController] / [closeGame] to play one. While a game runs,
+ * Swift module): [start] once at launch, [gameScreenViewController] for the game and companion, [games] /
+ * [addGames] for the games added from Files, [closeGame] to close one. While a game runs,
  * [telemetry] reads it every half second, off the main thread (the core's reads may come from any thread), and the
  * companion follows it.
  */
@@ -71,10 +82,10 @@ object PokeDaisyHost {
     private var battle by mutableStateOf<IosBattleInput?>(null)
     private var slots by mutableStateOf<StateSlotController?>(null)
     private var stateError by mutableStateOf<String?>(null)
-    private var confirmingClose by mutableStateOf(false)
     private var restartFresh = false
     private var started = false
     private var game: GameViewController? = null
+    private val touch = IosTouchControls({ game }, { settings }, { slots })
     private var timer: NSTimer? = null
     // 1 while a read is on its way, so a slow one never piles up behind the next.
     private val reading = atomic(false)
@@ -84,28 +95,41 @@ object PokeDaisyHost {
         if (started) return
         started = true
         IosHosts.install(appFilesDir())
+        IosTouchPreferences.changed = touch::releaseKeys
+        IosTouchPreferences.install()
     }
 
-    /** The companion (PARTY, BAG, MAP, ... SETTINGS) as a view controller, for any part of the window. */
-    fun companionViewController(): UIViewController {
+    /** One Compose host for the native Metal game surface, shared controls and companion. */
+    fun gameScreenViewController(romPath: String, onFailed: () -> Unit): UIViewController {
         start()
+        val current = createGameController(romPath, onFailed)
+        val gameBoy = romPath.substringAfterLast('.').lowercase() in listOf("gb", "gbc")
         return ComposeUIViewController {
             AppTheme {
-                val snapshot by telemetry.snapshot.collectAsState()
-                Box(Modifier.fillMaxSize()) {
-                    CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle)
-                    stateError?.let { message ->
-                        OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
-                            onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
-                    }
-                    if (confirmingClose) {
-                        OptionConfirm(tr("CLOSE GAME"),
-                            tr("Returns to the ROM list. RESUME GAMES is off: progress since your last in-game save will be lost."),
-                            tr("CLOSE GAME"), rememberGbaTextMetrics(),
-                            onConfirm = { confirmingClose = false; finishClose() },
-                            onDismiss = { confirmingClose = false })
-                    }
+                BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
+                    val dp = LocalDensity.current.density
+                    val visible = IosTouchPreferences.visible
+                    val stage = gamePanelLayout(maxWidth.value * dp, maxHeight.value * dp, dp,
+                        visible, gameBoy, IosTouchPreferences.underGame, IosTouchPreferences.style)
+                    SideEffect { touch.stage = stage }
+                    GameScreen(stage,
+                        game = { UIKitViewController(factory = { current }, modifier = Modifier.fillMaxSize(),
+                            properties = UIKitInteropProperties(interactionMode = null)) },
+                        companion = { Companion() },
+                        controls = { if (visible) touch.Controls(gameBoy, stage.portrait) })
                 }
+            }
+        }
+    }
+
+    @Composable
+    private fun Companion() {
+        val snapshot by telemetry.snapshot.collectAsState()
+        Box(Modifier.fillMaxSize()) {
+            CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle)
+            stateError?.let { message ->
+                OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
+                    onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
             }
         }
     }
@@ -167,7 +191,7 @@ object PokeDaisyHost {
 
     /** The game at [romPath] running, its battery save beside the others; closes the one before. [onFailed] hears a
      * game that won't open. */
-    fun gameViewController(romPath: String, onFailed: () -> Unit): UIViewController {
+    private fun createGameController(romPath: String, onFailed: () -> Unit): UIViewController {
         val fresh = restartFresh
         restartFresh = false
         closeGame()
@@ -205,14 +229,14 @@ object PokeDaisyHost {
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            })
+            }, onEditTouch = touch::edit, readTouchStage = touch::readStage)
             .also { L10n.apply(it.appLanguage, code) }
         battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
         }
-        g.beforeStateChange = { battle?.cancel() }
+        g.beforeStateChange = { battle?.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
@@ -224,11 +248,6 @@ object PokeDaisyHost {
         prefetchArt(romPath)
         timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
         return g
-    }
-
-    /** The native GAMES chip follows the same progress warning as companion SETTINGS > CLOSE GAME. */
-    fun requestCloseGame() {
-        if (settings?.autoResume == false) confirmingClose = true else finishClose()
     }
 
     private fun finishClose() {
@@ -250,11 +269,11 @@ object PokeDaisyHost {
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
         stateError = null
-        confirmingClose = false
         timer?.invalidate()
         timer = null
         battle?.cancel()
         battle = null
+        touch.close()
         game?.close()
         game = null
         slots = null

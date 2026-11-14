@@ -1,11 +1,11 @@
 # PokeDaisy for iPad
 
-The iPad app: a SwiftUI app with the game (the iOS core's `GameViewController`: Metal, sound, controllers and a
-hardware keyboard) beside the companion's shared screens (`shared-ui`, Compose Multiplatform). With no game running, the
-game's place lists the games added from Files (ADD GAMES); a game is copied into the app's `Documents/roms/` and keeps its
-save in `Documents/saves/`, both visible in Files. A game's menu (the circle beside it) has Load a save from Files, which puts the picked save in its place and keeps
-the one before as `<name>.backup-<date>.sav` (RetroArch's compressed saves aren't read yet). There are no on-screen buttons yet: play with a
-controller or a keyboard.
+The iPad app hosts the native Metal game surface, audio, controllers and keyboard with the same Compose companion
+screens and touch controls Android uses. With no game running, the app lists the games added from Files (ADD GAMES); a
+game is copied into the app's `Documents/roms/` and keeps its save in `Documents/saves/`, both visible in Files. A
+game's menu (the circle beside it) has Load a save from Files, which puts the picked save in its place and keeps the one
+before as `<name>.backup-<date>.sav` (RetroArch's compressed saves aren't read yet). A controller or a keyboard works
+too.
 
 ## Battles
 
@@ -53,3 +53,19 @@ From the command line (no signing, the simulator):
 xcodebuild -project iosApp/PokeDaisy.xcodeproj -scheme PokeDaisy -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
+
+## Shared touch customization
+
+The companion's TOUCH CONTROLS page, preview and EDIT LAYOUT are the existing shared Compose screens. Preferences use
+TouchStyleCodec, also used by Android, backed by NSUserDefaults. The game, controls and companion share one Compose host;
+Swift only switches between the game list and the game screen. An editor uses the same safe-area layout bounds as the
+game screen, pauses the core and keeps separate orientation layouts. Controller connection changes update AUTO visibility. FF (tap/hold),
+turbo and state buttons use the existing playback/slot bridges; unsupported actions and skins are omitted.
+
+## Game screen layout
+
+Upright, the screen follows Android's PortraitLayout: with the touch page's COMPANION at UNDER GAME (the default) the
+companion sits under the game and the controls get a strip of their own along the bottom, as on an Android phone; with
+AT BOTTOM the companion is along the bottom and the controls take the gap above it, or the game where there is none. Sideways, the game is centered beside the docked companion and the controls overlay its area, using Android's default panel
+width. The live screen, editor and both preview orientations use the same TouchStage bounds. Game Boy games keep their own aspect ratio. Return to the game list through shared SETTINGS > CLOSE GAME; there
+is no separate GAMES overlay, toolbar controller or Swift panel-sizing bridge.
