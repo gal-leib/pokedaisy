@@ -2,45 +2,39 @@ import SwiftUI
 import UIKit
 import PokeDaisyUI
 
-/// Sideways: the game left at the GBA's 3:2, the companion right in the rest. Upright: the game across the top,
-/// the companion under it - the Android app's layouts on one screen. With no game running the game's place lists
-/// the games added from Files.
+/// Sideways: the game left at the GBA's 3:2 with its buttons under it, the companion right in the rest. Upright: the
+/// game across the top, its buttons, the companion under them - the Android app's layouts on one screen. With no game
+/// running the game's place lists the games added from Files.
 struct RootView: View {
     @State private var playing: String?
     @State private var failed: String?
+    /// The proof of concept's UIKit buttons in place of the app's own, to time the two against each other.
+    @AppStorage("native_touch_controls") private var nativeControls = false
+
+    /// How tall the buttons' strip under the game is, at the least.
+    private let strip: CGFloat = 220
 
     var body: some View {
         GeometryReader { geo in
             let wide = geo.size.width > geo.size.height
             let layout = wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
             layout {
-                gameArea
-                    .frame(width: wide ? min(geo.size.width * 0.6, geo.size.height * 1.5) : nil,
-                           height: wide ? nil : geo.size.width / 1.5)
+                gameColumn
+                    .frame(width: wide ? min(geo.size.width * 0.6, (geo.size.height - strip) * 1.5) : nil,
+                           height: wide ? nil : (playing == nil ? geo.size.width / 1.5 : geo.size.width / 1.5 + strip))
                 ViewControllerView(make: { PokeDaisyHost.shared.companionViewController() })
             }
         }
         .background(Color.black)
     }
 
-    @ViewBuilder private var gameArea: some View {
+    @ViewBuilder private var gameColumn: some View {
         if let rom = playing {
-            ZStack(alignment: .topLeading) {
-                ViewControllerView(make: {
-                    PokeDaisyHost.shared.gameViewController(romPath: rom, onFailed: {
-                        DispatchQueue.main.async {
-                            failed = rom
-                            stop()
-                        }
-                    })
-                })
-                .id(rom)
-                Button("GAMES", action: stop)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .padding(8)
-                    .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
-                    .foregroundStyle(.white)
-                    .padding(8)
+            GeometryReader { col in
+                VStack(spacing: 0) {
+                    game(rom).frame(height: col.size.width / 1.5)
+                    controls(rom)
+                }
             }
         } else {
             GamesList(failed: failed) { rom in
@@ -48,6 +42,46 @@ struct RootView: View {
                 playing = rom
             }
         }
+    }
+
+    private func game(_ rom: String) -> some View {
+        ZStack(alignment: .topLeading) {
+            ViewControllerView(make: {
+                PokeDaisyHost.shared.gameViewController(romPath: rom, onFailed: {
+                    DispatchQueue.main.async {
+                        failed = rom
+                        stop()
+                    }
+                })
+            })
+            .id(rom)
+            HStack(spacing: 0) {
+                chip("GAMES", action: stop)
+                chip(nativeControls ? "TOUCH: NATIVE" : "TOUCH: SHARED") {
+                    PokeDaisyHost.shared.setTouchKeys(keys: 0)
+                    nativeControls.toggle()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func controls(_ rom: String) -> some View {
+        if nativeControls {
+            NativeGamepad()
+        } else {
+            let gameBoy = ["gb", "gbc"].contains((rom as NSString).pathExtension.lowercased())
+            ViewControllerView(make: { PokeDaisyHost.shared.touchControlsViewController(gameBoy: gameBoy) })
+                .id(rom)
+        }
+    }
+
+    private func chip(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: 13, weight: .bold, design: .monospaced))
+            .padding(8)
+            .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+            .foregroundStyle(.white)
+            .padding(8)
     }
 
     private func stop() {

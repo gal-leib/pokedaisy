@@ -3,8 +3,10 @@
 The iPad app: a SwiftUI app with the game (the iOS core's `GameViewController`: Metal, sound, controllers and a
 hardware keyboard) beside the companion's shared screens (`shared-ui`, Compose Multiplatform). With no game running, the
 game's place lists the games added from Files (ADD GAMES); a game is copied into the app's `Documents/roms/` and keeps its
-save in `Documents/saves/`, both visible in Files. There are no on-screen buttons yet: play with a controller or a
-keyboard.
+save in `Documents/saves/`, both visible in Files. The game's buttons sit in a strip under it: the app's own touch
+controls (`TouchControls`, shared with Android) or, after a tap on TOUCH, the proof of concept's UIKit buttons
+(`GamepadView.swift`), kept until touch delay has been timed on a real iPad and one of the two is picked. A controller
+or a keyboard works too.
 
 ## Build and run
 
