@@ -20,7 +20,7 @@ class StartSelect2Test {
     @Test
     fun untouchedStateHotkeysGiveUpXAndY() {
         val dir = tmp.newFolder().toOkioPath()
-        hotkeysFile(dir.toFile(), "BUTTON_SELECT+BUTTON_R1, BUTTON_Y, F1", "BUTTON_SELECT+BUTTON_L1, BUTTON_X, F2")
+        hotkeysFile(dir, "BUTTON_SELECT+BUTTON_R1, BUTTON_Y, F1", "BUTTON_SELECT+BUTTON_L1, BUTTON_X, F2")
         val raw = Hotkeys.load(dir).rawBindings
         assertEquals(listOf("BUTTON_SELECT+BUTTON_R1", "F1"), raw[Hotkeys.Action.SAVE_STATE])
         assertEquals(listOf("BUTTON_SELECT+BUTTON_L1", "F2"), raw[Hotkeys.Action.LOAD_STATE])
@@ -29,7 +29,7 @@ class StartSelect2Test {
     @Test
     fun customStateHotkeysAreKept() {
         val dir = tmp.newFolder().toOkioPath()
-        hotkeysFile(dir.toFile(), "BUTTON_Y", "BUTTON_X")
+        hotkeysFile(dir, "BUTTON_Y", "BUTTON_X")
         val raw = Hotkeys.load(dir).rawBindings
         assertEquals(listOf("BUTTON_Y"), raw[Hotkeys.Action.SAVE_STATE])
         assertEquals(listOf("BUTTON_X"), raw[Hotkeys.Action.LOAD_STATE])
