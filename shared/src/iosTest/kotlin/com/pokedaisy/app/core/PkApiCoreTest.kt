@@ -90,10 +90,15 @@ class PkApiCoreTest {
             for (speed in listOf(0.25, 1.0, 2.0, 10.0)) {
                 PkApiCore.setAudioRate(PkApiCore.SAMPLE_RATE / speed)
                 repeat(4) { PkApiCore.runFrame() }
-                PkApiCore.runFrame()
-                val count = PkApiCore.audio(samples)
-                val expected = PkApiCore.SAMPLE_RATE / speed / com.pokedaisy.app.game.FramePacer.FPS * 2
-                assertTrue(kotlin.math.abs(count - expected) < 32, "$rom at ${speed}x: $count samples, expected $expected")
+                // The core mixes sound in blocks, so compare a half second rather than one frame's boundary.
+                var count = 0
+                repeat(30) {
+                    PkApiCore.runFrame()
+                    count += PkApiCore.audio(samples)
+                }
+                val expected = PkApiCore.SAMPLE_RATE / speed / com.pokedaisy.app.game.FramePacer.FPS * 2 * 30
+                assertTrue(kotlin.math.abs(count - expected) < expected * 0.01 + 128,
+                    "$rom at ${speed}x: $count samples, expected $expected")
             }
             PkApiCore.stop()
         }
