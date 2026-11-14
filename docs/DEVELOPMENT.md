@@ -3647,6 +3647,15 @@ built pret decomp checkouts (`pokefirered/`, `pokeemerald/`, `pokeruby/`,
 `DECOMPS` environment variable. Machine-local paths go in an untracked
 `local.mk`, which the Makefile includes (see `local.mk.example`).
 
+### The core's state API
+
+`pk_api_save_state`, `pk_api_load_state` and `pk_api_state_matches_save` are the GBA / Game Boy state functions,
+shared by Android's JNI dispatch and the iPad's `PkApiCore`. They use mGBA's extended state with battery data and
+RTC, on the game thread, between frames, under the core lock. A manual load rewinds the battery save too: back it
+up first. For automatic resume, establish a save match first; changed or unverifiable saves must boot from the file.
+State writes target a temporary file before the host atomically replaces its slot. The C host test `pk_state`
+checks round trips, invalid states, cross-platform refusal and detection of a changed battery save.
+
 ### The shared module (`shared/`, for the iPad app)
 
 The companion's data and language code, `app/src/main/kotlin/com/pokedaisy/app/companion/data` and `companion/i18n`,

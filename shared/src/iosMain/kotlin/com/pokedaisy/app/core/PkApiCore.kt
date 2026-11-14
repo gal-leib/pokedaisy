@@ -3,6 +3,9 @@
 package com.pokedaisy.app.core
 
 import com.pokedaisy.app.companion.data.EmulatorCore
+import com.pokedaisy.app.core.pkapi.pk_api_save_state
+import com.pokedaisy.app.core.pkapi.pk_api_load_state
+import com.pokedaisy.app.core.pkapi.pk_api_state_matches_save
 import com.pokedaisy.app.core.pkapi.pk_api_audio
 import com.pokedaisy.app.core.pkapi.pk_api_deinit
 import com.pokedaisy.app.core.pkapi.pk_api_finish_save
@@ -95,6 +98,12 @@ object PkApiCore : EmulatorCore {
 
     /** Lets a save the game is writing finish (up to [maxFrames] frames): before [stop] or a state. */
     fun finishSave(maxFrames: Int): Int = pk_api_finish_save(maxFrames)
+
+    /** Extended states include the battery save: a manual load rewinds it too. Game thread only. */
+    fun saveState(path: String): Boolean = pk_api_save_state(path)
+    fun loadState(path: String): Boolean = pk_api_load_state(path)
+    /** 1 = matches the battery file, 0 = changed, -1 = absent/unreadable; only 1 permits automatic resume. */
+    fun stateMatchesSave(path: String): Int = pk_api_state_matches_save(path)
 
     override fun readBytes(addr: Long, len: Int): ByteArray? {
         if (len <= 0 || len > MAX_READ) return null

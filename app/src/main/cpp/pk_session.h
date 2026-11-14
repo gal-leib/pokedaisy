@@ -55,6 +55,7 @@ extern struct pk_session pk_session;
 /** Guards g.core's lifetime, not its state: the emu thread owns frames, saves and teardown, but the companion's ROM
  * readers (Pokédex, GUIDE, icons) read from IO threads, and one in flight while the game closed read a core
  * pk_api_deinit had just freed. Readers share it; init / teardown take it alone. */
+/* State loads also take the write lock while replacing the game RAM readers inspect. */
 extern pthread_rwlock_t pk_coreLock;
 
 int pk_is_gba(const struct mCore* core);

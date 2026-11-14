@@ -107,6 +107,22 @@ class PkApiCoreTest {
     }
 
     @Test
+    fun extendedStateRestoresGameBoyMemoryThroughCinterop() {
+        val state = "$dir/cinterop-state.ss"
+        assertTrue(PkApiCore.start("$dir/diagnostic.gb", "$dir/cinterop-state.sav"))
+        repeat(60) { PkApiCore.runFrame() }
+        val before = assertNotNull(PkApiCore.readBytes(0xC000, 1))
+        assertTrue(PkApiCore.saveState(state))
+        assertEquals(1, PkApiCore.stateMatchesSave(state))
+        repeat(7) { PkApiCore.runFrame() }
+        assertTrue(PkApiCore.loadState(state))
+        assertContentEquals(before, PkApiCore.readBytes(0xC000, 1))
+        assertEquals(-1, PkApiCore.stateMatchesSave("$dir/missing-state"))
+        kotlin.test.assertFalse(PkApiCore.loadState("$dir/missing-state"))
+        unlink(state)
+    }
+
+    @Test
     fun noGameReadsNothing() {
         PkApiCore.stop()
         assertNull(PkApiCore.readBytes(0x02000000, 4))
