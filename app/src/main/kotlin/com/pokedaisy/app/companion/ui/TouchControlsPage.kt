@@ -274,13 +274,15 @@ fun TouchControlsPage(
     skinUi: TouchSkinUi? = null,
     setStyle: (TouchControlsStyle) -> Unit = {},
     onDeleteSkin: (InstalledSkin) -> Unit = {},
+    otherStage: TouchStage? = null,
     rows: @Composable (Modifier) -> Unit,
 ) {
     val system = if (stage.ds) SkinSystem.DS else if (stage.gameBoy) SkinSystem.GB else SkinSystem.GBA
     val skin = style.skinFor(system)?.let { id -> skins.firstOrNull { it.id == id } }
     var other by remember { mutableStateOf(false) }
-    val shown = remember(stage, other, underGame, portraitRatio, expand, touchShown, style) {
+    val shown = remember(stage, other, otherStage, underGame, portraitRatio, expand, touchShown, style) {
         if (!other) stage
+        else if (otherStage != null) otherStage
         else {
             val w = stage.h
             val upright = stage.w > stage.h   // the other way round from what's shown

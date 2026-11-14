@@ -3959,10 +3959,18 @@ header, quick views, empty states, search strip and collection. Hosts supply dat
 title chrome and the about footer are shared too. Application-mode settings use the companion's page catalog and
 searchable home; hosts can omit game-only controls when no core is open.
 
-GamePanelLayout measures a one-window game host and the standalone touch editor's preview. LibraryPreferences stores
+GamePanelLayout returns a TouchStage directly for the one-window game host and the standalone editor. Portrait
+uses Android's PortraitLayout UNDER GAME arrangement, with no resize grip and room reserved for visible controls.
+Landscape uses the shared default side-panel width, centers the game in its area and overlays the controls there, without a separate strip. LibraryPreferences stores
 portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
 
 The iPad uses these presenters for its full-window library, Files-based setup and application settings. Its native
-adapter supplies file operations, preferences and launch actions; Swift only positions the Metal game surface and
-shared controllers. Both global and in-game touch editing use the shared editor, with a settings revision published
+adapter supplies file operations, preferences and launch actions; Swift only switches application/game controllers.
+One Compose game host embeds the Metal controller through UIKitViewController and places the shared companion and
+controls through GameScreen. Resizing moves the existing controller without restarting the core. Layout and editor
+bounds are safe-area pixels throughout; there is no UIKit window-coordinate conversion or separate GAMES toolbar.
+Both global and in-game touch editing use the shared editor, with a settings revision published
 after layout writes so the preview and rows refresh when the editor closes.
+
+Hosts can supply touchStageInOtherOrientation when their rotated layout differs from the phone stand-in. The iPad
+uses GamePanelLayout there too, so the rotated touch preview retains the docked companion and matches the live screen.

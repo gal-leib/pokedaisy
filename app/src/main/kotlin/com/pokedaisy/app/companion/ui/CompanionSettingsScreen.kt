@@ -305,6 +305,7 @@ fun CompanionSettingsScreen(
                         stage, style, shot, m, Modifier.fillMaxWidth().weight(1f), underGame = settings.uprightUnderGame == true,
                         expand = settings.gameAspect == GameAspect.WIDE && settings.wideSupported, touchShown = settings.touchControlsShown,
                         skins = touchSkins, skinUi = touchSkinUi.takeIf { settings.touchSkinsSupported }, setStyle = { settings.setTouchStyle(it); tick++ },
+                        otherStage = settings.touchStageInOtherOrientation,
                     ) { mod ->
                         OptionListWindow(m, mod) {
                             GroupedRows(rows, m, cursor, onClick = { i -> moveCursor(i); rows[i].onClick() }, onFocused = ::moveCursor)

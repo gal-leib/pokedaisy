@@ -56,15 +56,23 @@ xcodebuild -project iosApp/PokeDaisy.xcodeproj -scheme PokeDaisy -sdk iphonesimu
 ## Shared touch customization
 
 The companion's TOUCH CONTROLS page, preview and EDIT LAYOUT are the existing shared Compose screens. Preferences use
-TouchStyleCodec, also used by Android, backed by NSUserDefaults. The Swift shell only provides the controls' room and
-orientation; it no longer offers a second native pad. An editor uses the measured window/controls bounds, pauses the
-core and keeps separate orientation layouts. Controller connection changes update AUTO visibility. FF (tap/hold),
+TouchStyleCodec, also used by Android, backed by NSUserDefaults. The game, controls and companion share one Compose host;
+Swift only switches between the library and game controllers. An editor uses the same safe-area layout bounds as the
+game screen, pauses the core and keeps separate orientation layouts. Controller connection changes update AUTO visibility. FF (tap/hold),
 turbo and state buttons use the existing playback/slot bridges; unsupported actions and skins are omitted.
 
 ## Shared application screens
 
-The library, setup and app-settings presenters are the same Compose components Android uses. Swift hosts controllers
-and the native Metal game surface; it no longer defines a separate list, menus, settings UI or touch pad. The library
-is full-window when no game is open, with grid/list, search, sorting, favorites/recent views and save import. Settings
+The library, setup and app-settings presenters are the same Compose components Android uses. Swift switches between
+controllers; Compose embeds the native Metal game surface and owns the panel layout. There is no separate Swift list,
+menus, settings UI or touch pad. The library is full-window when no game is open, with grid/list, search, sorting, favorites/recent views and save import. Settings
 and touch layout editing work before a game starts. Setup uses Files to copy games and keeps saves in Documents/saves;
 Android folder linking and platform-specific media/tool services remain outside shared UI.
+
+## Game screen layout
+
+Upright, the game is above the companion and the controls are along the bottom, using Android's PortraitLayout
+UNDER GAME arrangement. Sideways, the game is centered beside the docked companion and the controls overlay its area, using Android's default panel
+width. The live screen, editor and both preview orientations use the same TouchStage bounds. Game Boy games keep their own aspect ratio. POSITION only
+aligns preset buttons within the controls' area. Return to the library through shared SETTINGS > CLOSE GAME; there
+is no separate GAMES overlay, toolbar controller or Swift panel-sizing bridge.

@@ -175,7 +175,7 @@ To use another button, change the `QUICK MENU` hotkey.
 - **`EDIT LAYOUT`**: move the buttons yourself (see below).
 
 In a DS game the buttons get X and Y too, around A and B the way the DS has them: X on top, Y on the left.
-- **`POSITION`**: with the phone held upright, where the buttons sit in their space: `TOP`, `MIDDLE` (the default) or `BOTTOM`. Their space is the gap between the game and the companion, or the game itself when there's no gap. It doesn't move a `CUSTOM` layout, which keeps your own places. With `EXPAND` and `UNDER GAME` the buttons get a space that fits them exactly, so it's greyed out then.
+- **`POSITION`**: with the phone held upright, where the buttons sit in their space: `TOP`, `MIDDLE` (the default) or `BOTTOM`. With the companion `UNDER GAME`, their space is below the companion. With `AT BOTTOM`, it is the gap between the game and the companion, or the game itself when there's no gap. It doesn't move a `CUSTOM` layout, which keeps your own places. With `EXPAND` and `UNDER GAME` the buttons get a space that fits them exactly, so it's greyed out then.
 - **`COMPANION`**: with the phone held upright, the companion right `UNDER GAME` (the default), which leaves the space at the bottom of the screen for the buttons (when there's no room to spare, the companion and then the game get a little smaller to make that space), or `AT BOTTOM` of the screen. It's the same setting as the one in `DISPLAY OPTIONS`, and only on phones and other one-screen devices. With `EXPAND` on, the game fills everything above the companion, so `UNDER GAME` gives the buttons a strip of their own along the bottom of the screen instead, under the companion, where they never cover the game. With no touch controls on screen there's nothing to choose then, and the setting is greyed out.
 - **`SIZE`**: `SMALL`, `NORMAL`, `LARGE` or `X-LARGE`, for every button at once.
 - **`LOOK`**: how the buttons are drawn. `GLASS` (the default) is see-through with a light edge, `SOLID` fills them in, `OUTLINE` draws only their edges and words (a press fills one in), `CONSOLE` makes them look like a handheld's: raised, sinking a little when you press them, and `MODERN` draws smooth round buttons with plain lettering instead of pixels.
@@ -287,6 +287,10 @@ This works from either screen. On a device with one screen, a tap also slides th
 
 Open the companion's `SETTINGS` > `TOUCH CONTROLS` to change the same layouts, size, look, colors, opacity and D-pad
 options as on Android. Changes apply to the controls straight away and are kept when you reopen the app.
+
+Hold the iPad upright to put the game at the top, the companion directly below it and the controls at the bottom.
+`POSITION` aligns the buttons within their controls area. Held sideways, the game is centered beside the companion, with touch controls over the game area.
+The preview and `EDIT LAYOUT` use the same arrangement as the game screen.
 
 `EDIT LAYOUT` pauses the game and opens the shared editor over its picture. Drag controls, resize or hide them, then
 choose `DONE`. Upright and sideways layouts are kept separately. `SHOW` > `AUTO` hides the controls while a gamepad is

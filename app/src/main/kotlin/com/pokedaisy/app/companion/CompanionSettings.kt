@@ -205,6 +205,9 @@ interface CompanionSettings {
     /** The game's screen as the touch controls see it, for TOUCH CONTROLS' preview; null = laid out like a phone's. */
     val touchStage: TouchStage? get() = null
 
+    /** A host with its own one-window layout supplies the same layout for the rotated preview too. */
+    val touchStageInOtherOrientation: TouchStage? get() = null
+
     /** The newest savestate's picture for the preview (null: a drawn stand-in). */
     fun touchPreviewShot(): androidx.compose.ui.graphics.ImageBitmap? = null
 

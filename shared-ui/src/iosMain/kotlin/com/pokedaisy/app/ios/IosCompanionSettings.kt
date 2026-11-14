@@ -56,6 +56,9 @@ internal class IosCompanionSettings(
     override val touchSkinsSupported = false
     override val touchBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_TOUCH)
     override val touchStage get() = readTouchStage()
+    override val touchStageInOtherOrientation get() = touchStage?.let {
+        com.pokedaisy.app.companion.ui.gamePanelLayout(it.h, it.w, it.dp, IosTouchPreferences.drawingStyle, gameBoy = it.gameBoy)
+    }
     override val touchControlsShown get() = IosTouchPreferences.visible
     override fun editTouchLayout() = onEditTouch()
     override fun feelVibration(strength: Int) = IosTouchPreferences.feel(strength)

@@ -651,7 +651,7 @@ class Prefs(context: Context) {
 
     /** Single-screen devices: the side panel's width, as a fraction of the screen's (see [SidePanel]). */
     var sidePanelWidth: Float
-        get() = p.getFloat("side_panel_width", 0.5f)
+        get() = p.getFloat("side_panel_width", com.pokedaisy.app.companion.ui.SIDE_PANEL_DEFAULT_WIDTH)
         set(v) = p.edit().putFloat("side_panel_width", v).apply()
 
     /** One screen held sideways: the companion opens as a window in the middle, over the game (true), or in the side

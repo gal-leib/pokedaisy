@@ -277,5 +277,7 @@ Open `SETTINGS` from the library to change appearance, language, playback defaul
 `RUN SETUP` reopens the shared setup pages. On iPad, games picked in Files are copied into PokeDaisy's `roms` folder,
 and battery saves stay in `saves`. You can reach both folders through Files.
 
+To return to the library while playing, open the companion's `SETTINGS` and choose `CLOSE GAME`. Confirm to close it.
+
 Only actions supported on iPad are offered. Folder linking, cover downloads and several Android tools still need
 platform support.
