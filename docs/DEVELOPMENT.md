@@ -3954,11 +3954,17 @@ Android retains its setup state, pickers and optional media services; the shared
 and callbacks. Hosts that copy picked games rather than linking folders can select that capability without presenting
 Android permission instructions. The settings host retains focus ownership and row actions while sharing the presenter.
 
-GamePanelLayout returns a TouchStage directly for the one-window game host and its touch editor. Portrait
+`LibraryScreen` is the shared presenter as well as the widgets: its display model, actions and focus record drive the
+header, quick views, empty states, search strip and collection. Hosts supply data and card/menu callbacks. App-settings
+title chrome and the about footer are shared too. Application-mode settings use the companion's page catalog and
+searchable home; hosts can omit game-only controls when no core is open.
+
+GamePanelLayout returns a TouchStage directly for the one-window game host and the standalone editor. Portrait
 uses Android's PortraitLayout with no resize grip, the player's UNDER GAME / AT BOTTOM, and Android's controls area: with
 UNDER GAME a strip of `TouchGeometry.naturalHeight` along the bottom (`padStrip`, as `PokeDaisyActivity.syncTouchControls`
 sets it), with AT BOTTOM the gap above the companion, else the game itself.
-Landscape uses the shared default side-panel width, centers the game in its area and overlays the controls there, without a separate strip.
+Landscape uses the shared default side-panel width, centers the game in its area and overlays the controls there, without a separate strip. LibraryPreferences stores
+portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
 
 On the iPad one Compose game host embeds the Metal controller through UIKitViewController and places the shared
 companion and controls through GameScreen. Resizing moves the existing controller without restarting the core. Layout

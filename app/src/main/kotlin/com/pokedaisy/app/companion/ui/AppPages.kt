@@ -1,10 +1,14 @@
 package com.pokedaisy.app.companion.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import com.pokedaisy.app.companion.Discord
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -260,5 +264,63 @@ fun AppSettingsHome(
         }
         Spacer(Modifier.height(m.u * 4))
         footer()
+    }
+}
+
+/** Application title chrome, shared by global settings on both platforms. */
+@Composable
+fun AppPageTitle(title: String, m: GbaTextMetrics, onBack: (() -> Unit)? = null,
+                 home: Boolean = false, onHelp: () -> Unit = {}) {
+    if (home) {
+        OptionTitleWindow("POKéDAISY", m,
+            leading = { PixelArt(LOGO_ROWS, LOGO_PALETTE, Modifier.size(m.lineHeight)) }) {
+            Spacer(Modifier.width(m.u * 4))
+            OptionButton(null, m, onClick = onHelp, icon = Icons.AutoMirrored.Filled.HelpOutline, contentDescription = tr("Help"))
+        }
+        Spacer(Modifier.height(m.u * 8))
+    } else {
+        OptionTitleWindow(title, m, onBack = onBack)
+        Spacer(Modifier.height(m.u * 4))
+    }
+}
+
+object AppLinks {
+    const val REPO_URL = "https://github.com/lidor30/pokedaisy"
+    const val COFFEE_URL = "https://buymeacoffee.com/lidor30g"
+}
+
+@Composable
+fun AppAboutFooter(version: String, m: GbaTextMetrics, onOpenUrl: (String) -> Unit) {
+    val small = rememberGbaTextMetrics(textScale = 1f)
+    OptionListWindow(m, Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = m.u * 8, vertical = m.u * 3),
+        ) {
+            GbaText(
+                tr("POKéDAISY {0}  ·  by {1}", version, "Lidor Itzhari (@lidor30)"),
+                OptionColors.label, OptionColors.labelShadow, small, modifier = Modifier.weight(1f),
+            )
+            FooterLink(tr("Buy me a coffee"), m, small, Modifier.padding(start = m.u * 6), { CoffeeCup() }) {
+                onOpenUrl(AppLinks.COFFEE_URL)
+            }
+            GbaText("  ·  ", OptionColors.label, OptionColors.labelShadow, small)
+            FooterLink("Discord", m, small, icon = { DiscordMark() }) { onOpenUrl(Discord.URL) }
+            GbaText("  ·  ", OptionColors.label, OptionColors.labelShadow, small)
+            FooterLink("GitHub", m, small, icon = { GitHubMark() }) { onOpenUrl(AppLinks.REPO_URL) }
+        }
+    }
+}
+
+/** A pixel [icon] then [text] in the value red, the whole of it one tap target. */
+@Composable
+private fun FooterLink(
+    text: String, m: GbaTextMetrics, small: GbaTextMetrics, modifier: Modifier = Modifier,
+    icon: @Composable () -> Unit, onClick: () -> Unit,
+) {
+    Row(modifier.clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(small.lineHeight)) { icon() }
+        Spacer(Modifier.width(m.u * 3))
+        GbaText(text, OptionColors.value, OptionColors.valueShadow, small)
     }
 }

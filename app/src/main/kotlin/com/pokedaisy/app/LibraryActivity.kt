@@ -512,11 +512,10 @@ class LibraryActivity : ComponentActivity() {
     }
 
     /** What an empty FAVORITES / RECENT says. */
-    private fun emptyViewText(view: LibraryView) =
-        if (view == LibraryView.FAVORITES) tr("No favorites yet. Long press a game and pick FAVORITE to keep it here.")
-        else tr("No games played yet. The games you play show here, the last one first.")
+    private fun emptyViewText(view: LibraryView) = com.pokedaisy.app.companion.ui.libraryEmptyViewText(view)
     /** The open quick view's pill: where D-pad UP from the games' top row lands. */
-    private val quickViewFocus = FocusRequester()
+    private val libraryFocus = com.pokedaisy.app.companion.ui.LibraryFocus()
+    private val quickViewFocus get() = libraryFocus.views
 
     /** The header's SEARCH (GitHub #123): what the games are filtered by, [shownRoms]; [searching] = its window is up. */
     private var searchQuery by mutableStateOf("")
@@ -556,95 +555,20 @@ class LibraryActivity : ComponentActivity() {
         BackHandler(enabled = toolsOpen) { toolsOpen = false }
         // BACK with a search on shows the whole library again.
         BackHandler(enabled = !toolsOpen && searchQuery.isNotEmpty()) { search("") }
-        com.pokedaisy.app.companion.ui.LibraryFrame(
-            section, m, small, onSection = pickSection,
+        val presentation = com.pokedaisy.app.companion.ui.LibraryPresentation(roms, gridView, section,
+            views.shown, view, views.counts, library.isNotEmpty(), searchQuery,
+            tr("No ROMs yet. Tap + to add a ROM file (a .gba, .zip or .7z) or your ROMs folders, or drop files into {0}",
+                "Android/data/$packageName/files/roms/"), tools)
+        val actions = com.pokedaisy.app.companion.ui.LibraryActions(
+            add = { addMenu = true }, refresh = ::refreshLibrary, search = { searching = true }, sort = { pickingSort = true },
+            toggleGrid = { gridView = !gridView }, help = {
+                startActivity(Intent(this@LibraryActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SCREEN, SettingsActivity.SCREEN_HELP))
+            }, query = ::search, view = ::pickQuickView, section = pickSection)
+        com.pokedaisy.app.companion.ui.LibraryScreen(presentation, actions, m, small, key = { it.absolutePath },
             modifier = Modifier.onSizeChanged { screenSize = with(density) { DpSize(it.width.toDp(), it.height.toDp()) } },
-            toolsBadge = toolsNew && !toolsOpen, compactTitle = narrowHeader && !toolsOpen,
-            headerGap = m.u * (if (library.isNotEmpty() || toolsOpen) 8 else 4),
-            header = {
-                // TOOLS has no games to sort, show, add or refresh: HELP alone.
-                if (!toolsOpen) {
-                // The header's first button: where UP from the top of the games lands.
-                HeaderIcon(Icons.AutoMirrored.Filled.Sort, tr("Sort"), m, Modifier.focusRequester(headerFirst)) { pickingSort = true }
-                androidx.compose.runtime.DisposableEffect(Unit) {
-                    headerFirstAttached = true
-                    onDispose { headerFirstAttached = false }
-                }
-                HeaderIcon(Icons.Filled.Search, tr("SEARCH"), m) { searching = true }
-                HeaderIcon(if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView, tr("Toggle view"), m) {
-                    gridView = !gridView
-                }
-                HeaderIcon(Icons.Filled.Add, tr("Add games"), m) { addMenu = true }
-                HeaderIcon(Icons.Filled.Refresh, tr("Refresh"), m) { refreshLibrary() }
-                }
-                // The manual (Settings > HELP), on its own.
-                HeaderIcon(Icons.AutoMirrored.Filled.HelpOutline, tr("Help"), m) {
-                    startActivity(Intent(this@LibraryActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SCREEN, SettingsActivity.SCREEN_HELP))
-                }
-            },
-            overlays = { LibraryDialogs(m, small); GameLoadingCover(m) },
-        ) {
-            SearchStrip(m)
-
-            if (library.isNotEmpty() && !toolsOpen) {
-                com.pokedaisy.app.companion.ui.QuickViewPills(
-                    views.shown, view, views.counts, m, small,
-                    onPick = ::pickQuickView,
-                    contentPadding = PaddingValues(horizontal = SCREEN_MARGIN),
-                    focusRequester = quickViewFocus,
-                )
-                androidx.compose.runtime.DisposableEffect(Unit) {
-                    quickViewFocusAttached = true
-                    onDispose { quickViewFocusAttached = false }
-                }
-                Spacer(Modifier.height(m.u * 8))
-            }
-
-            if (toolsOpen) {
-                com.pokedaisy.app.companion.ui.ToolsPage(
-                    tools, m, small,
-                    contentPadding = PaddingValues(start = SCREEN_MARGIN, end = SCREEN_MARGIN, bottom = SCREEN_MARGIN),
-                    modifier = Modifier.weight(1f),
-                )
-            } else if (library.isNotEmpty() && roms.isEmpty()) {
-                OptionListWindow(m, Modifier.fillMaxWidth().padding(horizontal = SCREEN_MARGIN)) {
-                    GbaText(
-                        emptyViewText(view),
-                        OptionColors.label, OptionColors.labelShadow, small, maxLines = Int.MAX_VALUE,
-                        modifier = Modifier.padding(m.u * 4),
-                    )
-                }
-            } else if (roms.isEmpty()) {
-                OptionListWindow(m, Modifier.fillMaxWidth().padding(horizontal = SCREEN_MARGIN)) {
-                    GbaText(
-                        if (searchQuery.isNotBlank()) tr("No games match your search.") else tr(
-                            "No ROMs yet. Tap + to add a ROM file (a .gba, .zip or .7z) or your ROMs folders, or drop files into {0}",
-                            "Android/data/$packageName/files/roms/",
-                        ),
-                        OptionColors.label, OptionColors.labelShadow, small, maxLines = Int.MAX_VALUE,
-                        modifier = Modifier.padding(m.u * 4),
-                    )
-                }
-            } else if (gridView) {
-                // A list of its own per view: another view starts at its top, not at the last one's first game.
-                androidx.compose.runtime.key(view) {
-                    RomGrid(
-                        roms, m, small,
-                        modifier = Modifier.weight(1f),
-                        onRename = { renaming = it },
-                        onDelete = { deleting = it },
-                    )
-                }
-            } else {
-                androidx.compose.runtime.key(view) {
-                    RomList(
-                        roms, m, small,
-                        modifier = Modifier.weight(1f),
-                        onRename = { renaming = it },
-                        onDelete = { deleting = it },
-                    )
-                }
-            }
+            focus = libraryFocus, overlays = { LibraryDialogs(m, small); GameLoadingCover(m) }) { rom, up ->
+            if (gridView) RomTile(rom, m, small, onRename = { renaming = rom }, onDelete = { deleting = rom }, upTo = up)
+            else RomRow(rom, m, small, onRename = { renaming = rom }, onDelete = { deleting = rom }, upTo = up)
         }
     }
 
@@ -1005,13 +929,17 @@ class LibraryActivity : ComponentActivity() {
     }
 
     /** The header's leftmost button (sort). */
-    private val headerFirst = FocusRequester()
+    private val headerFirst get() = libraryFocus.header
     /** [headerFirst] is on a button: only [LibraryScreen]'s header has it. The launcher's list draws the same cards
      * under a header of its own, and UP to an unattached requester threw ("FocusRequester is not initialized"). */
-    private var headerFirstAttached = false
+    private var headerFirstAttached: Boolean
+        get() = libraryFocus.headerAttached
+        set(value) { libraryFocus.headerAttached = value }
     private val headerUp: FocusRequester? get() = quickViewFocus.takeIf { quickViewFocusAttached } ?: headerFirst.takeIf { headerFirstAttached }
     /** [quickViewFocus] is on a pill (the classic library with games in it). */
-    private var quickViewFocusAttached = false
+    private var quickViewFocusAttached: Boolean
+        get() = libraryFocus.viewsAttached
+        set(value) { libraryFocus.viewsAttached = value }
 
     /** For a card in the games' top row: D-pad UP goes to the open quick view's pill (else the header's leftmost
      * button). A lazy list's top row had nowhere to go - UP did nothing. */
@@ -1228,39 +1156,13 @@ class LibraryActivity : ComponentActivity() {
      * have it too: while one is up keys go to Compose. */
     @Composable
     private fun SearchWindow(m: GbaTextMetrics, small: GbaTextMetrics) {
-        val focus = remember { FocusRequester() }
-        // A text field taking the focus brings the keyboard up by itself.
-        LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-        OptionOverlay({ searching = false }, Modifier.widthIn(max = 520.dp)) {
-            Column {
-                OptionTitleWindow(tr("SEARCH"), m)
-                Spacer(Modifier.height(m.u * 4))
-                OptionListWindow(m, Modifier.fillMaxWidth()) {
-                    Column {
-                        OptionTextField(
-                            searchQuery, ::search, small,
-                            Modifier.padding(horizontal = m.u * 8, vertical = m.u * 2).focusRequester(focus),
-                            placeholder = tr("SEARCH GAMES"), leadingIcon = com.pokedaisy.app.companion.ui.PixelIcons.search,
-                        )
-                        OptionLine(tr("CLEAR"), null, selected = false, m, height = m.rowHeight * 1.3f) { search(""); searching = false }
-                        OptionLine(tr("DONE"), null, selected = true, m, height = m.rowHeight * 1.3f) { searching = false }
-                    }
-                }
-            }
-        }
+        com.pokedaisy.app.companion.ui.LibrarySearchDialog(searchQuery, ::search, m, small) { searching = false }
     }
 
     /** What the library is filtered by, over the games: a tap opens SEARCH again, CLEAR shows them all. */
     @Composable
     private fun SearchStrip(m: GbaTextMetrics) {
-        if (searchQuery.isBlank() || toolsOpen) return
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = SCREEN_MARGIN).padding(bottom = m.u * 4),
-            horizontalArrangement = Arrangement.spacedBy(m.u * 4),
-        ) {
-            OptionButton(tr("SEARCH") + ": " + searchQuery, m, modifier = Modifier.weight(1f, fill = false), onClick = { searching = true })
-            OptionButton(tr("CLEAR"), m, onClick = { search("") })
-        }
+        if (!toolsOpen) com.pokedaisy.app.companion.ui.LibrarySearchStrip(searchQuery, m, { searching = true }, ::search)
     }
 
     @Composable

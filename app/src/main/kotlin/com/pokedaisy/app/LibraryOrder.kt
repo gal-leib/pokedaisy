@@ -78,15 +78,7 @@ object RomAdded {
 }
 
 /** The library's order ([Prefs.librarySort]). [id] is what Prefs keeps (stable, never renamed). */
-enum class LibrarySort(val id: Int, val label: String) {
-    NAME(0, "NAME"),
-    LAST_PLAYED(1, "LAST PLAYED"),
-    DATE_ADDED(2, "DATE ADDED");
-
-    companion object {
-        fun of(id: Int) = entries.firstOrNull { it.id == id } ?: NAME
-    }
-}
+typealias LibrarySort = com.pokedaisy.app.companion.LibrarySort
 
 /** The library's SEARCH: every word of [query] is in one of [names], whatever the case or accents ("poke red" finds
  * "Pokémon FireRed"). */
