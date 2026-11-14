@@ -179,7 +179,7 @@ internal fun rememberTmLearners(ctx: LearnContext, party: List<MonView>, item: I
  * forget. Drawn inside the item's description bar, in its [text] colours.
  */
 @Composable
-internal fun TmLearnersRow(ctx: LearnContext, party: List<MonView>, item: ItemView, text: Color, shadow: Color, m: GbaTextMetrics) {
+fun TmLearnersRow(ctx: LearnContext, party: List<MonView>, item: ItemView, text: Color, shadow: Color, m: GbaTextMetrics) {
     if (!MoveLearning.isTm(item.itemId) || party.isEmpty()) return
     val learners = rememberTmLearners(ctx, party, item) ?: return
     val u = m.u

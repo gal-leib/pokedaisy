@@ -32,7 +32,7 @@ import kotlinx.coroutines.IO
  * bundled). A path missing now is retried once
  * [RomArt.updates] moves - key composables on [rememberArtGeneration].
  */
-internal object GameArt {
+object GameArt {
     // A map can't hold a missing path as null, so those are kept apart (with the RomArt generation they missed in).
     private val cache = LockedMap<String, ImageBitmap>()
     private val missing = LockedMap<String, Int>()

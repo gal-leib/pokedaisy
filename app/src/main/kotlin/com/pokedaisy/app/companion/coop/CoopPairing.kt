@@ -401,6 +401,6 @@ class CoopPairing(
         const val VERSION_CODE: Byte = 3
 
         /** The ticket for [peer] with no secret and no addresses. */
-        internal fun peerOnlyTicket(peer: CoopPeerId): String = CoopTicket.peerOnly(peer)
+        fun peerOnlyTicket(peer: CoopPeerId): String = CoopTicket.peerOnly(peer)
     }
 }

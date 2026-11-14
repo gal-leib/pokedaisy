@@ -81,11 +81,11 @@ class DsBattleMenuState {
     var actionCursor by mutableIntStateOf(0)
     var moveCursor by mutableIntStateOf(0)
 
-    internal var actionEnabled: (Int) -> Boolean = { true }
-    internal var moveEnabled: (Int) -> Boolean = { true }
-    internal var pickAction: (Int) -> Unit = {}
-    internal var pickMove: (Int) -> Unit = {}
-    internal var back: () -> Unit = {}
+    var actionEnabled: (Int) -> Boolean = { true }
+    var moveEnabled: (Int) -> Boolean = { true }
+    var pickAction: (Int) -> Unit = {}
+    var pickMove: (Int) -> Unit = {}
+    var back: () -> Unit = {}
 
     /** A button while the menu is up: true = it's the menu's (kept from the game). */
     fun key(k: MenuKey): Boolean {
