@@ -183,7 +183,22 @@ object CheatCodes {
 }
 
 /**
- * Checks code lines with mGBA's own parser ([CheatsNative], no core needed).
+ * mGBA's own cheat-code parser, set by the host at start (the app: libpokedaisy's, no core needed).
+ * [check] gets the code's lines joined by newlines, a [CheatType.native] type and the directive so far;
+ * it answers the directive it settled on, a newline, then a `1` / `0` per line (read / not), or null.
+ */
+fun interface CheatParser {
+    fun check(code: String, type: Int, directive: String): String?
+
+    companion object {
+        /** Null (tests, no host): every line reads as bad. */
+        @kotlin.concurrent.Volatile
+        var current: CheatParser? = null
+    }
+}
+
+/**
+ * Checks code lines with mGBA's own parser ([CheatParser], no core needed).
  * [Result.cheat] holds the lines mGBA read, with the directive it settled on;
  * [Result.bad] the ones it couldn't. Null [Result.cheat] = none were readable.
  */
@@ -205,7 +220,7 @@ object CheatCheck {
 
     fun check(cheat: Cheat, type: CheatType = CheatType.AUTO): Result {
         if (cheat.lines.isEmpty()) return Result(null, emptyList())
-        val answer = CheatsNative.check(cheat.lines.joinToString("\n"), type.native, cheat.directive)
+        val answer = CheatParser.current?.check(cheat.lines.joinToString("\n"), type.native, cheat.directive)
             ?: return Result(null, cheat.lines)
         val directive = answer.substringBefore('\n')
         val flags = answer.substringAfter('\n', "")

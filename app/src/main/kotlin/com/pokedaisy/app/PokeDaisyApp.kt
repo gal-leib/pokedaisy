@@ -27,6 +27,8 @@ class PokeDaisyApp : Application() {
         com.pokedaisy.app.companion.ui.theme.FontSource.current = AndroidFonts(this)
         // The screens' pictures: Bitmaps made from pixels, image files decoded by BitmapFactory.
         com.pokedaisy.app.companion.ui.PictureCodec.current = AndroidPictures
+        // Cheat codes checked by mGBA's own parser.
+        com.pokedaisy.app.cheats.CheatParser.current = com.pokedaisy.app.cheats.MgbaCheatParser
         // The NEW tags' week starts with the first launch of a build that has the feature.
         Prefs(this).let { p -> com.pokedaisy.app.companion.NewFeatures.init(p.newFeatureSince, { p.newFeatureSince = it }) }
         val prefs = Prefs(this)
