@@ -128,6 +128,9 @@ The title shows the current slot, the one the hotkeys save to and load from.
 Saving or loading a slot makes it your current slot. If a state cannot be saved, your previous copy stays available.
 If PokeDaisy cannot keep the moment needed for `UNDO LOAD`, it leaves your game running instead of loading the slot.
 
+After you import a save or restart a game, PokeDaisy keeps starting from that save until it has captured a new
+resume point. An interrupted first launch cannot bring back an older slot automatically.
+
 ![The companion's STATES tab: UNDO SAVE and UNDO LOAD buttons above slot cards, each with a screenshot and SAVE and LOAD buttons](shots/companion-states.png "The STATES tab")
 
 > [!NOTE]

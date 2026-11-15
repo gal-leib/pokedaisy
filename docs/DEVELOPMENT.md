@@ -3861,12 +3861,16 @@ stops queued audio, finishes a battery save, releases scripted input, then
 runs the operation between display callbacks. Loads require a battery backup and an undo snapshot before changing
 memory. Files live in Documents/states/<ROM SHA-256>, so a reinstall's new container path does not lose their identity.
 
-`StateResume` handles automatic capture and restore. Initial core startup restores only a snapshot whose embedded
+`StateResume` handles automatic capture and restore on both hosts. Android stages manual fallback with its
+companion cache and achievement progress, consumes only the automatic state and retains its distinct background
+sleep behavior. Other-core DS snapshots use a host rejection callback to park their entire bundle for that core.
+Initial core startup restores only a snapshot whose embedded
 battery data matches the live save; mismatched/unverifiable automatic snapshots are parked. Pausing captures before
 the core is closed, while a foreground return retains the in-memory core. Import, restart and disabling resume write
 `boot_fresh` before removing the old resume. That marker blocks even matching manual-slot fallback across crashes,
-and is cleared only after a new resume snapshot commits successfully. The iPad's APP group exposes RESUME GAMES;
-Android keeps its existing library setting and resume lifecycle. Explicit close/restart first pauses and captures;
+and is cleared only after a new resume snapshot commits successfully, including on Android. Android's restart and
+RESUME GAMES-off launch use that same fresh marker; same-process sleep still retains the running core.
+The iPad's APP group exposes RESUME GAMES. Explicit close/restart first pauses and captures;
 failure resumes the running core and leaves the UI open rather than discarding the unsaved moment.
 
 ## ScreenScraper and the dual-screen launcher

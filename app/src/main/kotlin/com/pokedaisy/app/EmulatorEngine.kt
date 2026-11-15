@@ -952,26 +952,22 @@ class EmulatorEngine(
         var resumed: File? = null
         val dsCore = MgbaCore.pkNdsCore()
         if (resume != null && resume.isFile && resume.length() > 0) {
-            val matches = MgbaCore.pkStateMatchesSave(resume.absolutePath)
-            if (matches == MgbaCore.STATE_OTHER_CORE) {
-                // A DS game left on the other DS core (DS CORE changed since): its state can't load here. Kept for that
-                // core (SaveStates.parkedResume: the next start on it resumes it), and the game starts from its save file.
-                Log.w("pokedaisy", "resume skipped: the state is the other DS core's")
-                val other = if (dsCore == DsCore.CORE_DSPERATE) DsCore.CORE_MELONDS else DsCore.CORE_DSPERATE
-                resume.renameTo(SaveStates.parkedResume(resume, other))
-                SnapshotCache.fileFor(resume.toOkioPath()).delete()
-                startNotice = tr("This game was left on the other DS core, so it started from the save file")
-            } else if (matches == 0) {
-                Log.w("pokedaisy", "resume skipped: ${save.name} changed since the state was made")
-                resume.renameTo(File(resume.parentFile, "resume.replaced"))
-                SnapshotCache.fileFor(resume.toOkioPath()).delete()
-                startNotice = tr("Your save changed since you last played here, so the game started from the save file")
-            } else {
-                val ok = MgbaCore.pkLoadState(resume.absolutePath)
-                Log.i("pokedaisy", "resume state load: $ok")
+            val automatic = stateResume(rejected = { source, verdict ->
+                if (verdict == MgbaCore.STATE_OTHER_CORE) {
+                    val other = if (dsCore == DsCore.CORE_DSPERATE) DsCore.CORE_MELONDS else DsCore.CORE_DSPERATE
+                    states.files.moveState(source, SaveStates.parkedResume(File(source.toString()), other).toOkioPath())
+                    startNotice = tr("This game was left on the other DS core, so it started from the save file")
+                } else {
+                    states.files.moveState(source, states.files.directory / "resume.replaced")
+                    if (verdict == 0) startNotice = tr("Your save changed since you last played here, so the game started from the save file")
+                }
+                Log.w("pokedaisy", "resume skipped: save-match verdict $verdict")
+            })
+            if (automatic.restore(resume.toOkioPath())) {
+                resumed = resume
+                // Achievement initialization below still reads the progress sidecar after consuming the state.
                 resume.delete()
                 SnapshotCache.fileFor(resume.toOkioPath()).delete()
-                if (ok) resumed = resume
             }
             onResumeResult?.invoke(resumed != null)
         }
@@ -1991,8 +1987,14 @@ class EmulatorEngine(
         return ok
     }
 
-    private fun saveState(target: File): Boolean =
-        states.files.writeState(target.toOkioPath(), ::writeCoreState, snapshot = stateSnapshot())
+    private fun stateResume(rejected: ((okio.Path, Int) -> Unit)? = null) =
+        com.pokedaisy.app.companion.data.StateResume(states.files, write = ::writeCoreState,
+            read = { MgbaCore.pkLoadState(it.toString()) },
+            matchesSave = { MgbaCore.pkStateMatchesSave(it.toString()) }, snapshot = ::stateSnapshot,
+            rejected = rejected)
+
+    private fun saveState(target: File): Boolean = if (target == states.resumeFile) stateResume().save()
+        else states.files.writeState(target.toOkioPath(), ::writeCoreState, snapshot = stateSnapshot())
 
     /** Loads [source] and puts achievement progress back to where that state had it. */
     private fun loadState(source: File): Boolean {

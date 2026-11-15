@@ -11,6 +11,7 @@ class StateResume(
     private val enabled: () -> Boolean = { true },
     private val snapshot: () -> ByteArray? = { null },
     private val loaded: (Path) -> Unit = {},
+    private val rejected: ((Path, Int) -> Unit)? = null,
 ) {
     fun save(): Boolean = runCatching {
         if (!enabled()) { startFresh(); return@runCatching true }
@@ -19,18 +20,14 @@ class StateResume(
         ok
     }.getOrDefault(false)
 
-    fun restore(): Boolean = runCatching {
+    fun restore(source: Path? = null): Boolean = runCatching {
         if (!enabled() || files.freshBootFile.isFile) return@runCatching false
-        val source = files.latestResumeSource() ?: return@runCatching false
-        if (matchesSave(source) != 1 || !read(source)) {
+        val source = source ?: files.latestResumeSource() ?: return@runCatching false
+        val verdict = matchesSave(source)
+        if (verdict != 1 || !read(source)) {
             // Keep manual slots for explicit loads; an unsafe automatic snapshot is parked rather than retried.
-            if (source == files.resumeFile) {
-                val parked = files.directory / "resume.replaced"
-                source.moveTo(parked)
-                val cache = SnapshotCache.fileFor(source)
-                val parkedCache = SnapshotCache.fileFor(parked)
-                if (cache.isFile) cache.moveTo(parkedCache) else parkedCache.delete()
-            }
+            if (rejected != null) rejected.invoke(source, verdict)
+            else if (source == files.resumeFile) files.moveState(source, files.directory / "resume.replaced")
             return@runCatching false
         }
         loaded(source)
@@ -42,11 +39,18 @@ class StateResume(
     fun startFresh() = startFresh(files)
 
     companion object {
+        /** Android consumes its own automatic snapshot, never a manual slot. Keep all sidecars when staging it. */
+        fun stage(files: StateFiles): Path? {
+            if (files.freshBootFile.isFile) return null
+            val source = files.latestResumeSource() ?: return null
+            if (source != files.resumeFile) files.copyState(source, files.resumeFile)
+            return files.resumeFile
+        }
+
         /** Also used before importing battery data while no core is running. */
         fun startFresh(files: StateFiles) {
             files.freshBootFile.writeTextAtomically("fresh")
-            files.resumeFile.delete()
-            SnapshotCache.fileFor(files.resumeFile).delete()
+            files.removeState(files.resumeFile)
         }
     }
 }

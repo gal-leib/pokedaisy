@@ -52,11 +52,17 @@ class StateFiles(val directory: Path, private val extraSidecars: List<String> = 
     }.getOrDefault(false)
 
     fun deleteSlot(slot: Int) {
-        for (state in listOf(stateFile(slot), bakFile(slot))) {
-            state.delete(); sidecar(state, ".png").delete(); SnapshotCache.fileFor(state).delete()
-            for (suffix in extraSidecars) sidecar(state, suffix).delete()
-        }
+        for (state in listOf(stateFile(slot), bakFile(slot))) removeState(state)
     }
+
+    fun removeState(state: Path) {
+        state.delete(); sidecar(state, ".png").delete(); SnapshotCache.fileFor(state).delete()
+        for (suffix in extraSidecars) sidecar(state, suffix).delete()
+    }
+
+    /** Copy/move a native state with its portable cache and host-owned progress files. */
+    fun copyState(from: Path, to: Path) = copyBundle(from, to)
+    fun moveState(from: Path, to: Path) { copyBundle(from, to); removeState(from) }
 
     private fun copyBundle(from: Path, to: Path) {
         val tmp = sidecar(to, ".tmp")

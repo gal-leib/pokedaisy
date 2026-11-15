@@ -2935,9 +2935,7 @@ class PokeDaisyActivity : Activity() {
         if (engine.sleeping) {
             CoopBattles.resume()   // [pauseGame] ended any joined battle before the sleep: battles may start again
             engine.wake()
-            st.resumeFile.delete()
-            com.pokedaisy.app.companion.data.SnapshotCache.fileFor(st.resumeFile.toOkioPath()).delete()
-            RetroAchievements.progressFile(st.resumeFile).delete()
+            st.files.removeState(st.files.resumeFile)
             return true
         }
         CoopGuards.reset()   // a new game starts with nothing held or blocked by the last one
@@ -2951,10 +2949,9 @@ class PokeDaisyActivity : Activity() {
         // fall back to the newest manual save slot instead. Stage the winner
         // into resumeFile itself so the one-shot "load then delete" below only
         // ever touches that dedicated file, never a numbered slot.
-        // A save file was just loaded from the library: boot from it, once.
+        // A fresh boot stays fresh across crashes until a new automatic snapshot commits.
         if (st.freshBootFile.exists()) {
-            st.freshBootFile.delete()
-            st.resumeFile.delete()
+            st.files.removeState(st.files.resumeFile)
             waitForPlay()
             engine.start(romData ?: r, save, null)
             view.postDelayed({ (engine.lastError ?: engine.lastNotice)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() } }, 1500)
@@ -2965,7 +2962,7 @@ class PokeDaisyActivity : Activity() {
         val launch = freshLaunch
         freshLaunch = false
         if (launch && !Prefs(this).autoResume) {
-            st.resumeFile.delete()
+            com.pokedaisy.app.companion.data.StateResume.startFresh(st.files)
             waitForPlay()
             engine.start(romData ?: r, save, null)
             view.postDelayed({ (engine.lastError ?: engine.lastNotice)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() } }, 1500)
@@ -2974,15 +2971,12 @@ class PokeDaisyActivity : Activity() {
         // DS CORE changed since a DS game was left: the state its core left waits beside (SaveStates.parkedResume);
         // the core about to run takes its own back when the game has no other resume state.
         if (romIsNds && !st.resumeFile.let { it.isFile && it.length() > 0 }) {
-            SaveStates.parkedResume(st.resumeFile, engine.ndsCore).takeIf { it.isFile }?.renameTo(st.resumeFile)
-        }
-        st.latestResumeSource()?.let { src ->
-            if (src != st.resumeFile) runCatching {
-                src.copyTo(st.resumeFile, overwrite = true)
-                com.pokedaisy.app.companion.data.SnapshotCache.copy(src.toOkioPath(), st.resumeFile.toOkioPath())
+            SaveStates.parkedResume(st.resumeFile, engine.ndsCore).takeIf { it.isFile }?.let {
+                runCatching { st.files.moveState(it.toOkioPath(), st.files.resumeFile) }
             }
         }
-        val resume = st.resumeFile.takeIf { it.isFile && it.length() > 0 }
+        val resume = runCatching { com.pokedaisy.app.companion.data.StateResume.stage(st.files) }
+            .getOrNull()?.let { File(it.toString()) }
         // The companion's data as that state left it, until the game's own is read (a few KB).
         // Not over live data (back from HOME: the game was never closed).
         if (resume != null && !telemetry.snapshot.value.hasData) {
@@ -5126,10 +5120,7 @@ class PokeDaisyActivity : Activity() {
         // EmulatorView.unbindCoreBlocking().
         view.unbindCoreBlocking()
         engine.stop()
-        states?.resumeFile?.let {
-            if (it.exists()) it.delete()
-            com.pokedaisy.app.companion.data.SnapshotCache.fileFor(it.toOkioPath()).delete()
-        }
+        states?.let { com.pokedaisy.app.companion.data.StateResume.startFresh(it.files) }
         val save = SavesLocation.saveFor(this, Prefs(this), r)
         syncCheats()
         waitForPlay()
