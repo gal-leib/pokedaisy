@@ -121,6 +121,7 @@ object PokeDaisyHost {
                         gameContent = { UIKitViewController(factory = { current }, modifier = Modifier.fillMaxSize(),
                             properties = UIKitInteropProperties(interactionMode = null)) },
                         companion = { Companion(panels) })
+                    touch.EditorOverlay()
                 }
             }
         }

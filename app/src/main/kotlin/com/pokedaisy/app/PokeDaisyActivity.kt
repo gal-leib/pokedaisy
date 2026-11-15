@@ -2069,6 +2069,7 @@ class PokeDaisyActivity : Activity() {
         root.install(touchControls, dsBackdropView, dsTouchView, playClick,
             underlay = { DsWindowContent() }, gameOverlay = { FieldHudContent() },
             screenOverlay = { PerformanceContent() },
+            editorOverlay = { touchEditor.Content() },
             pictureOverlay = { if (keyCaptureShown) com.pokedaisy.app.companion.ui.KeyCapturePopup(keyCapture) },
             message = hud,
             onPicture = { fieldHudBounds = it })
@@ -4074,7 +4075,7 @@ class PokeDaisyActivity : Activity() {
     /** The touch controls' button rows, for the FIELD HUD to keep clear of. */
     private fun syncHudClear() {
         // EDIT LAYOUT hides the controls while their stand-ins move: the HUD stays where it was until DONE (GitHub #493).
-        if (touchEditor != null) return
+        if (touchEditor.isOpen) return
         if (!::touchControls.isInitialized) return
         hudClear.value = touchControls.clearTop to touchControls.clearBottom
         // EXPAND held sideways: the HUD keeps to the game's middle columns, where the clearance is measured, not under
@@ -4129,7 +4130,7 @@ class PokeDaisyActivity : Activity() {
     private fun syncTouchControls() {
         if (!::touchControls.isInitialized) return
         val style = Prefs(this).touchControlsStyle
-        val show = touchEditor == null && when (style.show) {
+        val show = !touchEditor.isOpen && when (style.show) {
             com.pokedaisy.app.companion.TouchShow.ALWAYS -> true
             com.pokedaisy.app.companion.TouchShow.NEVER -> false
             com.pokedaisy.app.companion.TouchShow.AUTO -> !physicalPadUsed && !Controllers.anyConnected()
@@ -4240,7 +4241,7 @@ class PokeDaisyActivity : Activity() {
     /** Nothing a touch could be meant for is open over the game (UI thread): the touch controls' input windows may take
      * the fingers on the buttons ([TouchInputWindows]); else the drawn pad does, under whatever is open. */
     private fun touchWindowsAllowed(): Boolean {
-        if (touchEditor != null || keyCapture.request != null || quickMenu.open || hudPanelOpen.value || battlePicking.value) return false
+        if (touchEditor.isOpen || keyCapture.request != null || quickMenu.open || hudPanelOpen.value || battlePicking.value) return false
         if (::sidePanel.isInitialized && sidePanel.overGame) return false
         if (coopOverlay.takesKeys || coopOverlay.linkWait != null) return false
         if (coopLockState.value?.ui?.value?.let { it.waiting != null || it.partnerProposed } == true) return false
@@ -4297,39 +4298,17 @@ class PokeDaisyActivity : Activity() {
 
     /** EDIT LAYOUT over the running game (TOUCH CONTROLS' row on the companion): the companion's window steps aside,
      * the controls themselves hide while their stand-ins are moved, and DONE / BACK keeps the layout. */
-    private var touchEditor: ComposeView? = null
     private val touchRev = androidx.compose.runtime.mutableIntStateOf(0)
-    private val touchEditBack = com.pokedaisy.app.companion.ui.CompanionBack()
+    private val touchEditor = com.pokedaisy.app.companion.ui.TouchEditorState(
+        read = { Prefs(this).touchControlsStyle }, write = { Prefs(this).touchControlsStyle = it },
+        closed = { touchRev.intValue++; syncTouchControls() })
 
     private fun openTouchEditor() {
-        if (touchEditor != null) return
-        val st = measuredTouchStage() ?: return
+        if (touchEditor.isOpen) return
+        val measured = measuredTouchStage() ?: return
         if (::sidePanel.isInitialized) sidePanel.closeWindow()
-        val editor = ComposeView(this).apply {
-            setContent {
-                androidx.compose.runtime.CompositionLocalProvider(com.pokedaisy.app.companion.ui.LocalCompanionBack provides touchEditBack) {
-                    com.pokedaisy.app.companion.ui.TouchLayoutEditor(
-                        st, Prefs(this@PokeDaisyActivity).touchControlsStyle, com.pokedaisy.app.companion.ui.rememberGbaTextMetrics(),
-                        onDone = { layout ->
-                            val prefs = Prefs(this@PokeDaisyActivity)
-                            prefs.touchControlsStyle = prefs.touchControlsStyle.withLayout(st.portrait, layout)
-                            closeTouchEditor()
-                        },
-                    )
-                }
-            }
-        }
-        touchEditor = editor
         input.setTouchBits(0)
-        stage.addView(editor, android.widget.FrameLayout.LayoutParams(-1, -1))
-        syncTouchControls()
-    }
-
-    private fun closeTouchEditor() {
-        val editor = touchEditor ?: return
-        touchEditor = null
-        stage.removeView(editor)
-        touchRev.intValue++
+        touchEditor.open(measured)
         syncTouchControls()
     }
 
@@ -4395,7 +4374,7 @@ class PokeDaisyActivity : Activity() {
         // The other screen, or the companion under the game on a phone held upright (GitHub discussion #308).
         if (presentation?.isShowing != true && !(::portraitPanel.isInitialized && portraitPanel.enabled)) return false
         if (!::engine.isInitialized || !engine.onField.value || engine.fieldLocked) return false
-        if (quickMenu.open || touchEditor != null || keyCapture.request != null) return false
+        if (quickMenu.open || touchEditor.isOpen || keyCapture.request != null) return false
         if (::sidePanel.isInitialized && sidePanel.windowOpen) return false
         val snap = telemetry.snapshot.value
         return snap.hasData && !snap.inBattle
@@ -4659,7 +4638,7 @@ class PokeDaisyActivity : Activity() {
 
     private fun companionBackTap() {
         // EDIT LAYOUT over the game: BACK is its DONE.
-        if (touchEditor != null) { touchEditBack.back(); return }
+        if (touchEditor.isOpen) { touchEditor.back.back(); return }
         // DS LAYOUT's touch screen opened by hand (and no companion window over it): BACK closes it first.
         if (dsWindowManual.value && !sidePanel.windowOpen) { dsWindowManual.value = false; return }
         // The companion was closed: BACK brings it back. Not while it opens over the game instead (closed while swapped):

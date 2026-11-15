@@ -232,6 +232,9 @@ Held sideways, the skin fills the screen and the game moves into the skin's own 
 
 `EDIT LAYOUT` shows every button at its real size with a dashed outline. In a game it opens over the game itself (from the companion's `SETTINGS`); from the top screen's Settings it opens over a picture of the game's screen.
 
+Android and iPad use the same editor. Editing one orientation keeps the other one's layout. Controls that your
+current game cannot show keep their saved positions too.
+
 ![EDIT LAYOUT on a phone held sideways: the buttons with dashed outlines in the bars beside the game, the bar with DONE, SNAP ON and RESET at the top](shots/settings-touch-edit.png "EDIT LAYOUT")
 
 - **Move a button:** drag it.

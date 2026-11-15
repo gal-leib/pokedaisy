@@ -57,7 +57,7 @@ internal class IosLibraryHost(
     fun controller(): UIViewController {
         appSettings = IosCompanionSettings(null, null, null,
             onClose = {}, onRestart = {}, onDisableResume = ::disableResume,
-            onEditTouch = { touch.editStandalone(host, settingsStage()) }, readTouchStage = ::settingsStage)
+            onEditTouch = { touch.editStandalone(settingsStage()) }, readTouchStage = ::settingsStage)
         L10n.apply(appSettings.appLanguage, null)
         host = ComposeUIViewController(configure = { configureUiAutomation() }) {
             AppTheme { CompactTextOnSmallWindows {
@@ -68,6 +68,7 @@ internal class IosLibraryHost(
                         val step = setupStep
                         if (step == null) Library() else Setup(step)
                         Dialogs()
+                        touch.EditorOverlay()
                     }
                 }
             } }

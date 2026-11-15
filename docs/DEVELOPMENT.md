@@ -4147,6 +4147,13 @@ after layout writes so the preview and rows refresh when the editor closes.
 Hosts can supply touchStageInOtherOrientation when their rotated layout differs from the phone stand-in. The iPad
 uses its saved common panel state and measured screen/grip dimensions there too, so the rotated in-game preview matches the current layout.
 
+`TouchEditorState` owns the in-game/Apple library editor session, orientation-aware publication, shared back handling
+and full-screen Compose overlay. Android hosts it in the existing game root instead of adding a ComposeView;
+iOS hosts it in the current game/library composition instead of presenting another view controller. Hosts retain
+only native input release and their established pause/resume effects. Closing a game discards its unfinished edit
+without resuming that game. Saving keeps the other orientation and positions for controls unavailable in the
+current game or host. A callback from a replaced editor request cannot publish over its successor.
+
 
 ### iOS game-button bindings
 

@@ -61,7 +61,7 @@ class GameScreenView(
     fun install(controls: View, backdrop: View, dsTouch: View, click: () -> Unit,
                 underlay: @Composable () -> Unit, gameOverlay: @Composable () -> Unit,
                 screenOverlay: @Composable () -> Unit, pictureOverlay: @Composable () -> Unit,
-                message: View, onPicture: (Rect) -> Unit) {
+                message: View, onPicture: (Rect) -> Unit, editorOverlay: @Composable () -> Unit = {}) {
         viewport.dsBackdrop = backdrop
         viewport.dsTouch = dsTouch
         viewport.addView(backdrop, 0, LayoutParams(-1, -1))
@@ -71,31 +71,34 @@ class GameScreenView(
             val effect = CompanionColors.composeEffect(this)
             val chrome = Modifier.graphicsLayer { renderEffect = effect }
             androidx.compose.runtime.CompositionLocalProvider(com.pokedaisy.app.companion.ui.LocalClickSound provides click) {
-                GameScreen(panels, viewport::gameHeightFor,
-                    game = { Native(viewport) }, controls = { Native(controls) },
-                    companion = { if (panels.portrait.enabled) portraitContent?.invoke() else sideContent?.invoke() },
-                    gameUnderlay = underlay,
-                    gameOverlay = { androidx.compose.foundation.layout.Box(chrome, propagateMinConstraints = true) { gameOverlay() } },
-                    pictureOverlay = pictureOverlay, chromeModifier = chrome,
-                    dismissSideOnGameTap = controls.visibility != View.VISIBLE,
-                    overlayRect = { viewport.overlayBounds().let { Rect(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) } },
-                    screenOverlayTop = { viewport.hudTop },
-                    screenOverlay = {
-                        screenOverlay()
-                        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                            AndroidView(factory = { message }, modifier = Modifier
-                                .align(androidx.compose.ui.Alignment.TopEnd).padding(top = 12.dp, end = 12.dp))
-                        }
-                    },
-                    onFrames = { current, chrome ->
-                        frames = current
-                        portraitInset = current.portrait?.topInset(panels.gripHeight) ?: 0
-                        reserved = chrome.map { IntRect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt()) }
-                        val area = current.controls.translate(-current.game.left, -current.game.top)
-                        if (viewport.controlsArea != area) { viewport.controlsArea = area; viewport.requestLayout() }
-                        onPicture(viewport.overlayBounds().let { Rect(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) }
-                            .translate(current.game.left, current.game.top))
-                    })
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                    GameScreen(panels, viewport::gameHeightFor,
+                        game = { Native(viewport) }, controls = { Native(controls) },
+                        companion = { if (panels.portrait.enabled) portraitContent?.invoke() else sideContent?.invoke() },
+                        gameUnderlay = underlay,
+                        gameOverlay = { androidx.compose.foundation.layout.Box(chrome, propagateMinConstraints = true) { gameOverlay() } },
+                        pictureOverlay = pictureOverlay, chromeModifier = chrome,
+                        dismissSideOnGameTap = controls.visibility != View.VISIBLE,
+                        overlayRect = { viewport.overlayBounds().let { Rect(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) } },
+                        screenOverlayTop = { viewport.hudTop },
+                        screenOverlay = {
+                            screenOverlay()
+                            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                                AndroidView(factory = { message }, modifier = Modifier
+                                    .align(androidx.compose.ui.Alignment.TopEnd).padding(top = 12.dp, end = 12.dp))
+                            }
+                        },
+                        onFrames = { current, chrome ->
+                            frames = current
+                            portraitInset = current.portrait?.topInset(panels.gripHeight) ?: 0
+                            reserved = chrome.map { IntRect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt()) }
+                            val area = current.controls.translate(-current.game.left, -current.game.top)
+                            if (viewport.controlsArea != area) { viewport.controlsArea = area; viewport.requestLayout() }
+                            onPicture(viewport.overlayBounds().let { Rect(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) }
+                                .translate(current.game.left, current.game.top))
+                        })
+                    editorOverlay()
+                }
             }
         }
     }

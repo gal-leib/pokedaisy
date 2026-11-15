@@ -2,10 +2,7 @@
 
 package com.pokedaisy.app.ios
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.key
@@ -15,22 +12,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.window.ComposeUIViewController
 import com.pokedaisy.app.companion.GameActions
 import com.pokedaisy.app.companion.TouchButton
 import com.pokedaisy.app.companion.TouchStage
 import com.pokedaisy.app.companion.ui.gamePanelLayout
 import com.pokedaisy.app.companion.ui.TouchControls
 import com.pokedaisy.app.companion.ui.TouchInput
-import com.pokedaisy.app.companion.ui.TouchLayoutEditor
 import com.pokedaisy.app.companion.ui.decodeImage
-import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
-import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.game.GameViewController
-import platform.UIKit.UIModalPresentationFullScreen
-import platform.UIKit.UIViewController
 
 /** The host's native presentation/input bridge. Drawing, hit testing, settings and editing come from shared UI. */
 internal class IosTouchControls(
@@ -38,7 +28,16 @@ internal class IosTouchControls(
     private val settings: () -> IosCompanionSettings?,
 ) {
     var stage by mutableStateOf<TouchStage?>(null)
-    private var editor: UIViewController? = null
+    private var editingGame: GameViewController? = null
+    private val editor = com.pokedaisy.app.companion.ui.TouchEditorState(
+        read = { IosTouchPreferences.style }, write = { IosTouchPreferences.style = it },
+        closed = {
+            releaseKeys()
+            editingGame?.let { it.uiPaused = false; it.resume() }
+            editingGame = null
+        })
+
+    @Composable fun EditorOverlay() = editor.Content()
     var actions: GameActions? = null
     private var inputEpoch by mutableIntStateOf(0)
     var previewStage: ((Boolean) -> TouchStage?)? = null
@@ -56,8 +55,8 @@ internal class IosTouchControls(
         actions?.cancelTouch()
         actions = null
         releaseKeys()
-        editor?.dismissViewControllerAnimated(false, completion = null)
-        editor = null
+        editingGame = null
+        editor.dismiss()
         stage = null
     }
 
@@ -84,43 +83,19 @@ internal class IosTouchControls(
     }
 
     fun edit() {
-        if (editor != null) return
+        if (editor.isOpen) return
         val current = game() ?: return
         beforeEdit()
         val measured = readStage() ?: return
-        val from = current.view.window?.rootViewController ?: return
         releaseKeys()
         current.uiPaused = true
         current.pause()
-        presentEditor(from, measured, current, PkApiCore.stateThumbnail()?.let(::decodeImage))
+        editingGame = current
+        editor.open(measured, IosTouchPreferences.buttons, PkApiCore.stateThumbnail()?.let(::decodeImage), drawBackdrop = true)
     }
 
-    fun editStandalone(from: UIViewController, stage: TouchStage? = null) {
-        if (editor != null || stage == null) return
-        presentEditor(from, stage, null, null)
-    }
-
-    private fun presentEditor(from: UIViewController, measured: TouchStage, current: GameViewController?,
-                              shot: androidx.compose.ui.graphics.ImageBitmap?) {
-        val view = ComposeUIViewController(configure = { configureUiAutomation() }) {
-            AppTheme {
-                Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
-                    TouchLayoutEditor(measured, IosTouchPreferences.drawingStyle, rememberGbaTextMetrics(),
-                        shot = shot, drawBackdrop = true,
-                        onDone = { layout ->
-                            IosTouchPreferences.style = IosTouchPreferences.style.withLayout(measured.portrait, layout)
-                            editor?.dismissViewControllerAnimated(true) {
-                                editor = null
-                                current?.uiPaused = false
-                                current?.resume()
-                            }
-                        })
-                }
-            }
-        }
-        view.modalPresentationStyle = UIModalPresentationFullScreen
-        editor = view
-        from.presentViewController(view, animated = true, completion = null)
+    fun editStandalone(stage: TouchStage? = null) {
+        if (stage != null) editor.open(stage, IosTouchPreferences.buttons, drawBackdrop = true)
     }
 
     private fun action(button: TouchButton, down: Boolean) {
