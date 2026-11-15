@@ -4120,6 +4120,14 @@ JSON. No data migration is required. Initial-library NEW suppression, 24-hour ar
 and favorites-first sorting share one policy. Platform discovery, game metadata, pickers and launches remain
 host adapters. JSON writes complete before observable choices change, and unknown JSON fields are retained.
 
+`DocsCache` owns manual refresh, conditional ETags, validated atomic publication, versioned image storage, nested
+image pruning and background prefetch for both platforms. Installed `docs/docs.json`, `docs.etag` and hashed image
+paths remain readable. Ktor supplies the HTTP client with Android and Darwin engines; connection/socket/request
+budgets are shared, with a request budget bounding Darwin's unsupported connection-timeout option. Hosts provide
+the cache directory, app version and native image decoder. Recreated hosts reuse one cache owner per directory
+and version. Invalid responses and network failures keep the previous manual, and a corrupt cache cannot claim
+its stale ETag. No UI source contains an HTTP implementation.
+
 The iPad uses these presenters for its full-window library, Files-based setup and application settings. Its native
 adapter supplies file operations, preferences and launch actions; Swift only switches application/game controllers.
 `IosGameScreen` supplies preferences and input/focus callbacks to the same `GameScreenState` and `GameScreen` used by

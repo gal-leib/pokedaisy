@@ -6,17 +6,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
-import com.pokedaisy.app.DocsApi
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.BestEffortStore
 import com.pokedaisy.app.companion.data.isFile
 import com.pokedaisy.app.companion.data.mkdirs
 import com.pokedaisy.app.companion.data.readBytes
-import com.pokedaisy.app.companion.data.readText
-import com.pokedaisy.app.companion.data.writeBytes
-import com.pokedaisy.app.companion.data.writeTextAtomically
 import com.pokedaisy.app.companion.ui.DeviceDates
-import com.pokedaisy.app.companion.ui.DocsSource
 import com.pokedaisy.app.companion.ui.DocsSources
 import com.pokedaisy.app.companion.ui.PictureCodec
 import com.pokedaisy.app.companion.ui.theme.FontSource
@@ -25,7 +20,6 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
-import okio.ByteString.Companion.encodeUtf8
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
@@ -54,7 +48,10 @@ object IosHosts {
         RomArt.filesDir = filesDir
         BestEffortStore.dir = filesDir
         ThemeStore.current = DefaultsThemeStore
-        DocsSources.current = WebDocsSource(filesDir / "docs")
+        val docs = com.pokedaisy.app.DocsCache.at(filesDir / "docs",
+            NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "dev")
+        DocsSources.current = com.pokedaisy.app.CachedDocsSource(docs, SkiaPictures::decode)
+        docs.prefetch()
         FontSource.current = BundleFonts
         PictureCodec.current = SkiaPictures
         DeviceDates.current = FoundationDates
@@ -134,35 +131,6 @@ private object SkiaPictures : PictureCodec {
     }
 
     override fun decode(bytes: ByteArray): ImageBitmap? = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
-}
-
-/** The manual from the website's docs API, kept in [dir] for offline reading (DocsStore's layout on Android). */
-private class WebDocsSource(private val dir: Path) : DocsSource {
-    private val manualFile = dir / "docs.json"
-
-    override fun cached(): DocsApi.Manual? =
-        runCatching { DocsApi.parse(manualFile.readText()) }.getOrNull()
-
-    override fun refresh(): DocsApi.Refresh {
-        val url = NSURL.URLWithString(DocsApi.URL) ?: return DocsApi.Refresh.Failed(offline = false)
-        val json = bytesOf(url)?.decodeToString() ?: return DocsApi.Refresh.Failed(offline = true)
-        val manual = runCatching { DocsApi.parse(json) }.getOrNull() ?: return DocsApi.Refresh.Failed(offline = false)
-        if (manualFile.isFile && runCatching { manualFile.readText() }.getOrNull() == json) {
-            return DocsApi.Refresh.Unchanged
-        }
-        dir.mkdirs()
-        manualFile.writeTextAtomically(json)
-        return DocsApi.Refresh.Updated(manual)
-    }
-
-    override fun image(manual: DocsApi.Manual, image: DocsApi.Block.Image): ImageBitmap? = runCatching {
-        val file = dir / "img" / ((image.src + "@" + image.version).encodeUtf8().sha1().hex().take(20) + ".png")
-        if (!file.isFile) {
-            val bytes = NSURL.URLWithString(manual.site + image.src)?.let(::bytesOf) ?: return@runCatching null
-            file.writeBytes(bytes)
-        }
-        SkiaPictures.decode(file.readBytes())
-    }.getOrNull()
 }
 
 /** Dates and times the device's way (STATES' save times). */
