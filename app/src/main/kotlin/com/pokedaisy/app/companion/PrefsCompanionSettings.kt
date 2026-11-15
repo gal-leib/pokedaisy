@@ -3,13 +3,15 @@ package com.pokedaisy.app.companion
 import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.i18n.L10n
 
-/** The stored settings implementation for both hosts. Overrides supply capabilities and native effects;
- * portable setters persist here before notifying the running game. */
-abstract class PrefsCompanionSettings(protected val prefs: Prefs) : CompanionSettings {
-    protected open fun onPlaybackChanged() {}
-    protected open fun onFieldOptionsChanged() {}
-    protected open val languageRomCode: String? get() = null
-    protected open fun allowDisableResume(): Boolean = true
+/** Concrete persistence delegate. Hosts compose it with game actions rather than inheriting implementation.
+ * Changes publish only after persistence; the owning host installs its notification callback before exposing UI. */
+class PrefsCompanionSettings(
+    private val prefs: Prefs,
+    private val languageRomCode: () -> String? = { null },
+    private val allowDisableResume: () -> Boolean = { true },
+) : StoredCompanionSettings {
+    enum class Change { PLAYBACK, FIELD_OPTIONS }
+    var changed: (Change) -> Unit = {}
     override val showHints get() = prefs.showHints
     override fun setShowHints(on: Boolean) { prefs.showHints = on }
     override val showFoeIvs get() = prefs.showFoeIvs
@@ -57,37 +59,37 @@ abstract class PrefsCompanionSettings(protected val prefs: Prefs) : CompanionSet
     override val tradeEvolutions get() = prefs.tradeEvolutions
     override fun setTradeEvolutions(on: Boolean) { prefs.tradeEvolutions = on }
     override val autoRun get() = prefs.autoRun
-    override fun setAutoRun(on: Boolean) { prefs.autoRun = on; onFieldOptionsChanged() }
+    override fun setAutoRun(on: Boolean) { prefs.autoRun = on; changed(Change.FIELD_OPTIONS) }
     override val runIndoors get() = prefs.runIndoors
-    override fun setRunIndoors(on: Boolean) { prefs.runIndoors = on; onFieldOptionsChanged() }
+    override fun setRunIndoors(on: Boolean) { prefs.runIndoors = on; changed(Change.FIELD_OPTIONS) }
     override val instantText get() = prefs.instantText
-    override fun setInstantText(on: Boolean) { prefs.instantText = on; onFieldOptionsChanged() }
+    override fun setInstantText(on: Boolean) { prefs.instantText = on; changed(Change.FIELD_OPTIONS) }
     override val reusableTms get() = prefs.reusableTms
-    override fun setReusableTms(on: Boolean) { prefs.reusableTms = on; onFieldOptionsChanged() }
+    override fun setReusableTms(on: Boolean) { prefs.reusableTms = on; changed(Change.FIELD_OPTIONS) }
     override val ffMaxSpeed get() = prefs.ffMaxSpeed
-    override fun setFfMaxSpeed(v: Float) { if (v in FF_SPEEDS) { prefs.ffMaxSpeed = v; onPlaybackChanged() } }
+    override fun setFfMaxSpeed(v: Float) { if (v in FF_SPEEDS) { prefs.ffMaxSpeed = v; changed(Change.PLAYBACK) } }
     override val battleSpeed get() = prefs.battleSpeed.takeIf { it in SCENE_SPEEDS } ?: 0f
-    override fun setBattleSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.battleSpeed = v; onPlaybackChanged() } }
+    override fun setBattleSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.battleSpeed = v; changed(Change.PLAYBACK) } }
     override val textSpeed get() = prefs.textSpeed.takeIf { it in SCENE_SPEEDS } ?: 0f
-    override fun setTextSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.textSpeed = v; onPlaybackChanged() } }
+    override fun setTextSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.textSpeed = v; changed(Change.PLAYBACK) } }
     override val menuSpeed get() = prefs.menuSpeed.takeIf { it in SCENE_SPEEDS } ?: 0f
-    override fun setMenuSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.menuSpeed = v; onPlaybackChanged() } }
+    override fun setMenuSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.menuSpeed = v; changed(Change.PLAYBACK) } }
     override val bikeSpeed get() = prefs.bikeSpeed.takeIf { it in SCENE_SPEEDS } ?: 0f
-    override fun setBikeSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.bikeSpeed = v; onPlaybackChanged() } }
+    override fun setBikeSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.bikeSpeed = v; changed(Change.PLAYBACK) } }
     override val surfSpeed get() = prefs.surfSpeed.takeIf { it in SCENE_SPEEDS } ?: 0f
-    override fun setSurfSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.surfSpeed = v; onPlaybackChanged() } }
+    override fun setSurfSpeed(v: Float) { if (v in SCENE_SPEEDS) { prefs.surfSpeed = v; changed(Change.PLAYBACK) } }
     override val ffToggled get() = prefs.ffToggled
-    override fun setFfToggled(on: Boolean) { prefs.ffToggled = on; onPlaybackChanged() }
+    override fun setFfToggled(on: Boolean) { prefs.ffToggled = on; changed(Change.PLAYBACK) }
     override val ffMode get() = prefs.ffMode
-    override fun setFfMode(mode: FfMode) { prefs.ffMode = mode; onPlaybackChanged() }
+    override fun setFfMode(mode: FfMode) { prefs.ffMode = mode; changed(Change.PLAYBACK) }
     override val ffMusicMode get() = prefs.ffMusicMode
-    override fun setFfMusicMode(mode: FfMusicMode) { prefs.ffMusicMode = mode; onPlaybackChanged() }
+    override fun setFfMusicMode(mode: FfMusicMode) { prefs.ffMusicMode = mode; changed(Change.PLAYBACK) }
     override val gameVolume get() = prefs.gameVolume
-    override fun setGameVolume(percent: Int) { prefs.gameVolume = percent; onPlaybackChanged() }
+    override fun setGameVolume(percent: Int) { prefs.gameVolume = percent; changed(Change.PLAYBACK) }
     override val gameMuted get() = prefs.gameMuted
-    override fun setGameMuted(on: Boolean) { prefs.gameMuted = on; onPlaybackChanged() }
+    override fun setGameMuted(on: Boolean) { prefs.gameMuted = on; changed(Change.PLAYBACK) }
     override val wildEncounters get() = prefs.wildEncounters
-    override fun setWildEncounters(percent: Int) { prefs.wildEncounters = percent; onFieldOptionsChanged() }
+    override fun setWildEncounters(percent: Int) { prefs.wildEncounters = percent; changed(Change.FIELD_OPTIONS) }
     override val screenFilter get() = prefs.screenFilter
     override fun setScreenFilter(filter: ScreenFilter) { prefs.screenFilter = filter }
     override val gridStrength get() = prefs.gridStrength
@@ -101,7 +103,7 @@ abstract class PrefsCompanionSettings(protected val prefs: Prefs) : CompanionSet
         if (on != autoResume && (on || allowDisableResume())) prefs.autoResume = on
     }
     override val appLanguage get() = prefs.appLanguage
-    override fun setAppLanguage(code: String) { prefs.appLanguage = code; L10n.apply(code, languageRomCode) }
+    override fun setAppLanguage(code: String) { prefs.appLanguage = code; L10n.apply(code, languageRomCode()) }
     override fun setDarkMode(v: Int) { prefs.darkMode = v }
     override val companionTabs get() = prefs.companionTabs
     override fun setCompanionTabs(tabs: List<String>) { prefs.companionTabs = tabs }

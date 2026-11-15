@@ -1422,38 +1422,39 @@ class PokeDaisyActivity : Activity() {
      * only writes Prefs, picked up next launch), this also live-applies to the
      * already-running engine/touch controls since the game keeps running. */
     private val companionSettings by lazy { createCompanionSettings() }
-    private fun createCompanionSettings(): com.pokedaisy.app.companion.CompanionSettings =
-        object : com.pokedaisy.app.companion.PrefsCompanionSettings(Prefs(this@PokeDaisyActivity)) {
-        override val languageRomCode get() = romCode
+    private fun createCompanionSettings(): com.pokedaisy.app.companion.CompanionSettings {
+        val stored = com.pokedaisy.app.companion.PrefsCompanionSettings(Prefs(this), languageRomCode = { romCode })
+        return object : com.pokedaisy.app.companion.CompanionSettings,
+            com.pokedaisy.app.companion.StoredCompanionSettings by stored {
         override fun setFfMaxSpeed(v: Float) {
-            super.setFfMaxSpeed(v)
+            stored.setFfMaxSpeed(v)
             if (::engine.isInitialized) engine.ffMaxSpeed = ffMaxSpeed
         }
         override val gameSpeed get() = if (::engine.isInitialized) engine.gameSpeed else 1f
-        override val gameSpeeds get() = if (::engine.isInitialized) engine.gameSpeeds else super.gameSpeeds
+        override val gameSpeeds get() = if (::engine.isInitialized) engine.gameSpeeds else super<com.pokedaisy.app.companion.CompanionSettings>.gameSpeeds
         override fun setGameSpeed(v: Float) {
             if (!::engine.isInitialized) return
             engine.setGameSpeed(v)
             Prefs(this@PokeDaisyActivity).setSpeedIndexFor(romKey, engine.speedIndex)
         }
         override fun setBattleSpeed(v: Float) {
-            super.setBattleSpeed(v)
+            stored.setBattleSpeed(v)
             if (::engine.isInitialized) engine.battleSpeed = battleSpeed
         }
         override fun setTextSpeed(v: Float) {
-            super.setTextSpeed(v)
+            stored.setTextSpeed(v)
             if (::engine.isInitialized) engine.textSpeed = textSpeed
         }
         override fun setMenuSpeed(v: Float) {
-            super.setMenuSpeed(v)
+            stored.setMenuSpeed(v)
             if (::engine.isInitialized) engine.menuSpeed = menuSpeed
         }
         override fun setBikeSpeed(v: Float) {
-            super.setBikeSpeed(v)
+            stored.setBikeSpeed(v)
             if (::engine.isInitialized) engine.bikeSpeed = bikeSpeed
         }
         override fun setSurfSpeed(v: Float) {
-            super.setSurfSpeed(v)
+            stored.setSurfSpeed(v)
             if (::engine.isInitialized) engine.surfSpeed = surfSpeed
         }
         override val fieldMovesReadable get() = ::engine.isInitialized && engine.fieldMovesKnown
@@ -1462,18 +1463,18 @@ class PokeDaisyActivity : Activity() {
             romIsNds && ::engine.isInitialized && engine.fieldState and MgbaCore.FIELD_KNOWN != 0
         override fun setAutoRun(on: Boolean) {
             if (on) com.pokedaisy.app.companion.FeatureTips.used(TipId.AUTO_RUN)
-            super.setAutoRun(on)
+            stored.setAutoRun(on)
             if (::engine.isInitialized) engine.autoRun = on
         }
         override fun setRunIndoors(on: Boolean) {
-            super.setRunIndoors(on)
+            stored.setRunIndoors(on)
             if (::engine.isInitialized) engine.runIndoors = on
         }
         // Ruby / Sapphire tell indoor maps by their type (flash, weather and the region map read it too): not theirs.
         override val runIndoorsSupported get() = fieldGame != WideScreen.OFF && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode)
         override fun setWildEncounters(percent: Int) {
             if (percent == 0) com.pokedaisy.app.companion.FeatureTips.used(TipId.WILD)
-            super.setWildEncounters(percent)
+            stored.setWildEncounters(percent)
             if (::engine.isInitialized) engine.wildEncounters = percent
         }
         override val wildEncountersSupported get() = (fieldGame != WideScreen.OFF && wildFlag != 0L) || gbField() != null ||
@@ -1498,12 +1499,12 @@ class PokeDaisyActivity : Activity() {
         override fun setReusableTms(on: Boolean) {
             if (coopRefuses()) return
             if (on) com.pokedaisy.app.companion.FeatureTips.used(TipId.REUSABLE_TMS)
-            super.setReusableTms(on)
+            stored.setReusableTms(on)
             if (::engine.isInitialized) engine.setReusableTms(tmSites, on)
         }
         override val reusableTmsSupported get() = tmSites.isNotEmpty()
         override fun setInstantText(on: Boolean) {
-            super.setInstantText(on)
+            stored.setInstantText(on)
             if (::engine.isInitialized) engine.setInstantText(textPatch, on)
         }
         override val instantTextSupported get() = textPatch != null
@@ -1565,7 +1566,7 @@ class PokeDaisyActivity : Activity() {
         override val followerSupported get() = followerSupported()
         override val followerReady get() = com.pokedaisy.app.companion.data.MonArt.available(filesDir.toOkioPath()).isNotEmpty()
         override fun setFollower(on: Boolean) {
-            super.setFollower(on)
+            stored.setFollower(on)
             applyFollower()
         }
         override val dayNightSupported get() = dayNightSupported()
@@ -1577,7 +1578,7 @@ class PokeDaisyActivity : Activity() {
         }
         override fun setRivalLook(on: Boolean) {
             if (coopRefuses()) return
-            super.setRivalLook(on)
+            stored.setRivalLook(on)
             lookRunner.apply()
         }
         override val autoRunBuiltIn get() =
@@ -1589,17 +1590,17 @@ class PokeDaisyActivity : Activity() {
             if (::engine.isInitialized) engine.setFastForwardToggled(on)
         }
         override fun setFfMusicMode(mode: FfMusicMode) {
-            super.setFfMusicMode(mode)
+            stored.setFfMusicMode(mode)
             if (::engine.isInitialized) engine.ffMusicMode = mode
         }
         override val rewindSupported get() = !romIsNds
         override fun setRewind(on: Boolean) {
-            super.setRewind(on)
+            stored.setRewind(on)
             if (::engine.isInitialized) engine.rewindEntries = rewindEntries(on)
             runOnUiThread { syncTouchExtras() }
         }
         override fun setFfMode(mode: FfMode) {
-            super.setFfMode(mode)
+            stored.setFfMode(mode)
             if (::engine.isInitialized) engine.ffMode = mode
         }
         override val touchStyle get() = Prefs(this@PokeDaisyActivity).touchControlsStyle
@@ -1633,7 +1634,7 @@ class PokeDaisyActivity : Activity() {
         override val buttonGroup get() = if (romIsNds) GbaControls.Group.DS else GbaControls.Group.GBA
         override val hotkeysEnabled get() = hotkeysOn
         override fun setHotkeysEnabled(on: Boolean) {
-            super.setHotkeysEnabled(on)
+            stored.setHotkeysEnabled(on)
             setHotkeysOn(on)
         }
         override fun hotkeyBindings() = Hotkeys.load(controlsDir).rawBindings
@@ -1675,11 +1676,11 @@ class PokeDaisyActivity : Activity() {
         override fun setGameMuted(on: Boolean) = this@PokeDaisyActivity.setGameVolume(GameVolume.percent, on)
         override val clickSound get() = clickSoundOn
         override fun setClickSound(on: Boolean) {
-            super.setClickSound(on)
+            stored.setClickSound(on)
             clickSoundOn = on
         }
         override fun setStatusBar(on: Boolean) {
-            super.setStatusBar(on)
+            stored.setStatusBar(on)
             runOnUiThread { syncGameScreen() }
         }
         override val fieldHud get() = Prefs(this@PokeDaisyActivity).fieldHud
@@ -1727,7 +1728,7 @@ class PokeDaisyActivity : Activity() {
         }
         override fun setGameAspect(aspect: com.pokedaisy.app.companion.GameAspect) {
             if (aspect == com.pokedaisy.app.companion.GameAspect.WIDE) com.pokedaisy.app.companion.FeatureTips.used(TipId.EXPAND)
-            super.setGameAspect(aspect)
+            stored.setGameAspect(aspect)
             runOnUiThread { syncGameScreen() }
         }
         override val wideSupported get() = wideGame != WideScreen.OFF
@@ -1755,7 +1756,7 @@ class PokeDaisyActivity : Activity() {
             if (turnOn) setGameAspect(com.pokedaisy.app.companion.GameAspect.WIDE)
         }
         override fun setTips(on: Boolean) {
-            super.setTips(on)
+            stored.setTips(on)
             com.pokedaisy.app.companion.FeatureTips.scheduler?.enabled = on
         }
         override val showsTips get() = tipsOnCompanion.value
@@ -1768,23 +1769,23 @@ class PokeDaisyActivity : Activity() {
             runOnUiThread { syncGameScreen() }
         }
         override fun setGbaColors(on: Boolean) {
-            super.setGbaColors(on)
+            stored.setGbaColors(on)
             runOnUiThread { syncGameScreen() }
         }
         override fun setUnlitScreen(on: Boolean) {
-            super.setUnlitScreen(on)
+            stored.setUnlitScreen(on)
             runOnUiThread { syncGameScreen() }
         }
         override fun setScreenFilter(filter: ScreenFilter) {
-            super.setScreenFilter(filter)
+            stored.setScreenFilter(filter)
             runOnUiThread { syncGameScreen() }
         }
         override fun setGridStrength(strength: GridStrength) {
-            super.setGridStrength(strength)
+            stored.setGridStrength(strength)
             runOnUiThread { syncGameScreen() }
         }
         override fun setSmoothing(mode: Smoothing) {
-            super.setSmoothing(mode)
+            stored.setSmoothing(mode)
             runOnUiThread { syncGameScreen() }
         }
         override val smoothingAvailable get() = GlCaps.gles3(this@PokeDaisyActivity)
@@ -1794,7 +1795,7 @@ class PokeDaisyActivity : Activity() {
             runOnUiThread { syncGameScreen() }
         }
         override fun setCompanionShaders(on: Boolean) {
-            super.setCompanionShaders(on)
+            stored.setCompanionShaders(on)
             runOnUiThread { syncGameScreen() }
         }
         // The display itself, not `presentation != null`: a swap composes the companion
@@ -1842,7 +1843,7 @@ class PokeDaisyActivity : Activity() {
             runOnUiThread { syncPresentation() }
         }
         override fun setShowHints(on: Boolean) {
-            super.setShowHints(on)
+            stored.setShowHints(on)
             battleHints.value = Prefs(this@PokeDaisyActivity).let { it.showHints && it.battleInfo }
         }
 
@@ -1851,23 +1852,23 @@ class PokeDaisyActivity : Activity() {
             com.pokedaisy.app.companion.ui.theme.pickTheme(com.pokedaisy.app.companion.ui.theme.themeById(id))
         }
         override fun setBattleInfo(on: Boolean) {
-            super.setBattleInfo(on)
+            stored.setBattleInfo(on)
             battleHints.value = Prefs(this@PokeDaisyActivity).let { it.showHints && it.battleInfo }
         }
         override fun setRaIcons(on: Boolean) {
-            super.setRaIcons(on)
+            stored.setRaIcons(on)
             com.pokedaisy.app.companion.ui.AchievementIcons.shown = on
         }
         override val battleStyle get() = this@PokeDaisyActivity.battleStyle.value
         override fun setBattleStyle(style: com.pokedaisy.app.companion.BattleStyle) {
-            super.setBattleStyle(style)
+            stored.setBattleStyle(style)
             this@PokeDaisyActivity.battleStyle.value = style
         }
         override val cheats get() = gameCheats()?.list.orEmpty()
         override fun setCheatsEnabled(on: Boolean) {
             if (coopRefuses()) return
             if (coopCheatsRefuse(on)) return
-            super.setCheatsEnabled(on)
+            stored.setCheatsEnabled(on)
             syncCheats()
         }
         override fun setCheatEnabled(index: Int, on: Boolean) {
@@ -1898,6 +1899,7 @@ class PokeDaisyActivity : Activity() {
         }
         override fun coopUnpair(save: com.pokedaisy.app.companion.coop.CoopSaveId) =
             com.pokedaisy.app.companion.coop.CoopSession.unpair(this@PokeDaisyActivity, save)
+        }
     }
 
     /** Reverses [Hotkeys.keyName] — "BUTTON_A"/"Z"/etc. back to a keyCode, for the companion's GAME BUTTONS

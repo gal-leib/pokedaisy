@@ -17,15 +17,19 @@ class PrefsCompanionSettingsTest {
         override fun getString(key: String, default: String?) = data[key] as? String ?: default
         override fun write(values: Map<String, Any?>) { values.forEach { (k, v) -> if (v == null) data.remove(k) else data[k] = v } }
     }
-    internal class Settings(p: Prefs) : PrefsCompanionSettings(p) {
+    internal class Settings(p: Prefs, allowDisableResume: () -> Boolean = { false },
+        private val stored: PrefsCompanionSettings = PrefsCompanionSettings(p, allowDisableResume = allowDisableResume),
+    ) : CompanionSettings, StoredCompanionSettings by stored {
         val speeds = mutableListOf<Float>()
         val fieldOptions = mutableListOf<Boolean>()
-        var canDiscardResume = false
         var blocked = false
-        override fun onPlaybackChanged() { speeds += ffMaxSpeed }
-        override fun onFieldOptionsChanged() { fieldOptions += reusableTms }
-        override fun allowDisableResume() = canDiscardResume
-        override fun setReusableTms(on: Boolean) { if (!blocked) super.setReusableTms(on) }
+        init {
+            stored.changed = { change -> when (change) {
+                PrefsCompanionSettings.Change.PLAYBACK -> speeds += ffMaxSpeed
+                PrefsCompanionSettings.Change.FIELD_OPTIONS -> fieldOptions += reusableTms
+            } }
+        }
+        override fun setReusableTms(on: Boolean) { if (!blocked) stored.setReusableTms(on) }
         override val gameName = "test"
         override val romFileName = "test.gba"
         override fun gbaControlBindings(): Map<GbaControls.Btn, List<String>> = emptyMap()
@@ -49,10 +53,12 @@ class PrefsCompanionSettingsTest {
     }
 
     @Test fun hostVetoesProtectBothStoredValuesAndRuntimeEffects() {
-        val p = Prefs(Store()); val s = Settings(p)
+        val p = Prefs(Store())
+        var canDiscard = false
+        val s = Settings(p, allowDisableResume = { canDiscard })
         s.setAutoResume(false)
         assertTrue(p.autoResume)
-        s.canDiscardResume = true; s.setAutoResume(false)
+        canDiscard = true; s.setAutoResume(false)
         assertFalse(p.autoResume)
         s.blocked = true; s.setReusableTms(true)
         assertFalse(p.reusableTms); assertTrue(s.fieldOptions.isEmpty())

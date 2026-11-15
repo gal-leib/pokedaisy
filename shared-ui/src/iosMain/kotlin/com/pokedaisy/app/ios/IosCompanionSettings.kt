@@ -43,11 +43,10 @@ internal class IosCompanionSettings(
     private val playback: () -> com.pokedaisy.app.companion.GamePlayback? = { null },
     private val options: () -> com.pokedaisy.app.companion.GameOptions? = { null },
     private val cheatHost: () -> com.pokedaisy.app.companion.GameCheats? = { null },
-) : com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences) {
-    override val languageRomCode get() = romCode
-    override fun onPlaybackChanged() = applyPlayback()
-    override fun onFieldOptionsChanged() = optionsChanged()
-    override fun allowDisableResume() = onDisableResume()
+    private val stored: com.pokedaisy.app.companion.PrefsCompanionSettings =
+        com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences,
+            languageRomCode = { romCode }, allowDisableResume = onDisableResume),
+) : CompanionSettings, com.pokedaisy.app.companion.StoredCompanionSettings by stored {
     private val d = NSUserDefaults.standardUserDefaults
     private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
     override val keyCapture get() = game?.keyCapture ?: libraryInput!!.capture
@@ -65,7 +64,7 @@ internal class IosCompanionSettings(
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
     override val cheats get() = cheatHost()?.list.orEmpty()
-    override fun setCheatsEnabled(on: Boolean) { super.setCheatsEnabled(on); cheatHost()?.apply() }
+    override fun setCheatsEnabled(on: Boolean) { stored.setCheatsEnabled(on); cheatHost()?.apply() }
     override val cheatsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_CHEATS)
     override val cheatsEditable get() = cheatHost()?.editable == true
     override fun setCheatEnabled(index: Int, on: Boolean) {
@@ -87,7 +86,7 @@ internal class IosCompanionSettings(
 
     var optionsChanged: () -> Unit = {}
     override val rewindBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_REWIND)
-    override fun setRewind(on: Boolean) { super.setRewind(on); releaseRewind() }
+    override fun setRewind(on: Boolean) { stored.setRewind(on); releaseRewind() }
     private var touchRewindHeld = false
     private var hardwareRewindHeld = false
     val rewindHeld get() = rewind && (touchRewindHeld || hardwareRewindHeld)
@@ -160,7 +159,15 @@ internal class IosCompanionSettings(
     fun holdFastForward(on: Boolean) { ffHeld = on; applyPlayback() }
 
     var playbackChanged: () -> Unit = {}
-    init { applyPlayback(); reloadBindings() }
+    init {
+        stored.changed = { change ->
+            when (change) {
+                com.pokedaisy.app.companion.PrefsCompanionSettings.Change.PLAYBACK -> applyPlayback()
+                com.pokedaisy.app.companion.PrefsCompanionSettings.Change.FIELD_OPTIONS -> optionsChanged()
+            }
+        }
+        applyPlayback(); reloadBindings()
+    }
 
     private fun applyPlayback() {
         val game = game ?: return
@@ -171,7 +178,7 @@ internal class IosCompanionSettings(
         playbackChanged()
     }
 
-    override fun setFfToggled(on: Boolean) { ffToggle = on; super.setFfToggled(on) }
+    override fun setFfToggled(on: Boolean) { ffToggle = on; stored.setFfToggled(on) }
     override val gameSpeed: Float get() = if (romPath == null) 1f else d.floatForKey("game_speed:$romPath").takeIf { it in gameSpeeds } ?: 1f
     override fun setGameSpeed(v: Float) {
         if (romPath == null || v !in gameSpeeds) return
@@ -197,7 +204,7 @@ internal class IosCompanionSettings(
     override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS
     override val hotkeysBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_HOTKEYS)
     // Preserve the old triggers as L/R until the player opts in to emulator shortcuts.
-    override fun setHotkeysEnabled(on: Boolean) { super.setHotkeysEnabled(on); reloadBindings() }
+    override fun setHotkeysEnabled(on: Boolean) { stored.setHotkeysEnabled(on); reloadBindings() }
     override fun hotkeyBindings() = Hotkeys.load(com.pokedaisy.app.game.IosGameInputBindings.directory).forActions(hotkeyActions).rawBindings
     override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {
         if (action !in hotkeyActions) return
