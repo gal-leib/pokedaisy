@@ -83,7 +83,7 @@ object PokeDaisyHost {
     private val touch = IosTouchControls({ game }, { settings })
     private var screen: IosGameScreen? = null
     private var playback: IosGamePlayback? = null
-    private var options: IosGameOptions? = null
+    private var options: com.pokedaisy.app.companion.GameOptions? = null
     private var cheats: com.pokedaisy.app.companion.GameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
@@ -241,7 +241,7 @@ object PokeDaisyHost {
             matchesSave = { PkApiCore.stateMatchesSave(it.toString()) },
             enabled = { defaults.objectForKey("auto_resume") == null || defaults.boolForKey("auto_resume") },
             snapshot = stateSnapshot, loaded = stateLoaded)
-        g.onCoreStarted = { playback?.start(); options?.start(); cheats?.start(); g.withState { resume.restore() } }
+        g.onCoreStarted = { playback?.start(); options?.start(romPath.toPath(), PkApiCore::configureWild); cheats?.start(); g.withState { resume.restore() } }
         g.beforeSuspend = {
             val saved = g.withState { resume.save() }
             if (!saved) resumeFailed()
@@ -269,11 +269,13 @@ object PokeDaisyHost {
             p.settingsChanged(settings!!)
             g.frameSpeed = p::speed
             val bKeys = battle!!::keys
-            val gameOptions = IosGameOptions(romPath, code) { code != null && !p.blocked && telemetry.snapshot.value.blocked == null }.also { o ->
+            val gameOptions = com.pokedaisy.app.companion.GameOptions(PkApiCore,
+                { code != null && !p.blocked && telemetry.snapshot.value.blocked == null }).also { o ->
                 settings!!.optionsChanged = { settings?.let(o::settingsChanged) }
                 o.settingsChanged(settings!!)
-                p.readField = o::fieldState
-                g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField)) }
+                p.readField = { o.fieldState(PkApiCore::stepField, com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(code.orEmpty())) }
+                g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField,
+                    com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN)) }
             }
             options = gameOptions
             g.beforeFrame = p::beforeFrame

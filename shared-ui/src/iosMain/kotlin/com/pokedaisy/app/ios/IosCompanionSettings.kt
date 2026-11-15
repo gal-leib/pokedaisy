@@ -41,7 +41,7 @@ internal class IosCompanionSettings(
     private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
     private val gameScreen: () -> IosGameScreen? = { null },
     private val playback: () -> IosGamePlayback? = { null },
-    private val options: () -> IosGameOptions? = { null },
+    private val options: () -> com.pokedaisy.app.companion.GameOptions? = { null },
     private val cheatHost: () -> com.pokedaisy.app.companion.GameCheats? = { null },
 ) : com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences) {
     override val languageRomCode get() = romCode
@@ -104,8 +104,6 @@ internal class IosCompanionSettings(
     fun releaseRewind() { touchRewindHeld = false; hardwareRewindHeld = false; rewindChanged() }
     override val autoRunBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
     override val runIndoorsSupported get() = fieldReadable && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode.orEmpty())
-    override val wildEncounters get() = if (d.objectForKey("wild_encounters") != null && d.integerForKey("wild_encounters") == 0L) 0 else 100
-    override fun setWildEncounters(percent: Int) { d.setInteger(if (percent == 0) 0L else 100L, "wild_encounters"); optionsChanged() }
     override val wildEncountersSupported get() = fieldReadable && options()?.wildFlagFound == true
     override val fieldOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_OPTIONS)
     override val instantTextSupported get() = options()?.instantTextSupported == true

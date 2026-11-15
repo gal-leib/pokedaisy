@@ -3792,9 +3792,12 @@ companion sample on a transition. Detected cursor and party-menu addresses confi
 without memory writes it walks the cursors. Party switching uses `battleSwitchAddrsFor`, the Android activity's verified mappings shared in place, including each hack's structure size and grid layout. It is offered only where those mappings support it.
 The shared battle view, style, focus, info and one-tap settings persist in `NSUserDefaults`.
 
-`IosGameOptions` schedules the existing `InstantText` and `ReusableTms` finders off the main thread. It discards
-results after closing or blocking a game, then applies changes between frames through `GameOptionPatches`, which
-Android's engine also calls. The shared transaction owns rollback for their combined patch set. Both JNI and
+`GameOptions` owns option discovery, desired patch state and field/auto-run policy for both hosts. Coroutine
+discovery runs off the UI thread; cancellation and a generation check discard results from a replaced, closed or
+blocked game. UI setters atomically publish desired state, and each host applies it at its existing frame boundary
+through `GameOptionPatches`. A setting changed during a patch remains pending for the next frame. Android retains
+its co-op battle gate and core field configuration; iOS retains its verified field adapters. The shared transaction
+owns rollback for their combined patch set. Both JNI and
 Kotlin/Native reach `pk_api_rom_patch` / `pk_api_rom_unpatch`; those functions own the core write lock, validate
 expected and replacement byte ranges, and preserve the existing co-op uninstall behavior. Identity reads still
 see the original file bytes. Fault-injection tests cover partial edits and failed restoration of the other feature.
@@ -4110,8 +4113,8 @@ reading, conflict removal and persistence to `GbaControls`. Existing files are n
 and capture popup are used in the game; library settings poll only while capture is active and stop on disposal.
 `Hotkeys.forActions` filters unavailable shortcuts out of both rows and consumption. `releaseAll` clears active
 holds, chord prefixes and deferred taps at ownership boundaries. `PolledGameKeys` feeds the existing `gameKey`
-policy, with an epoch guard after actions which can replace or pause the core. `IosGameHotkeys` only binds actions
-to the existing settings and slot controller. Playback speed priorities and the cycle order are shared with Android.
+policy, with an epoch guard after actions which can replace or pause the core. `GameActions` binds common actions
+to the existing settings and slot controller on both hosts. Playback speed priorities and the cycle order are shared with Android.
 The master switch starts off on iOS to preserve its legacy triggers; enabling it is explicit.
 
 `OptionTextField` reports focus through `TextInputFocus`; the iOS game host suppresses keyboard polling while a
@@ -4168,7 +4171,7 @@ page. Validation, normalization, code types, directives and import-result wordin
 Android's existing companion stays toggle-only; iOS exposes add/remove/import for a running GBA game. New codes
 start enabled, imports disabled, and the master switch controls native application.
 
-`IosGameCheats` stores `CheatStore` files by the ROM's original CRC under app support, applies enabled code text
+`GameCheats` stores `CheatStore` files by the ROM's original CRC under app support on iOS, applies enabled code text
 between frames and leaves the native lock/patch ownership to pk_api. `IosHosts` installs the stateless parser for
 `CheatCheck`. The Files picker reuses `RomPicker.pickData`, pauses input/frames, bounds imports to 1 MiB and binds
 its callback to the same running game. Shared text fields own keyboard input while typing codes.

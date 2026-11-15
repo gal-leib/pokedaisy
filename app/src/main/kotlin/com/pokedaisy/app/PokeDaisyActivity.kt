@@ -2150,6 +2150,7 @@ class PokeDaisyActivity : Activity() {
     private var freshLaunch = true
 
     private fun loadRom(romFile: File) {
+        if (::engine.isInitialized) engine.gameOptions.cancelDiscovery()
         freshLaunch = true
         // An archive unpacks once (cached after) - ~0.5 s for 32 MiB, on the black screen.
         val r = RomArchive.playable(romFile, cacheDir) ?: romFile
@@ -2248,23 +2249,6 @@ class PokeDaisyActivity : Activity() {
         syncShinyAchievements()
         gbFieldCache = null
         if (::engine.isInitialized) engine.gbField = null
-        if (gba && romBlocked == null) Thread({
-            val flag = com.pokedaisy.app.companion.data.WildEncounters.find(r.toOkioPath())
-            Log.i("pokedaisy", "wild encounters: switch %08X".format(flag))
-            // REUSABLE TMS: the spots that use a TM up, by their code (none = the row shows N/A).
-            val tms = com.pokedaisy.app.companion.data.ReusableTms.find(r.toOkioPath())
-            Log.i("pokedaisy", "reusable TMs: ${tms.size} site(s)")
-            val text = com.pokedaisy.app.companion.data.InstantText.find(r.toOkioPath())
-            runOnUiThread {
-                if (romData != r) return@runOnUiThread
-                wildFlag = flag
-                if (::engine.isInitialized) engine.wildFlag = flag
-                tmSites = tms
-                if (::engine.isInitialized) engine.setReusableTms(tms, Prefs(this).reusableTms)
-                textPatch = text
-                if (::engine.isInitialized) engine.setInstantText(text, Prefs(this).instantText)
-            }
-        }, "wild-encounters").start()
         Prefs(this).let { p ->
             expandOfferUp.value = wideGame != WideScreen.OFF && !p.expandGameOfferSeen &&
                 p.gameAspect != com.pokedaisy.app.companion.GameAspect.WIDE
@@ -2465,6 +2449,21 @@ class PokeDaisyActivity : Activity() {
             restoreFastForwardToggled(Prefs(this@PokeDaisyActivity).ffToggled)
             restoreSpeedIndex(Prefs(this@PokeDaisyActivity).speedIndexFor(romKey))
             applyFieldPrefs(this)
+        }
+        if (gba && romBlocked == null) {
+            val current = engine
+            current.gameOptions.start(r.toOkioPath(), configureWild = { flag, _ ->
+                if (romData == r && engine === current) {
+                    wildFlag = flag; current.wildFlag = flag
+                    flag != 0L
+                } else false
+            }, ready = { found ->
+                if (romData == r && engine === current) {
+                    tmSites = found.sites; textPatch = found.text
+                    current.setReusableTms(tmSites, Prefs(this).reusableTms)
+                    current.setInstantText(textPatch, Prefs(this).instantText)
+                }
+            })
         }
         // PLAYER LOOK: this ROM's scan and patches, in the background; the engine gets the pick once they're in.
         lookPatch = null
@@ -3117,6 +3116,7 @@ class PokeDaisyActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (::engine.isInitialized) engine.gameOptions.cancelDiscovery()
         if (::touchControls.isInitialized) touchControls.releaseInputWindows()
         stopListeningForFold()
         samplerThread.shutdown()

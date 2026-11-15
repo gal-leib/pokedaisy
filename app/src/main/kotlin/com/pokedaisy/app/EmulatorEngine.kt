@@ -127,7 +127,9 @@ class EmulatorEngine(
         get() = scenicFlight && flightState != MgbaCore.FLIGHT_IDLE && flightState != MgbaCore.FLIGHT_DISMOUNT
 
     /** AUTO-RUN: B held for the player while walking on the field (holding B walks); never on a bike or in a menu. */
-    @Volatile var autoRun = false
+    var autoRun
+        get() = gameOptions.autoRun
+        set(v) { gameOptions.autoRun = v }
     /** The running game runs by itself ([com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN]): flipping B there walks. */
     private val ownAutoRun get() = com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
 
@@ -141,39 +143,27 @@ class EmulatorEngine(
         private set
 
     /** RUN INDOORS: the current map lets the player run (gMapHeader.allowRunning; FireRed / Emerald engines). */
-    @Volatile var runIndoors = false
+    var runIndoors
+        get() = gameOptions.runIndoors
+        set(v) { gameOptions.runIndoors = v }
 
     /** WILD ENCOUNTERS: the game's own switch ([WildEncounters.find]; 0 = not found) and the percent of wild
      * encounters left (100 = the game's own rate, 0 = none). */
     @Volatile var wildFlag = 0L
-    @Volatile var wildEncounters = 100
+    var wildEncounters
+        get() = gameOptions.wildEncounters
+        set(v) { gameOptions.wildEncounters = v }
 
     /** DS RESOLUTION ([Prefs.dsResolution]): a DS game's 3D scale, handed to the core before the next frame. */
     @Volatile var ndsScale = 1
     private var ndsScaleSet = -1
 
-    /** REUSABLE TMS: the ROM's spots that use a TM up ([com.pokedaisy.app.companion.data.ReusableTms]; empty = none
-     * known) and whether they're patched; both go in on the next frame boundary ([setReusableTms]). */
-    @Volatile private var tmSites: List<com.pokedaisy.app.companion.data.ReusableTms.Site> = emptyList()
-    @Volatile private var reusableTms = false
-    @Volatile private var tmPatchDirty = false
-
-    fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean) {
-        tmSites = sites
-        reusableTms = on
-        tmPatchDirty = true
-    }
-
-    /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = none known) and whether it's
-     * in; with REUSABLE TMS's on the next frame boundary. */
-    @Volatile private var textPatch: com.pokedaisy.app.companion.data.InstantText.Patch? = null
-    @Volatile private var instantText = false
-
-    fun setInstantText(patch: com.pokedaisy.app.companion.data.InstantText.Patch?, on: Boolean) {
-        textPatch = patch
-        instantText = on
-        tmPatchDirty = true
-    }
+    /** Desired option state is shared; this host still decides when its frame loop may apply patches. */
+    val gameOptions by lazy { com.pokedaisy.app.companion.GameOptions(optionPatcher, { gba || nds }) }
+    fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean) =
+        gameOptions.setReusableTms(sites, on)
+    fun setInstantText(patch: com.pokedaisy.app.companion.data.InstantText.Patch?, on: Boolean) =
+        gameOptions.setInstantText(patch, on)
 
     /** SHINY ODDS ([com.pokedaisy.app.companion.data.ShinyOdds]): the game's foe party watched every frame, a new wild foe
      * made shiny at 1 in [shinyOdds] ([com.pokedaisy.app.companion.data.ShinyOdds.NORMAL] = the game's own odds, nothing
@@ -1010,7 +1000,8 @@ class EmulatorEngine(
         // After the resume (a state never carries cheats) and before the first frame.
         // The save was backed up above, before any cheat could touch it.
         applyCheats()
-        applyTmPatch()
+        gameOptions.coreStarted()
+        gameOptions.tick()
         applyLook()
 
         val sampleRate = MgbaCore.pkSampleRate()
@@ -1208,7 +1199,7 @@ class EmulatorEngine(
                 // battle, a menu screen (B leaves it) or on a bike (the Acro Bike's wheelie is B). Nor with A held: the
                 // expansion's DexNav creeps on A (Seaglass & co.), but checks B's run first, so a held B scared the
                 // Pokémon off. A while walking does nothing in the other games.
-                if (autoRun && (gba || nds)) keys = AutoRunPolicy.apply(keys, fieldState, fieldScreen, ownAutoRun)
+                if (autoRun && (gba || nds)) keys = gameOptions.keys(keys, fieldState, fieldScreen, ownAutoRun)
                 else if (!autoRun && !ownAutoRun && (gba || nds) && AutoRunPolicy.walking(keys, fieldState, fieldScreen)) {
                     walkFrames++
                     if (keys and CoreKey.B != 0) runFrames++
@@ -1428,7 +1419,7 @@ class EmulatorEngine(
                 }
                 fieldState = when {
                     nds -> MgbaCore.pkFieldState(false, wildKeep)
-                    gba && fieldGame != WideScreen.OFF -> MgbaCore.pkFieldState(runIndoors, wildKeep)
+                    gba && fieldGame != WideScreen.OFF -> gameOptions.fieldState(MgbaCore::pkFieldState, wildKnown = wildFlag != 0L)
                     else -> 0
                 }
                 // SHINY ODDS: a new wild foe, between the frame it's made and the battle drawing it.
@@ -1910,16 +1901,6 @@ class EmulatorEngine(
             MgbaCore.pkRomPatch(expectAt, expect, at, value)
     }
 
-    /** Both platforms use the same rollback rules for the shared native ROM patch set. */
-    private fun applyTmPatch() {
-        tmPatchDirty = false
-        val sites = tmSites.takeIf { gba && reusableTms }.orEmpty()
-        val text = textPatch.takeIf { gba && instantText }
-        val result = com.pokedaisy.app.companion.data.GameOptionPatches.apply(optionPatcher, sites, text)
-        if (sites.isNotEmpty()) Log.i("pokedaisy", "reusable TMs: ${if (result.tms) "${sites.size} site(s) patched" else "code didn't match"}")
-        if (text != null) Log.i("pokedaisy", "instant text: ${if (result.text) "${text.writes.size} piece(s) patched" else "code didn't match"}")
-    }
-
     /** PLAYER LOOK onto the ROM (emu thread): the last look's blocks out, this one's in (all or none), then the palettes. */
     private fun applyLook() {
         lookDirty = false
@@ -1963,7 +1944,7 @@ class EmulatorEngine(
         gameSession.servicePosted()
         if (cheatsDirty) applyCheats()
         // Never during a co-op battle: both reach pkRomUnpatch / pkRomUnblock, which uninstall co-op (they stay dirty until it ends).
-        if (tmPatchDirty && !CoopGuards.battleActive()) { applyTmPatch(); coopLock?.requestReinstall() }
+        if (gameOptions.dirty && !CoopGuards.battleActive()) { gameOptions.tick(); coopLock?.requestReinstall() }
         if (lookDirty && !CoopGuards.battleActive()) { applyLook(); coopLock?.requestReinstall() }
         // Co-op holds still service posted work and patches, but field delays must not advance.
         if (runFieldJobs) gameSession.serviceField(gba, gbOnField)
