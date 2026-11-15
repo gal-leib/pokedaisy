@@ -239,7 +239,8 @@ object PokeDaisyHost {
             if (!saved) resumeFailed()
             saved
         }
-        val (code, revision) = romHeader(romPath) ?: (null to 0)
+        val (code, revision) = (if (romPath.lowercase().endsWith(".gba"))
+            com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)
         settings = IosCompanionSettings(romPath, code, g,
             onClose = { finishClose() },
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
@@ -385,19 +386,6 @@ object PokeDaisyHost {
                 Gen2Art.prefetch(files, rom)
             }
         }
-    }
-
-    /** A GBA ROM's game code (header 0xAC) and revision (0xBC), or null. */
-    private fun romHeader(romPath: String): Pair<String, Int>? {
-        if (!romPath.lowercase().endsWith(".gba")) return null
-        return runCatching {
-            FileSystem.SYSTEM.source(romPath.toPath()).buffer().use { s ->
-                s.skip(0xAC)
-                val code = s.readUtf8(4)
-                s.skip(0xBC - 0xB0L)
-                code to (s.readByte().toInt() and 0xFF)
-            }
-        }.getOrNull()
     }
 
     private fun sample() { sampler?.request() }

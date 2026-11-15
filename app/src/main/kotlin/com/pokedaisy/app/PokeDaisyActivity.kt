@@ -2265,14 +2265,12 @@ class PokeDaisyActivity : Activity() {
         if (gba) RegionMapWatch.load(r.toOkioPath())
         val (menuField, menuBattle) = Prefs(this).ffMenuCallbacks(crc)
         // The game code and revision: a GBA header's 0xAC / 0xBC, a DS header's 0x0C / 0x1E.
-        val header = runCatching {
-            java.io.RandomAccessFile(r, "r").use { f -> f.seek(if (nds) 0x0C else 0xAC); ByteArray(0x13).also { f.readFully(it) } }
-        }.getOrNull()
-        val gameCode = header?.let { String(it, 0, 4, Charsets.US_ASCII) }.orEmpty()
+        val header = RomIdentity.header(r, nds)
+        val gameCode = header?.first.orEmpty()
         romCode = gameCode
         // AUTO = the ROM's own language (its game code's last letter; Origin HeartGold's header is Japanese, its text English).
         com.pokedaisy.app.companion.i18n.L10n.apply(Prefs(this).appLanguage, if (romOrigin) "IPKE" else gameCode)
-        romRev = header?.let { it[if (nds) 0x12 else 0x10].toInt() and 0xFF } ?: -1
+        romRev = header?.second ?: -1
         // A DS cart's EXPAND: the overworld past the top screen's edges, for a cart its field read knows.
         pickDsCore()
         view.camera.ndsMode(nds)

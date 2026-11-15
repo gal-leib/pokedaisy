@@ -3722,6 +3722,12 @@ events to the common axis policy; UI badges stay in `shared-ui/`. The app exclud
 
 ### The companion's screens (`shared-ui/`)
 
+`RomIdentityReader` shares header parsing, console detection, streaming SHA1/MD5 and the DS achievement hash.
+Raw paths use okio; Android's `RomIdentity` supplies its existing archive reader. Both game hosts use the same
+header parser. The DS hash consumes the contained cart too, rather than a compressed archive's bytes, and retains
+the header/code/icon ordering, SuperCard prefix handling, zero padding and code-size limit used for loose carts.
+No core is needed and whole-file fingerprints still stream through a bounded buffer.
+
 The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/`, in place. The core module's
 `ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
 multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
