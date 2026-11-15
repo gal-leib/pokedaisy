@@ -123,6 +123,7 @@ import kotlinx.coroutines.withContext
 import com.pokedaisy.app.companion.ui.PixelRoundedShape
 import com.pokedaisy.app.companion.ui.drawPixelRoundRect
 import okio.Path.Companion.toOkioPath
+import okio.source
 
 /**
  * Settings, in the companion SETTINGS tab's OPTION-screen look: a hub of
@@ -1473,17 +1474,16 @@ class SettingsActivity : ComponentActivity() {
     private var cheatCrc by mutableStateOf<String?>(null)
     /** The CHEATS page's game is a DS cart: Action Replay DS codes, checked as such (cheats.DsCheats). */
     private var cheatDs by mutableStateOf(false)
-    private var cheatList by mutableStateOf<List<Cheat>>(emptyList())
+    private var cheatSession by mutableStateOf<com.pokedaisy.app.companion.GameCheats?>(null)
+    private val cheatList get() = cheatSession?.list.orEmpty()
     private var cheatRemoveMode by mutableStateOf(false)
     private var removingCheat by mutableStateOf<Int?>(null)
     /** A title + message to show over CHEATS (an import's result, a file that isn't one; internal for ui-preview). */
     internal var cheatNotice by mutableStateOf<Pair<String, String>?>(null)
 
-    private fun cheatStore(): CheatStore? = cheatCrc?.let { CheatStore.forCrc(filesDir.toOkioPath(), it) }
-
     private fun saveCheats(list: List<Cheat>) {
-        cheatStore()?.save(list)
-        cheatList = list
+        cheatSession?.save(list)
+        revision++
     }
 
     /**
@@ -1499,11 +1499,14 @@ class SettingsActivity : ComponentActivity() {
         val rom = cheatRom ?: remember(games) { prefs.lastRomPath?.let(::File)?.takeIf { it.isFile } ?: games.firstOrNull() }
         LaunchedEffect(rom) {
             cheatCrc = null
-            cheatList = emptyList()
+            cheatSession = null
             val crc = rom?.let { withContext(Dispatchers.IO) { cheatCrcOf(it) } }
             cheatDs = rom != null && withContext(Dispatchers.IO) { runCatching { RomIdentity.isNds(rom) }.getOrDefault(false) }
             cheatCrc = crc
-            cheatList = crc?.let { c -> withContext(Dispatchers.IO) { CheatStore.forCrc(filesDir.toOkioPath(), c).load() } }.orEmpty()
+            cheatSession = crc?.let { c -> withContext(Dispatchers.IO) {
+                com.pokedaisy.app.companion.GameCheats(true,
+                    openStore = { CheatStore.forCrc(filesDir.toOkioPath(), c) }, enabled = { false }, submit = {}).also { it.start() }
+            } }
         }
         val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) importCheats(uri)
@@ -1556,17 +1559,18 @@ class SettingsActivity : ComponentActivity() {
 
     /** IMPORT FILE: reads the picked file and adds its cheats (all OFF), saying what came in and what didn't. */
     private fun importCheats(uri: Uri) {
-        val store = cheatStore() ?: return
+        val session = cheatSession ?: return
+        val ds = cheatDs
         val name = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank { null } ?: tk("CHEAT")
         Thread {
-            val text = runCatching {
-                contentResolver.openInputStream(uri)?.use { it.readBytes().takeIf { b -> b.size <= MAX_CHEAT_FILE } }
-            }.getOrNull()?.toString(Charsets.UTF_8)?.removePrefix("\uFEFF")
-            val result = text?.let { store.import(it, name, ds = cheatDs) }
-            val list = store.load()
+            val result = runCatching {
+                contentResolver.openInputStream(uri)?.source()?.use { session.import(it, name, ds) }
+            }.getOrNull()
             runOnUiThread {
-                cheatList = list
-                cheatNotice = cheatImportNotice(result)
+                if (cheatSession === session) {
+                    revision++
+                    cheatNotice = cheatImportNotice(result)
+                }
             }
         }.start()
     }
@@ -2223,7 +2227,7 @@ class SettingsActivity : ComponentActivity() {
         /** [EXTRA_SCREEN]: FOLDERS > ROMS FOLDERS alone (the library's + > MANAGE ROMS FOLDERS). */
         const val SCREEN_ROMS_FOLDERS = "ROMS_FOLDERS"
         /** Cheat files are text; anything bigger isn't one. */
-        const val MAX_CHEAT_FILE = 1 shl 20
+        const val MAX_CHEAT_FILE = com.pokedaisy.app.companion.GameCheats.MAX_FILE_BYTES
         /** Retail Emerald is 16 MB: the only size worth hashing for co-op. */
         const val EMERALD_ROM_BYTES = 16L * 1024 * 1024
         /** One picked overlay file at most (read into memory; a pack of a few 4K borders is ~20 MB). */

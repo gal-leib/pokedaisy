@@ -47,7 +47,7 @@ If you have cheat files from another emulator, there's no need to type anything.
 - a RetroArch `.cht` file, or
 - an mGBA `.cheats` file.
 
-For a DS game, a RetroArch `.cht` for its DS core works the same way.
+For a DS game, a RetroArch `.cht` for its DS core works the same way. Empty files and files larger than 1 MiB are not imported.
 
 PokeDaisy tells you how many cheats came in. Imported cheats start switched off, since a file often holds dozens you won't want all at once. Tap the ones you want to turn them on.
 

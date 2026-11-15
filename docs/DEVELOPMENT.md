@@ -3726,6 +3726,14 @@ The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/
 `ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
 multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
 
+`GameCheats` owns the per-game list, storage updates, enabled text and bounded import reader for
+both game hosts and Android's library cheat editor. Stores and formats remain `CheatStore`'s; imports
+stay off until enabled. The stream reader stops at 1 MiB plus one byte, including document providers
+with no size metadata, and rejects empty/oversized input before changing storage. Android retains its
+co-op vetoes and dirty-flag submission between frames; iOS submits only while its game is running.
+Library import completion is scoped to the selected session so a late result cannot replace another
+game's list. The iOS-only cheat class has been removed.
+
 `GameActions` dispatches the common hardware shortcuts and touch extras for both hosts, using
 `CompanionSettings` and `StateSlots`. It owns press/release policy, slot wrapping and touch FF's 300 ms tap
 threshold. Hosts receive hold effects with a hardware/touch source and retain their native input delivery

@@ -84,7 +84,7 @@ object PokeDaisyHost {
     private var screen: IosGameScreen? = null
     private var playback: IosGamePlayback? = null
     private var options: IosGameOptions? = null
-    private var cheats: IosGameCheats? = null
+    private var cheats: com.pokedaisy.app.companion.GameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
     private var timer: NSTimer? = null
@@ -309,7 +309,12 @@ object PokeDaisyHost {
         }
         g.beforeRewind = battle!!::cancel
         val currentSettings = settings!!
-        cheats = IosGameCheats(romPath, g) { currentSettings.cheatsEnabled }
+        cheats = com.pokedaisy.app.companion.GameCheats(
+            supported = romPath.substringAfterLast('.').lowercase() == "gba",
+            openStore = { com.pokedaisy.app.cheats.CheatStore.forCrc(appFilesDir(),
+                com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()).toString(16).padStart(8, '0')) },
+            enabled = { currentSettings.cheatsEnabled },
+            submit = { text -> if (g.isRunning && PkApiCore.applyCheats(text) < 0) com.pokedaisy.app.companion.data.Logs.i("cheats didn't load") })
         g.beforeStateChange = { currentSettings.releaseRewind(); battle?.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },

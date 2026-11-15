@@ -42,7 +42,7 @@ internal class IosCompanionSettings(
     private val gameScreen: () -> IosGameScreen? = { null },
     private val playback: () -> IosGamePlayback? = { null },
     private val options: () -> IosGameOptions? = { null },
-    private val cheatHost: () -> IosGameCheats? = { null },
+    private val cheatHost: () -> com.pokedaisy.app.companion.GameCheats? = { null },
 ) : com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences) {
     override val languageRomCode get() = romCode
     override fun onPlaybackChanged() = applyPlayback()
@@ -69,10 +69,10 @@ internal class IosCompanionSettings(
     override val cheatsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_CHEATS)
     override val cheatsEditable get() = cheatHost()?.editable == true
     override fun setCheatEnabled(index: Int, on: Boolean) {
-        if (index in cheats.indices) cheatHost()?.save(cheats.mapIndexed { i, c -> if (i == index) c.copy(enabled = on) else c })
+        cheatHost()?.setEnabled(index, on)
     }
-    override fun addCheat(cheat: com.pokedaisy.app.cheats.Cheat) { cheatHost()?.save(cheats + cheat) }
-    override fun removeCheat(index: Int) { cheatHost()?.save(cheats.filterIndexed { i, _ -> i != index }) }
+    override fun addCheat(cheat: com.pokedaisy.app.cheats.Cheat) { cheatHost()?.add(cheat) }
+    override fun removeCheat(index: Int) { cheatHost()?.remove(index) }
     override fun importCheats(onResult: (com.pokedaisy.app.cheats.CheatStore.Import?) -> Unit) {
         val g = game ?: return
         val host = cheatHost() ?: return

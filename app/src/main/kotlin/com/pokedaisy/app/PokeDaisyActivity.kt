@@ -1896,7 +1896,7 @@ class PokeDaisyActivity : Activity() {
             super.setBattleStyle(style)
             this@PokeDaisyActivity.battleStyle.value = style
         }
-        override val cheats get() = cheatStore()?.load().orEmpty()
+        override val cheats get() = gameCheats()?.list.orEmpty()
         override fun setCheatsEnabled(on: Boolean) {
             if (coopRefuses()) return
             if (coopCheatsRefuse(on)) return
@@ -1906,11 +1906,7 @@ class PokeDaisyActivity : Activity() {
         override fun setCheatEnabled(index: Int, on: Boolean) {
             if (coopRefuses()) return
             if (coopCheatsRefuse(on)) return
-            val store = cheatStore() ?: return
-            val list = store.load()
-            if (index !in list.indices) return
-            store.save(list.toMutableList().also { it[index] = it[index].copy(enabled = on) })
-            syncCheats()
+            gameCheats()?.setEnabled(index, on)
         }
         override val gameName get() = romBlocked?.title ?: com.pokedaisy.app.companion.data.activeGame.displayName()
         override val gameBlocked get() = romBlocked != null
@@ -2695,16 +2691,33 @@ class PokeDaisyActivity : Activity() {
     private fun cheatStore(): com.pokedaisy.app.cheats.CheatStore? =
         romKey.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.cheats.CheatStore.forCrc(filesDir.toOkioPath(), it) }
 
+    private var cheatSessionKey: String? = null
+    private var cheatSession: com.pokedaisy.app.companion.GameCheats? = null
+    private fun gameCheats(): com.pokedaisy.app.companion.GameCheats? {
+        if (romKey.isEmpty()) return null
+        if (cheatSessionKey != romKey) {
+            cheatSessionKey = romKey
+            cheatSession = com.pokedaisy.app.companion.GameCheats(true, ::cheatStore,
+                enabled = { Prefs(this).cheatsEnabled }, submit = ::submitCheats).also { it.refresh() }
+        }
+        return cheatSession
+    }
+
     /** Hands the engine this ROM's enabled cheats (none with the master switch off); it loads
      * them before the first frame, or on the next one while the game runs. */
     private var coopCheatNoticed = false
 
     private fun syncCheats() {
         if (!::engine.isInitialized) return
+        gameCheats()?.let { it.refresh(); it.apply() }
+    }
+
+    private fun submitCheats(cheatText: String) {
+        if (!::engine.isInitialized) return
         val enabled = Prefs(this).cheatsEnabled
         val coopOn = com.pokedaisy.app.companion.coop.CoopSession.gameOn || coopLock != null
         val text = com.pokedaisy.app.companion.coop.CoopSession.cheatsForEngine(enabled, coopOn) {
-            cheatStore()?.load()?.let(com.pokedaisy.app.cheats.CheatFiles::coreText).orEmpty()
+            cheatText
         }
         if (enabled && coopOn) {
             if (!coopCheatNoticed) { coopCheatNoticed = true; showHud(com.pokedaisy.app.companion.i18n.tr("Not while co-op is on.")) }
