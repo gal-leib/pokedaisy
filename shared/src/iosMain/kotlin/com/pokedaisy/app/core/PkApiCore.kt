@@ -25,6 +25,8 @@ import com.pokedaisy.app.core.pkapi.pk_api_rom_read
 import com.pokedaisy.app.core.pkapi.pk_api_rom_size
 import com.pokedaisy.app.core.pkapi.pk_api_run_frame
 import com.pokedaisy.app.core.pkapi.pk_api_set_audio_rate
+import com.pokedaisy.app.core.pkapi.pk_api_set_rewind
+import com.pokedaisy.app.core.pkapi.pk_api_set_rewinding
 import com.pokedaisy.app.core.pkapi.pk_api_set_keys
 import com.pokedaisy.app.core.pkapi.pk_api_video
 import com.pokedaisy.app.core.pkapi.pk_api_video_height
@@ -138,6 +140,10 @@ object PkApiCore : EmulatorCore, RomOptionPatcher {
     fun configureWild(addr: Long, wasOff: Boolean): Boolean =
         addr in 0L..0xFFFFFFFFL && pk_api_field_wild(addr.toUInt(), wasOff)
     fun stepField(runIndoors: Boolean, wildKeep: Int): Int = pk_api_field_step(runIndoors, wildKeep)
+
+    /** The existing diff ring, with battery data excluded. Main/game thread only. */
+    fun setRewind(entries: Int) = pk_api_set_rewind(entries)
+    fun setRewinding(on: Boolean) = pk_api_set_rewinding(on)
 
     /** Extended states include the battery save: a manual load rewinds it too. Game thread only. */
     fun saveState(path: String): Boolean = pk_api_save_state(path)

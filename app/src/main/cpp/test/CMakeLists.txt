@@ -19,3 +19,8 @@ add_executable(pk_state_test pk_state_test.c)
 target_link_libraries(pk_state_test PRIVATE pk_api)
 add_test(NAME pk_state COMMAND pk_state_test "${CMAKE_CURRENT_BINARY_DIR}")
 set_tests_properties(pk_state PROPERTIES FIXTURES_REQUIRED diagnostics TIMEOUT 60)
+
+add_executable(pk_rewind_api_test pk_rewind_api_test.c)
+target_link_libraries(pk_rewind_api_test PRIVATE pk_api)
+add_test(NAME pk_rewind_api COMMAND pk_rewind_api_test "${CMAKE_CURRENT_BINARY_DIR}")
+set_tests_properties(pk_rewind_api PROPERTIES FIXTURES_REQUIRED diagnostics TIMEOUT 60)

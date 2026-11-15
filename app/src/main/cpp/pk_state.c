@@ -85,6 +85,7 @@ bool pk_api_load_state(const char* path) {
         if (ok) {
             pk_heal_rtc(g.core);
             g.audioAvail = 0;
+            pkRewindReset();
         }
         pk_wide_reset();
     }

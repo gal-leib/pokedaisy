@@ -4057,3 +4057,16 @@ field owns it. Tokens keep a late disposal from releasing another field's keyboa
 keys and ends hotkey holds; controllers and touch retain their own channels. Key capture explicitly takes keyboard
 polling back while its prompt waits. Hotkey callbacks which release touch during a state operation are reflected
 in the current manual snapshot before the next core frame.
+
+
+### Shared rewind control
+
+`pk_api_set_rewind` / `pk_api_set_rewinding` expose the existing `pk_rewind.c` ring to JNI and Kotlin/Native.
+Configuration changes release the hold; successful manual/automatic state loads clear the old timeline while
+retaining the chosen capacity. Failed loads leave it alone. Controls and frames stay on the game thread; state
+loads already hold the core lock. No game addresses, state format or diff algorithm are duplicated.
+
+The native `pk_rewind_api` test uses original GB/GBA diagnostics to verify backwards frames, ring wrap/exhaustion,
+resume, resizing/off/no-core behavior and timeline resets. The Game Boy check changes its battery RAM after
+history capture, then checks both current RAM and the file retain the newer byte through rewind and close.
+The iOS setting and input hold are connected in a following parity PR.

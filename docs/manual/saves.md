@@ -154,6 +154,8 @@ Walked into the wrong trainer, or picked the wrong move? With rewind on, you can
 
 On a keyboard, `REWIND HOLD` is R. It has no controller button until you pick one under `HOTKEYS` (see [Controls](controls.md)). The sound is muted while you rewind, and when you reach the oldest moment it keeps, the picture stops there.
 
+Loading a save state starts a new rewind history. You cannot rewind from the loaded state into the timeline you left behind.
+
 Rewinding never touches your save file: it only moves the game back in time, and whatever you saved in the game stays saved until the game saves again.
 
 ## On iPad

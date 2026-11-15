@@ -135,6 +135,29 @@ void pkRewindOff(void) {
     }
     g.rewindEntries = 0;
     g.rewindTick = 0;
+    g.rewinding = false;
+}
+
+static void pkRewindConfigure(int entries, bool reset) {
+    if (entries < 0) entries = 0;
+    if (!reset && entries == g.rewindEntries) return;
+    pkRewindOff();
+    if (entries > 0 && g.core) {
+        pk_rewind_init(&g.rewind, (size_t) entries);
+        g.rewindEntries = entries;
+    }
+}
+
+void pk_api_set_rewind(int entries) {
+    pkRewindConfigure(entries, false);
+}
+
+void pkRewindReset(void) {
+    pkRewindConfigure(g.rewindEntries, true);
+}
+
+void pk_api_set_rewinding(bool on) {
+    g.rewinding = on && g.rewindEntries > 0;
 }
 
 void pk_api_deinit(void) {

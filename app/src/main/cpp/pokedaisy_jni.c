@@ -37,7 +37,6 @@
 #include "pk_coop_field.h"
 #include "pk_coop_lock.h"   // coop-lock (plan 5 Task 5)
 #include "pk_core_access.h"   // coop-lock (plan 5 Task 5)
-#include "pk_rewind.h"
 #include "pk_savevf.h"
 #include "pk_wide.h"
 #include "pk_flight.h"
@@ -430,19 +429,13 @@ Java_com_pokedaisy_app_MgbaCore_pkWideScene(JNIEnv* env, jobject thiz) {
 // REWIND: keep [entries] states (0 = off, the buffer freed). Emu thread, like pkRunFrame.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkSetRewind(JNIEnv* env, jobject thiz, jint entries) {
-    if (entries < 0) entries = 0;
-    if (entries == g.rewindEntries) return;
-    pkRewindOff();
-    if (entries > 0 && g.core) {
-        pk_rewind_init(&g.rewind, (size_t) entries);
-        g.rewindEntries = entries;
-    }
+    pk_api_set_rewind(entries);
 }
 
 // While [on], each frame steps back through the REWIND buffer instead of forward.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkSetRewinding(JNIEnv* env, jobject thiz, jboolean on) {
-    g.rewinding = on && g.rewindEntries > 0;
+    pk_api_set_rewinding(on);
 }
 
 // --- FF-music prerecording: a second, disposable core (see `rg` above) ------

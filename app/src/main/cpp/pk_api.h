@@ -78,6 +78,12 @@ const int16_t* pk_api_audio(int* count);
 /** The rate the sound is resampled to, in samples per emulated second: PK_API_SAMPLE_RATE normally, a little off it
  * while frames are paced by the display, so the device still gets PK_API_SAMPLE_RATE a real second. */
 void pk_api_set_audio_rate(double rate);
+/** Keep [entries] rewind snapshots, sampled every two game frames; zero/negative frees the history.
+ * Game thread only. Uses the existing mGBA diff ring without battery-save data. Reconfiguring releases rewind. */
+void pk_api_set_rewind(int entries);
+/** While held, run_frame restores an older snapshot before drawing. No history stands still, with no audio.
+ * Nothing happens with rewind disabled. Game thread only; deinit and successful state loads clear the history. */
+void pk_api_set_rewinding(bool on);
 /** Lets a save the game is writing finish before the game stops or a state is taken: runs up to [maxFrames] frames
  * unheard and unseen until it has (pk_host.h's pk_finish_save). Returns the frames run. */
 int pk_api_finish_save(int maxFrames);

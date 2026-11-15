@@ -127,6 +127,30 @@ class PkApiCoreTest {
     }
 
     @Test
+    fun rewindControlsCrossCinteropAndStateLoadsStartANewTimeline() {
+        val state = "$dir/cinterop-rewind.ss"
+        assertTrue(PkApiCore.start("$dir/diagnostic.gb", null))
+        repeat(60) { PkApiCore.runFrame() }
+        PkApiCore.setRewind(16)
+        repeat(40) { PkApiCore.runFrame() }
+        fun counter() = assertNotNull(PkApiCore.readBytes(0xC000, 1))[0].toInt() and 0xFF
+        val before = counter()
+        PkApiCore.setRewinding(true)
+        repeat(4) { PkApiCore.runFrame() }
+        assertTrue(counter() < before)
+        PkApiCore.setRewinding(false)
+        assertTrue(PkApiCore.saveState(state))
+        val saved = counter()
+        repeat(8) { PkApiCore.runFrame() }
+        assertTrue(PkApiCore.loadState(state))
+        PkApiCore.setRewinding(true); PkApiCore.runFrame()
+        assertEquals(saved, counter()) // configured capacity retained, old history gone
+        PkApiCore.setRewinding(false); PkApiCore.setRewind(0)
+        PkApiCore.runFrame(); assertEquals((saved + 1) and 0xFF, counter())
+        unlink(state)
+    }
+
+    @Test
     fun noGameReadsNothing() {
         PkApiCore.stop()
         assertNull(PkApiCore.readBytes(0x02000000, 4))
