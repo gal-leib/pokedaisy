@@ -50,6 +50,7 @@ val sharedUiSources by extra(
         "com/pokedaisy/app/DocsSearch.kt",
         "com/pokedaisy/app/InputBadges.kt",
         "com/pokedaisy/app/Prefs.kt",
+        "com/pokedaisy/app/GameSaves.kt",
         "com/pokedaisy/app/BattleInputController.kt",
     ),
 )

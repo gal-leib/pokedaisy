@@ -16,7 +16,7 @@ import java.util.zip.CRC32
  */
 class SaveStates(filesDir: File, romCrc: String) {
 
-    private val files = StateFiles(File(File(filesDir, "states"), romCrc).toOkioPath())
+    internal val files = StateFiles(File(File(filesDir, "states"), romCrc).toOkioPath())
 
     fun stateFile(slot: Int): File = File(files.stateFile(slot).toString())
     fun thumbFile(slot: Int): File = File(files.thumbFile(slot).toString())

@@ -3722,6 +3722,14 @@ events to the common axis policy; UI badges stay in `shared-ui/`. The app exclud
 
 ### The companion's screens (`shared-ui/`)
 
+`GameSaves` shares battery-save import transactions and dated backup names/listing. Hosts choose locations and
+their existing compression/extra-backup adapters. The common import rejects invalid input before opening state
+storage, stages bytes before touching the old save, commits fresh-boot intent before replacement, and rolls the
+old battery and marker back if publication fails. Automatic state/cache cleanup happens only after commit.
+If restoration is blocked too, the error names the retained battery backup. Same-second imports get distinct backups in newest-first order with the
+usual extension. Backup stamps use common date/time code in the device's timezone. Android keeps its RZIP decoder;
+iOS keeps its existing compressed-save refusal. A native host test verifies the iOS save/state paths and backup.
+
 `RomIdentityReader` shares header parsing, console detection, streaming SHA1/MD5 and the DS achievement hash.
 Raw paths use okio; Android's `RomIdentity` supplies its existing archive reader. Both game hosts use the same
 header parser. The DS hash consumes the contained cart too, rather than a compressed archive's bytes, and retains

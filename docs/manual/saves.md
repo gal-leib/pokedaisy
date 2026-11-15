@@ -90,11 +90,13 @@ Backups you already have stay where they are when you change the folder, and `RE
 
 To use a save from somewhere else (an old save from another emulator, a friend's file), long-press the game in the library and tap `LOAD SAVE`. Pick the file, and PokeDaisy tells you what it's about to do before you confirm with `LOAD`:
 
-- Your current save is renamed to `<game>.backup-<date and time>` next to it, so nothing is lost.
+- Your current save is renamed to `<game>.backup-<date and time>` next to it, so nothing is lost. If that name is already taken, a number is added so both copies are kept.
 - The new file is written under the name the game reads.
 - The next time you start the game, it starts from this save rather than picking up where you left off.
 
 If the file doesn't look like a GBA save, the confirmation says so.
+
+If replacing the save fails, PokeDaisy tries to put the old one back. If your storage prevents that, the error gives you the backup's name.
 
 ## Resuming where you left off
 

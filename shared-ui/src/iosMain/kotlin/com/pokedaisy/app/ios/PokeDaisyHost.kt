@@ -39,10 +39,7 @@ import okio.Path
 import okio.Path.Companion.toPath
 import okio.buffer
 import okio.use
-import platform.Foundation.NSDate
-import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSFileManager
-import platform.Foundation.NSLocale
 import platform.UIKit.UIViewController
 import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 
@@ -50,7 +47,7 @@ import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 private const val SAMPLE_MILLIS = 500L
 
 /** A save larger than this isn't one (a GBA flash chip is 128 KB; a Game Boy cart's RAM less). */
-private const val MAX_SAVE_BYTES = 1 shl 20
+private const val MAX_SAVE_BYTES = com.pokedaisy.app.GameSaves.MAX_BYTES
 
 /**
  * What the iPad app's Swift side calls (as `PokeDaisyHost.shared` in Swift; not `PokeDaisy`, which is the app's own
@@ -170,39 +167,13 @@ object PokeDaisyHost {
 
     /** The shared import dialog retains a bounded copy until the player confirms. */
     fun loadSave(romPath: String, bytes: ByteArray): String? {
-        val fs = FileSystem.SYSTEM
-        if (bytes.isEmpty() || bytes.size > MAX_SAVE_BYTES) return "That isn't a game save"
-        // RetroArch's compressed saves start "#RZIPv": the Android app unpacks them, the iPad app can't yet.
-        if (bytes.size >= 6 && bytes.copyOfRange(0, 6).decodeToString() == "#RZIPv") {
-            return "That save is compressed: turn off RetroArch's save compression and save again"
-        }
         val current = RomPicker.savePathFor(romPath).toPath()
-        val dir = current.parent ?: return "Can't write the save"
-        val backup = dir / backupName(current.name)
-        val tmp = dir / "${current.name}.tmp"
-        return runCatching {
-            fs.createDirectories(dir)
-            StateFiles.backupBattery(current)
-            // Commit this before replacing the save: neither a crash nor a matching old slot may undo the import.
-            StateResume.startFresh(StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath())))
-            if (fs.exists(current)) fs.atomicMove(current, backup)
-            fs.write(tmp) { write(bytes) }
-            fs.atomicMove(tmp, current)
-            null
-        }.getOrElse {
-            // Put the old save back.
-            runCatching { fs.delete(tmp) }
-            if (!fs.exists(current) && fs.exists(backup)) runCatching { fs.atomicMove(backup, current) }
-            "Can't write the save"
+        return when (val result = com.pokedaisy.app.GameSaves.load(current, bytes,
+            states = { StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath())) },
+            beforeReplace = { StateFiles.backupBattery(current) })) {
+            is com.pokedaisy.app.GameSaves.Result.Loaded -> null
+            is com.pokedaisy.app.GameSaves.Result.Failed -> result.reason
         }
-    }
-
-    private fun backupName(saveName: String): String {
-        val f = NSDateFormatter().apply {
-            dateFormat = "yyyyMMdd-HHmmss"
-            locale = NSLocale(localeIdentifier = "en_US_POSIX")
-        }
-        return "${saveName.substringBeforeLast('.')}.backup-${f.stringFromDate(NSDate())}.${saveName.substringAfterLast('.')}"
     }
 
     /** The game at [romPath] running, its battery save beside the others; closes the one before. [onFailed] hears a
