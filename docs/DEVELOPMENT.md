@@ -3637,6 +3637,11 @@ iOS now uses Android's `RamSnapshot.capture` before background telemetry decodin
 not read live GBA RAM while frames or item calls run. GB sampling stays on the game thread, as on Android;
 the core read lock protects core lifetime and ROM mapping, not whole frames.
 
+`ClassicFlyAction` shares the GBA target checks and start/fade/finish sequence, using the same
+`FieldItemUse` result policy and `GameSession` queue. Android keeps its DS/GB/scenic routing and delegates
+the classic branch; iOS uses the classic adapter directly. A delayed finish observes the second frame's
+busy state and stays attached to the original session, so a new scene/game cannot inherit its warp.
+
 Field actions reach the existing call machinery through `pk_api_call_safe`, `pk_api_call`,
 `pk_api_gb_call_at` and `pk_api_write`, on the game thread between frames. Android JNI delegates to these;
 its DS write branch stays with the DS core. `PkApiCore` implements the existing `GameCalls` interface so

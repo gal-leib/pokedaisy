@@ -566,6 +566,11 @@ class PokeDaisyActivity : Activity() {
         deliver = { result -> runOnUiThread(result) },
     )
 
+    private val sharedClassicFly = com.pokedaisy.app.companion.ClassicFlyAction(
+        sharedItemUse, ::fieldItemSupport,
+        session = { if (::engine.isInitialized && engine.running) engine.gameSession else null },
+    )
+
     private val itemUse = object : com.pokedaisy.app.companion.ItemUse by sharedItemUse {
         /** A DS game's Repels ([com.pokedaisy.app.companion.data.useGen4Repel], Black's [com.pokedaisy.app.companion.data.useGen5Repel]);
          * nothing else yet. */
@@ -597,7 +602,7 @@ class PokeDaisyActivity : Activity() {
                                 com.pokedaisy.app.companion.data.gen4ConfigFor(game)!!, calls, itemId, steps, free)
                     }.getOrElse { Log.e("pokedaisy", "repel failed", it); failed }
                     Log.i("pokedaisy", "item use (DS): $out")
-                    runOnUiThread { done(if (inBattle) com.pokedaisy.app.companion.fieldItemBattleResult(out) else out) }
+                    runOnUiThread { done(if (inBattle) com.pokedaisy.app.companion.fieldActionBattleResult(out) else out) }
                 }
                 return
             }
@@ -1312,21 +1317,7 @@ class PokeDaisyActivity : Activity() {
                 }
                 return
             }
-            val support = fieldItemSupport()
-            if (support == null || !support.canFly || !::engine.isInitialized || !engine.running) {
-                done(com.pokedaisy.app.companion.data.FlyTargets(com.pokedaisy.app.companion.data.FlyResult.FAILED))
-                return
-            }
-            val inBattle = telemetry.snapshot.value.inBattle
-            engine.requestFieldItemJob(inBattle) { calls, busy ->
-                val out = runCatching { com.pokedaisy.app.companion.data.flyTargets(support.fns, busy, calls) }
-                    .getOrElse { com.pokedaisy.app.companion.data.FlyTargets(com.pokedaisy.app.companion.data.FlyResult.FAILED) }
-                Log.i("pokedaisy", "fly targets: $out")
-                val shown = if (inBattle && out.result == com.pokedaisy.app.companion.data.FlyResult.NOT_NOW) {
-                    out.copy(result = com.pokedaisy.app.companion.data.FlyResult.IN_BATTLE)
-                } else out
-                runOnUiThread { done(shown) }
-            }
+            sharedClassicFly.targets(done)
         }
 
         override fun fly(mapsec: Int, targets: com.pokedaisy.app.companion.data.FlyTargets, done: (com.pokedaisy.app.companion.data.FlyResult) -> Unit) {
@@ -1404,38 +1395,13 @@ class PokeDaisyActivity : Activity() {
                 return
             }
             if (Prefs(this@PokeDaisyActivity).flyStyle == com.pokedaisy.app.companion.FlyStyle.SCENIC && flightSupport() != null) {
-                scenicFly(support, mapsec, done) { classicFly(support, mapsec, targets, done) }
+                scenicFly(support, mapsec, done) { sharedClassicFly.fly(mapsec, targets, done) }
                 return
             }
-            classicFly(support, mapsec, targets, done)
+            sharedClassicFly.fly(mapsec, targets, done)
         }
 
-        /** The game's own FLY: its cut-in, flight and landing (Fly.kt's two steps). */
-        private fun classicFly(
-            support: com.pokedaisy.app.companion.data.FieldItemSupport, mapsec: Int, targets: com.pokedaisy.app.companion.data.FlyTargets,
-            done: (com.pokedaisy.app.companion.data.FlyResult) -> Unit,
-        ) {
-            val inBattle = telemetry.snapshot.value.inBattle
-            engine.requestFieldItemJob(inBattle) { calls, busy ->
-                val started = runCatching { com.pokedaisy.app.companion.data.flyStart(support.fns, mapsec, targets, busy, calls) }
-                    .getOrElse { com.pokedaisy.app.companion.data.FlyResult.FAILED }
-                Log.i("pokedaisy", "fly to $mapsec: $started")
-                if (started == com.pokedaisy.app.companion.data.FlyResult.OK) {
-                    engine.requestFieldItemJob(false, com.pokedaisy.app.companion.data.FLY_FADE_FRAMES) { c, leftField ->
-                        val ok = com.pokedaisy.app.companion.data.flyFinish(support.fns, mapsec, targets, c, leftField)
-                        Log.i("pokedaisy", "fly to $mapsec: ${when {
-                            ok -> "flying"
-                            leftField -> "the game left the field during the fade, not taken"
-                            else -> "failed, field handed back"
-                        }}")
-                    }
-                }
-                val shown = if (inBattle && started == com.pokedaisy.app.companion.data.FlyResult.NOT_NOW) {
-                    com.pokedaisy.app.companion.data.FlyResult.IN_BATTLE
-                } else started
-                runOnUiThread { done(shown) }
-            }
-        }
+
     }
 
     /** The loaded ROM is a Game Boy / Color cart (no GBA header, no L/R). */

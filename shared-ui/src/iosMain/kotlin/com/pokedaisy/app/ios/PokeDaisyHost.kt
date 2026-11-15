@@ -86,6 +86,7 @@ object PokeDaisyHost {
     private var options: IosGameOptions? = null
     private var cheats: IosGameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
+    private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
     private var timer: NSTimer? = null
     // 1 while a read is on its way, so a slow one never piles up behind the next.
     private val reading = atomic(false)
@@ -130,7 +131,7 @@ object PokeDaisyHost {
         val snapshot by telemetry.snapshot.collectAsState()
         Box(Modifier.fillMaxSize()) {
             CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle, gamePick = telemetry.gamePick,
-                back = panels.back, keys = panels.keys, itemUse = items)
+                back = panels.back, keys = panels.keys, itemUse = items, fly = fly)
             stateError?.let { message ->
                 OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
                     onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
@@ -270,15 +271,22 @@ object PokeDaisyHost {
         val p = playback!!
         val fields = com.pokedaisy.app.companion.data.FieldItemSupportCache()
         fun live() = game === g && g.isRunning && code != null && !p.blocked && telemetry.snapshot.value.blocked == null
+        val readSupport = {
+            val snapshot = telemetry.snapshot.value
+            if (live()) fields.get(snapshot, code.orEmpty(), revision, telemetry.knownFieldItems()) else null
+        }
+        val currentSession = { p.session.takeIf { live() } }
         val sharedItems = com.pokedaisy.app.companion.FieldItemUse(
-            support = {
-                val snapshot = telemetry.snapshot.value
-                if (live()) fields.get(snapshot, code.orEmpty(), revision, telemetry.knownFieldItems()) else null
-            },
-            session = { p.session.takeIf { live() } },
+            support = readSupport, session = currentSession,
             inBattle = { telemetry.snapshot.value.inBattle },
             deliver = { result -> result(); if (live()) sample() },
         )
+        val classicFly = com.pokedaisy.app.companion.ClassicFlyAction(sharedItems, readSupport, currentSession) {
+            if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
+        }
+        fly = object : com.pokedaisy.app.companion.FlyAction by classicFly {
+            override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_CLASSIC_FLY)
+        }
         items = object : com.pokedaisy.app.companion.ItemUse by sharedItems {
             override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_ITEMS)
             override fun openPc(done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
@@ -336,6 +344,7 @@ object PokeDaisyHost {
         options = null
         cheats = null
         items = null
+        fly = null
         playback?.close()
         playback = null
         battle?.cancel()

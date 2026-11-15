@@ -30,7 +30,7 @@ class FieldItemUse(
         game.requestField(battling) { calls, busy ->
             val out = runCatching { work(fields, calls, busy) }.getOrElse { Logs.w("item use failed", it); failed }
             Logs.i("item use: $out")
-            deliver { if (session() === game) done(if (battling) fieldItemBattleResult(out) else out) }
+            deliver { if (session() === game) done(if (battling) fieldActionBattleResult(out) else out) }
         }
     }
 
@@ -52,8 +52,10 @@ class FieldItemUse(
 
 /** Report a busy field action as a battle refusal when the request came from a battle. */
 @Suppress("UNCHECKED_CAST")
-fun <T> fieldItemBattleResult(out: T): T = when {
+fun <T> fieldActionBattleResult(out: T): T = when {
     out is ItemUseOutcome && out.result == ItemUseResult.NOT_NOW -> out.copy(result = ItemUseResult.IN_BATTLE) as T
     out is PartyTargets && out.result == ItemUseResult.NOT_NOW -> out.copy(result = ItemUseResult.IN_BATTLE) as T
+    out is FlyTargets && out.result == FlyResult.NOT_NOW -> out.copy(result = FlyResult.IN_BATTLE) as T
+    out is FlyResult && out == FlyResult.NOT_NOW -> FlyResult.IN_BATTLE as T
     else -> out
 }

@@ -18,6 +18,7 @@ object NewFeatures {
     const val IOS_TOUCH_XY = "ios_touch_xy"
     const val IOS_CHEATS = "ios_cheats"
     const val IOS_FIELD_ITEMS = "ios_field_items"
+    const val IOS_CLASSIC_FLY = "ios_classic_fly"
 
     /** SETTINGS > HUD (companion.ui.FieldHud). */
     const val HUD = "hud"
@@ -218,6 +219,7 @@ object NewFeatures {
         IOS_TOUCH_XY,
         IOS_CHEATS,
         IOS_FIELD_ITEMS,
+        IOS_CLASSIC_FLY,
         IOS_FIELD_OPTIONS,
         IOS_GAME_OPTIONS,
         IOS_SCENE_SPEEDS,

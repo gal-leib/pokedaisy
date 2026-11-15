@@ -623,6 +623,7 @@ fun OptionButton(
     focusStart: Boolean = false,
     /** RAINBOW may colour it; false keeps the usual look (STATES' buttons). */
     rainbow: Boolean = true,
+    labelBadge: String? = null,
 ) {
     val u = m.u
     val interaction = remember { MutableInteractionSource() }
@@ -686,6 +687,9 @@ fun OptionButton(
         }
         if ((icon != null || pixelIcon != null) && label != null) Spacer(Modifier.width(u * 4))
         if (label != null) GbaText(tr(label), fg, shadow, m, bold = gameBoldLabels())
+        labelBadge?.let {
+            OptionBadge(it, m, Modifier.padding(start = u * 4), fill = OptionColors.newBadge, shadow = OptionColors.newBadgeShadow)
+        }
     }
 }
 
