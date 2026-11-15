@@ -2,8 +2,14 @@
 
 package com.pokedaisy.app.core
 
+import com.pokedaisy.app.companion.data.GameCalls
+import com.pokedaisy.app.companion.data.InProcessReader
 import com.pokedaisy.app.companion.data.EmulatorCore
 import com.pokedaisy.app.companion.data.RomArt
+import com.pokedaisy.app.core.pkapi.pk_api_call
+import com.pokedaisy.app.core.pkapi.pk_api_call_safe
+import com.pokedaisy.app.core.pkapi.pk_api_write
+import com.pokedaisy.app.core.pkapi.pk_api_gb_call_at
 import com.pokedaisy.app.core.pkapi.pk_api_save_state
 import com.pokedaisy.app.core.pkapi.pk_api_load_state
 import com.pokedaisy.app.core.pkapi.pk_api_state_matches_save
@@ -55,7 +61,21 @@ import kotlinx.cinterop.value
  *
  * Threads, as pk_api.h says: one thread (the game's) starts, runs and stops it; the reads may come from any thread.
  */
-object PkApiCore : EmulatorCore, RomOptionPatcher {
+object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls {
+    /** Existing field actions use this same interface on Android. Game thread between frames only. */
+    fun callSafe(): Boolean = pk_api_call_safe()
+    override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int): Long =
+        pk_api_call(fn.toUInt(), a0.toUInt(), a1.toUInt(), a2.toUInt(), a3.toUInt())
+    override fun read(addr: Long, len: Int): ByteArray = InProcessReader.readCoreMemory(addr, len)
+    override fun rom(off: Long, len: Int): ByteArray? = romRead(off, len)
+    override fun write(addr: Long, bytes: ByteArray): Boolean {
+        if (addr !in 0L..0xFFFFFFFFL || bytes.isEmpty()) return false
+        return bytes.usePinned { pk_api_write(addr.toUInt(), it.addressOf(0).reinterpret(), bytes.size) }
+    }
+    override fun gbCallAt(at: Int, fn: Int, a: Int, b: Int, hl: Int): Boolean =
+        pk_api_gb_call_at(at.toUShort(), fn.toUShort(), a.toUByte(), b.toUByte(), hl.toUShort())
+
+
     /** Existing mGBA GBA parser, independent of a running game. */
     fun checkCheat(code: String, type: Int, directive: String): String? {
         val result = pk_api_cheats_check(code, type, directive) ?: return null

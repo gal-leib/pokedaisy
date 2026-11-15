@@ -61,6 +61,18 @@ char* pk_api_cheats_check(const char* code, int type, const char* directive);
  * Uses the existing patch/overlay bookkeeping; game-option patches remain separate. */
 int pk_api_cheats_apply(const char* text);
 
+/** Game thread between frames: write scratch data in GBA EWRAM/IWRAM or GB WRAM only.
+ * CGB bank B uses (B << 16) | D000-DFFF. Rejects empty, crossing or non-RAM ranges without writing. */
+bool pk_api_write(uint32_t addr, const uint8_t* src, int len);
+/** Whether the running GBA core is at a safe depth for a game-function call; false on GB/no game. */
+bool pk_api_call_safe(void);
+/** Call an existing GBA Thumb function, preserving the CPU context. Returns unsigned r0 as int64_t,
+ * or -1 if unavailable/unsafe/timed out. Game thread between frames; memory effects are not rolled back. */
+int64_t pk_api_call(uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3);
+/** Let a GB game reach [at], then arrange its call of [fn] with A/B/HL (at most two HALT waits).
+ * Returns once scheduled, not when fn returns. Game thread between frames; false on GBA/no game. */
+bool pk_api_gb_call_at(uint16_t at, uint16_t fn, uint8_t a, uint8_t b, uint16_t hl);
+
 /** Field observation only: configure the current GBA ROM by its CRC32 (zero disables), then read PK_API_FIELD_*.
  * Game thread, between frames. Unknown games, Game Boy and no core return zero. Does not enable game patches. */
 bool pk_api_field_configure(uint32_t crc);

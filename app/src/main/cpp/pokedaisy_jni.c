@@ -539,7 +539,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadAudio(JNIEnv* env, jobject thiz, jsh
 // Whether a pkCall on the player's core can run now (pk_call_safe): the field-item jobs wait a frame when it can't.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCallSafe(JNIEnv* env, jobject thiz) {
-    return g.core && pk_is_gba(g.core) && pk_call_safe(g.core) ? JNI_TRUE : JNI_FALSE;
+    return pk_api_call_safe() ? JNI_TRUE : JNI_FALSE;
 }
 
 // Calls the game's own function `fn` (r0-r3 = a0-a3) on the player's core, between
@@ -549,12 +549,7 @@ Java_com_pokedaisy_app_MgbaCore_pkCallSafe(JNIEnv* env, jobject thiz) {
 // instead of steering the game's menus.
 JNIEXPORT jlong JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCall(JNIEnv* env, jobject thiz, jlong fn, jint a0, jint a1, jint a2, jint a3) {
-    const uint32_t args[4] = {(uint32_t) a0, (uint32_t) a1, (uint32_t) a2, (uint32_t) a3};
-    uint32_t r0;
-    if (!g.core || !pk_call(g.core, (uint32_t) fn, args, &r0)) {
-        return -1;
-    }
-    return (jlong) r0;
+    return (jlong) pk_api_call((uint32_t) fn, (uint32_t) a0, (uint32_t) a1, (uint32_t) a2, (uint32_t) a3);
 }
 
 // FREE FLIGHT (pk_flight.h): the game's functions through pk_call.
@@ -861,35 +856,17 @@ Java_com_pokedaisy_app_MgbaCore_pkWriteBytes(JNIEnv* env, jobject thiz, jlong ad
         if (b) (*env)->ReleaseByteArrayElements(env, bytes, b, JNI_ABORT);
         return ok ? JNI_TRUE : JNI_FALSE;
     }
-    if (g.core && !pk_is_gba(g.core)) {
-        jbyte* gbBytes = len > 0 ? (*env)->GetByteArrayElements(env, bytes, NULL) : NULL;
-        if (!gbBytes) {
-            return JNI_FALSE;
-        }
-        bool ok = pk_gb_write(g.core, a, (const uint8_t*) gbBytes, len);
-        (*env)->ReleaseByteArrayElements(env, bytes, gbBytes, JNI_ABORT);
-        return ok ? JNI_TRUE : JNI_FALSE;
-    }
-    bool ram = (a >= 0x02000000u && a + (uint32_t) len <= 0x02040000u) || (a >= 0x03000000u && a + (uint32_t) len <= 0x03008000u);
-    if (len <= 0 || !ram || !g.core || !pk_is_gba(g.core)) {
-        return JNI_FALSE;
-    }
-    jbyte* b = (*env)->GetByteArrayElements(env, bytes, NULL);
-    if (!b) {
-        return JNI_FALSE;
-    }
-    for (jsize i = 0; i < len; i++) {
-        g.core->busWrite8(g.core, a + (uint32_t) i, (uint8_t) b[i]);
-    }
-    (*env)->ReleaseByteArrayElements(env, bytes, b, JNI_ABORT);
-    return JNI_TRUE;
+    jbyte* b = len > 0 ? (*env)->GetByteArrayElements(env, bytes, NULL) : NULL;
+    bool ok = b && pk_api_write(a, (const uint8_t*) b, len);
+    if (b) (*env)->ReleaseByteArrayElements(env, bytes, b, JNI_ABORT);
+    return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 // A Game Boy game's own call from its main loop (pk_gb_call_at): the game runs on to `at`, then calls `fn` with A = `a`,
 // B = `b`, HL = `hl` and comes back to `at`. The emu thread, between frames - Yellow's PC anywhere (GbField.kt).
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkGbCallAt(JNIEnv* env, jobject thiz, jint at, jint fn, jint a, jint b, jint hl) {
-    return pk_gb_call_at(g.core, (uint16_t) at, (uint16_t) fn, (uint8_t) a, (uint8_t) b, (uint16_t) hl, 2) ? JNI_TRUE : JNI_FALSE;
+    return pk_api_gb_call_at((uint16_t) at, (uint16_t) fn, (uint8_t) a, (uint8_t) b, (uint16_t) hl) ? JNI_TRUE : JNI_FALSE;
 }
 
 // Same as pkReadBytes, from the FF-music render core (rg): FfMusicRenderer

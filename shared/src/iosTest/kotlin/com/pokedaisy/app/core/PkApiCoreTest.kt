@@ -171,4 +171,32 @@ class PkApiCoreTest {
         assertEquals(0xA5, assertNotNull(PkApiCore.readBytes(0x02003000, 1))[0].toInt() and 0xFF)
         assertEquals(0, PkApiCore.applyCheats(""))
     }
+    @Test
+    fun fieldCallsUseTheSharedGameCallsInterface() {
+        val calls: com.pokedaisy.app.companion.data.GameCalls = PkApiCore
+        assertTrue(PkApiCore.start("$dir/diagnostic.gba", null))
+        repeat(60) { PkApiCore.runFrame() }
+        val sum = byteArrayOf(0x40, 0x18, 0x80.toByte(), 0x18, 0xC0.toByte(), 0x18, 0x70, 0x47)
+        assertTrue(calls.write(0x03004000, sum))
+        assertContentEquals(sum, calls.read(0x03004000, sum.size))
+        assertTrue(PkApiCore.callSafe())
+        assertEquals(10L, calls.call(0x03004001, 1, 2, 3, 4))
+        assertTrue(calls.write(0x03004000, byteArrayOf(0, 0x20, 0xC0.toByte(), 0x43, 0x70, 0x47)))
+        assertEquals(0xFFFFFFFFL, calls.call(0x03004001))
+        kotlin.test.assertFalse(calls.write(0x03007FFF, byteArrayOf(1, 2)))
+        kotlin.test.assertFalse(calls.write(0x100000000, byteArrayOf(1)))
+        kotlin.test.assertFalse(calls.write(0x02000000, byteArrayOf()))
+        kotlin.test.assertFalse(calls.gbCallAt(0x150, 0xC100, 1, 2, 3))
+        PkApiCore.runFrame()
+        assertTrue(PkApiCore.start("$dir/diagnostic.gb", null))
+        repeat(60) { PkApiCore.runFrame() }
+        kotlin.test.assertFalse(PkApiCore.callSafe())
+        assertEquals(-1L, calls.call(0xC101))
+        assertTrue(calls.write(0xC100, byteArrayOf(0x12, 0x34)))
+        assertContentEquals(byteArrayOf(0x12, 0x34), calls.read(0xC100, 2))
+        assertContentEquals("PD-TEST-GB".encodeToByteArray(), calls.rom(0x134, 10))
+        PkApiCore.stop()
+        assertEquals(-1L, calls.call(0x03004001))
+    }
+
 }

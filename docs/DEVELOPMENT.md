@@ -3615,8 +3615,16 @@ The GBA / Game Boy game itself (starting and closing it, its frames, picture, so
 plain C API with no JNI in it: `pk_api.h`, implemented by `pk_session.c`. `pokedaisy_jni.c` calls it (and puts the DS
 games in front of it); the iPad app will call the same functions. `pk_api.cmake` builds it, mGBA included, as the
 static library `pk_api`, which the app's `CMakeLists.txt` links and any other host can too. The rest of the native code
-(states, cheats, EXPAND, REWIND, the render core, the game calls...) still reaches into its state as `g`
+(EXPAND, the render core...) still reaches into its state as `g`
 (`pk_session.h`, a transitional header) and moves under `pk_api.h` one area at a time.
+
+Field actions reach the existing call machinery through `pk_api_call_safe`, `pk_api_call`,
+`pk_api_gb_call_at` and `pk_api_write`, on the game thread between frames. Android JNI delegates to these;
+its DS write branch stays with the DS core. `PkApiCore` implements the existing `GameCalls` interface so
+shared PC / FLY / item actions can use it directly. Writes are restricted to scratch WRAM (including packed
+CGB banks), never ROM, I/O or battery RAM. GBA calls preserve CPU context and return unsigned r0 as a Long
+(`-1` means failure); GB calls return when scheduled. `pk_calls_api_test` covers real diagnostic calls,
+argument passing, unsigned results, timeout recovery and rejected ranges; `PkApiCoreTest` checks cinterop.
 
 Its host test runs it off Android on `linux/make_diagnostic.py`'s ROMs (CI's "Core C API (host)" job):
 

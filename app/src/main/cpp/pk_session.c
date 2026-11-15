@@ -23,6 +23,7 @@
 #include "pk_core_access.h"
 #include "pk_flight.h"
 #include "pk_host.h"
+#include "pk_gb_field.h"
 #include "pk_rewind.h"
 #include "pk_savevf.h"
 #include "pk_wide.h"
@@ -370,6 +371,32 @@ void pk_api_rom_unpatch(void) {
 
 char* pk_api_cheats_check(const char* code, int type, const char* directive) {
     return pk_cheats_check(code, type, directive);
+}
+
+bool pk_api_write(uint32_t addr, const uint8_t* src, int len) {
+    if (!g.core || !src || len <= 0) return false;
+    if (!pk_is_gba(g.core)) return pk_gb_write(g.core, addr, src, len);
+    uint64_t end = (uint64_t) addr + (uint32_t) len;
+    bool ram = (addr >= 0x02000000u && end <= 0x02040000u) ||
+               (addr >= 0x03000000u && end <= 0x03008000u);
+    if (!ram) return false;
+    for (int i = 0; i < len; ++i) g.core->busWrite8(g.core, addr + (uint32_t) i, src[i]);
+    return true;
+}
+
+bool pk_api_call_safe(void) {
+    return g.core && pk_is_gba(g.core) && pk_call_safe(g.core);
+}
+
+int64_t pk_api_call(uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
+    const uint32_t args[4] = {a0, a1, a2, a3};
+    uint32_t result;
+    if (!g.core || !pk_call(g.core, fn, args, &result)) return -1;
+    return (int64_t) result;
+}
+
+bool pk_api_gb_call_at(uint16_t at, uint16_t fn, uint8_t a, uint8_t b, uint16_t hl) {
+    return pk_gb_call_at(g.core, at, fn, a, b, hl, 2);
 }
 
 int pk_api_cheats_apply(const char* text) {
