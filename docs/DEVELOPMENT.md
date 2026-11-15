@@ -3618,6 +3618,15 @@ static library `pk_api`, which the app's `CMakeLists.txt` links and any other ho
 (EXPAND, the render core...) still reaches into its state as `g`
 (`pk_session.h`, a transitional header) and moves under `pk_api.h` one area at a time.
 
+`GameSession` (`shared/src/commonMain/.../game/`) owns queued between-frame work, field-job delays,
+safe-call waits, menu/map observation and the settled on-field signal. Both `EmulatorEngine` and
+`IosGamePlayback` drive it from their existing loops. Posted work runs before dirty patches, then field
+work; a callback's newly queued work waits for the next batch. Co-op holds skip field service without
+advancing delays, and iOS rewind skips the forward-work hook. Close/reset drop both queues and field
+visibility so delayed calls cannot reach the next game. Render/audio and each host's state operations
+remain with the host. `GameSessionTest` exercises this ordering, waits, busy gates, failures, close and
+fade/field settling on JVM and iOS.
+
 Field actions reach the existing call machinery through `pk_api_call_safe`, `pk_api_call`,
 `pk_api_gb_call_at` and `pk_api_write`, on the game thread between frames. Android JNI delegates to these;
 its DS write branch stays with the DS core. `PkApiCore` implements the existing `GameCalls` interface so

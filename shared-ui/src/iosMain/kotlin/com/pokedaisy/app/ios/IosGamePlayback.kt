@@ -6,6 +6,8 @@ import androidx.compose.runtime.setValue
 import com.pokedaisy.app.companion.*
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.core.PkApiCore
+import com.pokedaisy.app.game.GameSession
+import platform.Foundation.NSLog
 import okio.Path.Companion.toPath
 import platform.Foundation.NSUserDefaults
 
@@ -18,8 +20,9 @@ internal class IosGamePlayback(
 ) {
     private val gba = code != null
     private val defaults = NSUserDefaults.standardUserDefaults
-    private var menu = false
-    private var map = false
+    val session = GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> NSLog("PokeDaisy: %@: %@", where, error.toString()) }
+    private val menu get() = session.menuOpen
+    private val map get() = session.mapOpen
     private var field = 0
     val fieldState get() = field
     val onField get() = gba && !blocked && FfMenuWatch.onField
@@ -49,6 +52,7 @@ internal class IosGamePlayback(
     }
 
     fun start() {
+        session.reset()
         val crc = if (gba) runCatching { romCrc32(romPath.toPath()) }.getOrDefault(0L) else 0L
         val romKey = crc.toString(16).padStart(8, '0')
         blocked = BlockedGames.forCrc(romKey) != null
@@ -76,11 +80,17 @@ internal class IosGamePlayback(
         if (snapshot.connected) FfMenuWatch.notePosition(snapshot.x, snapshot.y, snapshot.mapGroup, snapshot.mapNum, snapshot.inBattle)
     }
 
+    fun beforeFrame() {
+        session.servicePosted()
+        // As Android with an unknown GB scene: each GB helper validates its own field RAM.
+        session.serviceField(gba, gbOnField = true)
+    }
+
     fun tick() {
-        if (!gba || blocked || telemetry.snapshot.value.blocked != null) { field = 0; menu = false; map = false; return }
-        map = RegionMapWatch.isOpen(InProcessReader)
-        menu = FfMenuWatch.tick(InProcessReader) && !ShopWatch.isOpen(InProcessReader)
-        field = if (fieldReadable) readField() else 0
+        val readable = gba && !blocked && telemetry.snapshot.value.blocked == null
+        session.observeScreens(readable)
+        session.observeField(readable && FfMenuWatch.onField && !map, -1, battle.gameState, battle.holdPicture)
+        field = if (readable && fieldReadable) readField() else 0
         if (field and GameField.AVATAR != 0) fieldMovesReadable = true
     }
 
@@ -95,6 +105,7 @@ internal class IosGamePlayback(
     }
 
     fun close() {
+        session.close()
         FfMenuWatch.onLearned = null
         RegionMapWatch.load(null)
     }

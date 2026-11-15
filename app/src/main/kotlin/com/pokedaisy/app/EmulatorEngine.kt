@@ -445,7 +445,7 @@ class EmulatorEngine(
      * player's first steps, then remembered per ROM), a Game Boy game's screen matched to its map (pk_wide_gb.c's
      * SCENE_FIELD, [gbSceneGame]), no battle or region map up,
      * and at EXPAND (whose scene is known every frame, [MgbaCore.pkWideScene]) no text box, map preview or battle
-     * transition either; a fade between maps changes nothing. Comes on [FIELD_SETTLE_FRAMES] after the field is
+     * transition either; a fade between maps changes nothing. Comes on twenty frames after the field is
      * back (a conversation's lines don't make the HUD blink), goes at once. Set on the emu thread.
      */
     val onField = kotlinx.coroutines.flow.MutableStateFlow(false)
@@ -509,7 +509,6 @@ class EmulatorEngine(
     /** The battle's command / move panel floats in too: BATTLE BUTTONS can't stand in for it (off, a double battle). */
     @Volatile var dsBattleMenuFloats = false
     private var touchFrames = 0
-    private var fieldFrames = 0
 
     /**
      * DAY AND NIGHT ([com.pokedaisy.app.companion.data.DayNight]): the tint the activity wants on the field now (red,
@@ -785,27 +784,18 @@ class EmulatorEngine(
         cheatsDirty = true
     }
 
-    /** A bag item's work on the game (FieldItems.kt), run on the next frame boundary: [run] gets the game's
-     * functions and whether it's busy (a battle, a menu screen, the region map). */
-    private class FieldItemJob(val inBattle: Boolean, var delayFrames: Int, val run: (com.pokedaisy.app.companion.data.GameCalls, Boolean) -> Unit) {
-        /** Frames waited for a clean frame end ([MgbaCore.pkCallSafe]). */
-        var waitedFrames = 0
+    private val gameSession by lazy {
+        com.pokedaisy.app.game.GameSession(gameCalls, MgbaCore::pkCallSafe) { where, error ->
+            Log.e("pokedaisy", where, error)
+        }
     }
-    private val fieldItemJobs = java.util.concurrent.ConcurrentLinkedQueue<FieldItemJob>()
-
-    /** Plain jobs for the emu thread, run between frames (the companion's sample results: PokeDaisyActivity.startSample). */
-    private val emuJobs = java.util.concurrent.ConcurrentLinkedQueue<() -> Unit>()
 
     /** Runs [job] on the emu thread before the next frame; dropped if the game closes first. */
-    fun postToEmu(job: () -> Unit) {
-        emuJobs.add(job)
-    }
+    fun postToEmu(job: () -> Unit) = gameSession.post(job)
 
-    /** Runs [run] on the emu thread between frames with the game's functions ([com.pokedaisy.app.companion.data.GameCalls])
-     * and whether the game is busy - USE / GIVE on the ITEMS tab. Every request runs, in order. */
-    fun requestFieldItemJob(inBattle: Boolean, delayFrames: Int = 0, run: (com.pokedaisy.app.companion.data.GameCalls, Boolean) -> Unit) {
-        fieldItemJobs.add(FieldItemJob(inBattle, delayFrames, run))
-    }
+    /** Queued field work uses the same delay, busy and safe-call policy on both platforms. */
+    fun requestFieldItemJob(inBattle: Boolean, delayFrames: Int = 0, run: (com.pokedaisy.app.companion.data.GameCalls, Boolean) -> Unit) =
+        gameSession.requestField(inBattle, delayFrames, run)
 
     private val gameCalls = object : com.pokedaisy.app.companion.data.GameCalls {
         override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int) = MgbaCore.pkCall(fn, a0, a1, a2, a3)
@@ -952,11 +942,13 @@ class EmulatorEngine(
     private var vh = 0
 
     private fun loop(rom: File, save: File, resume: File?) {
-        emuJobs.clear()   // the last game's
+        gameSession.reset()
+        onField.value = false
         SaveBackups.snapshot(save)
         // RetroArch's compressed .srm, unpacked first: mGBA would take it as the flash itself and the game start anew.
         RzipSave.unpackForPlay(save)?.let { why ->
             loadError = why
+            gameSession.close()
             running = false
             if (resume != null) onResumeResult?.invoke(false)
             return
@@ -965,6 +957,7 @@ class EmulatorEngine(
         MgbaCore.pkNdsSetCore(ndsCore)
         if (!MgbaCore.pkInit(rom.absolutePath, save.absolutePath)) {
             loadError = "mGBA could not load ${rom.name}"
+            gameSession.close()
             running = false
             if (resume != null) onResumeResult?.invoke(false)
             return
@@ -1349,12 +1342,10 @@ class EmulatorEngine(
                     runCatching { onBattleInputSample?.invoke() }
                 }
 
-                // GBA memory watchers; a Game Boy game has none of these screens / engines to read.
-                mapOpen = gba && RegionMapWatch.isOpen(InProcessReader)
+                gameSession.observeScreens(gba, nds && fieldState and MgbaCore.FIELD_MENU != 0)
+                mapOpen = gameSession.mapOpen
+                menuOpen = gameSession.menuOpen
                 regionMapOpen = mapOpen
-                // A shop's screens count as the field: its clerk talks inside them (GitHub #41).
-                menuOpen = gba && FfMenuWatch.tick(InProcessReader) && !ShopWatch.isOpen(InProcessReader) ||
-                    nds && fieldState and MgbaCore.FIELD_MENU != 0   // a DS menu screen: the field's child process
                 battleWaiting = nds && fieldState and MgbaCore.FIELD_BATTLE_INPUT != 0
                 if (nds) {
                     // Both screens black (between two scenes): every choice below holds - what comes after the black
@@ -1408,19 +1399,10 @@ class EmulatorEngine(
                     if (dsMenuApp.value) dsMenuApp.value = false
                 }
                 if (wideApplied == WideScreen.OFF || (wideCamera == null && !probeOnly)) wideScene = -1
-                // A fade between two maps keeps whatever the HUD was doing.
-                if (wideScene != WideCamera.SCENE_FADE) {
-                    // The field's own screen, positively (FfMenuWatch): "no menu found" isn't enough - a game whose field
-                    // screen isn't learned yet (a new game) never reports a menu, so its naming screen passed as field.
-                    // A Game Boy game: its scene (pk_wide_gb.c's screen match, with EXPAND or without) must say FIELD.
-                    val screen = if (gba || nds) fieldScreen && !mapOpen else wideScene == WideCamera.SCENE_FIELD
-                    val field = screen && !battleInput.holdFrame &&
-                        battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE &&
-                        (wideScene == -1 || wideScene == WideCamera.SCENE_FIELD)
-                    fieldFrames = if (field) fieldFrames + 1 else 0
-                    val show = fieldFrames >= FIELD_SETTLE_FRAMES
-                    if (onField.value != show) onField.value = show
-                }
+                gameSession.observeField(
+                    if (gba || nds) fieldScreen && !mapOpen else wideScene == WideCamera.SCENE_FIELD,
+                    wideScene, battleInput.gameState, battleInput.holdFrame)
+                if (onField.value != gameSession.onField) onField.value = gameSession.onField
                 // SCENE SPEEDS / AUTO-RUN / RUN INDOORS / WILD ENCOUNTERS: the field as WIDE's tables read it (or a
                 // pending hack's), every frame on a game they know - a few bytes, and SETTINGS learns from it whether
                 // BIKE / SURF SPEED can work here.
@@ -1878,6 +1860,8 @@ class EmulatorEngine(
         } finally {
             // A loop that died mid-game mustn't look alive, or leave a suspend for the next start.
             running = false
+            gameSession.close()
+            onField.value = false
             pacedPerFrame = 0   // no frames are coming: the GL thread mustn't wait for one
             pendingSuspend = null
             runCatching { track?.stop() }
@@ -1976,33 +1960,13 @@ class EmulatorEngine(
     }
 
     private fun servicePending(runFieldJobs: Boolean = true) {
-        repeat(emuJobs.size) { emuJobs.poll()?.let { job -> runCatching(job).onFailure { Log.e("pokedaisy", "emu job failed", it) } } }
+        gameSession.servicePosted()
         if (cheatsDirty) applyCheats()
         // Never during a co-op battle: both reach pkRomUnpatch / pkRomUnblock, which uninstall co-op (they stay dirty until it ends).
         if (tmPatchDirty && !CoopGuards.battleActive()) { applyTmPatch(); coopLock?.requestReinstall() }
         if (lookDirty && !CoopGuards.battleActive()) { applyLook(); coopLock?.requestReinstall() }
-        // The jobs queued by now (one a job queues runs on a later frame); a delayed one waits its frames.
-        // Not while co-op holds the game: they call game code (PC, USE, FLY) with no frames advancing; they stay queued.
-        if (runFieldJobs) repeat(fieldItemJobs.size) {
-            val job = fieldItemJobs.poll() ?: return@repeat
-            if (job.delayFrames > 0) {
-                job.delayFrames--
-                fieldItemJobs.add(job)
-                return@repeat
-            }
-            // The game's code part-way through this frame (its interrupt handler, a lag frame): its functions are
-            // called on a later frame that ends cleanly, never in the middle of its own (MgbaCore.pkCallSafe).
-            if (gba && job.waitedFrames < CALL_WAIT_FRAMES && !MgbaCore.pkCallSafe()) {
-                job.waitedFrames++
-                fieldItemJobs.add(job)
-                return@repeat
-            }
-            // Not with a menu screen or the region map up either: the game itself only uses items from its bag.
-            // A Game Boy game: its scene must be the plain field.
-            val busy = job.inBattle || if (gba) menuOpen || mapOpen else !gbOnField
-            runCatching { job.run(gameCalls, busy) }
-                .onFailure { Log.e("pokedaisy", "field item job failed", it) }
-        }
+        // Co-op holds still service posted work and patches, but field delays must not advance.
+        if (runFieldJobs) gameSession.serviceField(gba, gbOnField)
         pendingSuspend?.let { target ->
             pendingSuspend = null
             finishSave()
@@ -2172,10 +2136,6 @@ class EmulatorEngine(
         @Volatile private var coreLoop: Thread? = null
         private val coreLock = Any()
 
-        /** Frames a field-item job waits for a clean frame end (MgbaCore.pkCallSafe) - after that its calls just fail
-         * (pk_call refuses them), so the job reports its own failure rather than calling into the game mid-code. */
-        const val CALL_WAIT_FRAMES = 120
-
         /** [dsTouchWanted]: frames the game wants its touch screen before it floats in, and frames without before it goes. */
         const val TOUCH_ON_FRAMES = 2
         const val TOUCH_OFF_FRAMES = 6
@@ -2186,9 +2146,6 @@ class EmulatorEngine(
         /** ...and frames it must stay lit first: the battle's own redraw between the bag and its commands lasts 5. */
         const val FADE_LIT_FRAMES = 12
 
-
-        /** FIELD HUD: frames of plain field before [onField] comes on (~1/3 s at 1x). */
-        const val FIELD_SETTLE_FRAMES = 20
 
         private const val SOFT_RESET_FRAMES = 10
         private const val SOFT_RESET_KEYS = CoreKey.A or CoreKey.B or CoreKey.SELECT or CoreKey.START

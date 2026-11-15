@@ -122,6 +122,7 @@ class GameViewController(
     /** Shared battle automation runs once per emulated frame, on every input source. */
     var frameKeys: (Int) -> Int = { it }
     var frameSpeed: () -> Double = { speed }
+    var beforeFrame: () -> Unit = {}
     var afterFrame: () -> Unit = {}
     var holdPicture: () -> Boolean = { false }
     var quietPress: () -> Boolean = { false }
@@ -234,6 +235,8 @@ class GameViewController(
         }
         onHotkey = {}
         beforeRewind = {}
+        beforeFrame = {}
+        afterFrame = {}
     }
 
     private fun refresh(view: MTKView) {
@@ -255,6 +258,8 @@ class GameViewController(
         for (frame in 0 until frames) {
             // Unlimited FF still leaves time for the companion and touch events on the main thread.
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
+            if (!rewinding) beforeFrame()
+            if (!running || !active || uiPaused) break
             val held = input.keys()
             if (!running || !active || uiPaused) break
             val keys = if (rewinding) 0 else frameKeys(held)

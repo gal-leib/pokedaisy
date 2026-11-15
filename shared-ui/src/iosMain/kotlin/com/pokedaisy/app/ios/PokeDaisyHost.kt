@@ -262,6 +262,7 @@ object PokeDaisyHost {
                 g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField)) }
             }
             options = gameOptions
+            g.beforeFrame = p::beforeFrame
             g.afterFrame = { p.tick(); gameOptions.tick() }
         }
         g.beforeRewind = battle!!::cancel
