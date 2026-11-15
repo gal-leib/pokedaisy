@@ -8,7 +8,7 @@ import okio.buffer
 import okio.use
 
 /** State-file layout shared by Android and iPad. State blobs publish atomically; pictures/data are optional. */
-class StateFiles(val directory: Path) {
+class StateFiles(val directory: Path, private val extraSidecars: List<String> = emptyList()) {
     init { directory.mkdirs() }
 
     fun stateFile(slot: Int): Path { require(slot in 0..9); return directory / "ss$slot" }
@@ -36,8 +36,12 @@ class StateFiles(val directory: Path) {
             tmp.moveTo(target)
             optional(sidecar(target, ".png"), thumbnail)
             optional(SnapshotCache.fileFor(target), snapshot)
+            for (suffix in extraSidecars) copyOptional(sidecar(tmp, suffix), sidecar(target, suffix))
             true
-        } catch (_: Exception) { false } finally { runCatching { tmp.delete() } }
+        } catch (_: Exception) { false } finally {
+            runCatching { tmp.delete() }
+            for (suffix in extraSidecars) runCatching { sidecar(tmp, suffix).delete() }
+        }
     }
 
     fun undoSave(slot: Int): Boolean = runCatching {
@@ -50,6 +54,7 @@ class StateFiles(val directory: Path) {
     fun deleteSlot(slot: Int) {
         for (state in listOf(stateFile(slot), bakFile(slot))) {
             state.delete(); sidecar(state, ".png").delete(); SnapshotCache.fileFor(state).delete()
+            for (suffix in extraSidecars) sidecar(state, suffix).delete()
         }
     }
 
@@ -58,8 +63,14 @@ class StateFiles(val directory: Path) {
         try { from.copyTo(tmp); tmp.moveTo(to) } finally { runCatching { tmp.delete() } }
         for ((src, dst) in listOf(sidecar(from, ".png") to sidecar(to, ".png"),
             SnapshotCache.fileFor(from) to SnapshotCache.fileFor(to))) {
-            optional(dst, src.takeIf { it.isFile }?.readBytes())
+            copyOptional(src, dst)
         }
+        for (suffix in extraSidecars) copyOptional(sidecar(from, suffix), sidecar(to, suffix))
+    }
+
+    private fun copyOptional(from: Path, to: Path) {
+        runCatching { optional(to, from.takeIf { it.isFile }?.readBytes()) }
+            .onFailure { runCatching { to.delete() } }
     }
 
     private fun optional(path: Path, bytes: ByteArray?) {

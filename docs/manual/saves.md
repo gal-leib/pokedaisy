@@ -125,6 +125,9 @@ The companion's `STATES` tab shows 10 slots (`SLOT 0` to `SLOT 9`), each with a 
 
 The title shows the current slot, the one the hotkeys save to and load from.
 
+Saving or loading a slot makes it your current slot. If a state cannot be saved, your previous copy stays available.
+If PokeDaisy cannot keep the moment needed for `UNDO LOAD`, it leaves your game running instead of loading the slot.
+
 ![The companion's STATES tab: UNDO SAVE and UNDO LOAD buttons above slot cards, each with a screenshot and SAVE and LOAD buttons](shots/companion-states.png "The STATES tab")
 
 > [!NOTE]

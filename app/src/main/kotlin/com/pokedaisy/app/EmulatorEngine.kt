@@ -5,6 +5,7 @@ import com.pokedaisy.app.companion.data.AutoRunPolicy
 import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.data.SnapshotCache
 import com.pokedaisy.app.companion.data.delete
+import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.companion.i18n.tr
 import android.graphics.Bitmap
 import android.media.AudioFormat
@@ -283,9 +284,6 @@ class EmulatorEngine(
 
     /** Invoked on the emu thread ~1×/sec (between frames) — do core memory reads here. */
     var onSample: (() -> Unit)? = null
-
-    /** A savestate was just written to this file (emu thread, between frames): save what goes beside it. */
-    var onStateSaved: ((File) -> Unit)? = null
 
     /** The start's resume state loaded (true) or was skipped / failed (false), before the first frame.
      * Only fired for a start that was given one. */
@@ -1952,68 +1950,49 @@ class EmulatorEngine(
             return
         }
         val save = pendingSave
-        if (save >= 0) {
-            pendingSave = -1
-            // Keep one level of undo: stash the slot's previous contents first.
-            runCatching {
-                val cur = states.stateFile(save)
-                if (cur.isFile) cur.copyTo(states.bakFile(save), overwrite = true)
-                RetroAchievements.progressFile(cur).let { if (it.isFile) it.copyTo(RetroAchievements.progressFile(states.bakFile(save)), overwrite = true) }
-                SnapshotCache.copy(cur.toOkioPath(), states.bakFile(save).toOkioPath())
-                states.thumbFile(save).let { if (it.isFile) it.copyTo(states.bakThumbFile(save), overwrite = true) }
-            }
-            val ok = saveState(states.stateFile(save))
-            if (ok) writeThumb(states.thumbFile(save))
-            onStateResult?.invoke(Hotkeys.Action.SAVE_STATE, save, ok)
-        }
+        if (save >= 0) { pendingSave = -1; slots.requestSave(save) }
         val load = pendingLoad
         if (load >= 0) {
             pendingLoad = -1
             if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
                 onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, load, false)
-            } else if (states.exists(load)) {
-                // Snapshot the live state so the load can be undone.
-                runCatching { saveState(states.undoLoadFile) }
-                val ok = loadState(states.stateFile(load))
-                onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, load, ok)
-            } else {
-                onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, load, false)
-            }
+            } else slots.requestLoad(load)
         }
-        if (pendingUndoSave) {
-            pendingUndoSave = false
-            val slot = currentSlot
-            val ok = runCatching {
-                val bak = states.bakFile(slot)
-                if (!bak.isFile) return@runCatching false
-                bak.copyTo(states.stateFile(slot), overwrite = true)
-                RetroAchievements.progressFile(states.stateFile(slot)).let { cur ->
-                    val bakProgress = RetroAchievements.progressFile(bak)
-                    if (bakProgress.isFile) bakProgress.copyTo(cur, overwrite = true) else cur.delete()
-                }
-                SnapshotCache.copy(bak.toOkioPath(), states.stateFile(slot).toOkioPath())
-                states.bakThumbFile(slot).let { if (it.isFile) it.copyTo(states.thumbFile(slot), overwrite = true) }
-                true
-            }.getOrDefault(false)
-            onStateResult?.invoke(Hotkeys.Action.UNDO_SAVE, slot, ok)
-        }
+        if (pendingUndoSave) { pendingUndoSave = false; slots.select(currentSlot); slots.requestUndoSave() }
         if (pendingUndoLoad) {
             pendingUndoLoad = false
-            val ok = !refuseLoad(CoopGuards.statesBlocked, isResume = false) &&
-                states.undoLoadFile.let { it.isFile && it.length() > 0 } &&
-                loadState(states.undoLoadFile)
-            onStateResult?.invoke(Hotkeys.Action.UNDO_LOAD, currentSlot, ok)
+            if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
+                onStateResult?.invoke(Hotkeys.Action.UNDO_LOAD, currentSlot, false)
+            } else { slots.select(currentSlot); slots.requestUndoLoad() }
         }
     }
 
-    /** A savestate plus its achievement progress (RetroAchievements.progressFile) and
-     * companion data ([onStateSaved]) beside it. */
-    private fun saveState(target: File): Boolean {
-        val ok = MgbaCore.pkSaveState(target.absolutePath)
-        if (ok) RetroAchievements.afterSaveState(target)
-        if (ok) runCatching { onStateSaved?.invoke(target) }.onFailure { Log.w("pokedaisy", "state side data failed", it) }
+    /** Called only between frames. The common controller owns slot transactions and undo snapshots. */
+    private val slots by lazy {
+        com.pokedaisy.app.companion.StateSlotController(states.files, onCore = { it() },
+            write = ::writeCoreState,
+            read = { loadState(File(it.toString())) },
+            beforeLoad = {}, thumbnail = ::stateThumbnail, snapshot = ::stateSnapshot,
+            selected = { currentSlot = it }, completed = { action, index, ok -> onStateResult?.invoke(action, index, ok) })
+    }
+
+    fun stateSlotList() = slots.list()
+    fun requestDeleteState(slot: Int) { postToEmu { slots.requestDelete(slot) } }
+
+    private fun stateSnapshot(): ByteArray? = runCatching {
+        telemetry.refresh()
+        telemetry.forState()?.takeIf { it.hasData && !it.unsupported }?.let(SnapshotCache::encode)
+    }.getOrNull()
+
+    /** Only the native state bytes and Android achievement capture remain platform work. */
+    private fun writeCoreState(target: okio.Path): Boolean {
+        val ok = MgbaCore.pkSaveState(target.toString())
+        if (ok) RetroAchievements.afterSaveState(File(target.toString()))
         return ok
     }
+
+    private fun saveState(target: File): Boolean =
+        states.files.writeState(target.toOkioPath(), ::writeCoreState, snapshot = stateSnapshot())
 
     /** Loads [source] and puts achievement progress back to where that state had it. */
     private fun loadState(source: File): Boolean {
@@ -2024,9 +2003,9 @@ class EmulatorEngine(
         return ok
     }
 
-    private fun writeThumb(dest: File) {
-        val buf = videoBuf ?: return
-        try {
+    private fun stateThumbnail(): ByteArray? {
+        val buf = videoBuf ?: return null
+        return try {
             // Build the pixels by hand from the raw RGBX bytes (the same byte
             // order EmulatorView uploads as GL_RGBA) instead of
             // copyPixelsFromBuffer(): mGBA leaves the 4th byte as junk, not an
@@ -2050,11 +2029,13 @@ class EmulatorEngine(
             val tw = 160
             val th = (tw * vh / vw)
             val thumb = Bitmap.createScaledBitmap(full, tw, th, true)
-            dest.outputStream().use { thumb.compress(Bitmap.CompressFormat.PNG, 90, it) }
+            val bytes = java.io.ByteArrayOutputStream().also { thumb.compress(Bitmap.CompressFormat.PNG, 90, it) }.toByteArray()
             full.recycle()
             thumb.recycle()
+            bytes
         } catch (t: Throwable) {
             Log.w("pokedaisy", "thumb write failed", t)
+            null
         }
     }
 

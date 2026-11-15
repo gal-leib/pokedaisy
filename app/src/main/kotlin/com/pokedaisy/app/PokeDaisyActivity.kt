@@ -349,27 +349,11 @@ class PokeDaisyActivity : Activity() {
 
     /** Backs the bottom-screen "States" tab. */
     private val stateSlots = object : com.pokedaisy.app.companion.StateSlots {
-        override fun list() = states?.allSlots()?.map {
-            com.pokedaisy.app.companion.StateSlots.Slot(
-                it.slot, it.present, it.savedAt, it.thumb?.absolutePath, it.thumb?.lastModified() ?: 0L,
-            )
-        } ?: emptyList()
+        override fun list() = if (::engine.isInitialized) engine.stateSlotList() else emptyList()
         override val currentIndex get() = if (::engine.isInitialized) engine.currentSlot else 0
         override fun requestSave(index: Int) { if (::engine.isInitialized && !coopRefuses()) engine.requestSaveState(index) }
         override fun requestLoad(index: Int) { if (::engine.isInitialized && !coopRefuses()) engine.requestLoadState(index) }
-        override fun requestDelete(index: Int) {
-            val s = states ?: return
-            if (index !in SaveStates.SLOT_MIN..SaveStates.SLOT_MAX) return
-            val state = s.stateFile(index)
-            runCatching {
-                state.delete()
-                s.thumbFile(index).delete()
-                s.bakFile(index).delete()
-                s.bakThumbFile(index).delete()
-                com.pokedaisy.app.companion.data.SnapshotCache.fileFor(state.toOkioPath()).delete()
-                com.pokedaisy.app.achievements.RetroAchievements.progressFile(state).delete()
-            }
-        }
+        override fun requestDelete(index: Int) { if (::engine.isInitialized) engine.requestDeleteState(index) }
         override fun requestUndoSave() { if (::engine.isInitialized && !coopRefuses()) engine.requestUndoSave() }
         override fun requestUndoLoad() { if (::engine.isInitialized && !coopRefuses()) engine.requestUndoLoad() }
     }
@@ -2386,12 +2370,6 @@ class PokeDaisyActivity : Activity() {
                     override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) = postToEmu(block::run)
                 }, current = { ::engine.isInitialized && engine === this && running }, after = afterSample)
             onSample = { startSample(this) }   // runs on the emu thread
-            // Every savestate carries the companion's data beside it, read fresh: a launch that
-            // resumes from it shows that at once instead of LOADING (TelemetryStore.showCached).
-            onStateSaved = { state ->
-                telemetry.refresh()
-                com.pokedaisy.app.companion.data.SnapshotCache.write(state.toOkioPath(), telemetry.forState())
-            }
             onResumeResult = { loaded -> if (!loaded) { telemetry.dropCached(); runOnUiThread { waitForPlay() } } }
             // Fast polls and transition-triggered full samples share the same game session on both hosts.
             battleSession.changed = { startSample(this) }

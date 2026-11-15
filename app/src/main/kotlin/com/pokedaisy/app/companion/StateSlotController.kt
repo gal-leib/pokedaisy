@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion
 
+import com.pokedaisy.app.Hotkeys
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -20,6 +21,7 @@ class StateSlotController(
     private val failed: (String) -> Unit = {},
     initialIndex: Int = 0,
     private val selected: (Int) -> Unit = {},
+    private val completed: (Hotkeys.Action, Int, Boolean) -> Unit = { _, _, _ -> },
 ) : StateSlots {
     override var currentIndex by mutableStateOf(initialIndex.coerceIn(0, 9))
         private set
@@ -33,14 +35,14 @@ class StateSlotController(
 
     override fun requestSave(index: Int) {
         if (!select(index)) return
-        perform(tr("Slot {0}: save failed", index)) {
+        perform(tr("Slot {0}: save failed", index), Hotkeys.Action.SAVE_STATE) {
             files.saveSlot(index, write, thumbnail(), snapshot())
         }
     }
 
     override fun requestLoad(index: Int) {
         if (!select(index)) return
-        perform(tr("Slot {0}: nothing to load", index)) {
+        perform(tr("Slot {0}: nothing to load", index), Hotkeys.Action.LOAD_STATE) {
             if (!files.exists(index)) return@perform false
             beforeLoad()
             // Refuse the load if its undo snapshot couldn't be made.
@@ -54,9 +56,9 @@ class StateSlotController(
         perform(tr("Couldn't delete slot {0}", index)) { files.deleteSlot(index); true }
     }
 
-    override fun requestUndoSave() = perform(tr("Nothing to undo")) { files.undoSave(currentIndex) }
+    override fun requestUndoSave() = perform(tr("Nothing to undo"), Hotkeys.Action.UNDO_SAVE) { files.undoSave(currentIndex) }
 
-    override fun requestUndoLoad() = perform(tr("Nothing to undo")) {
+    override fun requestUndoLoad() = perform(tr("Nothing to undo"), Hotkeys.Action.UNDO_LOAD) {
         if (!files.undoLoadFile.isFile) return@perform false
         beforeLoad()
         load(files.undoLoadFile)
@@ -76,7 +78,10 @@ class StateSlotController(
         return true
     }
 
-    private fun perform(message: String, action: () -> Boolean) {
-        if (!runCatching { onCore(action) }.getOrDefault(false)) failed(message)
+    private fun perform(message: String, kind: Hotkeys.Action? = null, action: () -> Boolean) {
+        val index = currentIndex
+        val ok = runCatching { onCore(action) }.getOrDefault(false)
+        if (!ok) failed(message)
+        if (kind != null) completed(kind, index, ok)
     }
 }

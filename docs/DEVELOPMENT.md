@@ -3851,9 +3851,13 @@ without changing the encounter switch, ownership or RNG. A resumed OFF state kee
 `AutoRunPolicy` is compiled in place for both hosts and runs on manual keys before battle scripts. The native
 table and field-callback guards remain required; Game Boy's separate field routines have not been wired on iOS.
 
-The iPad STATES bridge is the common `StateSlotController` over `StateFiles`: slot saves, loads, delete and both
-undos, using the existing screen. The host supplies native read/write callbacks, a thumbnail and a cached companion
-snapshot. `GameViewController.withState` stops queued audio, finishes a battery save, releases scripted input, then
+Both STATES bridges use common `StateSlotController` over `StateFiles`: slot saves, loads, delete and both
+undos, using the existing screen. Android services it on the emulator thread; iOS uses
+`GameViewController.withState`. Hosts supply native read/write callbacks, a thumbnail and a cached companion
+snapshot. Android's `.ra` achievement progress travels with the same staged state, previous-slot copy, undo load
+and delete transaction. A failed partial core write preserves the previous slot and clears staged sidecars.
+Android retains its co-op load and save restrictions and HUD result callbacks. `GameViewController.withState`
+stops queued audio, finishes a battery save, releases scripted input, then
 runs the operation between display callbacks. Loads require a battery backup and an undo snapshot before changing
 memory. Files live in Documents/states/<ROM SHA-256>, so a reinstall's new container path does not lose their identity.
 
