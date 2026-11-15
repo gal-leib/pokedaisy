@@ -51,6 +51,10 @@ internal class IosCompanionSettings(
     private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
     override val keyCapture get() = game?.keyCapture ?: libraryInput!!.capture
     fun pollKeyCapture() { libraryInput?.pollCapture() }
+    private val bindings by lazy {
+        com.pokedaisy.app.companion.GameBindings(com.pokedaisy.app.game.IosGameInputBindings.directory,
+            hotkeyActions, ::reloadBindings)
+    }
     private fun reloadBindings() {
         actions?.cancelHardware()
         game?.reloadBindings() ?: libraryInput?.reloadBindings()
@@ -192,24 +196,20 @@ internal class IosCompanionSettings(
     override val fieldMovesReadable get() = playback()?.fieldMovesReadable == true
     override val gameButtonsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_BINDINGS)
     override val buttonGroup = GbaControls.Group.GBA
-    override fun gbaControlBindings() = GbaControls.rawBindings(com.pokedaisy.app.game.IosGameInputBindings.directory)
+    override fun gbaControlBindings() = bindings.gameButtons()
     override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {
-        GbaControls.setBindingNamed(com.pokedaisy.app.game.IosGameInputBindings.directory, btn, keyName); reloadBindings()
+        bindings.setGameButton(btn, keyName)
     }
     override fun clearGbaControlBinding(btn: GbaControls.Btn) {
-        GbaControls.clearBinding(com.pokedaisy.app.game.IosGameInputBindings.directory, btn); reloadBindings()
+        bindings.clearGameButton(btn)
     }
     override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS
     override val hotkeysBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_HOTKEYS)
     // Preserve the old triggers as L/R until the player opts in to emulator shortcuts.
     override fun setHotkeysEnabled(on: Boolean) { stored.setHotkeysEnabled(on); reloadBindings() }
-    override fun hotkeyBindings() = Hotkeys.load(com.pokedaisy.app.game.IosGameInputBindings.directory).forActions(hotkeyActions).rawBindings
+    override fun hotkeyBindings() = bindings.hotkeys()
     override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {
-        if (action !in hotkeyActions) return
-        val directory = com.pokedaisy.app.game.IosGameInputBindings.directory
-        if (keyNames == null) Hotkeys.clearBinding(directory, action)
-        else Hotkeys.setBindingNamed(directory, action, keyNames, takeFrom)
-        reloadBindings()
+        bindings.setHotkey(action, keyNames, takeFrom)
     }
     override val clickSound = false
     override fun setClickSound(on: Boolean) {}

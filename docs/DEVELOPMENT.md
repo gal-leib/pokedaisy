@@ -4267,3 +4267,14 @@ restores its patches, then cancels battle commands and closes queued work/watche
 Android retires portable option work without native unpatching: its engine owns core destruction, and a
 bounded stop wait may leave that thread alive. iOS restores option patches between frames. Native patch
 adapters own the core write lock. Core pause/restart keeps the loaded-game owner and desired settings alive.
+
+
+### Shared binding edits
+
+`GameBindings` validates supported hotkey actions and publishes reloads only after a successful edit. Both game
+hosts use it for shared settings. `GbaControls` and `Hotkeys` keep their installed properties formats and return
+write success; each file is replaced atomically. Invalid key names never reach disk. A D-pad edit also removes
+its single-key hotkey conflict; if that write fails, the controls edit is rolled back and no reload is published.
+The shared tests inject failed writes through blocked temporary paths and verify persisted files and publication.
+Android's adapter reloads game buttons and hotkeys together; iOS reloads its native poller. Runtime held actions
+are released before replacing their parser, while independent touch extras retain their ownership.

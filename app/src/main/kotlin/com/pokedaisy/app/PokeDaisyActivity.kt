@@ -1620,16 +1620,13 @@ class PokeDaisyActivity : Activity() {
         override fun editTouchLayout() = runOnUiThread { openTouchEditor() }
         override val touchRevision get() = touchRev.intValue
         override val touchControlsShown get() = ::touchControls.isInitialized && touchControls.visibility == View.VISIBLE
-        override fun gbaControlBindings() = GbaControls.rawBindings(controlsDir)
+        override fun gbaControlBindings() = gameBindings.gameButtons()
         override val keyCapture get() = this@PokeDaisyActivity.keyCapture
         override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {
-            val code = keyCodeForName(keyName) ?: return
-            GbaControls.setBinding(controlsDir, btn, code)
-            input.setControls(GbaControls.load(controlsDir))
+            gameBindings.setGameButton(btn, keyName)
         }
         override fun clearGbaControlBinding(btn: GbaControls.Btn) {
-            GbaControls.clearBinding(controlsDir, btn)
-            input.setControls(GbaControls.load(controlsDir))
+            gameBindings.clearGameButton(btn)
         }
         override val buttonGroup get() = if (romIsNds) GbaControls.Group.DS else GbaControls.Group.GBA
         override val hotkeysEnabled get() = hotkeysOn
@@ -1637,12 +1634,9 @@ class PokeDaisyActivity : Activity() {
             stored.setHotkeysEnabled(on)
             setHotkeysOn(on)
         }
-        override fun hotkeyBindings() = Hotkeys.load(controlsDir).rawBindings
+        override fun hotkeyBindings() = gameBindings.hotkeys()
         override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {
-            val dir = controlsDir
-            if (keyNames.isNullOrEmpty()) Hotkeys.clearBinding(dir, action)
-            else Hotkeys.setBindingNamed(dir, action, keyNames, takeFrom)
-            reloadHotkeys()
+            gameBindings.setHotkey(action, keyNames, takeFrom)
         }
         override fun restartGame() = this@PokeDaisyActivity.restartGame()
         override fun closeGame() {
@@ -4723,6 +4717,13 @@ class PokeDaisyActivity : Activity() {
             return
         }
         if (!hotkeyTakes(keyCode, down)) input.onKey(keyCode, down)
+    }
+
+    private val gameBindings by lazy {
+        com.pokedaisy.app.companion.GameBindings(controlsDir, Hotkeys.Action.entries) {
+            input.setControls(GbaControls.load(controlsDir))
+            reloadHotkeys()
+        }
     }
 
     /** Replacing the parser cannot retain an action owned by its old chords. Touch extras keep their own holds. */

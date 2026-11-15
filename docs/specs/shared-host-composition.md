@@ -33,7 +33,10 @@ interfaces and targeted native input/capture smoke checks.
 Implemented first slice: `GameActions` owns hardware/touch held-action aggregation on both platforms; binding
 reloads release the old hardware ownership before replacing parsers. Native effects keep capability/co-op gates.
 Five focused tests pass on JVM and Native, including overlapping owners, cancellation and idempotent cleanup.
-The remaining binding edit/publish paths and native smoke checks remain part of the follow-up audit.
+Second slice implemented: `GameBindings` owns the edit/publish rule on both hosts. Invalid edits and failed
+atomic writes do not trigger reloads; a failed D-pad conflict update rolls back the controls edit. Unsupported
+hotkey choices remain stored. Four common persistence/failure tests exercise both runtimes. Native smoke
+checks remain part of the combined follow-up validation.
 
 ## D3: Own session assembly
 

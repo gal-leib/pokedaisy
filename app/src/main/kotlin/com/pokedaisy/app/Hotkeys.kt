@@ -6,7 +6,7 @@ import com.pokedaisy.app.companion.data.Logs
 import com.pokedaisy.app.companion.data.PropertiesText
 import com.pokedaisy.app.companion.data.isFile
 import com.pokedaisy.app.companion.data.readText
-import com.pokedaisy.app.companion.data.writeText
+import com.pokedaisy.app.companion.data.writeTextAtomically
 import com.pokedaisy.app.companion.i18n.tk
 import kotlin.concurrent.Volatile
 import okio.Path
@@ -234,11 +234,9 @@ class Hotkeys private constructor(
             return props
         }
 
-        private fun writeProps(filesDir: Path, props: Map<String, String>) {
-            runCatching {
-                file(filesDir).writeText(PropertiesText.format(props, "PokeDaisy hotkeys — comma-separated chords, '+' joins keys of one chord"))
-            }
-        }
+        private fun writeProps(filesDir: Path, props: Map<String, String>): Boolean = runCatching {
+            file(filesDir).writeTextAtomically(PropertiesText.format(props, "PokeDaisy hotkeys — comma-separated chords, '+' joins keys of one chord"))
+        }.isSuccess
 
         fun load(filesDir: Path): Hotkeys {
             val props = readProps(filesDir)
@@ -256,7 +254,8 @@ class Hotkeys private constructor(
          * Replace [action]'s binding with the chord [keyNames] (KEYCODE_ suffixes) and persist; the same
          * chord comes off each of [takeFrom] (the player said MOVE to [clashes]), their other chords stay.
          */
-        fun setBindingNamed(filesDir: Path, action: Action, keyNames: Collection<String>, takeFrom: Collection<Action> = emptyList()) {
+        fun setBindingNamed(filesDir: Path, action: Action, keyNames: Collection<String>, takeFrom: Collection<Action> = emptyList()): Boolean {
+            if (keyNames.isEmpty() || keyNames.any { KeyCodes.code(it) == null }) return false
             val props = readProps(filesDir)
             val chord = chordOf(keyNames.joinToString("+"))
             for (other in takeFrom) if (other != action) {
@@ -265,11 +264,12 @@ class Hotkeys private constructor(
                 props[other.prop] = kept.joinToString(", ")
             }
             props[action.prop] = keyNames.joinToString("+")
-            writeProps(filesDir, props)
+            return writeProps(filesDir, props)
         }
 
         /** The key [keyName] alone comes off every hotkey that was just that key (its chords with other keys stay). */
-        fun releaseKey(filesDir: Path, keyName: String) {
+        fun releaseKey(filesDir: Path, keyName: String): Boolean {
+            if (KeyCodes.code(keyName) == null) return false
             val props = readProps(filesDir)
             val chord = chordOf(keyName)
             var changed = false
@@ -278,14 +278,14 @@ class Hotkeys private constructor(
                 val kept = chords.filter { chordOf(it) != chord }
                 if (kept.size != chords.size) { props[a.prop] = kept.joinToString(", "); changed = true }
             }
-            if (changed) writeProps(filesDir, props)
+            return !changed || writeProps(filesDir, props)
         }
 
         /** Unbinds [action] (an empty value, so the default doesn't come back). */
-        fun clearBinding(filesDir: Path, action: Action) {
+        fun clearBinding(filesDir: Path, action: Action): Boolean {
             val props = readProps(filesDir)
             props[action.prop] = ""
-            writeProps(filesDir, props)
+            return writeProps(filesDir, props)
         }
 
         /**

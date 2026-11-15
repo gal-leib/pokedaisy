@@ -129,7 +129,7 @@ On the companion, the game's screen shows a window while a hotkey waits, with th
 
 ![Over the game while a companion hotkey waits: SAVE STATE, the button held so far, CLEAR SAVE STATE and CANCEL](shots/game-capture.png "The game's screen while the companion waits for keys")
 
-The new buttons replace the hotkey's whole binding, keyboard key included.
+The new buttons replace the hotkey's whole binding, keyboard key included. A binding takes effect after it saves; an invalid button or a failed save leaves the active controls alone.
 
 ![The companion's HOTKEYS page with the HOTKEYS switch and every hotkey's buttons](shots/companion-settings-hotkeys.png "HOTKEYS on the companion")
 

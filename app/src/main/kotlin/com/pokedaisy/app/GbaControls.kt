@@ -6,7 +6,7 @@ import com.pokedaisy.app.companion.data.Logs
 import com.pokedaisy.app.companion.data.PropertiesText
 import com.pokedaisy.app.companion.data.isFile
 import com.pokedaisy.app.companion.data.readText
-import com.pokedaisy.app.companion.data.writeText
+import com.pokedaisy.app.companion.data.writeTextAtomically
 import com.pokedaisy.app.companion.i18n.tk
 import okio.Path
 
@@ -115,9 +115,8 @@ object GbaControls {
         return p
     }
 
-    private fun writeProps(dir: Path, p: Map<String, String>, comment: String = "PokeDaisy GBA button map") {
-        runCatching { file(dir).writeText(PropertiesText.format(p, comment)) }
-    }
+    private fun writeProps(dir: Path, p: Map<String, String>, comment: String = "PokeDaisy GBA button map"): Boolean =
+        runCatching { file(dir).writeTextAtomically(PropertiesText.format(p, comment)) }.isSuccess
 
     /** keycode -> button bits per [Group] ([TURBO] set for TURBO A / B, [COMPANION] added to a key's button). A key
      * bound twice in one map takes the later button. */
@@ -150,25 +149,31 @@ object GbaControls {
     fun setBinding(dir: Path, btn: Btn, keyCode: Int) = setBindingNamed(dir, btn, Hotkeys.keyName(keyCode))
 
     /** [setBinding] by the key's name (no "KEYCODE_" prefix). */
-    fun setBindingNamed(dir: Path, btn: Btn, name: String) {
+    fun setBindingNamed(dir: Path, btn: Btn, name: String): Boolean {
+        if (KeyCodes.code(name) == null) return false
         val props = readProps(dir)
+        val before = props.toMap()
         for (other in Btn.entries) if (!btn.sharesKeyWith(other)) {
             val keys = props[other.prop].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
             if (name in keys) props[other.prop] = (keys - name).joinToString(", ")
         }
         props[btn.prop] = name
-        writeProps(dir, props)
+        if (!writeProps(dir, props)) return false
         // A D-pad key goes to the D-pad alone: a hotkey that was only this key loses it (else the hotkey kept it - the
         // 8BitDo Micro's UP is ZOOM's C).
-        if (btn.dpad) Hotkeys.releaseKey(dir, name)
+        if (btn.dpad && !Hotkeys.releaseKey(dir, name)) {
+            writeProps(dir, before)
+            return false
+        }
+        return true
     }
 
     /** Leaves [btn] unbound - TURBO A / B and the GBA / Game Boy rows only ([Btn.canClear]). */
-    fun clearBinding(dir: Path, btn: Btn) {
-        if (!btn.canClear) return
+    fun clearBinding(dir: Path, btn: Btn): Boolean {
+        if (!btn.canClear) return false
         val props = readProps(dir)
         props[btn.prop] = ""
-        writeProps(dir, props)
+        return writeProps(dir, props)
     }
 
     private fun resolveKey(name: String): Int? {
