@@ -20,7 +20,7 @@ class Prefs(
 ) {
     /** Existing host defaults where the installed apps differ. An explicitly saved value always wins. */
     data class Defaults(val hotkeysEnabled: Boolean = true, val sidePanelDocked: Boolean = false,
-                        val companionWindow: Boolean = true)
+                        val companionWindow: Boolean = true, val battleStyleNames: Boolean = false)
 
     var lastRomPath: String?
         get() = p.getString("last_rom", null)
@@ -338,8 +338,14 @@ class Prefs(
 
     /** BATTLE STYLE: the battle controls' look, a [com.pokedaisy.app.companion.BattleStyle] id (0 = GEN 4, the old one). */
     var battleStyle: Int
-        get() = p.getInt("battle_style", 0)
-        set(v) = p.edit().putInt("battle_style", v).apply()
+        get() = if (defaults.battleStyleNames) com.pokedaisy.app.companion.BattleStyle.entries
+            .firstOrNull { it.name == p.getString("battle_style", null) }?.id ?: 0 else p.getInt("battle_style", 0)
+        set(v) {
+            val edit = p.edit()
+            if (defaults.battleStyleNames) edit.putString("battle_style", com.pokedaisy.app.companion.BattleStyle.of(v).name)
+            else edit.putInt("battle_style", v)
+            edit.apply()
+        }
 
     /** The Library's one-time BATTLE STYLE pick has been answered (or dismissed). */
     var battleStyleAsked: Boolean

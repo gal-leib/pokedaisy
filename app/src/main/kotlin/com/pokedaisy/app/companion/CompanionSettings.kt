@@ -623,6 +623,8 @@ enum class FfMode(val label: String) {
 
 
 /** SCENE SPEEDS' choices, SAME (0: GAME SPEED's) first. */
+val FF_SPEEDS = listOf(0f, 1.5f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)
+
 val SCENE_SPEEDS = listOf(0f, 1f, 1.5f, 2f, 3f, 4f)
 
 /** SETTINGS > ASPECT: how the game sits on its screen, in the order the pickers list them.

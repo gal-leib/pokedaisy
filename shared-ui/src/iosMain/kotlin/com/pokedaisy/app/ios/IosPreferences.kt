@@ -6,7 +6,7 @@ import platform.Foundation.NSUserDefaults
 
 /** The existing iOS defaults domain. Shared settings retain the three defaults of installed iOS builds. */
 internal val iosPreferences = Prefs(DefaultsPreferenceStore(NSUserDefaults.standardUserDefaults),
-    Prefs.Defaults(hotkeysEnabled = false, sidePanelDocked = true, companionWindow = false))
+    Prefs.Defaults(hotkeysEnabled = false, sidePanelDocked = true, companionWindow = false, battleStyleNames = true))
 
 internal class DefaultsPreferenceStore(private val d: NSUserDefaults) : PreferenceStore {
     override fun contains(key: String) = d.objectForKey(key) != null

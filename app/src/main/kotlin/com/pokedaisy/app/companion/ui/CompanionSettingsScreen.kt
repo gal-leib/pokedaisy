@@ -52,7 +52,7 @@ import com.pokedaisy.app.companion.next
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.MAX_BAR_TABS
 
-private val FF_RATES = floatArrayOf(0f, 1.5f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)
+private val FF_RATES = com.pokedaisy.app.companion.FF_SPEEDS.toFloatArray()
 
 /** SETTINGS > STATUS BAR's choices: off, over the game, over the companion's tabs. */
 val STATUS_BAR_PLACES = listOf(tk("OFF"), tk("GAME"), tk("COMPANION"))

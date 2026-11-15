@@ -3726,6 +3726,13 @@ The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/
 `ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
 multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
 
+`PrefsCompanionSettings` implements the stored companion settings for both hosts. Android's activity
+creates its adapter lazily after attachment, retains its co-op/capability checks, and delegates persistence
+before applying native effects. iOS retains view/controller actions and calls common playback/field-option
+hooks. Shared speed choices are used by both the settings UI and the setter validation. The historical
+battle-style representations remain integer IDs on Android and names on iOS through the common Prefs codec;
+no installed value is rewritten merely by reading it.
+
 `Prefs` is common code too, compiled in place by `shared-ui`. `PreferenceStore` is its primitive
 storage interface: Android keeps the existing `pokedaisy` SharedPreferences file through `PrefsAndroid`,
 and iOS keeps its NSUserDefaults domain through `DefaultsPreferenceStore`. Existing Android `Prefs(context)`

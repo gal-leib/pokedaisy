@@ -43,7 +43,11 @@ internal class IosCompanionSettings(
     private val playback: () -> IosGamePlayback? = { null },
     private val options: () -> IosGameOptions? = { null },
     private val cheatHost: () -> IosGameCheats? = { null },
-) : CompanionSettings {
+) : com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences) {
+    override val languageRomCode get() = romCode
+    override fun onPlaybackChanged() = applyPlayback()
+    override fun onFieldOptionsChanged() = optionsChanged()
+    override fun allowDisableResume() = onDisableResume()
     private val d = NSUserDefaults.standardUserDefaults
     private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
     override val keyCapture get() = game?.keyCapture ?: libraryInput!!.capture
@@ -53,7 +57,6 @@ internal class IosCompanionSettings(
         game?.setHotkeys(if (hotkeysEnabled) Hotkeys.load(com.pokedaisy.app.game.IosGameInputBindings.directory).forActions(hotkeyActions) else null)
     }
 
-
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
@@ -62,8 +65,7 @@ internal class IosCompanionSettings(
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
     override val cheats get() = cheatHost()?.list.orEmpty()
-    override val cheatsEnabled get() = iosPreferences.cheatsEnabled
-    override fun setCheatsEnabled(on: Boolean) { iosPreferences.cheatsEnabled = on; cheatHost()?.apply() }
+    override fun setCheatsEnabled(on: Boolean) { super.setCheatsEnabled(on); cheatHost()?.apply() }
     override val cheatsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_CHEATS)
     override val cheatsEditable get() = cheatHost()?.editable == true
     override fun setCheatEnabled(index: Int, on: Boolean) {
@@ -84,9 +86,8 @@ internal class IosCompanionSettings(
     }
 
     var optionsChanged: () -> Unit = {}
-    override val rewind get() = iosPreferences.rewind
     override val rewindBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_REWIND)
-    override fun setRewind(on: Boolean) { iosPreferences.rewind = on; releaseRewind() }
+    override fun setRewind(on: Boolean) { super.setRewind(on); releaseRewind() }
     private var touchRewindHeld = false
     private var hardwareRewindHeld = false
     val rewindHeld get() = rewind && (touchRewindHeld || hardwareRewindHeld)
@@ -101,21 +102,13 @@ internal class IosCompanionSettings(
         hardwareRewindHeld = on && rewind; rewindChanged()
     }
     fun releaseRewind() { touchRewindHeld = false; hardwareRewindHeld = false; rewindChanged() }
-    override val autoRun get() = iosPreferences.autoRun
-    override fun setAutoRun(on: Boolean) { iosPreferences.autoRun = on; optionsChanged() }
     override val autoRunBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
-    override val runIndoors get() = iosPreferences.runIndoors
-    override fun setRunIndoors(on: Boolean) { iosPreferences.runIndoors = on; optionsChanged() }
     override val runIndoorsSupported get() = fieldReadable && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode.orEmpty())
     override val wildEncounters get() = if (d.objectForKey("wild_encounters") != null && d.integerForKey("wild_encounters") == 0L) 0 else 100
     override fun setWildEncounters(percent: Int) { d.setInteger(if (percent == 0) 0L else 100L, "wild_encounters"); optionsChanged() }
     override val wildEncountersSupported get() = fieldReadable && options()?.wildFlagFound == true
     override val fieldOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_OPTIONS)
-    override val instantText get() = iosPreferences.instantText
-    override fun setInstantText(on: Boolean) { iosPreferences.instantText = on; optionsChanged() }
     override val instantTextSupported get() = options()?.instantTextSupported == true
-    override val reusableTms get() = iosPreferences.reusableTms
-    override fun setReusableTms(on: Boolean) { iosPreferences.reusableTms = on; optionsChanged() }
     override val reusableTmsSupported get() = options()?.reusableTmsSupported == true
     override val reusableTmsBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.ReusableTms.BUILT_IN
     override val gameOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_OPTIONS)
@@ -142,34 +135,10 @@ internal class IosCompanionSettings(
     override fun editTouchLayout() = onEditTouch()
     override fun feelVibration(strength: Int) = IosTouchPreferences.feel(strength)
 
-    override val autoResume: Boolean get() = iosPreferences.autoResume
     override val resumeGamesEditable = true
     override val resumeBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_RESUME)
-    override fun setAutoResume(on: Boolean) {
-        if (on == autoResume) return
-        if (on || onDisableResume()) iosPreferences.autoResume = on
-    }
 
-    override val showHints: Boolean get() = iosPreferences.showHints
-    override fun setShowHints(on: Boolean) { iosPreferences.showHints = on }
-    override val showFoeIvs: Boolean get() = iosPreferences.showFoeIvs
-    override fun setShowFoeIvs(on: Boolean) { iosPreferences.showFoeIvs = on }
-
-    override val appLanguage: String get() = iosPreferences.appLanguage
-    override fun setAppLanguage(code: String) {
-        iosPreferences.appLanguage = code
-        L10n.apply(code, romCode)
-    }
-
-    override fun setDarkMode(v: Int) { ThemeStore.current?.darkMode = v }
     override fun setAppTheme(id: Int) = pickTheme(themeById(id))
-
-    override val companionTabs: List<String>
-        get() = iosPreferences.companionTabs
-    override fun setCompanionTabs(tabs: List<String>) { iosPreferences.companionTabs = tabs }
-
-    override fun guideNoticeAccepted(game: String) = iosPreferences.guideNoticeAccepted(game)
-    override fun acceptGuideNotice(game: String) = iosPreferences.acceptGuideNotice(game)
 
     override val gameName: String get() = if (game == null) "" else activeGame.displayName()
     override val romFileName: String get() = romPath.orEmpty().substringAfterLast('/')
@@ -204,60 +173,20 @@ internal class IosCompanionSettings(
         playbackChanged()
     }
 
-    override val ffMaxSpeed: Float get() = iosPreferences.ffMaxSpeed
-    override fun setFfMaxSpeed(v: Float) {
-        if (v !in listOf(0f, 1.5f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)) return
-        iosPreferences.ffMaxSpeed = v; applyPlayback()
-    }
-    override fun setFfToggled(on: Boolean) { ffToggle = on; iosPreferences.ffToggled = on; applyPlayback() }
+    override fun setFfToggled(on: Boolean) { ffToggle = on; super.setFfToggled(on) }
     override val gameSpeed: Float get() = if (romPath == null) 1f else d.floatForKey("game_speed:$romPath").takeIf { it in gameSpeeds } ?: 1f
     override fun setGameSpeed(v: Float) {
         if (romPath == null || v !in gameSpeeds) return
         d.setFloat(v, "game_speed:$romPath"); applyPlayback()
     }
-    override val gameVolume: Int get() = iosPreferences.gameVolume
-    override fun setGameVolume(percent: Int) { iosPreferences.gameVolume = percent; applyPlayback() }
-    override val gameMuted: Boolean get() = iosPreferences.gameMuted
-    override fun setGameMuted(on: Boolean) { iosPreferences.gameMuted = on; applyPlayback() }
-
-    override val battleInfo: Boolean get() = iosPreferences.battleInfo
-    override fun setBattleInfo(on: Boolean) { iosPreferences.battleInfo = on }
-    override val oneTapMoves: Boolean get() = iosPreferences.oneTapMoves
-    override fun setOneTapMoves(on: Boolean) { iosPreferences.oneTapMoves = on }
-
-    override val battleInfoFirst: Boolean get() = iosPreferences.battleInfoFirst
-    override fun setBattleInfoFirst(on: Boolean) { iosPreferences.battleInfoFirst = on }
-    override val battleSuggestionsFirst: Boolean get() = iosPreferences.battleSuggestionsFirst
-    override fun setBattleSuggestionsFirst(on: Boolean) { iosPreferences.battleSuggestionsFirst = on }
-    override val battleFocus: Boolean get() = iosPreferences.battleFocus
-    override fun setBattleFocus(on: Boolean) { iosPreferences.battleFocus = on }
-    override val battleStyle: BattleStyle get() = BattleStyle.entries.firstOrNull { it.name == d.stringForKey("battle_style") } ?: BattleStyle.GEN4
-    override fun setBattleStyle(style: BattleStyle) = d.setObject(style.name, "battle_style")
 
     // Not on the iPad yet: never shown (shownRows), so fixed values.
     override val ffMusicMode = FfMusicMode.SPED_UP
     override fun setFfMusicMode(mode: FfMusicMode) {}
-    override val ffMode get() = FfMode.entries.firstOrNull { it.name == d.stringForKey("ff_mode") } ?: FfMode.SMART
-    override fun setFfMode(mode: FfMode) { d.setObject(mode.name, "ff_mode"); applyPlayback() }
     override val ffMusicModes = listOf(FfMusicMode.SPED_UP)
     override val speedOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCENE_SPEEDS)
     override val fieldReadable get() = playback()?.fieldReadable == true
     override val fieldMovesReadable get() = playback()?.fieldMovesReadable == true
-    private fun sceneSpeed(key: String) = d.floatForKey("scene_speed_$key").takeIf { it in com.pokedaisy.app.companion.SCENE_SPEEDS } ?: 0f
-    private fun setSceneSpeed(key: String, speed: Float) {
-        if (speed !in com.pokedaisy.app.companion.SCENE_SPEEDS) return
-        d.setFloat(speed, "scene_speed_$key"); applyPlayback()
-    }
-    override val battleSpeed get() = sceneSpeed("battle")
-    override fun setBattleSpeed(v: Float) = setSceneSpeed("battle", v)
-    override val textSpeed get() = sceneSpeed("text")
-    override fun setTextSpeed(v: Float) = setSceneSpeed("text", v)
-    override val menuSpeed get() = sceneSpeed("menu")
-    override fun setMenuSpeed(v: Float) = setSceneSpeed("menu", v)
-    override val bikeSpeed get() = sceneSpeed("bike")
-    override fun setBikeSpeed(v: Float) = setSceneSpeed("bike", v)
-    override val surfSpeed get() = sceneSpeed("surf")
-    override fun setSurfSpeed(v: Float) = setSceneSpeed("surf", v)
     override val gameButtonsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_BINDINGS)
     override val buttonGroup = GbaControls.Group.GBA
     override fun gbaControlBindings() = GbaControls.rawBindings(com.pokedaisy.app.game.IosGameInputBindings.directory)
@@ -270,8 +199,7 @@ internal class IosCompanionSettings(
     override val hotkeyActions get() = IosGameHotkeys.ACTIONS
     override val hotkeysBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_HOTKEYS)
     // Preserve the old triggers as L/R until the player opts in to emulator shortcuts.
-    override val hotkeysEnabled get() = iosPreferences.hotkeysEnabled
-    override fun setHotkeysEnabled(on: Boolean) { iosPreferences.hotkeysEnabled = on; reloadBindings() }
+    override fun setHotkeysEnabled(on: Boolean) { super.setHotkeysEnabled(on); reloadBindings() }
     override fun hotkeyBindings() = Hotkeys.load(com.pokedaisy.app.game.IosGameInputBindings.directory).forActions(hotkeyActions).rawBindings
     override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {
         if (action !in hotkeyActions) return
