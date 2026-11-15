@@ -4291,3 +4291,17 @@ cheat editors can still use `GameCheats` directly. Android's input path reads th
 iOS settings retain their own runtime provider; live effects no longer look up a replacement game's settings or
 controllers. Close/restart/editor callbacks check native game identity. Renderer, input delivery, file pickers
 and native core cleanup remain platform adapters.
+
+
+### Runtime-owned state slots
+
+Both native hosts bind their existing `StateSlotController` through `GameRuntime.bindStates`. The controller
+retains its native state transport and backup/achievement adapters; the shared runtime owns its loaded-game
+lifetime. Closing rejects new disk/core requests and slot selection, rechecks after entering the core transport,
+and suppresses late loaded/result/error callbacks. An in-progress state transaction may finish. Atomic binding
+also retires a controller first created after runtime close. The existing slot/undo tests now run from common
+tests on JVM and Native, with added delayed-close checks.
+
+`StateResume` remains a synchronous transaction helper rather than a background resource. Android creates it
+with each core-thread operation's rejection adapter; iOS retains it behind `withState`. Neither needs a second
+loaded-game lifecycle or a factory wrapper. The native exit save can finish after manual slots are retired.

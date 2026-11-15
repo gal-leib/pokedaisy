@@ -1964,13 +1964,13 @@ class EmulatorEngine(
     }
 
     /** Called only between frames. The common controller owns slot transactions and undo snapshots. */
-    private val slots by lazy {
+    private val slots by lazy { playback.bindStates {
         com.pokedaisy.app.companion.StateSlotController(states.files, onCore = { it() },
             write = ::writeCoreState,
             read = { loadState(File(it.toString())) },
             beforeLoad = {}, thumbnail = ::stateThumbnail, snapshot = ::stateSnapshot,
             selected = { currentSlot = it }, completed = { action, index, ok -> onStateResult?.invoke(action, index, ok) })
-    }
+    } }
 
     fun stateSlotList() = slots.list()
     fun requestDeleteState(slot: Int) { postToEmu { slots.requestDelete(slot) } }

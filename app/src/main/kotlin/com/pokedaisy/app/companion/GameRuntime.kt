@@ -32,6 +32,20 @@ class GameRuntime(
     val options = GameOptions(optionPatcher, { !closed.value && !blocked &&
         telemetry.snapshot.value.blocked == null && optionsAllowed() })
 
+    private val stateSlots = atomic<StateSlotController?>(null)
+
+    /** Native state transports differ; their controller has the same loaded-game lifetime. */
+    fun bindStates(create: () -> StateSlotController): StateSlotController {
+        stateSlots.value?.let { return it }
+        val controller = create()
+        if (!stateSlots.compareAndSet(null, controller)) {
+            controller.close()
+            return stateSlots.value!!
+        }
+        if (closed.value) controller.close()
+        return controller
+    }
+
     var actions: GameActions? = null
         private set
     var cheats: GameCheats? = null
@@ -183,6 +197,7 @@ class GameRuntime(
         battle.changed = {}
         release { actions?.close() }
         release { cheats?.close() }
+        release { stateSlots.value?.close() }
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }
         release { session.close() }

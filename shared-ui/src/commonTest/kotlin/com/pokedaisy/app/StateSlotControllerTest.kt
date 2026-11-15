@@ -2,14 +2,14 @@ package com.pokedaisy.app
 
 import com.pokedaisy.app.companion.StateSlotController
 import com.pokedaisy.app.companion.data.*
-import java.nio.file.Files
-import okio.Path.Companion.toOkioPath
-import org.junit.After
-import org.junit.Assert.*
-import org.junit.Test
+import kotlin.random.Random
+import kotlin.test.*
+import okio.FileSystem
+import okio.SYSTEM
 
 class StateSlotControllerTest {
-    private val root = Files.createTempDirectory("pokedaisy-state-slots").toFile().toOkioPath()
+    private val root = (FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "pokedaisy-state-slots-${Random.nextLong().toULong()}")
+        .also { FileSystem.SYSTEM.createDirectories(it) }
     private val files = StateFiles(root)
     private var game = 1
     private var rejectWrite = false
@@ -21,7 +21,7 @@ class StateSlotControllerTest {
         read = { p -> p.readText().toIntOrNull()?.let { game = it; true } ?: false },
         beforeLoad = { if (rejectBackup) error("backup unavailable"); backups++ },
         failed = { errors++ })
-    @After fun clean() = root.deleteRecursively()
+    @AfterTest fun clean() = root.deleteRecursively()
 
     @Test fun saveLoadAndBothUndosRestoreTheExpectedMoment() {
         slots.requestSave(3)
@@ -61,4 +61,36 @@ class StateSlotControllerTest {
         assertTrue(controller.list().none { it.present })
     }
 
+
+    @Test fun closingLeavesSavedFilesAndRejectsEveryNewOperation() {
+        slots.requestSave(2)
+        slots.close(); slots.close()
+        game = 9
+        slots.requestSave(2); slots.requestLoad(2); slots.requestDelete(2)
+        slots.requestUndoLoad(); slots.requestUndoSave()
+        assertFalse(slots.select(3))
+        assertTrue(slots.list().isEmpty())
+        assertTrue(files.exists(2)); assertEquals("1", files.stateFile(2).readText())
+        assertEquals(9, game); assertEquals(0, backups); assertEquals(0, errors)
+    }
+
+    @Test fun retiringWhileWaitingForTheCorePreventsDiskAndCallbacks() {
+        lateinit var controller: StateSlotController
+        controller = StateSlotController(files, onCore = { action -> controller.close(); action() },
+            write = { error("retired write") }, read = { error("retired read") }, beforeLoad = {},
+            failed = { error("retired failure popup") }, completed = { _, _, _ -> error("retired result") })
+        controller.requestSave(0)
+        assertFalse(files.exists(0))
+    }
+
+    @Test fun retiringDuringAReadSuppressesLoadedAndResultCallbacks() {
+        files.stateFile(0).writeText("1")
+        lateinit var controller: StateSlotController
+        controller = StateSlotController(files, onCore = { it() },
+            write = { it.writeText("undo"); true }, read = { controller.close(); true }, beforeLoad = {},
+            loaded = { error("retired telemetry") }, failed = { error("retired popup") },
+            completed = { _, _, _ -> error("retired result") })
+        controller.requestLoad(0)
+        assertTrue(files.exists(0))
+    }
 }

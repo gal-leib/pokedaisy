@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.Hotkeys
+import kotlinx.atomicfu.atomic
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -23,10 +24,12 @@ class StateSlotController(
     private val selected: (Int) -> Unit = {},
     private val completed: (Hotkeys.Action, Int, Boolean) -> Unit = { _, _, _ -> },
 ) : StateSlots {
+    private val closed = atomic(false)
+    fun close() { closed.value = true }
     override var currentIndex by mutableStateOf(initialIndex.coerceIn(0, 9))
         private set
 
-    override fun list(): List<StateSlots.Slot> = (0..9).map { i ->
+    override fun list(): List<StateSlots.Slot> = if (closed.value) emptyList() else (0..9).map { i ->
         val state = files.stateFile(i)
         val thumb = files.thumbFile(i)
         StateSlots.Slot(i, files.exists(i), state.lastModified,
@@ -66,21 +69,23 @@ class StateSlotController(
 
     private fun load(path: Path): Boolean {
         if (!read(path)) return false
-        loaded(path)
+        if (!closed.value) loaded(path)
         return true
     }
 
     /** Change the current slot without writing or loading a state. */
     fun select(index: Int): Boolean {
-        if (index !in 0..9) return false
+        if (closed.value || index !in 0..9) return false
         currentIndex = index
         selected(index)
         return true
     }
 
     private fun perform(message: String, kind: Hotkeys.Action? = null, action: () -> Boolean) {
+        if (closed.value) return
         val index = currentIndex
-        val ok = runCatching { onCore(action) }.getOrDefault(false)
+        val ok = runCatching { onCore { !closed.value && action() } }.getOrDefault(false)
+        if (closed.value) return
         if (!ok) failed(message)
         if (kind != null) completed(kind, index, ok)
     }

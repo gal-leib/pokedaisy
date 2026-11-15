@@ -152,4 +152,21 @@ class GameRuntimeTest {
         assertEquals(listOf(true, false), held)
         assertFalse(settings.ffToggled)
     }
+
+    @Test fun ownedStateControllersAreRetiredEvenWhenBoundAfterClose() {
+        for (bindFirst in listOf(true, false)) withPlayback { runtime, _, _ ->
+            fun bind() = runtime.bindStates {
+                StateSlotController(StateFiles("unused-retired-state-directory".toPath()), onCore = { error("retired core") },
+                    write = { error("retired write") }, read = { error("retired read") }, beforeLoad = {},
+                    selected = { error("retired selection") })
+            }
+            if (bindFirst) bind()
+            runtime.close()
+            val controller = bind()
+            assertSame(controller, runtime.bindStates { error("duplicate state controller") })
+            assertFalse(controller.select(0))
+            assertTrue(controller.list().isEmpty())
+            controller.requestSave(0); controller.requestLoad(0)
+        }
+    }
 }

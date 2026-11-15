@@ -56,8 +56,11 @@ own controllers. The focused JVM/Native runtime and sampler tests pass. The next
 removing the separate iOS options owner. Failed patch cleanup cannot skip queued-work/watcher shutdown.
 The action/cheat slice now creates and retires both controllers under the same owner on both hosts. Android's
 extra cheat cache and iOS's extra cheat owner are removed; delayed input/imports are inert after close.
-Settings callbacks retain their own runtime and native game identity. State assembly/lifetime is the next slice;
-this is not yet completion of D3.
+Settings callbacks retain their own runtime and native game identity. The state slice binds the existing native
+state transports under the same owner. Retired slots reject new work and suppress late callbacks; existing
+transactions may finish. Slot/undo tests now run unchanged from common tests on JVM and Native, with lifetime
+regressions added. `StateResume` is a synchronous helper with no background lifetime; its native exit-save
+adapters remain outside manual-slot retirement. Native smoke checks and the remaining-host audit complete D4.
 
 ## D4: Reduce the remaining hosts
 

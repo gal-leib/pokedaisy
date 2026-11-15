@@ -293,14 +293,14 @@ object PokeDaisyHost {
             }
         }
         g.beforeStateChange = { currentSettings.releaseRewind(); currentBattle.cancel(); touch.releaseKeys() }
-        slots = StateSlotController(files, onCore = g::withState,
+        slots = p.bindStates { StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
             thumbnail = { PkApiCore.stateThumbnail() },
             snapshot = stateSnapshot, loaded = stateLoaded,
             failed = { stateError = it },
             initialIndex = defaults.integerForKey("state_slot").toInt(),
-            selected = { defaults.setInteger(it.toLong(), "state_slot") })
+            selected = { defaults.setInteger(it.toLong(), "state_slot") }) }
         prefetchArt(romPath)
         p.startSampling(
             gameBoy = !romPath.lowercase().endsWith(".gba"), game = kotlinx.coroutines.Dispatchers.Main,
