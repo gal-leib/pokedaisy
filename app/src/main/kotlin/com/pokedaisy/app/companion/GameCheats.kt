@@ -20,23 +20,28 @@ class GameCheats(
     private val enabled: () -> Boolean,
     private val submit: (String) -> Unit,
 ) {
+    private val closed = atomic(false)
     private var store: CheatStore? = null
     private val current = atomic(emptyList<Cheat>())
     val list get() = current.value
-    val editable get() = store != null
+    val editable get() = !closed.value && store != null
 
     fun start() {
-        if (!supported) return
+        if (!supported || closed.value) return
         refresh()
         apply()
     }
 
+    fun close() { closed.value = true }
+
     fun refresh() {
+        if (closed.value) return
         if (supported && store == null) store = runCatching(openStore).getOrNull()
         current.value = store?.load().orEmpty()
     }
-    fun apply() { if (supported) submit(if (enabled()) CheatFiles.coreText(list) else "") }
+    fun apply() { if (supported && !closed.value) submit(if (enabled()) CheatFiles.coreText(list) else "") }
     fun save(cheats: List<Cheat>) {
+        if (closed.value) return
         val target = store ?: return
         target.save(cheats)
         current.value = cheats.toList()
@@ -56,11 +61,12 @@ class GameCheats(
 
     /** Read at most the existing 1 MiB limit plus one byte, even when a document provider reports no size. */
     fun import(source: Source, fallbackName: String, ds: Boolean = false): CheatStore.Import? {
+        if (closed.value) return null
         val target = store ?: return null
         val buffer = Buffer()
         while (buffer.size <= MAX_FILE_BYTES) {
             if (source.read(buffer, minOf(8192L, MAX_FILE_BYTES + 1L - buffer.size)) == -1L) {
-                if (buffer.size == 0L) return null
+                if (closed.value || buffer.size == 0L) return null
                 val result = target.import(buffer.readUtf8().removePrefix("\uFEFF"), fallbackName, ds)
                 refresh()
                 apply()

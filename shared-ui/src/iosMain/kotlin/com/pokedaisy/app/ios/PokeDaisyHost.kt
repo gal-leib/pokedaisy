@@ -75,7 +75,6 @@ object PokeDaisyHost {
     private val touch = IosTouchControls({ game }, { settings })
     private var screen: IosGameScreen? = null
     private var playback: com.pokedaisy.app.companion.GameRuntime? = null
-    private var cheats: com.pokedaisy.app.companion.GameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
 
@@ -96,9 +95,10 @@ object PokeDaisyHost {
         val panels = IosGameScreen(game, touch, gameBoy).also { screen = it }
         val currentSettings = settings
         val currentSlots = slots
-        if (currentSettings != null && currentSlots != null) {
+        val currentRuntime = playback
+        if (currentSettings != null && currentSlots != null && currentRuntime != null) {
             currentSettings.rewindUnavailable = panels::showRewindUnavailable
-            val shortcuts = com.pokedaisy.app.companion.GameActions(currentSettings, currentSlots,
+            val shortcuts = currentRuntime.bindActions(currentSettings, currentSlots,
                 selectSlot = { currentSlots.select(it) }, companion = panels::toggleCompanion,
                 hold = { action, down ->
                     when (action) {
@@ -210,12 +210,13 @@ object PokeDaisyHost {
             if (!saved) resumeFailed()
             saved
         }
+        var currentRuntime: com.pokedaisy.app.companion.GameRuntime? = null
         settings = IosCompanionSettings(romPath, code, g,
-            onClose = { finishClose() },
-            onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
+            onClose = { if (game === g) finishClose() },
+            onRestart = { if (game === g && prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen }, playback = { playback }, options = { playback?.options }, cheatHost = { cheats })
+            }, onEditTouch = { if (game === g) touch.edit() }, readTouchStage = { touch.readStage().takeIf { game === g } }, gameScreen = { screen.takeIf { game === g } }, playback = { currentRuntime })
             .also { s ->
                 L10n.apply(s.appLanguage, code)
                 s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
@@ -229,13 +230,15 @@ object PokeDaisyHost {
         playback = com.pokedaisy.app.companion.GameRuntime(
             com.pokedaisy.app.game.GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> com.pokedaisy.app.companion.data.Logs.i("$where: $error") },
             telemetry, iosPreferences, battle!!, PkApiCore, { code != null }, PkApiCore::configureField, { PkApiCore.configureField(0) }).also { p ->
-            settings!!.playbackChanged = { settings?.let { p.settingsChanged(it, it.ffActive, it.slowmoHeld) } }
-            p.settingsChanged(settings!!, settings!!.ffActive, settings!!.slowmoHeld)
+            currentRuntime = p
+            val currentSettings = settings!!
+            currentSettings.playbackChanged = { p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld) }
+            p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld)
             g.frameSpeed = { p.speed().let { if (it.isInfinite()) 0.0 else it.toDouble() } }
             val bKeys = battle!!::keys
             val gameOptions = p.options.also { o ->
-                settings!!.optionsChanged = { settings?.let(o::settingsChanged) }
-                o.settingsChanged(settings!!)
+                currentSettings.optionsChanged = { o.settingsChanged(currentSettings) }
+                o.settingsChanged(currentSettings)
                 p.readField = { o.fieldState(PkApiCore::stepField, com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(code.orEmpty())) }
                 g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField,
                     com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN)) }
@@ -273,7 +276,7 @@ object PokeDaisyHost {
         }
         g.beforeRewind = battle!!::cancel
         val currentSettings = settings!!
-        cheats = com.pokedaisy.app.companion.GameCheats(
+        val currentCheats = p.bindCheats(
             supported = romPath.substringAfterLast('.').lowercase() == "gba",
             openStore = { com.pokedaisy.app.cheats.CheatStore.forCrc(appFilesDir(),
                 com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()).toString(16).padStart(8, '0')) },
@@ -281,7 +284,6 @@ object PokeDaisyHost {
             submit = { text -> if (g.isRunning && PkApiCore.applyCheats(text) < 0) com.pokedaisy.app.companion.data.Logs.i("cheats didn't load") })
         val currentBattle = battle!!
         val currentOptions = p.options
-        val currentCheats = cheats!!
         g.onCoreStarted = {
             if (game === g) {
                 p.start(romPath.toPath(), code, if (code != null) runCatching { com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()) }.getOrDefault(0L) else 0L)
@@ -334,7 +336,6 @@ object PokeDaisyHost {
     fun closeGame() {
         stateError = null
         playback?.quiesce()
-        cheats = null
         items = null
         fly = null
         playback?.close()

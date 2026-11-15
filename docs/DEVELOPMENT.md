@@ -4278,3 +4278,16 @@ its single-key hotkey conflict; if that write fails, the controls edit is rolled
 The shared tests inject failed writes through blocked temporary paths and verify persisted files and publication.
 Android's adapter reloads game buttons and hotkeys together; iOS reloads its native poller. Runtime held actions
 are released before replacing their parser, while independent touch extras retain their ownership.
+
+
+### Runtime-owned actions and cheats
+
+`GameRuntime.bindActions` and `bindCheats` create one controller per loaded game. Both hosts use them, replacing
+Android's separate cheat-session key/cache and the iOS cheat owner. Close releases held actions and retires cheat
+edits/imports before patch/battle/watcher cleanup; every resource is visited even if an earlier cleanup throws.
+Delayed callbacks cannot save/load, toggle playback or edit a retired game's cheat file. Standalone library
+cheat editors can still use `GameCheats` directly. Android's input path reads the cached controller.
+
+iOS settings retain their own runtime provider; live effects no longer look up a replacement game's settings or
+controllers. Close/restart/editor callbacks check native game identity. Renderer, input delivery, file pickers
+and native core cleanup remain platform adapters.

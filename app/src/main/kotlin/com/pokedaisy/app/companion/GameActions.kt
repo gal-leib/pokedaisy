@@ -15,6 +15,7 @@ class GameActions(
     private val nowMillis: () -> Long = { actionClockOrigin.elapsedNow().inWholeMilliseconds },
 ) {
     enum class Source { HARDWARE, TOUCH }
+    private var closed = false
     private var ffDownAt: Long? = null
     private val held = mutableMapOf<Hotkeys.Action, Set<Source>>()
 
@@ -42,9 +43,16 @@ class GameActions(
         for (action in held.keys.toList()) release(action)
     }
 
+    fun close() {
+        if (closed) return
+        closed = true
+        clear()
+    }
+
     /** False leaves platform-only shortcuts with their host, including QUICK MENU's release event. */
     fun hotkey(event: Hotkeys.Event): Boolean {
         val action = event.action
+        if (closed) return action in BASIC_ACTIONS
         if (action in HELD) {
             hold(action, event.pressed, Source.HARDWARE)
             return true
@@ -71,6 +79,7 @@ class GameActions(
 
     /** FF taps toggle, holds last until release. X/Y and platform-only extras remain native input. */
     fun touch(button: TouchButton, down: Boolean): Boolean {
+        if (closed) return button in setOf(TouchButton.FF, TouchButton.REWIND, TouchButton.SAVE_STATE, TouchButton.LOAD_STATE)
         when (button) {
             TouchButton.FF -> {
                 if (down) {

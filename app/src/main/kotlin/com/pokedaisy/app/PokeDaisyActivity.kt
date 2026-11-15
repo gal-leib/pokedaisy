@@ -2612,16 +2612,10 @@ class PokeDaisyActivity : Activity() {
     private fun cheatStore(): com.pokedaisy.app.cheats.CheatStore? =
         romKey.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.cheats.CheatStore.forCrc(filesDir.toOkioPath(), it) }
 
-    private var cheatSessionKey: String? = null
-    private var cheatSession: com.pokedaisy.app.companion.GameCheats? = null
     private fun gameCheats(): com.pokedaisy.app.companion.GameCheats? {
-        if (romKey.isEmpty()) return null
-        if (cheatSessionKey != romKey) {
-            cheatSessionKey = romKey
-            cheatSession = com.pokedaisy.app.companion.GameCheats(true, ::cheatStore,
-                enabled = { Prefs(this).cheatsEnabled }, submit = ::submitCheats).also { it.refresh() }
-        }
-        return cheatSession
+        if (romKey.isEmpty() || !::engine.isInitialized) return null
+        return engine.playback.cheats ?: engine.playback.bindCheats(true, ::cheatStore,
+            enabled = { Prefs(this).cheatsEnabled }, submit = ::submitCheats)
     }
 
     /** Hands the engine this ROM's enabled cheats (none with the master switch off); it loads
@@ -4751,11 +4745,10 @@ class PokeDaisyActivity : Activity() {
         reloadHotkeys()
     }
 
-    private val gameActions by lazy {
-        com.pokedaisy.app.companion.GameActions(companionSettings, stateSlots,
+    private val gameActions get() = engine.playback.actions ?:
+        engine.playback.bindActions(companionSettings, stateSlots,
             selectSlot = { index -> engine.cycleSlot(index - engine.currentSlot) },
             hold = ::holdGameAction, companion = ::toggleGameCompanion)
-    }
 
     private fun holdGameAction(action: Hotkeys.Action, down: Boolean) {
         when (action) {

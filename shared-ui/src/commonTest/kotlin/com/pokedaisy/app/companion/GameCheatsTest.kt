@@ -64,4 +64,19 @@ class GameCheatsTest {
         session.start(); session.refresh(); session.apply()
         assertFalse(opened); assertFalse(submitted); assertFalse(session.editable)
     }
+
+    @Test fun closingRejectsDelayedEditsAndImportsWithoutWritingOrSubmitting() = withStore { store ->
+        val cheat = Cheat("Diagnostic byte", listOf("02000010:7F"), enabled = true)
+        store.save(listOf(cheat))
+        val submitted = mutableListOf<String>()
+        val session = GameCheats(true, { store }, { true }, { submitted += it })
+        session.start(); val applied = submitted.toList()
+        session.close(); session.close()
+        session.setEnabled(0, false); session.remove(0); session.add(cheat.copy(name = "Late"))
+        assertNull(session.import(Buffer().writeUtf8("02000010:01"), "Late"))
+        session.refresh(); session.start(); session.apply()
+        assertFalse(session.editable)
+        assertEquals(listOf(cheat), store.load())
+        assertEquals(applied, submitted)
+    }
 }

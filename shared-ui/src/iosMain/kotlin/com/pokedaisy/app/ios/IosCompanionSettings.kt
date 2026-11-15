@@ -41,12 +41,12 @@ internal class IosCompanionSettings(
     private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
     private val gameScreen: () -> IosGameScreen? = { null },
     private val playback: () -> com.pokedaisy.app.companion.GameRuntime? = { null },
-    private val options: () -> com.pokedaisy.app.companion.GameOptions? = { null },
-    private val cheatHost: () -> com.pokedaisy.app.companion.GameCheats? = { null },
     private val stored: com.pokedaisy.app.companion.PrefsCompanionSettings =
         com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences,
             languageRomCode = { romCode }, allowDisableResume = onDisableResume),
 ) : CompanionSettings, com.pokedaisy.app.companion.StoredCompanionSettings by stored {
+    private fun options() = playback()?.options
+    private fun cheatHost() = playback()?.cheats
     private val d = NSUserDefaults.standardUserDefaults
     private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
     override val keyCapture get() = game?.keyCapture ?: libraryInput!!.capture

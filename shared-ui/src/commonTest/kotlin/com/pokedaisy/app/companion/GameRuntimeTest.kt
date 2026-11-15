@@ -114,4 +114,42 @@ class GameRuntimeTest {
             runtime.close()
         }
     }
+
+    @Test fun runtimeOwnsBoundControllersAndClosedBindingDoesNotOpenStores() = withPlayback { runtime, _, _ ->
+        var opened = 0
+        var submitted = 0
+        val cheats = runtime.bindCheats(true, { opened++; null }, { true }, { submitted++ })
+        assertSame(cheats, runtime.bindCheats(false, { error("replaced binding") }, { false }, {}))
+        assertEquals(1, opened)
+        runtime.close()
+        cheats.start(); cheats.apply(); cheats.refresh()
+        assertEquals(1, opened); assertEquals(0, submitted)
+        withPlayback { retired, _, _ ->
+            retired.close()
+            retired.bindCheats(true, { error("closed store opened") }, { true }, { error("closed core used") }).start()
+        }
+    }
+
+    @Test fun runtimeCloseReleasesBoundHoldsAndRejectsDelayedSlotActions() = withPlayback { runtime, _, _ ->
+        val settings = PrefsCompanionSettingsTest.Settings(Prefs(PrefsCompanionSettingsTest.Store()))
+        val slots = object : StateSlots {
+            override val currentIndex = 0
+            override fun list() = emptyList<StateSlots.Slot>()
+            override fun requestSave(index: Int) { error("retired save") }
+            override fun requestLoad(index: Int) { error("retired load") }
+            override fun requestDelete(index: Int) { error("unexpected delete") }
+            override fun requestUndoSave() { error("retired undo") }
+            override fun requestUndoLoad() { error("retired undo") }
+        }
+        val held = mutableListOf<Boolean>()
+        val actions = runtime.bindActions(settings, slots, {}, { _, down -> held += down }, {})
+        assertSame(actions, runtime.bindActions(settings, slots, {}, { _, _ -> error("replaced input") }, {}))
+        actions.touch(TouchButton.FF, true)
+        runtime.close()
+        actions.touch(TouchButton.FF, false)
+        actions.touch(TouchButton.SAVE_STATE, true)
+        actions.hotkey(com.pokedaisy.app.Hotkeys.Event(com.pokedaisy.app.Hotkeys.Action.LOAD_STATE, true))
+        assertEquals(listOf(true, false), held)
+        assertFalse(settings.ffToggled)
+    }
 }

@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.Prefs
+import com.pokedaisy.app.Hotkeys
+import com.pokedaisy.app.cheats.CheatStore
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,6 +31,25 @@ class GameRuntime(
     private var sampler: GameSampler? = null
     val options = GameOptions(optionPatcher, { !closed.value && !blocked &&
         telemetry.snapshot.value.blocked == null && optionsAllowed() })
+
+    var actions: GameActions? = null
+        private set
+    var cheats: GameCheats? = null
+        private set
+
+    fun bindActions(settings: CompanionSettings, slots: StateSlots, selectSlot: (Int) -> Unit,
+                    hold: (Hotkeys.Action, Boolean) -> Unit, companion: () -> Unit): GameActions =
+        actions ?: GameActions(settings, slots, selectSlot, hold, companion).also {
+            actions = it
+            if (closed.value) it.close()
+        }
+
+    fun bindCheats(supported: Boolean, openStore: () -> CheatStore?, enabled: () -> Boolean,
+                   submit: (String) -> Unit): GameCheats =
+        cheats ?: GameCheats(supported, openStore, enabled, submit).also {
+            cheats = it
+            if (closed.value) it.close() else it.refresh()
+        }
 
     /** Configure once per loaded game. Capture/delivery use [game]; decode remains on the sampler worker. */
     fun startSampling(gameBoy: Boolean, nds: Boolean = false, game: CoroutineDispatcher,
@@ -152,20 +173,25 @@ class GameRuntime(
     /** Native hosts call after stopping the core or between frames; patch cleanup may touch the core. */
     fun close() {
         if (!closed.compareAndSet(false, true)) return
-        quiesce()
-        battle.changed = {}
-        try {
-            options.close(restoreOptionPatchesOnClose)
-        } finally {
-            try {
-                battle.cancel()
-            } finally {
-                session.close()
-                if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {
-                    FfMenuWatch.onLearned = null
-                    RegionMapWatch.load(null)
-                }
+        var failure: Throwable? = null
+        fun release(block: () -> Unit) {
+            try { block() } catch (error: Throwable) {
+                if (failure == null) failure = error else failure!!.addSuppressed(error)
             }
         }
+        release(::quiesce)
+        battle.changed = {}
+        release { actions?.close() }
+        release { cheats?.close() }
+        release { options.close(restoreOptionPatchesOnClose) }
+        release { battle.cancel() }
+        release { session.close() }
+        release {
+            if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {
+                FfMenuWatch.onLearned = null
+                RegionMapWatch.load(null)
+            }
+        }
+        failure?.let { throw it }
     }
 }

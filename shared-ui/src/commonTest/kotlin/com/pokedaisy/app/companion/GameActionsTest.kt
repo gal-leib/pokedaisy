@@ -91,4 +91,16 @@ class GameActionsTest {
         assertEquals(1, holds.count { it == Hotkeys.Action.FF_HOLD to false })
         assertEquals(1, holds.count { it == Hotkeys.Action.SLOWMO_HOLD to false })
     }
+
+    @Test fun closingReleasesHoldsAndMakesDelayedInputInert() {
+        actions.touch(TouchButton.FF, true)
+        actions.close(); actions.close()
+        actions.touch(TouchButton.FF, false)
+        actions.touch(TouchButton.SAVE_STATE, true)
+        key(Hotkeys.Action.FF_TOGGLE); key(Hotkeys.Action.LOAD_STATE)
+        assertFalse(settings.ffToggled)
+        assertTrue(requests.isEmpty())
+        assertEquals(listOf(Hotkeys.Action.FF_HOLD to true, Hotkeys.Action.FF_HOLD to false), holds)
+        assertFalse(key(Hotkeys.Action.QUICK_MENU))
+    }
 }

@@ -54,7 +54,10 @@ watcher lifetime and common battle sample delivery. Both hosts adopt it; separat
 delivery/teardown are removed. Closed owners reject delayed starts and samples, and iOS startup captures its
 own controllers. The focused JVM/Native runtime and sampler tests pass. The next slice also puts option creation, discovery cancellation and final patch cleanup under this owner,
 removing the separate iOS options owner. Failed patch cleanup cannot skip queued-work/watcher shutdown.
-Cheats, actions and state assembly still need the next capability slices; this is not completion of D3.
+The action/cheat slice now creates and retires both controllers under the same owner on both hosts. Android's
+extra cheat cache and iOS's extra cheat owner are removed; delayed input/imports are inert after close.
+Settings callbacks retain their own runtime and native game identity. State assembly/lifetime is the next slice;
+this is not yet completion of D3.
 
 ## D4: Reduce the remaining hosts
 
