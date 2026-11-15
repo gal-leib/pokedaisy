@@ -14,6 +14,7 @@ internal class IosGameHotkeys(
         when (event.action) {
             Hotkeys.Action.FF_HOLD -> settings.holdHardwareFastForward(event.pressed)
             Hotkeys.Action.SLOWMO_HOLD -> settings.holdSlowmo(event.pressed)
+            Hotkeys.Action.REWIND_HOLD -> settings.holdHardwareRewind(event.pressed)
             else -> if (event.pressed) when (event.action) {
                 Hotkeys.Action.SAVE_STATE -> slots.requestSave(slots.currentIndex)
                 Hotkeys.Action.LOAD_STATE -> slots.requestLoad(slots.currentIndex)
@@ -37,6 +38,7 @@ internal class IosGameHotkeys(
             Hotkeys.Action.SAVE_STATE, Hotkeys.Action.LOAD_STATE, Hotkeys.Action.UNDO_SAVE, Hotkeys.Action.UNDO_LOAD,
             Hotkeys.Action.SLOT_NEXT, Hotkeys.Action.SLOT_PREV,
             Hotkeys.Action.FF_HOLD, Hotkeys.Action.FF_TOGGLE, Hotkeys.Action.SPEED_CYCLE, Hotkeys.Action.SLOWMO_HOLD,
+            Hotkeys.Action.REWIND_HOLD,
             Hotkeys.Action.EXIT_GAME, Hotkeys.Action.RESTART_GAME, Hotkeys.Action.COMPANION, Hotkeys.Action.MUTE,
         )
     }

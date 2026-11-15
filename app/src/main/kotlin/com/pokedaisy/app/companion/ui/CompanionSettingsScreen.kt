@@ -602,7 +602,7 @@ private fun homeRows(
         },
         // Keeps the last ~20 s; the REWIND HOLD hotkey plays them backwards.
         if (s.rewindSupported) {
-            SettingRow(tk("REWIND"), onOff(s.rewind)) { s.setRewind(!s.rewind); changed() }
+            SettingRow(tk("REWIND"), onOff(s.rewind), labelBadge = s.rewindBadge) { s.setRewind(!s.rewind); changed() }
         } else null,
         // SCENE SPEEDS, FF MODE and FF MUSIC: set once and rarely touched, on their own page.
         SettingRow(tk("SPEED OPTIONS"), null, labelBadge = s.speedOptionsBadge, subtitle = "Scene speeds, FF mode and FF music", opensPage = true) { navigate(Page.SPEED) },

@@ -192,6 +192,7 @@ interface CompanionSettings {
     /** REWIND on / off ([Prefs.rewind]); hosts without a game leave it off. */
     val rewind: Boolean get() = false
     fun setRewind(on: Boolean) {}
+    val rewindBadge: String? get() = null
     /** Whether the running game's core can rewind (not a DS game: its states are megabytes each). */
     val rewindSupported: Boolean get() = true
 

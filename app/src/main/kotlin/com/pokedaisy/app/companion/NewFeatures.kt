@@ -14,6 +14,7 @@ object NewFeatures {
     /** Shared game-button capture and bindings on iPhone and iPad. */
     const val IOS_GAME_BINDINGS = "ios_game_bindings"
     const val IOS_GAME_HOTKEYS = "ios_game_hotkeys"
+    const val IOS_REWIND = "ios_rewind"
 
     /** SETTINGS > HUD (companion.ui.FieldHud). */
     const val HUD = "hud"
@@ -210,6 +211,7 @@ object NewFeatures {
     val ALL = listOf(
         IOS_GAME_BINDINGS,
         IOS_GAME_HOTKEYS,
+        IOS_REWIND,
         IOS_FIELD_OPTIONS,
         IOS_GAME_OPTIONS,
         IOS_SCENE_SPEEDS,

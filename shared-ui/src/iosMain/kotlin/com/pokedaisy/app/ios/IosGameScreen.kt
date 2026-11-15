@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.companion.TouchStage
+import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.*
 import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.game.GameViewController
@@ -40,6 +41,12 @@ internal class IosGameScreen(
     private var density = 1f
     private val aspect = if (gameBoy) 160f / 144 else 1.5f
     private var frames by mutableStateOf<GameScreenFrames?>(null)
+    private var rewindUnavailable by mutableStateOf(false)
+    fun showRewindUnavailable() {
+        touch.releaseKeys()
+        game?.companionInputCaptured = true
+        rewindUnavailable = true
+    }
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
     private fun number(key: String, default: Float) = if (d.objectForKey(key) == null) default else d.doubleForKey(key).toFloat()
 
@@ -100,7 +107,17 @@ internal class IosGameScreen(
                             compactText = minOf(maxWidth, maxHeight) >= 600.dp, content = companion)
                     }
                 },
-                pictureOverlay = { game?.keyCapture?.let { KeyCapturePopup(it) } },
+                pictureOverlay = {
+                    game?.keyCapture?.let { KeyCapturePopup(it) }
+                    if (rewindUnavailable) {
+                        val dismiss = {
+                            rewindUnavailable = false
+                            game?.companionInputCaptured = state.side.windowOpen
+                        }
+                        OptionConfirm(tr("REWIND"), tr("Rewind is off - turn it on in SETTINGS"), tr("OK"),
+                            rememberGbaTextMetrics(), onConfirm = dismiss, onDismiss = dismiss, cancelLabel = null)
+                    }
+                },
                 dismissSideOnGameTap = !visible,
                 onFrames = { measured, _ -> frames = measured; touch.stage = stage(measured, visible) })
         }

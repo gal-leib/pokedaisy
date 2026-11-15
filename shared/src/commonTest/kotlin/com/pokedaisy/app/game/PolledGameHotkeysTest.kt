@@ -127,4 +127,31 @@ class PolledGameHotkeysTest {
         assertEquals(0, k.input.mask); assertEquals(0, k.input.tapMask())
     }
 
+    @Test fun holdEndsOnlyAfterTheLastKeyboardOrControllerAliasIsReleased() = withDirectory { dir ->
+        for (action in listOf(Hotkeys.Action.FF_HOLD, Hotkeys.Action.SLOWMO_HOLD, Hotkeys.Action.REWIND_HOLD)) {
+            FileSystem.SYSTEM.write(dir / "hotkeys.properties") { writeUtf8("${action.prop}=BUTTON_R2, SPACE") }
+            val k = keys(dir, action)
+            val space = KeyCodes.code("SPACE")!!
+            val events = mutableListOf<Boolean>(); k.onHotkey = { events += it.pressed }
+            k.poll(setOf(trigger), false)
+            k.poll(setOf(trigger, space), false)
+            k.poll(setOf(space), false)
+            assertEquals(listOf(true), events, action.name)
+            k.poll(emptySet(), false)
+            assertEquals(listOf(true, false), events, action.name)
+            k.poll(setOf(trigger, space), false)
+            k.quarantine(setOf(trigger, space))
+            assertEquals(listOf(true, false, true, false), events, action.name)
+        }
+    }
+
+    @Test fun toggleAliasesKeepTheirSeparatePressEdges() = withDirectory { dir ->
+        FileSystem.SYSTEM.write(dir / "hotkeys.properties") { writeUtf8("ff_toggle=BUTTON_R2, SPACE") }
+        val k = keys(dir, Hotkeys.Action.FF_TOGGLE)
+        val events = mutableListOf<Boolean>(); k.onHotkey = { events += it.pressed }
+        k.poll(setOf(trigger), false)
+        k.poll(setOf(trigger, KeyCodes.code("SPACE")!!), false)
+        assertEquals(listOf(true, true), events)
+    }
+
 }

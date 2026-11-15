@@ -158,6 +158,8 @@ Loading a save state starts a new rewind history. You cannot rewind from the loa
 
 Rewinding never touches your save file: it only moves the game back in time, and whatever you saved in the game stays saved until the game saves again.
 
+Rewind also works on iPhone and iPad for GBA and Game Boy games. Turn on `REWIND`, then hold the touch controls' rewind button, or enable `HOTKEYS` and bind `REWIND HOLD` to your keyboard or controller. You can hide or move the touch button under `TOUCH CONTROLS`. Pausing, loading a state, opening the layout editor or leaving the game releases the hold. Rewind runs at normal speed even with FF on.
+
 ## On iPad
 
 Open `STATES` from `MORE`, or put it on your tab bar in `SETTINGS` > `TAB BAR`. You have ten slots with screenshots.

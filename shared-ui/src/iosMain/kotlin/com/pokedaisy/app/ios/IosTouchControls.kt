@@ -50,6 +50,7 @@ internal class IosTouchControls(
         inputEpoch++
         game()?.let { it.touchKeys = 0; it.touchTurbo = 0 }
         settings()?.holdFastForward(false)
+        settings()?.holdTouchRewind(false)
         ffDownAt = null
     }
 
@@ -136,6 +137,7 @@ internal class IosTouchControls(
             }
             TouchButton.SAVE_STATE -> if (down) slots()?.let { it.requestSave(it.currentIndex) }
             TouchButton.LOAD_STATE -> if (down) slots()?.let { it.requestLoad(it.currentIndex) }
+            TouchButton.REWIND -> s.holdTouchRewind(down)
             else -> Unit
         }
     }

@@ -57,10 +57,27 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "REWIND")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
 
     var optionsChanged: () -> Unit = {}
+    override val rewind get() = bool("rewind", false)
+    override val rewindBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_REWIND)
+    override fun setRewind(on: Boolean) { d.setBool(on, "rewind"); releaseRewind() }
+    private var touchRewindHeld = false
+    private var hardwareRewindHeld = false
+    val rewindHeld get() = rewind && (touchRewindHeld || hardwareRewindHeld)
+    var rewindChanged: () -> Unit = {}
+    var rewindUnavailable: () -> Unit = {}
+    fun holdTouchRewind(on: Boolean) {
+        if (on && !rewind) rewindUnavailable()
+        touchRewindHeld = on && rewind; rewindChanged()
+    }
+    fun holdHardwareRewind(on: Boolean) {
+        if (on && !rewind) rewindUnavailable()
+        hardwareRewindHeld = on && rewind; rewindChanged()
+    }
+    fun releaseRewind() { touchRewindHeld = false; hardwareRewindHeld = false; rewindChanged() }
     override val autoRun get() = bool("auto_run", false)
     override fun setAutoRun(on: Boolean) { d.setBool(on, "auto_run"); optionsChanged() }
     override val autoRunBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN

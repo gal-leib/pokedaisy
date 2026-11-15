@@ -3,6 +3,7 @@
 package com.pokedaisy.app.game
 
 import com.pokedaisy.app.core.PkApiCore
+import com.pokedaisy.app.companion.data.RewindPolicy
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -56,6 +57,7 @@ class GameViewController(
     private val observers = mutableListOf<NSObjectProtocol>()
     private var running = false
     private var active = false
+    private var stateChanging = false
     private lateinit var gameView: MTKView
 
     /** The keys the app's on-screen controls hold ([PkApiCore.KEY_A] ...), main thread. */
@@ -89,6 +91,30 @@ class GameViewController(
     var speed: Double = 1.0
     var volume: Float = 1f
     var muted: Boolean = false
+    /** The same diff-ring capacity as Android; configuring it releases any current hold. */
+    var rewindEnabled: Boolean = false
+        set(value) {
+            if (field == value) return
+            holdRewind(false)
+            field = value
+            if (running) PkApiCore.setRewind(RewindPolicy.capacity(value))
+        }
+    private var rewinding = false
+    /** Cancel queued battle commands on either transport edge. No state operation or touch release here. */
+    var beforeRewind: () -> Unit = {}
+
+    fun holdRewind(on: Boolean) {
+        val next = on && rewindEnabled
+        if (next == rewinding) return
+        rewinding = next
+        beforeRewind()
+        if (!running) return
+        audio.stop()
+        PkApiCore.setRewinding(next)
+        pacer.reset()
+        audioSpeed = -1.0
+        if (active && !stateChanging && !uiPaused && !gameView.paused) audio.start()
+    }
     /** Shared battle automation runs once per emulated frame, on every input source. */
     var frameKeys: (Int) -> Int = { it }
     var frameSpeed: () -> Double = { speed }
@@ -138,6 +164,7 @@ class GameViewController(
             return
         }
         running = true
+        PkApiCore.setRewind(RewindPolicy.capacity(rewindEnabled))
         onCoreStarted()
         active = true
         audio.start()
@@ -174,6 +201,7 @@ class GameViewController(
     /** Main/game thread, between display callbacks: no frames or queued sound cross a state operation. */
     fun withState(operation: () -> Boolean): Boolean {
         if (!running) return false
+        stateChanging = true
         audio.stop()
         return try {
             beforeStateChange()
@@ -182,6 +210,7 @@ class GameViewController(
             PkApiCore.setKeys(0)
             if (PkApiCore.finishSave(600) >= 600) false else operation()
         } finally {
+            stateChanging = false
             pacer.reset()
             audioSpeed = -1.0
             if (active && running) audio.start()
@@ -200,6 +229,7 @@ class GameViewController(
             PkApiCore.stop()
         }
         onHotkey = {}
+        beforeRewind = {}
     }
 
     private fun refresh(view: MTKView) {
@@ -208,7 +238,7 @@ class GameViewController(
         // GameController queries. A controller action can close/restart the game or open the editor here.
         input.poll()
         if (!running || !active || uiPaused) return
-        val rate = frameSpeed().takeIf { it.isFinite() && it in 0.0..64.0 } ?: 1.0
+        val rate = effectiveSpeed()
         val now = CACurrentMediaTime()
         if (rate != audioSpeed) {
             pacer.reset()
@@ -223,21 +253,24 @@ class GameViewController(
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
             val held = input.keys()
             if (!running || !active || uiPaused) break
-            val keys = frameKeys(held)
+            val keys = if (rewinding) 0 else frameKeys(held)
             if (!running || !active || uiPaused) break
             PkApiCore.setKeys(keys)
             PkApiCore.runFrame()
             afterFrame()
-            audio.volume = if (muted || rate == 0.0 || quietPress()) 0f else volume
+            audio.volume = if (rewinding || muted || rate == 0.0 || quietPress()) 0f else volume
             audio.push()
             ran = true
             // A menu may open on the first uncapped frame. Do not spend the remaining fast batch inside it.
-            if (frameSpeed() != rate) break
+            if (effectiveSpeed() != rate) break
         }
         if (!running || !active || uiPaused) return
-        if (ran && !holdPicture()) renderer?.upload()
+        if (ran && (rewinding || !holdPicture())) renderer?.upload()
         draw(view)
     }
+
+    private fun effectiveSpeed(): Double = if (rewinding) 1.0 else
+        frameSpeed().takeIf { it.isFinite() && it in 0.0..64.0 } ?: 1.0
 
     private fun draw(view: MTKView) {
         val renderer = renderer ?: return

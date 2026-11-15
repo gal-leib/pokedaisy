@@ -71,7 +71,7 @@ internal object IosTouchPreferences {
     }
 
     val buttons = TouchButton.entries.toSet() - setOf(TouchButton.QUICK_MENU, TouchButton.ZOOM,
-        TouchButton.REWIND, TouchButton.X, TouchButton.Y)
+        TouchButton.X, TouchButton.Y)
     val drawingStyle: TouchControlsStyle get() = style.forButtons(buttons)
 
     /** Android's key (Prefs.portraitCompanionUnderGame). */

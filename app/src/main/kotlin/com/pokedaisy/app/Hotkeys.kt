@@ -54,6 +54,9 @@ class Hotkeys private constructor(
          * it takes its keys from the other hotkeys on them - L2 / R2, SPEED CYCLE's and FF HOLD's in every other game. */
         val dsOnly get() = this == TOUCH_SCREEN || this == DS_LAYOUT
 
+        /** Hold actions remain active until their last bound chord is released. */
+        val isHold get() = this == FF_HOLD || this == SLOWMO_HOLD || this == REWIND_HOLD
+
         val prop get() = name.lowercase()
 
         val label get() = name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
@@ -78,19 +81,26 @@ class Hotkeys private constructor(
         val out = ArrayList<Event>()
         // The DS hotkeys' chords while they're live: theirs, not the other hotkeys' on the same keys.
         val dsTaken = chords.filter { (a, _) -> a.dsOnly && dsActive(a) }.values.flatten().toSet()
-        for ((action, list) in chords) for (chord in list) {
-            if (keyCode !in chord) continue
-            val satisfied = held.containsAll(chord)
-            val key = action to chord
-            // Only a new press is turned away: a chord already down still gets its release (an FF HOLD let go after
-            // the screen turned).
-            val off = if (action.dsOnly) !dsActive(action) else chord in dsTaken
-            if (off && key !in activeChords) continue
-            if (satisfied && activeChords.add(key)) {
-                out.add(Event(action, true))
-                // A held-back key that fired a chord was the hotkey's: the game never gets it.
-                for (k in chord) if (k in heldBack) heldBack[k] = true
-            } else if (!satisfied && activeChords.remove(key)) out.add(Event(action, false))
+        for ((action, list) in chords) {
+            val wasHeld = action.isHold && activeChords.any { it.first == action }
+            for (chord in list) {
+                if (keyCode !in chord) continue
+                val satisfied = held.containsAll(chord)
+                val key = action to chord
+                // Only a new press is turned away: a chord already down still gets its release (an FF HOLD let go after
+                // the screen turned).
+                val off = if (action.dsOnly) !dsActive(action) else chord in dsTaken
+                if (off && key !in activeChords) continue
+                if (satisfied && activeChords.add(key)) {
+                    if (!action.isHold) out.add(Event(action, true))
+                    // A held-back key that fired a chord was the hotkey's: the game never gets it.
+                    for (k in chord) if (k in heldBack) heldBack[k] = true
+                } else if (!satisfied && activeChords.remove(key) && !action.isHold) out.add(Event(action, false))
+            }
+            if (action.isHold) {
+                val isHeld = activeChords.any { it.first == action }
+                if (wasHeld != isHeld) out.add(Event(action, isHeld))
+            }
         }
         toTap.remove(keyCode)
         if (!down) heldBack.remove(keyCode)?.let { spent -> if (!spent) toTap.add(keyCode) }

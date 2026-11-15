@@ -5289,7 +5289,7 @@ class PokeDaisyActivity : Activity() {
     // --- helpers -----------------------------------------------------------------
 
     /** REWIND's buffer: 600 states, one every 2 frames - the last ~20 s of play. */
-    private fun rewindEntries(on: Boolean) = if (on && !romIsNds) 600 else 0   // a DS game has no rewind (MB-sized states)
+    private fun rewindEntries(on: Boolean) = com.pokedaisy.app.companion.data.RewindPolicy.capacity(on, !romIsNds)
 
     private fun showHud(text: String, millis: Long = 1800) {
         hud.text = text

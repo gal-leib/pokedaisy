@@ -4069,4 +4069,10 @@ loads already hold the core lock. No game addresses, state format or diff algori
 The native `pk_rewind_api` test uses original GB/GBA diagnostics to verify backwards frames, ring wrap/exhaustion,
 resume, resizing/off/no-core behavior and timeline resets. The Game Boy check changes its battery RAM after
 history capture, then checks both current RAM and the file retain the newer byte through rewind and close.
-The iOS setting and input hold are connected in a following parity PR.
+iOS connects the shared REWIND row, the existing touch extra and REWIND HOLD to these controls. `RewindPolicy`
+keeps Android/iOS capacity identical. `GameViewController` owns transport: normal pace, no scripted keys, fresh
+picture uploads and muted/flushed sound while rewinding. It cancels queued battle commands on both edges.
+Touch and hardware holds have separate owners; state operations release both before changing the timeline, and
+background/editor transitions quarantine input. Starting rewind avoids `withState`, whose touch release would
+cancel the initiating finger. When rewind is off, its hold shows the existing translated settings hint through
+the shared confirmation UI. Chord holds stay active until their last alias releases, including capture cleanup.

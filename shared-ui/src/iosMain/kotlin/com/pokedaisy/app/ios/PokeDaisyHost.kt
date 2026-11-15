@@ -106,6 +106,7 @@ object PokeDaisyHost {
         val currentSettings = settings
         val currentSlots = slots
         if (currentSettings != null && currentSlots != null) {
+            currentSettings.rewindUnavailable = panels::showRewindUnavailable
             val shortcuts = IosGameHotkeys(currentSettings, currentSlots, panels)
             game?.onHotkey = shortcuts::handle
         }
@@ -238,7 +239,11 @@ object PokeDaisyHost {
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
             }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen }, playback = { playback }, options = { options })
-            .also { L10n.apply(it.appLanguage, code) }
+            .also { s ->
+                L10n.apply(s.appLanguage, code)
+                s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
+                s.rewindChanged()
+            }
         battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
@@ -258,7 +263,9 @@ object PokeDaisyHost {
             options = gameOptions
             g.afterFrame = { p.tick(); gameOptions.tick() }
         }
-        g.beforeStateChange = { battle?.cancel(); touch.releaseKeys() }
+        g.beforeRewind = battle!!::cancel
+        val currentSettings = settings!!
+        g.beforeStateChange = { currentSettings.releaseRewind(); battle?.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
