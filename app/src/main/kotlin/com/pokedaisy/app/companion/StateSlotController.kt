@@ -32,14 +32,14 @@ class StateSlotController(
     }
 
     override fun requestSave(index: Int) {
-        if (!choose(index)) return
+        if (!select(index)) return
         perform(tr("Slot {0}: save failed", index)) {
             files.saveSlot(index, write, thumbnail(), snapshot())
         }
     }
 
     override fun requestLoad(index: Int) {
-        if (!choose(index)) return
+        if (!select(index)) return
         perform(tr("Slot {0}: nothing to load", index)) {
             if (!files.exists(index)) return@perform false
             beforeLoad()
@@ -68,7 +68,8 @@ class StateSlotController(
         return true
     }
 
-    private fun choose(index: Int): Boolean {
+    /** Change the current slot without writing or loading a state. */
+    fun select(index: Int): Boolean {
         if (index !in 0..9) return false
         currentIndex = index
         selected(index)

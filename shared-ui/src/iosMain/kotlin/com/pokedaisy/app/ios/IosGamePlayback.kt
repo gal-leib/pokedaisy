@@ -28,6 +28,7 @@ internal class IosGamePlayback(
         private set
     private var base = 1f
     private var ff = false
+    private var slowmo = false
     private var ffSpeed = 2f
     private var smart = true
     private var battleSpeed = 0f
@@ -41,6 +42,7 @@ internal class IosGamePlayback(
         private set
 
     fun settingsChanged(s: IosCompanionSettings) {
+        slowmo = s.slowmoHeld
         base = s.gameSpeed; ff = s.ffActive; ffSpeed = s.ffMaxSpeed; smart = s.ffMode == FfMode.SMART
         battleSpeed = s.battleSpeed; textSpeed = s.textSpeed; menuSpeed = s.menuSpeed
         bikeSpeed = s.bikeSpeed; surfSpeed = s.surfSpeed
@@ -86,8 +88,8 @@ internal class IosGamePlayback(
     fun speed(): Double {
         if (battle.holdPicture) return 0.0
         val scene = PlaybackPolicy.scene(battle.gameState, menu, map, gba && FfMenuWatch.battling, field)
-        val requested = if (ff) ffSpeed.takeIf { it > 0f } ?: Float.POSITIVE_INFINITY else
-            PlaybackPolicy.sceneSpeed(scene, base, battleSpeed, textSpeed, menuSpeed, bikeSpeed, surfSpeed)
+        val requested = PlaybackPolicy.requestedSpeed(ff, ffSpeed, slowmo,
+            PlaybackPolicy.sceneSpeed(scene, base, battleSpeed, textSpeed, menuSpeed, bikeSpeed, surfSpeed))
         val speed = PlaybackPolicy.smartSpeed(requested, smart, battle.gameState, menu, map)
         return if (speed.isInfinite()) 0.0 else speed.toDouble()
     }

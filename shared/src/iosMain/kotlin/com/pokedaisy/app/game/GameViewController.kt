@@ -48,6 +48,10 @@ class GameViewController(
     private val input = GameInput()
     val keyCapture get() = input.capture
     fun reloadBindings() = input.reloadBindings()
+    fun setHotkeys(model: com.pokedaisy.app.Hotkeys?) = input.setHotkeys(model)
+    var onHotkey: (com.pokedaisy.app.Hotkeys.Event) -> Unit
+        get() = input.onHotkey
+        set(value) { input.onHotkey = value }
     private val pacer = FramePacer()
     private val observers = mutableListOf<NSObjectProtocol>()
     private var running = false
@@ -77,6 +81,9 @@ class GameViewController(
         get() = input.onCompanionButtons
         set(value) { input.onCompanionButtons = value }
     val controllerButtons: Int get() = input.controllerKeys()
+    var keyboardInputCaptured: Boolean
+        get() = input.keyboardCaptured
+        set(value) { input.keyboardCaptured = value }
 
     /** Per-game pace, or zero for unlimited FF (bounded work per display refresh). Main thread. */
     var speed: Double = 1.0
@@ -185,12 +192,14 @@ class GameViewController(
     fun close() {
         observers.forEach { NSNotificationCenter.defaultCenter.removeObserver(it) }
         observers.clear()
-        if (!running) return
-        pause()
-        running = false
-        audio.release()
-        PkApiCore.finishSave(FINISH_SAVE_FRAMES)
-        PkApiCore.stop()
+        if (running) {
+            pause()
+            running = false
+            audio.release()
+            PkApiCore.finishSave(FINISH_SAVE_FRAMES)
+            PkApiCore.stop()
+        }
+        onHotkey = {}
     }
 
     private fun refresh(view: MTKView) {

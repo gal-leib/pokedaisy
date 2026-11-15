@@ -1,6 +1,7 @@
 package com.pokedaisy.app.game
 
 import com.pokedaisy.app.GbaInput
+import com.pokedaisy.app.Hotkeys
 import com.pokedaisy.app.companion.KeyCapture
 import com.pokedaisy.app.companion.data.KeyCodes
 import platform.GameController.*
@@ -12,6 +13,10 @@ class GameInput {
     private var frame = 0L
     private val buttons = PolledGameKeys()
     val capture: KeyCapture get() = buttons.capture
+    var onHotkey: (Hotkeys.Event) -> Unit
+        get() = buttons.onHotkey
+        set(value) { buttons.onHotkey = value }
+    fun setHotkeys(model: Hotkeys?) = buttons.setHotkeys(model, hardware().keys)
     private val touchGate = ManualInputGate()
     private val axesGate = ManualInputGate()
 
@@ -27,6 +32,12 @@ class GameInput {
             ownership(ManualInputGate.Owner.COMPANION, value)
         }
     var onCompanionButtons: (Int) -> Unit = {}
+    var keyboardCaptured = false
+        set(value) {
+            if (field == value) return
+            field = value
+            buttons.quarantine(hardware().keys)
+        }
     fun editorCaptured(on: Boolean) = ownership(ManualInputGate.Owner.EDITOR, on)
     fun backgroundCaptured(on: Boolean) = ownership(ManualInputGate.Owner.BACKGROUND, on)
 
@@ -51,10 +62,19 @@ class GameInput {
     fun poll() {
         val h = hardware()
         if (companionCaptured && !capture.active) onCompanionButtons(controllerKeys(h))
-        buttons.poll(h.keys, touchGate.blocked)
+        val beforeTouch = touchKeys
+        val beforeTurbo = touchTurbo
         val allowed = touchGate.filter(touchKeys or touchTurbo)
         buttons.input.setTouchBits(touchKeys and allowed, touchTurbo and allowed)
-        buttons.input.setAxes(axesGate.filter(h.axes))
+        val axes = axesGate.filter(h.axes)
+        buttons.input.setAxes(axes)
+        if (axes != 0 || allowed != 0) buttons.letThrough()
+        buttons.poll(if (keyboardCaptured && !capture.active) h.controllers else h.keys, touchGate.blocked)
+        // State operations can release touch from a hotkey callback during this poll.
+        if (touchKeys != beforeTouch || touchTurbo != beforeTurbo) {
+            val after = touchGate.filter(touchKeys or touchTurbo)
+            buttons.input.setTouchBits(touchKeys and after, touchTurbo and after)
+        }
     }
 
     /** The native batch reuses the manual snapshot; turbo advances at game-frame pace. */

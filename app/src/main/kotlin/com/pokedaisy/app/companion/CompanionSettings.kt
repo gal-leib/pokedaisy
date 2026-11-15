@@ -31,7 +31,7 @@ interface CompanionSettings {
 
     /** GAME SPEED: the running game's speed step (1x normal; slower or faster until changed), kept per game. */
     val gameSpeed: Float get() = 1f
-    val gameSpeeds: List<Float> get() = listOf(0.25f, 0.5f, 1f, 1.5f, 2f, 3f, 4f)
+    val gameSpeeds: List<Float> get() = PlaybackPolicy.SPEED_STEPS.sorted()
     fun setGameSpeed(v: Float) {}
 
     /** SCENE SPEEDS (GitHub #43 / #85): a battle's, a field text box's and a menu screen's speed while FF is off;
@@ -249,6 +249,10 @@ interface CompanionSettings {
     /** Whether the hotkeys fire at all ([com.pokedaisy.app.Prefs.hotkeysEnabled]). */
     val hotkeysEnabled: Boolean
     fun setHotkeysEnabled(on: Boolean)
+
+    /** Available actions and platform introduction badge. Hidden actions cannot take keys from gameplay. */
+    val hotkeyActions: List<Hotkeys.Action> get() = Hotkeys.Action.entries
+    val hotkeysBadge: String? get() = null
 
     /** Current hotkey bindings, by display name. */
     fun hotkeyBindings(): Map<Hotkeys.Action, List<String>>

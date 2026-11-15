@@ -103,6 +103,12 @@ object PokeDaisyHost {
         val current = createGameController(romPath, onFailed)
         val gameBoy = romPath.substringAfterLast('.').lowercase() in listOf("gb", "gbc")
         val panels = IosGameScreen(game, touch, gameBoy).also { screen = it }
+        val currentSettings = settings
+        val currentSlots = slots
+        if (currentSettings != null && currentSlots != null) {
+            val shortcuts = IosGameHotkeys(currentSettings, currentSlots, panels)
+            game?.onHotkey = shortcuts::handle
+        }
         return ComposeUIViewController(configure = { configureUiAutomation() }) {
             AppTheme {
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {

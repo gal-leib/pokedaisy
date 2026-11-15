@@ -4046,4 +4046,14 @@ with text fields while it owns input. App suspension cancels capture and quarant
 `IosGameInputBindings` seeds only the old iOS defaults, in `Documents/bindings/controls.properties`, then delegates
 reading, conflict removal and persistence to `GbaControls`. Existing files are never reseeded. The shared settings
 and capture popup are used in the game; library settings poll only while capture is active and stop on disposal.
-Hotkey wiring is a separate parity change.
+`Hotkeys.forActions` filters unavailable shortcuts out of both rows and consumption. `releaseAll` clears active
+holds, chord prefixes and deferred taps at ownership boundaries. `PolledGameKeys` feeds the existing `gameKey`
+policy, with an epoch guard after actions which can replace or pause the core. `IosGameHotkeys` only binds actions
+to the existing settings and slot controller. Playback speed priorities and the cycle order are shared with Android.
+The master switch starts off on iOS to preserve its legacy triggers; enabling it is explicit.
+
+`OptionTextField` reports focus through `TextInputFocus`; the iOS game host suppresses keyboard polling while a
+field owns it. Tokens keep a late disposal from releasing another field's keyboard. Entry/exit quarantines held
+keys and ends hotkey holds; controllers and touch retain their own channels. Key capture explicitly takes keyboard
+polling back while its prompt waits. Hotkey callbacks which release touch during a state operation are reflected
+in the current manual snapshot before the next core frame.

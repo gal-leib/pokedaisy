@@ -27,7 +27,7 @@ import com.pokedaisy.app.game.GameViewController
 
 /**
  * The companion's SETTINGS on the iPad: shared battle and appearance options, playback and sound, kept in the
- * app's defaults. Only supported rows are shown ([shownRows]); shaders, EXPAND and hotkeys wait for later ports.
+ * app's defaults. Only supported rows are shown ([shownRows]); shaders and EXPAND wait for later ports.
  */
 internal class IosCompanionSettings(
     private val romPath: String?,
@@ -47,14 +47,17 @@ internal class IosCompanionSettings(
     private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
     override val keyCapture get() = game?.keyCapture ?: libraryInput!!.capture
     fun pollKeyCapture() { libraryInput?.pollCapture() }
-    private fun reloadBindings() { game?.reloadBindings() ?: libraryInput?.reloadBindings() }
+    private fun reloadBindings() {
+        game?.reloadBindings() ?: libraryInput?.reloadBindings()
+        game?.setHotkeys(if (hotkeysEnabled) Hotkeys.load(com.pokedaisy.app.game.IosGameInputBindings.directory).forActions(hotkeyActions) else null)
+    }
 
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
 
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
 
     var optionsChanged: () -> Unit = {}
@@ -141,15 +144,21 @@ internal class IosCompanionSettings(
     private var ffToggle by mutableStateOf(bool("ff_toggled", false))
     override val ffToggled get() = ffToggle
     private var ffHeld by mutableStateOf(false)
-    val ffActive get() = ffToggled || ffHeld
+    private var hardwareFfHeld by mutableStateOf(false)
+    var slowmoHeld by mutableStateOf(false)
+        private set
+    val ffActive get() = ffToggled || ffHeld || hardwareFfHeld
+    fun holdHardwareFastForward(on: Boolean) { hardwareFfHeld = on; applyPlayback() }
+    fun holdSlowmo(on: Boolean) { slowmoHeld = on; applyPlayback() }
     fun holdFastForward(on: Boolean) { ffHeld = on; applyPlayback() }
 
     var playbackChanged: () -> Unit = {}
-    init { applyPlayback() }
+    init { applyPlayback(); reloadBindings() }
 
     private fun applyPlayback() {
         val game = game ?: return
-        game.speed = (if (ffActive) ffMaxSpeed else gameSpeed).toDouble()
+        val requested = com.pokedaisy.app.companion.PlaybackPolicy.requestedSpeed(ffActive, ffMaxSpeed, slowmoHeld, gameSpeed)
+        game.speed = if (requested.isInfinite()) 0.0 else requested.toDouble()
         game.volume = gameVolume / 100f
         game.muted = gameMuted
         playbackChanged()
@@ -218,10 +227,19 @@ internal class IosCompanionSettings(
     override fun clearGbaControlBinding(btn: GbaControls.Btn) {
         GbaControls.clearBinding(com.pokedaisy.app.game.IosGameInputBindings.directory, btn); reloadBindings()
     }
-    override val hotkeysEnabled = false
-    override fun setHotkeysEnabled(on: Boolean) {}
-    override fun hotkeyBindings(): Map<Hotkeys.Action, List<String>> = emptyMap()
-    override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {}
+    override val hotkeyActions get() = IosGameHotkeys.ACTIONS
+    override val hotkeysBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_HOTKEYS)
+    // Preserve the old triggers as L/R until the player opts in to emulator shortcuts.
+    override val hotkeysEnabled get() = bool("hotkeys_enabled", false)
+    override fun setHotkeysEnabled(on: Boolean) { d.setBool(on, "hotkeys_enabled"); reloadBindings() }
+    override fun hotkeyBindings() = Hotkeys.load(com.pokedaisy.app.game.IosGameInputBindings.directory).forActions(hotkeyActions).rawBindings
+    override fun setHotkeyBinding(action: Hotkeys.Action, keyNames: List<String>?, takeFrom: List<Hotkeys.Action>) {
+        if (action !in hotkeyActions) return
+        val directory = com.pokedaisy.app.game.IosGameInputBindings.directory
+        if (keyNames == null) Hotkeys.clearBinding(directory, action)
+        else Hotkeys.setBindingNamed(directory, action, keyNames, takeFrom)
+        reloadBindings()
+    }
     override val clickSound = false
     override fun setClickSound(on: Boolean) {}
     override val statusBar = false

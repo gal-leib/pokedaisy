@@ -31,6 +31,7 @@ internal class IosGameScreen(
     private val d = NSUserDefaults.standardUserDefaults
     val back = CompanionBack()
     val keys = CompanionKeys()
+    private val textInputFocus = TextInputFocus { game?.keyboardInputCaptured = it }
     private var releaseFocus: () -> Unit = {}
     private var previousButtons = 0
     private var menuSuppressed = 0
@@ -93,7 +94,7 @@ internal class IosGameScreen(
                 controls = { if (visible) touch.Controls(gameBoy, upright) },
                 companion = {
                     CompositionLocalProvider(LocalCompanionTopInset provides (frames?.portrait?.topInset(state.gripHeight) ?: 0),
-                        LocalCompanionBack provides back, LocalCompanionKeys provides keys) {
+                        LocalCompanionBack provides back, LocalCompanionKeys provides keys, LocalTextInputFocus provides textInputFocus) {
                         // The same host/call site in either orientation keeps tab, scroll and navigation state.
                         SidePanelHost(window = !upright && state.side.isWindow, onClose = state::hide, keys = keys,
                             compactText = minOf(maxWidth, maxHeight) >= 600.dp, content = companion)
@@ -151,7 +152,13 @@ internal class IosGameScreen(
             else -> keys.key(key, repeat)
         }
     }
+    fun toggleCompanion() {
+        if (portrait) state.togglePortrait()
+        else if (state.side.shown) state.hide() else state.show()
+    }
+
     fun close() {
+        textInputFocus.clear()
         state.setSide(state.side.withEnabled(false))
         game?.onCompanionButtons = {}
         game?.companionInputCaptured = false

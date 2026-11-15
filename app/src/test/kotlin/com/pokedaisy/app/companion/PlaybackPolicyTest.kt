@@ -43,4 +43,16 @@ class PlaybackPolicyTest {
         assertEquals(4f, speed(4f, false))
         assertEquals(4f, PlaybackPolicy.smartSpeed(4f, true, BATTLE_INPUT_BUSY, true, true))
     }
+    @Test fun ffWinsOverSlowmoAndSlowmoWinsOverSceneSpeed() {
+        assertEquals(Float.POSITIVE_INFINITY, PlaybackPolicy.requestedSpeed(true, 0f, true, 4f))
+        assertEquals(3f, PlaybackPolicy.requestedSpeed(true, 3f, true, .25f))
+        assertEquals(.5f, PlaybackPolicy.requestedSpeed(false, 3f, true, 4f))
+        assertEquals(.25f, PlaybackPolicy.requestedSpeed(false, 3f, false, .25f))
+    }
+
+    @Test fun cycleWrapsAt4xAndLeavesBothSlowStepsForTheSpeedPicker() {
+        assertEquals(listOf(1.5f, 2f, 3f, 4f, 1f, 1f, 1f, 1f),
+            listOf(1f, 1.5f, 2f, 3f, 4f, .5f, .25f, 9f).map(PlaybackPolicy::cycleSpeed))
+    }
+
 }

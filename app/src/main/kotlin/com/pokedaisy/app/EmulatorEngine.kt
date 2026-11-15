@@ -413,8 +413,7 @@ class EmulatorEngine(
 
     /** SPEED CYCLE: 1x, 1.5x ... 4x and round; from a slow step (GAME SPEED's 0.5x / 0.25x), back to 1x. */
     fun cycleSpeed() {
-        speedIdx = if (speedIdx >= CYCLE_STEPS) 0 else (speedIdx + 1) % CYCLE_STEPS
-        announceSpeed()
+        setGameSpeed(PlaybackPolicy.cycleSpeed(gameSpeed))
     }
 
     /** Current speed-cycle position, for persisting a per-ROM default. */
@@ -645,11 +644,7 @@ class EmulatorEngine(
         battleSpeed, textSpeed, menuSpeed, bikeSpeed, surfSpeed)
 
     /** The speed the player asked for (FF, slow-mo, the speed steps); Float.POSITIVE_INFINITY = "run uncapped". */
-    private fun requestedSpeed(): Float = when {
-        ffHeld || ffToggled -> if (ffMaxSpeed > 0f) ffMaxSpeed else Float.POSITIVE_INFINITY
-        slowmoHeld -> 0.5f
-        else -> sceneSpeed()
-    }
+    private fun requestedSpeed(): Float = PlaybackPolicy.requestedSpeed(ffHeld || ffToggled, ffMaxSpeed, slowmoHeld, sceneSpeed())
 
     /** What the emulator actually runs at: [requestedSpeed], unless SMART is holding it at 1x for now. */
     private fun effectiveSpeed(): Float {
@@ -2232,8 +2227,8 @@ class EmulatorEngine(
         /** Speed steps, by the index saved per ROM. Index 0 (1×) is the normal, audio-on state; SPEED CYCLE
          * goes through the first [CYCLE_STEPS], GAME SPEED adds the slow ones (muted, like SLOWMO HOLD) -
          * appended, so the indexes saved before keep their meaning. */
-        val SPEED_STEPS = floatArrayOf(1f, 1.5f, 2f, 3f, 4f, 0.5f, 0.25f)
-        const val CYCLE_STEPS = 5
+        val SPEED_STEPS = PlaybackPolicy.SPEED_STEPS.toFloatArray()
+        const val CYCLE_STEPS = PlaybackPolicy.CYCLE_STEPS
         /** At fast-forward, a WIDE window is drawn at most this often (~80 a second: every refresh of a 60 Hz screen). */
         const val WIDE_DRAW_NANOS = 12_000_000L
         /** The scenic FLY's pace in the air: the trip a Kanto crossing takes about 5 s at. */

@@ -49,4 +49,16 @@ class StateSlotControllerTest {
         assertEquals(0, errors)
         assertEquals(10, slots.list().size)
     }
+    @Test fun selectingASlotDoesNotRunTheCoreOrWriteAState() {
+        var coreCalls = 0
+        var selected = -1
+        val controller = StateSlotController(files, onCore = { coreCalls++; it() },
+            write = { error("unexpected write") }, read = { error("unexpected load") }, beforeLoad = {},
+            selected = { selected = it })
+        assertTrue(controller.select(9)); assertEquals(9, selected)
+        assertFalse(controller.select(10)); assertFalse(controller.select(-1))
+        assertEquals(9, controller.currentIndex); assertEquals(0, coreCalls)
+        assertTrue(controller.list().none { it.present })
+    }
+
 }

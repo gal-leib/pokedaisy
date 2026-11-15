@@ -97,6 +97,16 @@ class Hotkeys private constructor(
         return out
     }
 
+    /** A platform exposes only actions it can perform; unavailable chords must not consume game buttons. */
+    fun forActions(actions: Collection<Action>): Hotkeys = Hotkeys(rawBindings.filterKeys { it in actions })
+
+    /** End holds and partial chords at a capture, modal or background boundary. No deferred taps survive. */
+    fun releaseAll(): List<Event> {
+        val releases = activeChords.map { it.first }.distinct().map { Event(it, false) }
+        held.clear(); activeChords.clear(); heldBack.clear(); toTap.clear()
+        return releases
+    }
+
     /** Keys held back from the game while they're held ([gameKey]) -> whether a chord took them since. */
     private val heldBack = HashMap<Int, Boolean>()
     /** Held-back keys let go with no chord: the game is owed their press ([takeTap]). */

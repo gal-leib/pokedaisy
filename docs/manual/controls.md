@@ -31,7 +31,7 @@ Since a DS game and a GBA game never run at the same time, a button can be in bo
 
 In a game, the companion's `GAME BUTTONS` shows the group for the game you're playing under `ALL GAMES`. The top screen's Settings shows all three.
 
-To change one, tap its row (it says `PRESS A BUTTON…`) and press the button you want on your device. That works the same on the top screen and on the companion: there, while a row waits, the game's screen shows a window asking for the button and the keys you hold. `CANCEL`, or `BACK`, leaves the button as it was. `TURBO A`, `TURBO B`, the D-pad rows and the GBA and Game Boy rows also get `CLEAR`, which takes them off every button again.
+To change one, tap its row (it says `PRESS A BUTTON…`) and press the button you want on your device. That works the same on the top screen and on the companion: there, while a row waits, the game's screen shows a window asking for the button and the keys you hold. `CANCEL`, `BACK` or Escape leaves the button as it was. `TURBO A`, `TURBO B`, the D-pad rows and the GBA and Game Boy rows also get `CLEAR`, which takes them off every button again.
 
 The new button replaces everything that row had, keyboard key included. A button can only do one thing in a game: put it on a new row and it leaves the old one in the same games. `TO COMPANION` is the exception: it shares its button with whatever else is on it.
 
@@ -109,6 +109,14 @@ When SELECT or START is part of a chord, the game gets it when you let go rather
 The speed hotkeys are explained in [Fast-forward and game speed](fast-forward.md), states and rewind in [Saves](saves.md), and zoom in [Screen](screen.md).
 
 ![The top screen's HOTKEYS page: the HOTKEYS switch, then each hotkey with its buttons](shots/settings-hotkeys.png "HOTKEYS on the top screen")
+
+### iPhone and iPad hotkeys
+
+On iPhone and iPad, `HOTKEYS` starts off so your existing trigger buttons still press L and R. Turn it on to use the speed, state, slot, `EXIT GAME`, `RESTART GAME`, `COMPANION` and `MUTE` shortcuts. The defaults in the table apply to these actions. Actions that need a feature still being ported are omitted.
+
+`FF HOLD` and `SLOWMO HOLD` stop when you release their keys, open a companion window or button capture, focus a text box, or put the app in the background. Fast-forward takes priority over half speed. The touch FF button keeps its own hold. `SPEED CYCLE` goes through 1x, 1.5x, 2x, 3x and 4x, then back to 1x. From half or quarter speed it returns to 1x, using the same policy as Android.
+
+Use the shared key-capture rows to change a shortcut or chord. Escape cancels a capture. SELECT and START alone keep their game action after release; a completed shortcut takes the combination. `COMPANION` opens the shared panel, and hides or reveals it in portrait. In a companion window, B or START closes it. While you type in a text box, keyboard shortcuts and game buttons leave those keys to the text box. The binding file is `PokeDaisy/bindings/hotkeys.properties` in Files.
 
 ### Changing a hotkey
 

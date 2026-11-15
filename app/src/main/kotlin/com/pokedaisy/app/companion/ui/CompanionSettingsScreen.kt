@@ -197,9 +197,10 @@ fun CompanionSettingsScreen(
                         val btns = GbaControls.Btn.entries.filter {
                             it.group == group && (it != GbaControls.Btn.TO_COMPANION || settings.usesSecondScreen || settings.buttonGroup == null)
                         }
+                        val bindings = settings.gbaControlBindings()
                         listOf(groupTitle(group.title)) + btns.map { btn ->
                             val title = btn.title
-                            SettingRow(title, bindingValue(capture, title, settings.gbaControlBindings()[btn]), subtitle = btn.subtitle, labelBadge = settings.gameButtonsBadge ?: btn.badge) {
+                            SettingRow(title, bindingValue(capture, title, bindings[btn]), subtitle = btn.subtitle, labelBadge = settings.gameButtonsBadge ?: btn.badge) {
                                 capture?.toggle(title) {
                                     KeyCapture.Request(
                                         title, chord = false,
@@ -211,33 +212,36 @@ fun CompanionSettingsScreen(
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     // Off, the binds stay as they are, greyed out, and every key goes to the game.
-                    Page.HOTKEYS -> listOf(
-                        SettingRow(tk("HOTKEYS"), if (settings.hotkeysEnabled) tk("ON") else tk("OFF")) {
-                            settings.setHotkeysEnabled(!settings.hotkeysEnabled); tick++
-                        },
-                    ) + Hotkeys.Action.entries.map { action ->
-                        val title = action.title
-                        SettingRow(title, bindingValue(capture, title, settings.hotkeyBindings()[action]), enabled = settings.hotkeysEnabled, labelBadge = action.badge) {
-                            capture?.toggle(title) {
-                                KeyCapture.Request(
-                                    title, chord = true,
-                                    onDone = { keys ->
-                                        // A chord another hotkey already has exactly moves only on MOVE.
-                                        val names = keys.map(KeyCapture::keyName)
-                                        val taken = Hotkeys.clashes(settings.hotkeyBindings(), action, names)
-                                        if (taken.isEmpty()) { settings.setHotkeyBinding(action, names); tick++ }
-                                        else confirm = Confirm(
-                                            tk("KEY IN USE"),
-                                            tr("{0} is already {1}. Move it to {2}?", KeyCapture.chordLabel(keys), taken.joinToString(", ") { tr(it.title) }, tr(title)),
-                                            tk("MOVE"),
-                                        ) { settings.setHotkeyBinding(action, names, taken); tick++ }
-                                    },
-                                    // CLEAR leaves it unbound.
-                                    onClear = { settings.setHotkeyBinding(action, null); tick++ },
-                                )
+                    Page.HOTKEYS -> {
+                        val bindings = settings.hotkeyBindings()
+                        listOf(
+                            SettingRow(tk("HOTKEYS"), if (settings.hotkeysEnabled) tk("ON") else tk("OFF")) {
+                                settings.setHotkeysEnabled(!settings.hotkeysEnabled); tick++
+                            },
+                        ) + settings.hotkeyActions.map { action ->
+                            val title = action.title
+                            SettingRow(title, bindingValue(capture, title, bindings[action]), enabled = settings.hotkeysEnabled, labelBadge = settings.hotkeysBadge ?: action.badge) {
+                                capture?.toggle(title) {
+                                    KeyCapture.Request(
+                                        title, chord = true,
+                                        onDone = { keys ->
+                                            // A chord another hotkey already has exactly moves only on MOVE.
+                                            val names = keys.map(KeyCapture::keyName)
+                                            val taken = Hotkeys.clashes(settings.hotkeyBindings(), action, names)
+                                            if (taken.isEmpty()) { settings.setHotkeyBinding(action, names); tick++ }
+                                            else confirm = Confirm(
+                                                tk("KEY IN USE"),
+                                                tr("{0} is already {1}. Move it to {2}?", KeyCapture.chordLabel(keys), taken.joinToString(", ") { tr(it.title) }, tr(title)),
+                                                tk("MOVE"),
+                                            ) { settings.setHotkeyBinding(action, names, taken); tick++ }
+                                        },
+                                        // CLEAR leaves it unbound.
+                                        onClear = { settings.setHotkeyBinding(action, null); tick++ },
+                                    )
+                                }
                             }
-                        }
-                    } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                        } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    }
                     Page.SHADERS -> shaderRows(settings) { tick++ } + SettingRow(tk("CANCEL"), null) { page = Page.DISPLAY }
                     Page.FIELD_HUD -> fieldHudRows(
                         settings.fieldHud, settings.fieldHudStyle,
@@ -915,7 +919,7 @@ private fun homeRows(
     ) + coopRows(s, changed, navigate, pick = { title, choices, current, onPick -> select(Selector(title, choices, current) { onPick(it); changed() }) }, askLock = askLock) + listOfNotNull(
         groupTitle(tk("CONTROLS")),
         SettingRow(tk("GAME BUTTONS"), null, labelBadge = s.gameButtonsBadge, subtitle = "Key bindings: which button presses A, B, START...", opensPage = true) { navigate(Page.BUTTONS) },
-        SettingRow(tk("HOTKEYS"), onOff(s.hotkeysEnabled), opensPage = true, subtitle = "Button combos for states, FF and more") { navigate(Page.HOTKEYS) },
+        SettingRow(tk("HOTKEYS"), onOff(s.hotkeysEnabled), labelBadge = s.hotkeysBadge, opensPage = true, subtitle = "Button combos for states, FF and more") { navigate(Page.HOTKEYS) },
         // PC, FLY, a Repel, the bike, a rod, states, FF... on a held button (L3 by default): its own page.
         SettingRow(tk("QUICK MENU"), null, subtitle = "Actions on a held button", labelBadge = quickMenuBadge(), opensPage = true) { navigate(Page.QUICK_MENU) },
         // The on-screen buttons: when they show, layouts, size, extras, EDIT LAYOUT - its own page, with a preview.

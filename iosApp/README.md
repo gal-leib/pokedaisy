@@ -28,7 +28,7 @@ sharing are not connected on iOS.
 SETTINGS has FF (a persistent toggle), FF SPEED (including INFINITE), GAME SPEED (kept per game), GAME VOLUME and MUTE GAME.
 SMART mode and per-scene speeds use Android's shared playback policy and existing memory watchers. Sound is pitched
 and sped up; INFINITE is silent and yields between bounded batches so the main thread handles touch and the companion.
-Steady music and speed hotkeys remain later parity work.
+Steady music remains later parity work.
 
 ## Game options and bindings
 
@@ -39,6 +39,12 @@ GAME BUTTONS uses the same binding rows, capture model and input mapper as Andro
 X/Y bindings. Files live in Documents/bindings, in the shared properties format. Existing iOS keyboard/trigger defaults
 are preserved. The native adapter maps GameController codes and axes; shared models own binding and capture behavior.
 Held buttons are quarantined across capture, modal and background transitions. Library capture polls without a core.
+
+HOTKEYS uses the shared chord engine and capture UI, with the speed, state, slot, exit/restart, companion and mute
+actions iOS currently supports. It starts off, preserving the old trigger mappings. Hardware and touch FF holds
+have independent ownership; shared playback policy prioritizes FF, then half speed, then scene/base speed. Chord
+and hold state resets at capture, modal and background boundaries. Other actions are omitted until their feature
+is ported. Bindings use Documents/bindings/hotkeys.properties, the same format as Android.
 
 ## Save states
 

@@ -4,6 +4,21 @@ import com.pokedaisy.app.companion.data.*
 
 /** Shared scene priority and speed choices. Renderer pacing and exceptional modes stay with the host. */
 object PlaybackPolicy {
+    val SPEED_STEPS = listOf(1f, 1.5f, 2f, 3f, 4f, .5f, .25f)
+    const val CYCLE_STEPS = 5
+
+    /** The hotkey cycles normal/fast steps; a manually selected slow step returns to 1x. */
+    fun cycleSpeed(current: Float): Float {
+        val index = SPEED_STEPS.indexOf(current)
+        return SPEED_STEPS[if (index !in 0 until CYCLE_STEPS) 0 else (index + 1) % CYCLE_STEPS]
+    }
+
+    fun requestedSpeed(fastForward: Boolean, ffMax: Float, slowmo: Boolean, scene: Float): Float = when {
+        fastForward -> if (ffMax > 0f) ffMax else Float.POSITIVE_INFINITY
+        slowmo -> .5f
+        else -> scene
+    }
+
     enum class Scene { FIELD, TEXT, BATTLE, MENU, BIKE, SURF }
 
     fun scene(battleState: Int, menu: Boolean, map: Boolean, battling: Boolean, field: Int): Scene = when {

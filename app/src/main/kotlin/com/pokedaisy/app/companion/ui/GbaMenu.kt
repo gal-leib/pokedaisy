@@ -1030,6 +1030,11 @@ fun OptionTextField(
     var shown by remember { androidx.compose.runtime.mutableStateOf(false) }
     // D-pad focus (the library's and Settings' search box) shows like every other control's: the focus ring.
     var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val textFocus = LocalTextInputFocus.current
+    val fieldOwner = remember { Any() }
+    androidx.compose.runtime.DisposableEffect(textFocus, fieldOwner) {
+        onDispose { textFocus?.set(fieldOwner, false) }
+    }
     val hidden = password && !shown
     BasicTextField(
         value = value,
@@ -1047,7 +1052,10 @@ fun OptionTextField(
         cursorBrush = SolidColor(OptionColors.value),
         modifier = modifier
             .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                focused = it.isFocused
+                textFocus?.set(fieldOwner, it.isFocused)
+            }
             .gbaFocusRing(focused, PixelRoundedShape(u * 2))
             .drawBehind { drawLayeredBox(OptionColors.titleLayers.inPx(u.toPx()), OptionColors.titleFill, radius = 2 * u.toPx()) }
             .padding(horizontal = u * 6, vertical = u * 5),
