@@ -3726,6 +3726,12 @@ The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/
 `ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
 multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
 
+`GameActions` dispatches the common hardware shortcuts and touch extras for both hosts, using
+`CompanionSettings` and `StateSlots`. It owns press/release policy, slot wrapping and touch FF's 300 ms tap
+threshold. Hosts receive hold effects with a hardware/touch source and retain their native input delivery
+and extra actions. Cancelling touch actions clears a pending FF tap before releasing holds. Android's
+slot adapter retains co-op refusal checks; native frame loops and input aggregation are unchanged.
+
 `PrefsCompanionSettings` implements the stored companion settings for both hosts. Android's activity
 creates its adapter lazily after attachment, retains its co-op/capability checks, and delegates persistence
 before applying native effects. iOS retains view/controller actions and calls common playback/field-option

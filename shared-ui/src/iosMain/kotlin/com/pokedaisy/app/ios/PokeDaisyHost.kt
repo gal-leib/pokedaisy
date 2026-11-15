@@ -80,7 +80,7 @@ object PokeDaisyHost {
     private var restartFresh = false
     private var started = false
     private var game: GameViewController? = null
-    private val touch = IosTouchControls({ game }, { settings }, { slots })
+    private val touch = IosTouchControls({ game }, { settings })
     private var screen: IosGameScreen? = null
     private var playback: IosGamePlayback? = null
     private var options: IosGameOptions? = null
@@ -111,8 +111,19 @@ object PokeDaisyHost {
         val currentSlots = slots
         if (currentSettings != null && currentSlots != null) {
             currentSettings.rewindUnavailable = panels::showRewindUnavailable
-            val shortcuts = IosGameHotkeys(currentSettings, currentSlots, panels)
-            game?.onHotkey = shortcuts::handle
+            val shortcuts = com.pokedaisy.app.companion.GameActions(currentSettings, currentSlots,
+                selectSlot = { currentSlots.select(it) }, companion = panels::toggleCompanion,
+                hold = { action, down, source ->
+                    val touched = source == com.pokedaisy.app.companion.GameActions.Source.TOUCH
+                    when (action) {
+                        com.pokedaisy.app.Hotkeys.Action.FF_HOLD -> if (touched) currentSettings.holdFastForward(down) else currentSettings.holdHardwareFastForward(down)
+                        com.pokedaisy.app.Hotkeys.Action.SLOWMO_HOLD -> currentSettings.holdSlowmo(down)
+                        com.pokedaisy.app.Hotkeys.Action.REWIND_HOLD -> if (touched) currentSettings.holdTouchRewind(down) else currentSettings.holdHardwareRewind(down)
+                        else -> Unit
+                    }
+                })
+            touch.actions = shortcuts
+            game?.onHotkey = { shortcuts.hotkey(it) }
         }
         return ComposeUIViewController(configure = { configureUiAutomation() }) {
             AppTheme {

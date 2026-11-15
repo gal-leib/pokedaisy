@@ -6,7 +6,7 @@ import com.pokedaisy.app.Prefs
 import kotlin.test.*
 
 class PrefsCompanionSettingsTest {
-    private class Store : PreferenceStore {
+    internal class Store : PreferenceStore {
         val data = mutableMapOf<String, Any?>()
         override fun contains(key: String) = key in data
         override fun getBoolean(key: String, default: Boolean) = data[key] as? Boolean ?: default
@@ -16,7 +16,7 @@ class PrefsCompanionSettingsTest {
         override fun getString(key: String, default: String?) = data[key] as? String ?: default
         override fun write(values: Map<String, Any?>) { values.forEach { (k, v) -> if (v == null) data.remove(k) else data[k] = v } }
     }
-    private class Settings(p: Prefs) : PrefsCompanionSettings(p) {
+    internal class Settings(p: Prefs) : PrefsCompanionSettings(p) {
         val speeds = mutableListOf<Float>()
         val fieldOptions = mutableListOf<Boolean>()
         var canDiscardResume = false

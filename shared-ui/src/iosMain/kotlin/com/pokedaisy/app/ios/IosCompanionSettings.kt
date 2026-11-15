@@ -196,7 +196,7 @@ internal class IosCompanionSettings(
     override fun clearGbaControlBinding(btn: GbaControls.Btn) {
         GbaControls.clearBinding(com.pokedaisy.app.game.IosGameInputBindings.directory, btn); reloadBindings()
     }
-    override val hotkeyActions get() = IosGameHotkeys.ACTIONS
+    override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS
     override val hotkeysBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_HOTKEYS)
     // Preserve the old triggers as L/R until the player opts in to emulator shortcuts.
     override fun setHotkeysEnabled(on: Boolean) { super.setHotkeysEnabled(on); reloadBindings() }

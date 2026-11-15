@@ -17,7 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
-import com.pokedaisy.app.companion.StateSlotController
+import com.pokedaisy.app.companion.GameActions
 import com.pokedaisy.app.companion.TouchButton
 import com.pokedaisy.app.companion.TouchStage
 import com.pokedaisy.app.companion.ui.gamePanelLayout
@@ -29,7 +29,6 @@ import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
 import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.game.GameViewController
-import platform.QuartzCore.CACurrentMediaTime
 import platform.UIKit.UIModalPresentationFullScreen
 import platform.UIKit.UIViewController
 
@@ -37,11 +36,10 @@ import platform.UIKit.UIViewController
 internal class IosTouchControls(
     private val game: () -> GameViewController?,
     private val settings: () -> IosCompanionSettings?,
-    private val slots: () -> StateSlotController?,
 ) {
     var stage by mutableStateOf<TouchStage?>(null)
     private var editor: UIViewController? = null
-    private var ffDownAt: Double? = null
+    var actions: GameActions? = null
     private var inputEpoch by mutableIntStateOf(0)
     var previewStage: ((Boolean) -> TouchStage?)? = null
     var beforeEdit: () -> Unit = {}
@@ -51,10 +49,12 @@ internal class IosTouchControls(
         game()?.let { it.touchKeys = 0; it.touchTurbo = 0; it.touchButtonKeys = emptySet() }
         settings()?.holdFastForward(false)
         settings()?.holdTouchRewind(false)
-        ffDownAt = null
+        actions?.cancelTouch()
     }
 
     fun close() {
+        actions?.cancelTouch()
+        actions = null
         releaseKeys()
         editor?.dismissViewControllerAnimated(false, completion = null)
         editor = null
@@ -125,19 +125,8 @@ internal class IosTouchControls(
 
     private fun action(button: TouchButton, down: Boolean) {
         if (game()?.let { it.isRunning && !it.uiPaused && !it.companionInputCaptured } != true) return
-        val s = settings() ?: return
+        if (settings() == null || actions?.touch(button, down) == true) return
         when (button) {
-            TouchButton.FF -> if (down) {
-                ffDownAt = CACurrentMediaTime()
-                s.holdFastForward(true)
-            } else {
-                s.holdFastForward(false)
-                ffDownAt?.let { if (CACurrentMediaTime() - it < 0.3) s.setFfToggled(!s.ffToggled) }
-                ffDownAt = null
-            }
-            TouchButton.SAVE_STATE -> if (down) slots()?.let { it.requestSave(it.currentIndex) }
-            TouchButton.LOAD_STATE -> if (down) slots()?.let { it.requestLoad(it.currentIndex) }
-            TouchButton.REWIND -> s.holdTouchRewind(down)
             TouchButton.X, TouchButton.Y -> game()?.let { g ->
                 val code = if (button == TouchButton.X) com.pokedaisy.app.companion.data.KeyCodes.BUTTON_X
                     else com.pokedaisy.app.companion.data.KeyCodes.BUTTON_Y

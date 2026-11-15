@@ -3183,6 +3183,7 @@ class PokeDaisyActivity : Activity() {
 
     /** Everything onPause does: the game stops (or holds, asleep), its listeners and the second screen go. */
     private fun pauseGame() {
+        if (::engine.isInitialized) gameActions.cancelTouch()
         stopPlayClock()
         AudioEffectsTrack.close(this)
         keyCapture.cancel()
@@ -4353,30 +4354,15 @@ class PokeDaisyActivity : Activity() {
         return true
     }
 
-    /** When the touch controls' FF went down: a short tap turns FF on / off, a longer press is FF while held. */
-    private var touchFfDownAt = 0L
-
-    /** The touch controls' extras: FF, the QUICK MENU, SAVE / LOAD STATE (the hotkeys' own actions). */
+    /** Touch extras and hotkeys share their action policy. Android retains the extra menu and native key delivery. */
     private fun onTouchAction(button: com.pokedaisy.app.companion.TouchButton, down: Boolean) {
-        if (!::engine.isInitialized) return
+        if (!::engine.isInitialized || gameActions.touch(button, down)) return
         when (button) {
-            com.pokedaisy.app.companion.TouchButton.FF -> {
-                if (down) {
-                    touchFfDownAt = android.os.SystemClock.uptimeMillis()
-                    engine.setFastForwardHeld(true)
-                } else {
-                    engine.setFastForwardHeld(false)
-                    if (android.os.SystemClock.uptimeMillis() - touchFfDownAt < TOUCH_FF_TAP_MS) engine.toggleFastForward()
-                }
-            }
             com.pokedaisy.app.companion.TouchButton.QUICK_MENU -> if (down) handleHotkey(Hotkeys.Event(Hotkeys.Action.QUICK_MENU, true))
-            com.pokedaisy.app.companion.TouchButton.SAVE_STATE -> if (down) handleHotkey(Hotkeys.Event(Hotkeys.Action.SAVE_STATE, true))
-            com.pokedaisy.app.companion.TouchButton.LOAD_STATE -> if (down) handleHotkey(Hotkeys.Event(Hotkeys.Action.LOAD_STATE, true))
             com.pokedaisy.app.companion.TouchButton.ZOOM -> if (down) handleHotkey(Hotkeys.Event(Hotkeys.Action.ZOOM, true))
-            com.pokedaisy.app.companion.TouchButton.REWIND -> handleHotkey(Hotkeys.Event(Hotkeys.Action.REWIND_HOLD, down))
             com.pokedaisy.app.companion.TouchButton.X -> touchKey(KeyEvent.KEYCODE_BUTTON_X, down)
             com.pokedaisy.app.companion.TouchButton.Y -> touchKey(KeyEvent.KEYCODE_BUTTON_Y, down)
-            else -> {}
+            else -> Unit
         }
     }
 
@@ -4875,6 +4861,7 @@ class PokeDaisyActivity : Activity() {
     /** A companion rebind started / ended: its popup over the game, and nothing left held - the game's keys, a held
      * FF / slow-mo / rewind, a half-pressed chord, the right stick's look-around - since their releases go to it. */
     private fun onKeyCapture(on: Boolean) {
+        if (::engine.isInitialized) gameActions.cancelTouch()
         keyCaptureShown = on
         input.releaseAll()
         rtDown = false; ltDown = false
@@ -4891,60 +4878,64 @@ class PokeDaisyActivity : Activity() {
         hotkeys = Hotkeys.load(controlsDir)
     }
 
-    private fun handleHotkey(e: Hotkeys.Event) {
-        if (!::engine.isInitialized) return
-        when (e.action) {
-            Hotkeys.Action.SAVE_STATE -> if (e.pressed) if (!coopRefuses()) engine.requestSaveState(engine.currentSlot)
-            Hotkeys.Action.LOAD_STATE -> if (e.pressed) if (!coopRefuses()) engine.requestLoadState(engine.currentSlot)
-            Hotkeys.Action.UNDO_SAVE -> if (e.pressed) if (!coopRefuses()) engine.requestUndoSave()
-            Hotkeys.Action.UNDO_LOAD -> if (e.pressed) if (!coopRefuses()) engine.requestUndoLoad()
-            Hotkeys.Action.SLOT_NEXT -> if (e.pressed) engine.cycleSlot(+1)
-            Hotkeys.Action.SLOT_PREV -> if (e.pressed) engine.cycleSlot(-1)
-            Hotkeys.Action.FF_HOLD -> engine.setFastForwardHeld(e.pressed)
-            Hotkeys.Action.FF_TOGGLE -> if (e.pressed) engine.toggleFastForward()
-            Hotkeys.Action.SPEED_CYCLE -> if (e.pressed) engine.cycleSpeed()
-            Hotkeys.Action.SLOWMO_HOLD -> engine.setSlowmoHeld(e.pressed)
+    private val gameActions by lazy {
+        com.pokedaisy.app.companion.GameActions(companionSettings, stateSlots,
+            selectSlot = { index -> engine.cycleSlot(index - engine.currentSlot) },
+            hold = { action, down, _ -> holdGameAction(action, down) }, companion = ::toggleGameCompanion)
+    }
+
+    private fun holdGameAction(action: Hotkeys.Action, down: Boolean) {
+        when (action) {
+            Hotkeys.Action.FF_HOLD -> engine.setFastForwardHeld(down)
+            Hotkeys.Action.SLOWMO_HOLD -> engine.setSlowmoHeld(down)
             Hotkeys.Action.REWIND_HOLD -> if (romIsNds) {
                 // The rewind ring is mGBA's: the hotkey would do nothing at all and look broken.
-                if (e.pressed) showHud(com.pokedaisy.app.companion.i18n.tr("Rewind doesn't work in DS games"))
+                if (down) showHud(com.pokedaisy.app.companion.i18n.tr("Rewind doesn't work in DS games"))
             } else {
-                if (e.pressed && !Prefs(this).rewind) showHud(com.pokedaisy.app.companion.i18n.tr("Rewind is off - turn it on in SETTINGS"))
-                else if (e.pressed) showHud(com.pokedaisy.app.companion.i18n.tr("Rewinding"))
-                engine.setRewindHeld(e.pressed)
+                if (down && !Prefs(this).rewind) showHud(com.pokedaisy.app.companion.i18n.tr("Rewind is off - turn it on in SETTINGS"))
+                else if (down) showHud(com.pokedaisy.app.companion.i18n.tr("Rewinding"))
+                engine.setRewindHeld(down)
             }
+            else -> Unit
+        }
+    }
+
+    private fun toggleGameCompanion() {
+        // One screen: COMPANION BUTTON can hide the edge tab, so this is the way in. Closed on a device with a
+        // second screen (CLOSE COMPANION), it comes back to its own.
+        if (companionClosed) reopenCompanion()
+        else if (dsCompanionKeyed()) {
+            // A DS game's second screen: the game's touch screen or the companion, the buttons going with it.
+            val on = dsBottom?.showingCompanion != true || !bottomFocus.value
+            dsBottom?.show(on)
+            setBottomFocus(on)
+        }
+        else if (::sidePanel.isInitialized && sidePanel.enabled) sidePanel.openPanel()
+        else if (::portraitPanel.isInitialized && portraitPanel.enabled && !romIsNds) {
+            portraitPanel.toggleHidden()
+            if (portraitPanel.hidden) setBottomFocus(false)
+        }
+    }
+
+    private fun handleHotkey(e: Hotkeys.Event) {
+        if (!::engine.isInitialized) return
+        if (gameActions.hotkey(e)) {
+            if (e.action == Hotkeys.Action.MUTE && e.pressed)
+                showHud(com.pokedaisy.app.companion.i18n.tr(if (GameVolume.muted) "Game muted" else "Game sound on"))
+            return
+        }
+        when (e.action) {
             Hotkeys.Action.ZOOM -> if (e.pressed) zoomStep()
             Hotkeys.Action.SOFT_RESET -> if (e.pressed && !coopRefuses()) {
                 engine.softReset()
                 showHud(com.pokedaisy.app.companion.i18n.tr("Soft reset"))
             }
-            Hotkeys.Action.EXIT_GAME -> if (e.pressed) exitGame()
-            Hotkeys.Action.RESTART_GAME -> if (e.pressed) restartGame()
             Hotkeys.Action.CLOSE_APP -> if (e.pressed) closeApp()
-            Hotkeys.Action.COMPANION -> if (e.pressed) {
-                // One screen: COMPANION BUTTON can hide the edge tab, so this is the way in. Closed on a device with a
-                // second screen (CLOSE COMPANION), it comes back to its own.
-                if (companionClosed) reopenCompanion()
-                else if (dsCompanionKeyed()) {
-                    // A DS game's second screen: the game's touch screen or the companion, the buttons going with it.
-                    val on = dsBottom?.showingCompanion != true || !bottomFocus.value
-                    dsBottom?.show(on)
-                    setBottomFocus(on)
-                }
-                else if (::sidePanel.isInitialized && sidePanel.enabled) sidePanel.openPanel()
-                else if (::portraitPanel.isInitialized && portraitPanel.enabled && !romIsNds) {
-                    portraitPanel.toggleHidden()
-                    if (portraitPanel.hidden) setBottomFocus(false)
-                }
-            }
             Hotkeys.Action.QUICK_MENU -> triggerQuickMenu(e.pressed)
             Hotkeys.Action.FREE_FLIGHT -> if (e.pressed) toggleFlight()
-            Hotkeys.Action.MUTE -> if (e.pressed) {
-                val muted = !GameVolume.muted
-                setGameVolume(GameVolume.percent, muted)
-                showHud(com.pokedaisy.app.companion.i18n.tr(if (muted) "Game muted" else "Game sound on"))
-            }
             Hotkeys.Action.TOUCH_SCREEN -> if (e.pressed) { com.pokedaisy.app.companion.FeatureTips.used(TipId.DS_TRIGGERS); toggleDsTouch() }
             Hotkeys.Action.DS_LAYOUT -> if (e.pressed) { com.pokedaisy.app.companion.FeatureTips.used(TipId.DS_TRIGGERS); nextDsLayout() }
+            else -> Unit
         }
     }
 
@@ -5274,9 +5265,6 @@ class PokeDaisyActivity : Activity() {
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-    /** A touch FF shorter than this turns FF on / off; longer, it was FF while held. */
-    private val TOUCH_FF_TAP_MS = 300L
 
     /** See the debug-mirror comment at the `addView` call site. The
      * ViewTreeLifecycleOwner this needs is set on the root content view in
