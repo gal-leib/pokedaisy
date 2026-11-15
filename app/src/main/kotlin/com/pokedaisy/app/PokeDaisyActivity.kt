@@ -2120,7 +2120,7 @@ class PokeDaisyActivity : Activity() {
     private var freshLaunch = true
 
     private fun loadRom(romFile: File) {
-        if (::engine.isInitialized) { engine.gameOptions.cancelDiscovery(); engine.playback.close() }
+        if (::engine.isInitialized) engine.playback.close()
         freshLaunch = true
         // An archive unpacks once (cached after) - ~0.5 s for 32 MiB, on the black screen.
         val r = RomArchive.playable(romFile, cacheDir) ?: romFile
@@ -2992,7 +2992,7 @@ class PokeDaisyActivity : Activity() {
     }
 
     override fun onDestroy() {
-        if (::engine.isInitialized) { engine.gameOptions.cancelDiscovery(); engine.playback.stopSampling() }
+        if (::engine.isInitialized) engine.playback.quiesce()
         if (::touchControls.isInitialized) touchControls.releaseInputWindows()
         stopListeningForFold()
         com.pokedaisy.app.companion.FeatureTips.available = { false }

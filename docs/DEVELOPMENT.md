@@ -4260,3 +4260,10 @@ idempotent, and delayed startup/sample triggers cannot restart a closed owner or
 A native core may still stop and restart for the same loaded ROM without closing the owner. iOS core-start
 callbacks capture their own controllers and check game identity before startup. Native patch cleanup retains
 its existing between-frame ordering.
+
+`GameRuntime.options` creates the shared option controller from the host's native patch adapter. Quiescing stops
+sampling and invalidates option discovery before native shutdown. Final close retires the option controller and
+restores its patches, then cancels battle commands and closes queued work/watchers even if patch cleanup throws.
+Android retires portable option work without native unpatching: its engine owns core destruction, and a
+bounded stop wait may leave that thread alive. iOS restores option patches between frames. Native patch
+adapters own the core write lock. Core pause/restart keeps the loaded-game owner and desired settings alive.

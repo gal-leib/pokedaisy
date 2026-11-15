@@ -8,7 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import okio.Path.Companion.toPath
 
 class GameRuntimeTest {
-    private fun withPlayback(test: (GameRuntime, GameSession, GameBattleInput) -> Unit) {
+    private fun withPlayback(patcher: RomOptionPatcher = object : RomOptionPatcher {
+        override fun unpatch() {}
+        override fun patch(expectAt: Long, expect: ByteArray, at: Long, value: ByteArray) = true
+    }, test: (GameRuntime, GameSession, GameBattleInput) -> Unit) {
         val telemetry = TelemetryStore()
         val calls = object : GameCalls {
             override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int) = 0L
@@ -17,7 +20,7 @@ class GameRuntimeTest {
         }
         val session = GameSession(calls, { true }) { _, _ -> }
         val battle = GameBattleInput(telemetry, null, 0)
-        val playback = GameRuntime(session, telemetry, Prefs(PrefsCompanionSettingsTest.Store()), battle)
+        val playback = GameRuntime(session, telemetry, Prefs(PrefsCompanionSettingsTest.Store()), battle, patcher, { true })
         try { test(playback, session, battle) } finally { playback.close() }
     }
 
@@ -77,6 +80,38 @@ class GameRuntimeTest {
             var ran = false
             session.post { ran = true }; session.servicePosted()
             assertFalse(ran)
+        }
+    }
+
+    @Test fun closeRetiresOptionsSoLateSettingsCannotRepatchTheCore() = withPlayback { runtime, _, _ ->
+        val options = runtime.options
+        options.setReusableTms(listOf(ReusableTms.Site(0x08001000L, ByteArray(16))), true)
+        assertEquals(GameOptionPatches.Result(true, false), options.tick())
+        runtime.close()
+        options.setReusableTms(listOf(ReusableTms.Site(0x08002000L, ByteArray(16))), true)
+        assertNull(options.tick())
+        assertFalse(options.dirty)
+        assertEquals(0, options.fieldState({ _, _ -> error("closed core") }))
+    }
+
+    @Test fun aFailedPatchCleanupStillClosesSessionWorkAndWatchers() {
+        var fail = false
+        val core = object : RomOptionPatcher {
+            override fun unpatch() { if (fail) error("patch cleanup failed") }
+            override fun patch(expectAt: Long, expect: ByteArray, at: Long, value: ByteArray) = true
+        }
+        withPlayback(core) { runtime, session, _ ->
+            runtime.start("diagnostic.gb".toPath(), null, 3)
+            runtime.options.setReusableTms(listOf(ReusableTms.Site(0x08001000L, ByteArray(16))), true)
+            runtime.options.tick()
+            var ran = false
+            session.post { ran = true }
+            fail = true
+            assertFailsWith<IllegalStateException> { runtime.close() }
+            session.servicePosted()
+            assertFalse(ran)
+            assertNull(FfMenuWatch.onLearned)
+            runtime.close()
         }
     }
 }

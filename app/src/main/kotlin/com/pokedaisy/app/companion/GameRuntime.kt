@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import com.pokedaisy.app.game.GameSession
 import okio.Path
 
-/** Owns per-game observation: playback watchers, battle sample delivery and the sampler lifetime.
+/** Owns per-game playback, option discovery/patches, battle sample delivery and the sampler lifetime.
  * Core frame scheduling, exceptional modes and rendering remain native. Closing ends the loaded-game lifetime;
  * stopping/restarting a native core for the same ROM does not close this owner. */
 class GameRuntime(
@@ -19,11 +19,16 @@ class GameRuntime(
     private val telemetry: TelemetryStore,
     private val prefs: Prefs,
     private val battle: GameBattleInput,
+    optionPatcher: RomOptionPatcher,
+    optionsAllowed: () -> Boolean,
     private val configureField: (Long) -> Boolean = { false },
     private val disableField: () -> Unit = {},
+    private val restoreOptionPatchesOnClose: Boolean = true,
 ) {
     private val closed = atomic(false)
     private var sampler: GameSampler? = null
+    val options = GameOptions(optionPatcher, { !closed.value && !blocked &&
+        telemetry.snapshot.value.blocked == null && optionsAllowed() })
 
     /** Configure once per loaded game. Capture/delivery use [game]; decode remains on the sampler worker. */
     fun startSampling(gameBoy: Boolean, nds: Boolean = false, game: CoroutineDispatcher,
@@ -43,9 +48,10 @@ class GameRuntime(
     fun sample() { if (!closed.value) sampler?.request() }
 
     /** Stop producers before native host teardown; safe before or after sampling was configured. */
-    fun stopSampling() {
+    fun quiesce() {
         sampler?.close()
         sampler = null
+        options.cancelDiscovery()
     }
 
     private var gba = false
@@ -143,15 +149,23 @@ class GameRuntime(
         return smartSpeed(requestedSpeed(scene), battle.gameState, menu, map)
     }
 
+    /** Native hosts call after stopping the core or between frames; patch cleanup may touch the core. */
     fun close() {
         if (!closed.compareAndSet(false, true)) return
-        stopSampling()
+        quiesce()
         battle.changed = {}
-        battle.cancel()
-        session.close()
-        if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {
-            FfMenuWatch.onLearned = null
-            RegionMapWatch.load(null)
+        try {
+            options.close(restoreOptionPatchesOnClose)
+        } finally {
+            try {
+                battle.cancel()
+            } finally {
+                session.close()
+                if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {
+                    FfMenuWatch.onLearned = null
+                    RegionMapWatch.load(null)
+                }
+            }
         }
     }
 }

@@ -110,10 +110,13 @@ class GameOptions(
         if (!closed.value && allowed() && autoRun) AutoRunPolicy.apply(held, field, onField, ownAutoRun) else held
 
     fun cancelDiscovery() { generation.incrementAndGet(); scan?.cancel(); scan = null }
-    fun close() {
+    /** Retire portable work. Hosts whose engine frees the core retain its native patch cleanup. */
+    fun close(restorePatches: Boolean = true) {
         closed.value = true
         cancelDiscovery(); scope.cancel()
-        if (appliedAny) core.unpatch()
-        appliedAny = false; applied = null
+        if (restorePatches) {
+            if (appliedAny) core.unpatch()
+            appliedAny = false; applied = null
+        }
     }
 }

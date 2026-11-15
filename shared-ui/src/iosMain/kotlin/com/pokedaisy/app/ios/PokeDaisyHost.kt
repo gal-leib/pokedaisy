@@ -75,7 +75,6 @@ object PokeDaisyHost {
     private val touch = IosTouchControls({ game }, { settings })
     private var screen: IosGameScreen? = null
     private var playback: com.pokedaisy.app.companion.GameRuntime? = null
-    private var options: com.pokedaisy.app.companion.GameOptions? = null
     private var cheats: com.pokedaisy.app.companion.GameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
@@ -216,7 +215,7 @@ object PokeDaisyHost {
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen }, playback = { playback }, options = { options }, cheatHost = { cheats })
+            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen }, playback = { playback }, options = { playback?.options }, cheatHost = { cheats })
             .also { s ->
                 L10n.apply(s.appLanguage, code)
                 s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
@@ -229,20 +228,18 @@ object PokeDaisyHost {
         }
         playback = com.pokedaisy.app.companion.GameRuntime(
             com.pokedaisy.app.game.GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> com.pokedaisy.app.companion.data.Logs.i("$where: $error") },
-            telemetry, iosPreferences, battle!!, PkApiCore::configureField, { PkApiCore.configureField(0) }).also { p ->
+            telemetry, iosPreferences, battle!!, PkApiCore, { code != null }, PkApiCore::configureField, { PkApiCore.configureField(0) }).also { p ->
             settings!!.playbackChanged = { settings?.let { p.settingsChanged(it, it.ffActive, it.slowmoHeld) } }
             p.settingsChanged(settings!!, settings!!.ffActive, settings!!.slowmoHeld)
             g.frameSpeed = { p.speed().let { if (it.isInfinite()) 0.0 else it.toDouble() } }
             val bKeys = battle!!::keys
-            val gameOptions = com.pokedaisy.app.companion.GameOptions(PkApiCore,
-                { code != null && !p.blocked && telemetry.snapshot.value.blocked == null }).also { o ->
+            val gameOptions = p.options.also { o ->
                 settings!!.optionsChanged = { settings?.let(o::settingsChanged) }
                 o.settingsChanged(settings!!)
                 p.readField = { o.fieldState(PkApiCore::stepField, com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(code.orEmpty())) }
                 g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField,
                     com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN)) }
             }
-            options = gameOptions
             g.beforeFrame = p::beforeFrame
             g.afterFrame = { p.tick(); gameOptions.tick() }
         }
@@ -283,7 +280,7 @@ object PokeDaisyHost {
             enabled = { currentSettings.cheatsEnabled },
             submit = { text -> if (g.isRunning && PkApiCore.applyCheats(text) < 0) com.pokedaisy.app.companion.data.Logs.i("cheats didn't load") })
         val currentBattle = battle!!
-        val currentOptions = options!!
+        val currentOptions = p.options
         val currentCheats = cheats!!
         g.onCoreStarted = {
             if (game === g) {
@@ -336,9 +333,7 @@ object PokeDaisyHost {
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
         stateError = null
-        playback?.stopSampling()
-        options?.close()
-        options = null
+        playback?.quiesce()
         cheats = null
         items = null
         fly = null

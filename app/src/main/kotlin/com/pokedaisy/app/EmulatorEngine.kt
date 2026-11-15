@@ -174,7 +174,7 @@ class EmulatorEngine(
     private var ndsScaleSet = -1
 
     /** Desired option state is shared; this host still decides when its frame loop may apply patches. */
-    val gameOptions by lazy { com.pokedaisy.app.companion.GameOptions(optionPatcher, { gba || nds }) }
+    val gameOptions get() = playback.options
     fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean) =
         gameOptions.setReusableTms(sites, on)
     fun setInstantText(patch: com.pokedaisy.app.companion.data.InstantText.Patch?, on: Boolean) =
@@ -758,8 +758,8 @@ class EmulatorEngine(
     }
 
     val playback by lazy {
-        com.pokedaisy.app.companion.GameRuntime(gameSession, telemetry, preferences, battle,
-            configureField = { fieldGame != WideScreen.OFF })
+        com.pokedaisy.app.companion.GameRuntime(gameSession, telemetry, preferences, battle, optionPatcher, { gba || nds },
+            configureField = { fieldGame != WideScreen.OFF }, restoreOptionPatchesOnClose = false)
     }
 
     /** Runs [job] on the emu thread before the next frame; dropped if the game closes first. */

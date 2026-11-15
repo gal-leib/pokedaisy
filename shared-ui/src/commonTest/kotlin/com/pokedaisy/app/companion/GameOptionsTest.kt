@@ -93,4 +93,16 @@ class GameOptionsTest {
             assertEquals(GameOptions.Discovery(), options.discovery)
         } finally { options.close(); FileSystem.SYSTEM.delete(file) }
     }
+
+    @Test fun retiringForAnEngineOwnedCoreNeverUnpatchesOnTheClosingThread() {
+        val core = Core()
+        val options = GameOptions(core, { true })
+        options.setReusableTms(sites, true); options.tick()
+        val resets = core.resets
+        options.close(restorePatches = false)
+        assertEquals(resets, core.resets)
+        assertEquals(setOf(sites.single().branch), core.active)
+        assertNull(options.tick())
+        assertFalse(options.dirty)
+    }
 }
