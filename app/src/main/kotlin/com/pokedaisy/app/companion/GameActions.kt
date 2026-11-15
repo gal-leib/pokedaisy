@@ -10,12 +10,37 @@ class GameActions(
     private val settings: CompanionSettings,
     private val slots: StateSlots,
     private val selectSlot: (Int) -> Unit,
-    private val hold: (Hotkeys.Action, Boolean, Source) -> Unit,
+    private val hold: (Hotkeys.Action, Boolean) -> Unit,
     private val companion: () -> Unit,
     private val nowMillis: () -> Long = { actionClockOrigin.elapsedNow().inWholeMilliseconds },
 ) {
     enum class Source { HARDWARE, TOUCH }
     private var ffDownAt: Long? = null
+    private val held = mutableMapOf<Hotkeys.Action, Set<Source>>()
+
+    private fun hold(action: Hotkeys.Action, down: Boolean, source: Source) {
+        val before = held[action].orEmpty()
+        val after = if (down) before + source else before - source
+        if (after.isEmpty()) held.remove(action) else held[action] = after
+        if (before.isNotEmpty() != after.isNotEmpty()) hold(action, after.isNotEmpty())
+    }
+
+    /** Release one input owner without cancelling the other's holds. Called on the host's input thread. */
+    fun cancelHardware() = release(Source.HARDWARE)
+    private fun release(source: Source) {
+        for (action in held.keys.toList()) hold(action, false, source)
+    }
+
+    /** State changes can quarantine a particular action until a new press. */
+    fun release(action: Hotkeys.Action) {
+        if (action == Hotkeys.Action.FF_HOLD) ffDownAt = null
+        if (held.remove(action)?.isNotEmpty() == true) hold(action, false)
+    }
+
+    fun clear() {
+        ffDownAt = null
+        for (action in held.keys.toList()) release(action)
+    }
 
     /** False leaves platform-only shortcuts with their host, including QUICK MENU's release event. */
     fun hotkey(event: Hotkeys.Event): Boolean {
@@ -67,8 +92,7 @@ class GameActions(
 
     fun cancelTouch() {
         ffDownAt = null
-        hold(Hotkeys.Action.FF_HOLD, false, Source.TOUCH)
-        hold(Hotkeys.Action.REWIND_HOLD, false, Source.TOUCH)
+        release(Source.TOUCH)
     }
 
     companion object {

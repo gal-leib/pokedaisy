@@ -102,15 +102,15 @@ object PokeDaisyHost {
             currentSettings.rewindUnavailable = panels::showRewindUnavailable
             val shortcuts = com.pokedaisy.app.companion.GameActions(currentSettings, currentSlots,
                 selectSlot = { currentSlots.select(it) }, companion = panels::toggleCompanion,
-                hold = { action, down, source ->
-                    val touched = source == com.pokedaisy.app.companion.GameActions.Source.TOUCH
+                hold = { action, down ->
                     when (action) {
-                        com.pokedaisy.app.Hotkeys.Action.FF_HOLD -> if (touched) currentSettings.holdFastForward(down) else currentSettings.holdHardwareFastForward(down)
+                        com.pokedaisy.app.Hotkeys.Action.FF_HOLD -> currentSettings.holdFastForward(down)
                         com.pokedaisy.app.Hotkeys.Action.SLOWMO_HOLD -> currentSettings.holdSlowmo(down)
-                        com.pokedaisy.app.Hotkeys.Action.REWIND_HOLD -> if (touched) currentSettings.holdTouchRewind(down) else currentSettings.holdHardwareRewind(down)
+                        com.pokedaisy.app.Hotkeys.Action.REWIND_HOLD -> currentSettings.holdRewind(down)
                         else -> Unit
                     }
                 })
+            currentSettings.actions = shortcuts
             touch.actions = shortcuts
             game?.onHotkey = { shortcuts.hotkey(it) }
         }

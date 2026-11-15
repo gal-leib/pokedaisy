@@ -52,6 +52,7 @@ internal class IosCompanionSettings(
     override val keyCapture get() = game?.keyCapture ?: libraryInput!!.capture
     fun pollKeyCapture() { libraryInput?.pollCapture() }
     private fun reloadBindings() {
+        actions?.cancelHardware()
         game?.reloadBindings() ?: libraryInput?.reloadBindings()
         game?.setHotkeys(if (hotkeysEnabled) Hotkeys.load(com.pokedaisy.app.game.IosGameInputBindings.directory).forActions(hotkeyActions) else null)
     }
@@ -87,20 +88,19 @@ internal class IosCompanionSettings(
     var optionsChanged: () -> Unit = {}
     override val rewindBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_REWIND)
     override fun setRewind(on: Boolean) { stored.setRewind(on); releaseRewind() }
-    private var touchRewindHeld = false
-    private var hardwareRewindHeld = false
-    val rewindHeld get() = rewind && (touchRewindHeld || hardwareRewindHeld)
+    var actions: com.pokedaisy.app.companion.GameActions? = null
+    var rewindHeld = false
+        private set
     var rewindChanged: () -> Unit = {}
     var rewindUnavailable: () -> Unit = {}
-    fun holdTouchRewind(on: Boolean) {
+    fun holdRewind(on: Boolean) {
         if (on && !rewind) rewindUnavailable()
-        touchRewindHeld = on && rewind; rewindChanged()
+        rewindHeld = on && rewind; rewindChanged()
     }
-    fun holdHardwareRewind(on: Boolean) {
-        if (on && !rewind) rewindUnavailable()
-        hardwareRewindHeld = on && rewind; rewindChanged()
+    fun releaseRewind() {
+        actions?.release(Hotkeys.Action.REWIND_HOLD)
+        holdRewind(false)
     }
-    fun releaseRewind() { touchRewindHeld = false; hardwareRewindHeld = false; rewindChanged() }
     override val autoRunBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
     override val runIndoorsSupported get() = fieldReadable && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode.orEmpty())
     override val wildEncountersSupported get() = fieldReadable && options()?.wildFlagFound == true
@@ -150,11 +150,9 @@ internal class IosCompanionSettings(
     private var ffToggle by mutableStateOf(iosPreferences.ffToggled)
     override val ffToggled get() = ffToggle
     private var ffHeld by mutableStateOf(false)
-    private var hardwareFfHeld by mutableStateOf(false)
     var slowmoHeld by mutableStateOf(false)
         private set
-    val ffActive get() = ffToggled || ffHeld || hardwareFfHeld
-    fun holdHardwareFastForward(on: Boolean) { hardwareFfHeld = on; applyPlayback() }
+    val ffActive get() = ffToggled || ffHeld
     fun holdSlowmo(on: Boolean) { slowmoHeld = on; applyPlayback() }
     fun holdFastForward(on: Boolean) { ffHeld = on; applyPlayback() }
 

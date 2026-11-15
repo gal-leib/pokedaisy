@@ -1642,7 +1642,7 @@ class PokeDaisyActivity : Activity() {
             val dir = controlsDir
             if (keyNames.isNullOrEmpty()) Hotkeys.clearBinding(dir, action)
             else Hotkeys.setBindingNamed(dir, action, keyNames, takeFrom)
-            hotkeys = Hotkeys.load(controlsDir)
+            reloadHotkeys()
         }
         override fun restartGame() = this@PokeDaisyActivity.restartGame()
         override fun closeGame() {
@@ -2085,7 +2085,7 @@ class PokeDaisyActivity : Activity() {
         syncOrientation(secondScreen() != null)
         syncGameScreen()
 
-        hotkeys = Hotkeys.load(controlsDir)
+        reloadHotkeys()
         // L2 / R2 are TOUCH SCREEN / DS LAYOUT's in a DS game on one screen, SPEED CYCLE / FF HOLD's elsewhere.
         Hotkeys.dsActive = { a ->
             when (a) {
@@ -2598,7 +2598,7 @@ class PokeDaisyActivity : Activity() {
         view.onResume()
         // Pick up any Settings changes made since launch.
         if (romCode.isNotEmpty()) com.pokedaisy.app.companion.i18n.L10n.apply(Prefs(this).appLanguage, romCode)
-        hotkeys = Hotkeys.load(controlsDir)
+        reloadHotkeys()
         hotkeysOn = Prefs(this).hotkeysEnabled
         input.setControls(GbaControls.load(controlsDir))
         if (::engine.isInitialized) {
@@ -4735,6 +4735,12 @@ class PokeDaisyActivity : Activity() {
         if (!hotkeyTakes(keyCode, down)) input.onKey(keyCode, down)
     }
 
+    /** Replacing the parser cannot retain an action owned by its old chords. Touch extras keep their own holds. */
+    private fun reloadHotkeys() {
+        if (::engine.isInitialized) gameActions.cancelHardware()
+        hotkeys = Hotkeys.load(controlsDir)
+    }
+
     /** A companion rebind started / ended: its popup over the game, and nothing left held - the game's keys, a held
      * FF / slow-mo / rewind, a half-pressed chord, the right stick's look-around - since their releases go to it. */
     private fun onKeyCapture(on: Boolean) {
@@ -4743,22 +4749,21 @@ class PokeDaisyActivity : Activity() {
         input.releaseAll()
         rtDown = false; ltDown = false
         if (::view.isInitialized) { view.camera.stickX = 0f; view.camera.stickY = 0f }
-        if (::engine.isInitialized) { engine.setFastForwardHeld(false); engine.setSlowmoHeld(false); engine.setRewindHeld(false) }
-        hotkeys = Hotkeys.load(controlsDir)
+        if (::engine.isInitialized) gameActions.clear()
+        reloadHotkeys()
     }
 
     /** Turns the hotkeys on/off from the companion. Off lets go of any held one (FF / slow-mo
      * hold) and forgets the keys held so far, so a chord can't fire half-pressed once back on. */
     private fun setHotkeysOn(on: Boolean) {
         hotkeysOn = on
-        if (::engine.isInitialized) { engine.setFastForwardHeld(false); engine.setSlowmoHeld(false) }
-        hotkeys = Hotkeys.load(controlsDir)
+        reloadHotkeys()
     }
 
     private val gameActions by lazy {
         com.pokedaisy.app.companion.GameActions(companionSettings, stateSlots,
             selectSlot = { index -> engine.cycleSlot(index - engine.currentSlot) },
-            hold = { action, down, _ -> holdGameAction(action, down) }, companion = ::toggleGameCompanion)
+            hold = ::holdGameAction, companion = ::toggleGameCompanion)
     }
 
     private fun holdGameAction(action: Hotkeys.Action, down: Boolean) {

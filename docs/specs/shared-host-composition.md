@@ -30,6 +30,11 @@ Acceptance: releasing one owner cannot cancel another; close/capture transitions
 unsupported choices survive; failed/invalid edits do not publish a reload. Verify behavior through controller
 interfaces and targeted native input/capture smoke checks.
 
+Implemented first slice: `GameActions` owns hardware/touch held-action aggregation on both platforms; binding
+reloads release the old hardware ownership before replacing parsers. Native effects keep capability/co-op gates.
+Five focused tests pass on JVM and Native, including overlapping owners, cancellation and idempotent cleanup.
+The remaining binding edit/publish paths and native smoke checks remain part of the follow-up audit.
+
 ## D3: Own session assembly
 
 Move common controller creation, dependencies and shutdown order behind one session owner. Reuse the existing

@@ -27,10 +27,10 @@ class GameActionsTest {
         override fun requestUndoSave() { requests += "undo save" }
         override fun requestUndoLoad() { requests += "undo load" }
     }
-    private val holds = mutableListOf<Triple<Hotkeys.Action, Boolean, GameActions.Source>>()
+    private val holds = mutableListOf<Pair<Hotkeys.Action, Boolean>>()
     private var time = 1_000L
     private val actions = GameActions(settings, slots, { index = it },
-        { action, down, source -> holds += Triple(action, down, source) }, { companion++ }, { time })
+        { action, down -> holds += action to down }, { companion++ }, { time })
     private fun key(action: Hotkeys.Action, down: Boolean = true) = actions.hotkey(Hotkeys.Event(action, down))
 
     @Test fun shortcutReleasesNeverRepeatActionsAndSlotsWrap() {
@@ -42,7 +42,7 @@ class GameActionsTest {
         assertFalse(key(Hotkeys.Action.QUICK_MENU, false))
     }
 
-    @Test fun tapsAndHoldsKeepTheirSourceAndCancellationNeverToggles() {
+    @Test fun touchCancellationKeepsHardwareOwnershipAndNeverToggles() {
         key(Hotkeys.Action.FF_HOLD)
         actions.touch(TouchButton.FF, true); time += 299; actions.touch(TouchButton.FF, false)
         assertTrue(settings.ffToggled)
@@ -50,11 +50,9 @@ class GameActionsTest {
         assertTrue(settings.ffToggled)
         actions.touch(TouchButton.FF, true); actions.cancelTouch(); actions.touch(TouchButton.FF, false)
         assertTrue(settings.ffToggled)
-        assertEquals(Triple(Hotkeys.Action.FF_HOLD, true, GameActions.Source.HARDWARE), holds.first())
-        assertTrue(holds.any { it == Triple(Hotkeys.Action.FF_HOLD, false, GameActions.Source.TOUCH) })
-        assertFalse(holds.any { it == Triple(Hotkeys.Action.FF_HOLD, false, GameActions.Source.HARDWARE) })
+        assertEquals(listOf(Hotkeys.Action.FF_HOLD to true), holds)
         key(Hotkeys.Action.FF_HOLD, false)
-        assertEquals(Triple(Hotkeys.Action.FF_HOLD, false, GameActions.Source.HARDWARE), holds.last())
+        assertEquals(listOf(Hotkeys.Action.FF_HOLD to true, Hotkeys.Action.FF_HOLD to false), holds)
     }
 
     @Test fun touchAndHardwareUseTheSameSlotsAndSettingsActions() {
@@ -68,5 +66,29 @@ class GameActionsTest {
         key(Hotkeys.Action.COMPANION); key(Hotkeys.Action.EXIT_GAME); key(Hotkeys.Action.RESTART_GAME)
         assertEquals(1, companion); assertEquals(1, closed); assertEquals(1, restarted)
         assertFalse(actions.touch(TouchButton.X, true))
+    }
+    @Test fun hardwareCancellationKeepsTouchAndActionReleaseQuarantinesEveryOwner() {
+        actions.touch(TouchButton.REWIND, true)
+        key(Hotkeys.Action.REWIND_HOLD)
+        actions.cancelHardware()
+        assertEquals(listOf(Hotkeys.Action.REWIND_HOLD to true), holds)
+        actions.release(Hotkeys.Action.REWIND_HOLD)
+        assertEquals(Hotkeys.Action.REWIND_HOLD to false, holds.last())
+        actions.touch(TouchButton.REWIND, false)
+        assertEquals(2, holds.size)
+        key(Hotkeys.Action.REWIND_HOLD)
+        assertEquals(Hotkeys.Action.REWIND_HOLD to true, holds.last())
+        actions.clear(); actions.clear()
+        assertEquals(4, holds.size)
+    }
+
+    @Test fun clearingAllHoldsCancelsPendingTapAndIsIdempotent() {
+        actions.touch(TouchButton.FF, true)
+        key(Hotkeys.Action.SLOWMO_HOLD)
+        actions.clear(); actions.clear()
+        actions.touch(TouchButton.FF, false)
+        assertFalse(settings.ffToggled)
+        assertEquals(1, holds.count { it == Hotkeys.Action.FF_HOLD to false })
+        assertEquals(1, holds.count { it == Hotkeys.Action.SLOWMO_HOLD to false })
     }
 }

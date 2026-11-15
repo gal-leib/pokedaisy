@@ -46,13 +46,12 @@ internal class IosTouchControls(
     fun releaseKeys() {
         inputEpoch++
         game()?.let { it.touchKeys = 0; it.touchTurbo = 0; it.touchButtonKeys = emptySet() }
-        settings()?.holdFastForward(false)
-        settings()?.holdTouchRewind(false)
         actions?.cancelTouch()
     }
 
     fun close() {
-        actions?.cancelTouch()
+        actions?.clear()
+        settings()?.actions = null
         actions = null
         releaseKeys()
         editingGame = null

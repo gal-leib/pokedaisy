@@ -4237,3 +4237,12 @@ start enabled, imports disabled, and the master switch controls native applicati
 between frames and leaves the native lock/patch ownership to pk_api. `IosHosts` installs the stateless parser for
 `CheatCheck`. The Files picker reuses `RomPicker.pickData`, pauses input/frames, bounds imports to 1 MiB and binds
 its callback to the same running game. Shared text fields own keyboard input while typing codes.
+
+
+### Shared held-action ownership
+
+`GameActions` combines hardware and touch ownership for FF, slow motion and rewind before notifying native
+effects. Native adapters receive only aggregate edges. Touch cancellation releases touch; binding reloads release
+hardware before replacing the parser. Capture/close can clear every owner, and state changes can quarantine rewind
+without turning a cancelled FF tap into a toggle. Input delivery, capability gates and frame pacing stay native.
+The controller runs on each host's existing input thread and adds no work to the rendering path.
