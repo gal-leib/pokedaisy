@@ -2120,7 +2120,6 @@ class PokeDaisyActivity : Activity() {
     private var freshLaunch = true
 
     private fun loadRom(romFile: File) {
-        gameSampler?.close(); gameSampler = null
         if (::engine.isInitialized) { engine.gameOptions.cancelDiscovery(); engine.playback.close() }
         freshLaunch = true
         // An archive unpacks once (cached after) - ~0.5 s for 32 MiB, on the black screen.
@@ -2342,10 +2341,6 @@ class PokeDaisyActivity : Activity() {
                         nowPlaying()
                     }
                 }
-                // SMART FF reads the game's own gMain once the game is known (no scan
-                // guesswork), and learns the field's main callback from the player moving.
-                playback.sampled()
-                battleSession.sampled()
                 // SHINY ODDS: the foe party of a game it knows (retail FireRed / Emerald), handed to the engine.
                 if (snap.connected) telemetry.knownShinyTarget().let { t ->
                     if (t != shinyTarget) {
@@ -2368,14 +2363,12 @@ class PokeDaisyActivity : Activity() {
                     runOnUiThread { showHud(notes.joinToString("\n"), NUZLOCKE_NOTICE_MS) }
                 }
             }
-            gameSampler = com.pokedaisy.app.companion.GameSampler.forGame(telemetry, romIsGameBoy, romIsNds,
+            playback.startSampling(romIsGameBoy, romIsNds,
                 game = object : kotlinx.coroutines.CoroutineDispatcher() {
                     override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) = postToEmu(block::run)
                 }, current = { ::engine.isInitialized && engine === this && running }, after = afterSample)
             onSample = { startSample(this) }   // runs on the emu thread
             onResumeResult = { loaded -> if (!loaded) { telemetry.dropCached(); runOnUiThread { waitForPlay() } } }
-            // Fast polls and transition-triggered full samples share the same game session on both hosts.
-            battleSession.changed = { startSample(this) }
             ffMaxSpeed = Prefs(this@PokeDaisyActivity).ffMaxSpeed
             ffMusicMode = Prefs(this@PokeDaisyActivity).ffMusicMode
             ffMode = Prefs(this@PokeDaisyActivity).ffMode
@@ -2993,18 +2986,15 @@ class PokeDaisyActivity : Activity() {
         return true
     }
 
-    private var gameSampler: com.pokedaisy.app.companion.GameSampler? = null
-
     /** Requests originate between frames; common sampling owns capture, decode, coalescing and delivery. */
     private fun startSample(e: EmulatorEngine) {
-        if (::engine.isInitialized && engine === e) gameSampler?.request()
+        if (::engine.isInitialized && engine === e) e.playback.sample()
     }
 
     override fun onDestroy() {
-        if (::engine.isInitialized) engine.gameOptions.cancelDiscovery()
+        if (::engine.isInitialized) { engine.gameOptions.cancelDiscovery(); engine.playback.stopSampling() }
         if (::touchControls.isInitialized) touchControls.releaseInputWindows()
         stopListeningForFold()
-        gameSampler?.close(); gameSampler = null
         com.pokedaisy.app.companion.FeatureTips.available = { false }
         Hotkeys.dsActive = { false }
         // Gone while the game slept (onPause held it): stop it now, as a close would have.

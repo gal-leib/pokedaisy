@@ -3620,7 +3620,7 @@ static library `pk_api`, which the app's `CMakeLists.txt` links and any other ho
 
 `GameSession` (`shared/src/commonMain/.../game/`) owns queued between-frame work, field-job delays,
 safe-call waits, menu/map observation and the settled on-field signal. Both `EmulatorEngine` and
-`GamePlayback` drive it from their existing loops. Posted work runs before dirty patches, then field
+`GameRuntime` drive it from their existing loops. Posted work runs before dirty patches, then field
 work; a callback's newly queued work waits for the next batch. Co-op holds skip field service without
 advancing delays, and iOS rewind skips the forward-work hook. Close/reset drop both queues and field
 visibility so delayed calls cannot reach the next game. Render/audio and each host's state operations
@@ -3834,7 +3834,7 @@ The iPad playback settings update `GameViewController` on the main thread: `Fram
 capped speed, with real-time catch-up bounded before scaling; unlimited FF runs batches with an 8 ms budget.
 `pk_api_set_audio_rate` requests fewer samples per emulated frame during FF (pitched audio at the device's 48 kHz).
 `GameAudio` sets mixer volume for GAME VOLUME / MUTE GAME. Normal speed is per ROM path; FF and volume are app-wide.
-`GamePlayback` shares watcher setup, learned menu callbacks, telemetry-fed position learning, live speed settings,
+`GameRuntime` shares watcher setup, learned menu callbacks, telemetry-fed position learning, live speed settings,
 requested speed, SMART gating and field readability. Both hosts use it with the existing `PlaybackPolicy`.
 Android retains its frame order, DS holds, rewind and scenic-flight overrides; iOS drives the same session from
 its display callbacks and maps common infinity to its native pacing sentinel. Learned menu callbacks stay under
@@ -4246,3 +4246,17 @@ effects. Native adapters receive only aggregate edges. Touch cancellation releas
 hardware before replacing the parser. Capture/close can clear every owner, and state changes can quarantine rewind
 without turning a cancelled FF tap into a toggle. Input delivery, capability gates and frame pacing stay native.
 The controller runs on each host's existing input thread and adds no work to the rendering path.
+
+
+### Shared observation lifetime
+
+`GameRuntime` now owns the playback watchers and sampler together. Both hosts configure sampling once with their
+core-thread dispatcher and current-game predicate; common delivery updates playback and battle metadata before
+host-specific sample effects. Android requests samples from its existing frame cadence, and iOS supplies its
+500 ms period. Capture, worker decode and generation checks remain in `GameSampler` and `TelemetryStore`.
+
+Closing stops sampling before cancelling battle commands and closing queued session work/watchers. It is
+idempotent, and delayed startup/sample triggers cannot restart a closed owner or replace a newer game's watcher.
+A native core may still stop and restart for the same loaded ROM without closing the owner. iOS core-start
+callbacks capture their own controllers and check game identity before startup. Native patch cleanup retains
+its existing between-frame ordering.

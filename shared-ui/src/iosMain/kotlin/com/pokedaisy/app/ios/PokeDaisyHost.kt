@@ -74,12 +74,11 @@ object PokeDaisyHost {
     private var game: GameViewController? = null
     private val touch = IosTouchControls({ game }, { settings })
     private var screen: IosGameScreen? = null
-    private var playback: com.pokedaisy.app.companion.GamePlayback? = null
+    private var playback: com.pokedaisy.app.companion.GameRuntime? = null
     private var options: com.pokedaisy.app.companion.GameOptions? = null
     private var cheats: com.pokedaisy.app.companion.GameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
-    private var sampler: com.pokedaisy.app.companion.GameSampler? = null
 
     /** Sets the shared screens' hosts (fonts, pictures, settings, the manual). Safe to call more than once. */
     fun start() {
@@ -207,7 +206,6 @@ object PokeDaisyHost {
             snapshot = stateSnapshot, loaded = stateLoaded)
         val (code, revision) = (if (romPath.lowercase().endsWith(".gba"))
             com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)
-        g.onCoreStarted = { playback?.start(romPath.toPath(), code, if (code != null) runCatching { com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()) }.getOrDefault(0L) else 0L); options?.start(romPath.toPath(), PkApiCore::configureWild); cheats?.start(); g.withState { resume.restore() } }
         g.beforeSuspend = {
             val saved = g.withState { resume.save() }
             if (!saved) resumeFailed()
@@ -229,7 +227,7 @@ object PokeDaisyHost {
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
         }
-        playback = com.pokedaisy.app.companion.GamePlayback(
+        playback = com.pokedaisy.app.companion.GameRuntime(
             com.pokedaisy.app.game.GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> com.pokedaisy.app.companion.data.Logs.i("$where: $error") },
             telemetry, iosPreferences, battle!!, PkApiCore::configureField, { PkApiCore.configureField(0) }).also { p ->
             settings!!.playbackChanged = { settings?.let { p.settingsChanged(it, it.ffActive, it.slowmoHeld) } }
@@ -284,7 +282,18 @@ object PokeDaisyHost {
                 com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()).toString(16).padStart(8, '0')) },
             enabled = { currentSettings.cheatsEnabled },
             submit = { text -> if (g.isRunning && PkApiCore.applyCheats(text) < 0) com.pokedaisy.app.companion.data.Logs.i("cheats didn't load") })
-        g.beforeStateChange = { currentSettings.releaseRewind(); battle?.cancel(); touch.releaseKeys() }
+        val currentBattle = battle!!
+        val currentOptions = options!!
+        val currentCheats = cheats!!
+        g.onCoreStarted = {
+            if (game === g) {
+                p.start(romPath.toPath(), code, if (code != null) runCatching { com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()) }.getOrDefault(0L) else 0L)
+                currentOptions.start(romPath.toPath(), PkApiCore::configureWild)
+                currentCheats.start()
+                g.withState { resume.restore() }
+            }
+        }
+        g.beforeStateChange = { currentSettings.releaseRewind(); currentBattle.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
@@ -294,11 +303,11 @@ object PokeDaisyHost {
             initialIndex = defaults.integerForKey("state_slot").toInt(),
             selected = { defaults.setInteger(it.toLong(), "state_slot") })
         prefetchArt(romPath)
-        sampler = com.pokedaisy.app.companion.GameSampler.forGame(telemetry,
+        p.startSampling(
             gameBoy = !romPath.lowercase().endsWith(".gba"), game = kotlinx.coroutines.Dispatchers.Main,
             current = { game === g && g.isRunning }, after = {
-                battle?.sampled(); playback?.sampled(); settings?.let { options?.settingsChanged(it) }
-            }).also { it.startPeriodic(SAMPLE_MILLIS) }
+                currentOptions.settingsChanged(currentSettings)
+            }, periodMillis = SAMPLE_MILLIS)
         return g
     }
 
@@ -327,8 +336,7 @@ object PokeDaisyHost {
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
         stateError = null
-        sampler?.close()
-        sampler = null
+        playback?.stopSampling()
         options?.close()
         options = null
         cheats = null
@@ -336,7 +344,6 @@ object PokeDaisyHost {
         fly = null
         playback?.close()
         playback = null
-        battle?.cancel()
         battle = null
         screen?.close()
         screen = null
@@ -362,5 +369,5 @@ object PokeDaisyHost {
         }
     }
 
-    private fun sample() { sampler?.request() }
+    private fun sample() { playback?.sample() }
 }

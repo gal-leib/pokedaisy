@@ -46,6 +46,12 @@ Acceptance: both platforms construct the shared owner; lifecycle and ordering kn
 is idempotent; stale callbacks and partial startup are tested. Native rendering, audio and frame/input paths retain
 their existing ownership and threading requirements.
 
+First slice implemented: evolve the existing playback controller into `GameRuntime`, which owns sampling,
+watcher lifetime and common battle sample delivery. Both hosts adopt it; separate sampler fields and duplicate
+delivery/teardown are removed. Closed owners reject delayed starts and samples, and iOS startup captures its
+own controllers. The focused JVM/Native runtime and sampler tests pass. Options, cheats, actions and state
+assembly still need the next capability slices; this is not completion of D3.
+
 ## D4: Reduce the remaining hosts
 
 Delete setup/teardown displaced by D2-D3. Group Android-only display, permissions, pickers and rendering adapters by

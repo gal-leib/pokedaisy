@@ -758,7 +758,7 @@ class EmulatorEngine(
     }
 
     val playback by lazy {
-        com.pokedaisy.app.companion.GamePlayback(gameSession, telemetry, preferences, battle,
+        com.pokedaisy.app.companion.GameRuntime(gameSession, telemetry, preferences, battle,
             configureField = { fieldGame != WideScreen.OFF })
     }
 

@@ -6,11 +6,15 @@ import androidx.compose.runtime.setValue
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.Prefs
 import kotlin.concurrent.Volatile
+import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CoroutineDispatcher
 import com.pokedaisy.app.game.GameSession
 import okio.Path
 
-/** Shared per-game watchers, playback settings and field observations. Hosts retain frame scheduling and exceptional modes. */
-class GamePlayback(
+/** Owns per-game observation: playback watchers, battle sample delivery and the sampler lifetime.
+ * Core frame scheduling, exceptional modes and rendering remain native. Closing ends the loaded-game lifetime;
+ * stopping/restarting a native core for the same ROM does not close this owner. */
+class GameRuntime(
     val session: GameSession,
     private val telemetry: TelemetryStore,
     private val prefs: Prefs,
@@ -18,6 +22,32 @@ class GamePlayback(
     private val configureField: (Long) -> Boolean = { false },
     private val disableField: () -> Unit = {},
 ) {
+    private val closed = atomic(false)
+    private var sampler: GameSampler? = null
+
+    /** Configure once per loaded game. Capture/delivery use [game]; decode remains on the sampler worker. */
+    fun startSampling(gameBoy: Boolean, nds: Boolean = false, game: CoroutineDispatcher,
+                      current: () -> Boolean, after: (SnapshotView) -> Unit = {}, periodMillis: Long? = null) {
+        if (closed.value) return
+        check(sampler == null) { "Sampling is already configured for this game" }
+        require(periodMillis == null || periodMillis > 0)
+        sampler = GameSampler.forGame(telemetry, gameBoy, nds, game,
+            current = { !closed.value && current() }, after = { snapshot ->
+                sampled()
+                battle.sampled()
+                after(snapshot)
+            }).also { if (periodMillis != null) it.startPeriodic(periodMillis) }
+        battle.changed = ::sample
+    }
+
+    fun sample() { if (!closed.value) sampler?.request() }
+
+    /** Stop producers before native host teardown; safe before or after sampling was configured. */
+    fun stopSampling() {
+        sampler?.close()
+        sampler = null
+    }
+
     private var gba = false
     private var learnedCallback: ((Long, Long) -> Unit)? = null
     private val menu get() = session.menuOpen
@@ -51,6 +81,7 @@ class GamePlayback(
     }
 
     fun start(romPath: Path, code: String?, crc: Long, gba: Boolean = code != null) {
+        if (closed.value) return
         this.gba = gba
         session.reset()
         val romKey = crc.toString(16).padStart(8, '0')
@@ -66,7 +97,7 @@ class GamePlayback(
         fieldMovesReadable = false
     }
 
-    fun sampled() {
+    private fun sampled() {
         val snapshot = telemetry.snapshot.value
         if (snapshot.blocked != null) {
             blocked = true
@@ -113,6 +144,10 @@ class GamePlayback(
     }
 
     fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        stopSampling()
+        battle.changed = {}
+        battle.cancel()
         session.close()
         if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {
             FfMenuWatch.onLearned = null
