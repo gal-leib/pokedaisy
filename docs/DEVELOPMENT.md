@@ -3628,6 +3628,8 @@ remain with the host. `GameSessionTest` exercises this ordering, waits, busy gat
 fade/field settling on JVM and iOS.
 
 `FieldItemSupportCache` shares Android's per-ROM code checks and retry-on-read-failure behavior.
+A live party is required before looking up even cached support: a title/intro can identify a map without
+having a running party yet. This avoids exposing PC/item calls before gameplay.
 `FieldItemUse` shares the bag/party actions and queued result delivery, including NOT_NOW becoming
 IN_BATTLE. Android delegates its standard actions and keeps DS, GB and TM orchestration; iOS supplies
 its live game session and main-thread result delivery. A result from a replaced session is dropped.

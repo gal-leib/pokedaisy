@@ -438,8 +438,9 @@ class PokeDaisyActivity : Activity() {
     private val fieldSupport = com.pokedaisy.app.companion.data.FieldItemSupportCache()
 
     private fun fieldItemSupport(): com.pokedaisy.app.companion.data.FieldItemSupport? {
-        if (romBlocked != null || !::engine.isInitialized || !engine.running || !telemetry.snapshot.value.hasData) return null
-        return fieldSupport.get(telemetry.snapshot.value.game, romCode, romRev, telemetry.knownFieldItems())
+        val snapshot = telemetry.snapshot.value
+        if (romBlocked != null || !::engine.isInitialized || !engine.running) return null
+        return fieldSupport.get(snapshot, romCode, romRev, telemetry.knownFieldItems())
     }
 
     /** TRADE EVOLUTIONS' calls for the loaded ROM ([com.pokedaisy.app.companion.data.tradeEvoFor]), its code checked once
