@@ -438,7 +438,7 @@ class PokeDaisyActivity : Activity() {
     private val fieldSupport = com.pokedaisy.app.companion.data.FieldItemSupportCache()
 
     private fun fieldItemSupport(): com.pokedaisy.app.companion.data.FieldItemSupport? {
-        if (romBlocked != null || !::engine.isInitialized || !engine.running) return null
+        if (romBlocked != null || !::engine.isInitialized || !engine.running || !telemetry.snapshot.value.hasData) return null
         return fieldSupport.get(telemetry.snapshot.value.game, romCode, romRev, telemetry.knownFieldItems())
     }
 

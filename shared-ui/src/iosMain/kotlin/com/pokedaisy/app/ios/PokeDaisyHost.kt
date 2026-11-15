@@ -271,7 +271,7 @@ object PokeDaisyHost {
         val fields = com.pokedaisy.app.companion.data.FieldItemSupportCache()
         fun live() = game === g && g.isRunning && code != null && !p.blocked && telemetry.snapshot.value.blocked == null
         val sharedItems = com.pokedaisy.app.companion.FieldItemUse(
-            support = { if (live()) fields.get(telemetry.snapshot.value.game, code.orEmpty(), revision, telemetry.knownFieldItems()) else null },
+            support = { if (live() && telemetry.snapshot.value.hasData) fields.get(telemetry.snapshot.value.game, code.orEmpty(), revision, telemetry.knownFieldItems()) else null },
             session = { p.session.takeIf { live() } },
             inBattle = { telemetry.snapshot.value.inBattle },
             deliver = { result -> result(); if (live()) sample() },
