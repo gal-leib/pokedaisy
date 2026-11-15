@@ -1,6 +1,8 @@
 package com.pokedaisy.app
 
-import android.content.Context
+import com.pokedaisy.app.companion.PreferenceStore
+import com.pokedaisy.app.companion.edit
+import kotlin.time.Clock
 import com.pokedaisy.app.companion.DS_RESOLUTION_MAX
 import com.pokedaisy.app.companion.FfMode
 import com.pokedaisy.app.companion.GameAspect
@@ -10,10 +12,15 @@ import com.pokedaisy.app.companion.Smoothing
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.data.LibraryView
 
-/** Tiny SharedPreferences wrapper for app-level state. */
-class Prefs(context: Context) {
-    private val p = context.getSharedPreferences("pokedaisy", Context.MODE_PRIVATE)
-    private val appContext: Context = context.applicationContext ?: context
+/** App preferences, keys and legacy codecs shared by every host. Storage retains each platform's existing format. */
+class Prefs(
+    private val p: PreferenceStore,
+    private val defaults: Defaults = Defaults(),
+    private val dsCpuBoostDefault: () -> Boolean = { true },
+) {
+    /** Existing host defaults where the installed apps differ. An explicitly saved value always wins. */
+    data class Defaults(val hotkeysEnabled: Boolean = true, val sidePanelDocked: Boolean = false,
+                        val companionWindow: Boolean = true)
 
     var lastRomPath: String?
         get() = p.getString("last_rom", null)
@@ -31,7 +38,7 @@ class Prefs(context: Context) {
 
     fun pushRecentRom(path: String) {
         val updated = (listOf(path) + recentRomPaths().filter { it != path }).take(RECENT_CAP)
-        p.edit().putString("recent_roms", updated.joinToString("\n")).putLong("played_$path", System.currentTimeMillis()).apply()
+        p.edit().putString("recent_roms", updated.joinToString("\n")).putLong("played_$path", Clock.System.now().toEpochMilliseconds()).apply()
     }
 
     /** When the ROM at [path] was last started (the library's LAST PLAYED order); 0 = never, or before this was kept. */
@@ -55,14 +62,14 @@ class Prefs(context: Context) {
     /** Whether a ROM's cover (keyed by file name, like [romDisplayName]) was
      * explicitly picked by the user rather than auto-captured — a manual
      * cover is never overwritten by a later auto-capture backfill. */
-    fun romCoverManual(file: java.io.File): Boolean = p.getBoolean("cover_manual_${file.name}", false)
-    fun setRomCoverManual(file: java.io.File, manual: Boolean) =
-        p.edit().putBoolean("cover_manual_${file.name}", manual).apply()
+    fun romCoverManual(fileName: String): Boolean = p.getBoolean("cover_manual_${fileName}", false)
+    fun setRomCoverManual(fileName: String, manual: Boolean) =
+        p.edit().putBoolean("cover_manual_${fileName}", manual).apply()
 
     /** Where an automatic cover came from ([CoverArtSync.Source] name), for INFO; null = unknown (older covers). */
-    fun romCoverSource(file: java.io.File): String? = p.getString("cover_source_${file.name}", null)
-    fun setRomCoverSource(file: java.io.File, source: String?) = p.edit().apply {
-        if (source == null) remove("cover_source_${file.name}") else putString("cover_source_${file.name}", source)
+    fun romCoverSource(fileName: String): String? = p.getString("cover_source_${fileName}", null)
+    fun setRomCoverSource(fileName: String, source: String?) = p.edit().apply {
+        if (source == null) remove("cover_source_${fileName}") else putString("cover_source_${fileName}", source)
     }.apply()
 
     /** RetroAchievements account (achievements/RetroAchievements.kt): the username and the
@@ -419,7 +426,7 @@ class Prefs(context: Context) {
 
     /** Whether the emulator hotkeys ([com.pokedaisy.app.Hotkeys]) fire at all; off, every key goes to the game. */
     var hotkeysEnabled: Boolean
-        get() = p.getBoolean("hotkeys_enabled", true)
+        get() = p.getBoolean("hotkeys_enabled", defaults.hotkeysEnabled)
         set(v) = p.edit().putBoolean("hotkeys_enabled", v).apply()
 
     /** SETTINGS > FPS / CPU: the game's frames per second and the app's CPU share over the game's corner. */
@@ -537,10 +544,10 @@ class Prefs(context: Context) {
     /** SCREEN > DS RESOLUTION: a DS game's 3D at this many times the DS's own (2-8: the GPU renderer,
      * nds/pk_nds_gl.h) or the DS's own on the CPU (1, the default: melonDS's software renderer, pixel for pixel). */
     /** DS CPU BOOST: the emulated ARM9 at twice the DS's clock (MgbaCore.pkNdsCpuBoost). Until the player sets it, on
-     * except where [DevicePerformance.looksWeak]: the boost about doubles the ARM9's work (HeartGold's frame 3.8 -> 7.3 ms
+     * except where the host reports a weak device: the boost about doubles the ARM9's work (HeartGold's frame 3.8 -> 7.3 ms
      * on the RP6), and a chip with only little cores (the RG DS's A55s) runs out of time with it, not without. */
     var dsCpuBoost: Boolean
-        get() = if (p.contains("ds_cpu_boost")) p.getBoolean("ds_cpu_boost", true) else !DevicePerformance.looksWeak(appContext)
+        get() = if (p.contains("ds_cpu_boost")) p.getBoolean("ds_cpu_boost", true) else dsCpuBoostDefault()
         set(v) = p.edit().putBoolean("ds_cpu_boost", v).apply()
 
     /** SCREEN > DS CORE: which emulator runs a DS game (companion.DsCore: AUTO, the default, MELONDS, DSPERATE). */
@@ -646,7 +653,7 @@ class Prefs(context: Context) {
 
     /** Single-screen devices: the companion's side panel is locked beside the game (see [SidePanel]). */
     var sidePanelDocked: Boolean
-        get() = p.getBoolean("side_panel_docked", false)
+        get() = p.getBoolean("side_panel_docked", defaults.sidePanelDocked)
         set(v) = p.edit().putBoolean("side_panel_docked", v).apply()
 
     /** Single-screen devices: the side panel's width, as a fraction of the screen's (see [SidePanel]). */
@@ -657,7 +664,7 @@ class Prefs(context: Context) {
     /** One screen held sideways: the companion opens as a window in the middle, over the game (true), or in the side
      * panel on the right (SETTINGS > COMPANION VIEW; see [SidePanel]). */
     var companionWindow: Boolean
-        get() = p.getBoolean("companion_window", true)
+        get() = p.getBoolean("companion_window", defaults.companionWindow)
         set(v) = p.edit().putBoolean("companion_window", v).apply()
 
     /** One screen held sideways: the white tab at the bottom of the screen's right edge that opens the companion (SETTINGS >
@@ -718,9 +725,9 @@ class Prefs(context: Context) {
         p.getString("guide_notice_ok", null)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     /** Display-only ROM name override (keyed by file name); null = use the file name. */
-    fun romDisplayName(file: java.io.File): String? = p.getString("romname_${file.name}", null)
-    fun setRomDisplayName(file: java.io.File, name: String?) = p.edit().apply {
-        if (name.isNullOrBlank()) remove("romname_${file.name}") else putString("romname_${file.name}", name.trim())
+    fun romDisplayName(fileName: String): String? = p.getString("romname_${fileName}", null)
+    fun setRomDisplayName(fileName: String, name: String?) = p.edit().apply {
+        if (name.isNullOrBlank()) remove("romname_${fileName}") else putString("romname_${fileName}", name.trim())
     }.apply()
 
     /**
@@ -730,9 +737,9 @@ class Prefs(context: Context) {
      * a file dropped directly into the roms/ folder, or picked from a provider
      * with no real filesystem path, like Drive).
      */
-    fun romSourcePath(file: java.io.File): String? = p.getString("romsrc_${file.name}", null)
-    fun setRomSourcePath(file: java.io.File, path: String?) = p.edit().apply {
-        if (path.isNullOrBlank()) remove("romsrc_${file.name}") else putString("romsrc_${file.name}", path)
+    fun romSourcePath(fileName: String): String? = p.getString("romsrc_${fileName}", null)
+    fun setRomSourcePath(fileName: String, path: String?) = p.edit().apply {
+        if (path.isNullOrBlank()) remove("romsrc_${fileName}") else putString("romsrc_${fileName}", path)
     }.apply()
 
     /** Custom folder for game saves (.sav/.srm); null = the app's own files/saves/. */
@@ -762,9 +769,9 @@ class Prefs(context: Context) {
         set(v) = p.edit().putInt("save_backups_keep", v).apply()
 
     /** [file]'s own save folder (the library menu's SAVE FOLDER); null = [SavesLocation.saveFor]'s search. */
-    fun romSaveDir(file: java.io.File): String? = p.getString("romsavedir_${file.name}", null)
-    fun setRomSaveDir(file: java.io.File, path: String?) = p.edit().apply {
-        if (path.isNullOrBlank()) remove("romsavedir_${file.name}") else putString("romsavedir_${file.name}", path)
+    fun romSaveDir(fileName: String): String? = p.getString("romsavedir_${fileName}", null)
+    fun setRomSaveDir(fileName: String, path: String?) = p.edit().apply {
+        if (path.isNullOrBlank()) remove("romsavedir_${fileName}") else putString("romsavedir_${fileName}", path)
     }.apply()
 
     /** The player's own ROMs folders (first-time setup, the library's +, Settings > FOLDERS > ROMS FOLDERS): their

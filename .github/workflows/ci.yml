@@ -106,14 +106,16 @@ jobs:
 
       # Also commonTest's portable platform checks: a KLIB compile alone doesn't exercise Native APIs.
       - name: The core and the platform checks in the iPad simulator
-        run: ./gradlew :shared:iosSimulatorArm64Test --stacktrace
+        run: ./gradlew :shared:iosSimulatorArm64Test :shared-ui:iosSimulatorArm64Test --stacktrace
 
       - name: Test reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ios-test-reports
-          path: shared/build/reports/tests/
+          path: |
+            shared/build/reports/tests/
+            shared-ui/build/reports/tests/
           retention-days: 7
 
   # The iPad app: the companion's screens (shared-ui/) compiled for the iPad, then iosApp/'s XcodeGen project built

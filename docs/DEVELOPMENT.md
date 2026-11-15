@@ -3726,6 +3726,15 @@ The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/
 `ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
 multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
 
+`Prefs` is common code too, compiled in place by `shared-ui`. `PreferenceStore` is its primitive
+storage interface: Android keeps the existing `pokedaisy` SharedPreferences file through `PrefsAndroid`,
+and iOS keeps its NSUserDefaults domain through `DefaultsPreferenceStore`. Existing Android `Prefs(context)`
+callers and file-name helpers stay source compatible. Shared getters, codecs and compound edits retain their
+keys and representations; host defaults preserve iOS's initial hotkey and companion-window choices.
+The device-performance default for DS CPU boost stays with Android. The iOS settings, touch preferences,
+theme store, NEW dates and learned fast-forward callbacks use this same implementation. Other settings
+orchestration and the library's historical format are consolidated separately, without resetting stored data.
+
 `shared-ui/` compiles the companion's screens for Android and iOS the same way, where they live: `companion/ui`, the
 `companion/*.kt` settings and state beside them, the co-op screens' model (`companion/coop`, without the transport and
 session files, which are Android / JVM only: sockets, Android NSD, Bouncy Castle, OkHttp), the manual reader

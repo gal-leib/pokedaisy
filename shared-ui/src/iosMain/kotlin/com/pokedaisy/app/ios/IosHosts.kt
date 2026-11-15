@@ -59,31 +59,22 @@ object IosHosts {
         PictureCodec.current = SkiaPictures
         DeviceDates.current = FoundationDates
         com.pokedaisy.app.cheats.CheatParser.current = com.pokedaisy.app.cheats.CheatParser(com.pokedaisy.app.core.PkApiCore::checkCheat)
-        val defaults = NSUserDefaults.standardUserDefaults
-        val seen = defaults.stringForKey("new_feature_since").orEmpty().split(",").mapNotNull { entry ->
-            val parts = entry.split(":", limit = 2)
-            parts.getOrNull(1)?.toLongOrNull()?.let { parts[0] to it }
-        }.toMap()
-        com.pokedaisy.app.companion.NewFeatures.init(seen, save = { dates ->
-            defaults.setObject(dates.entries.joinToString(",") { "${it.key}:${it.value}" }, "new_feature_since")
-        })
+        com.pokedaisy.app.companion.NewFeatures.init(iosPreferences.newFeatureSince,
+            save = { iosPreferences.newFeatureSince = it })
     }
 }
 
 /** THEME and DARK MODE, under Prefs' keys and defaults (8 = POKéDAISY, the old 0-7 read as it; 0 = dark mode OFF). */
 private object DefaultsThemeStore : ThemeStore {
-    private val d get() = NSUserDefaults.standardUserDefaults
-    private fun int(key: String, default: Int) = if (d.objectForKey(key) == null) default else d.integerForKey(key).toInt()
-
     override var appTheme: Int
-        get() = int("app_theme", 8).let { if (it in 0..7) 8 else it }
-        set(v) = d.setInteger(v.toLong(), "app_theme")
+        get() = iosPreferences.appTheme
+        set(v) { iosPreferences.appTheme = v }
     override var themeBeforeSeasonal: Int
-        get() = int("theme_before_seasonal", 8).let { if (it in 0..7) 8 else it }
-        set(v) = d.setInteger(v.toLong(), "theme_before_seasonal")
+        get() = iosPreferences.themeBeforeSeasonal
+        set(v) { iosPreferences.themeBeforeSeasonal = v }
     override var darkMode: Int
-        get() = int("dark_mode", 0)
-        set(v) = d.setInteger(v.toLong(), "dark_mode")
+        get() = iosPreferences.darkMode
+        set(v) { iosPreferences.darkMode = v }
 }
 
 /** A file's bytes from the URL (a file:// or https:// one), or null. Blocking. */

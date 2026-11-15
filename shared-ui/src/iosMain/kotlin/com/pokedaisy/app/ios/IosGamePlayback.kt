@@ -9,7 +9,6 @@ import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.game.GameSession
 import platform.Foundation.NSLog
 import okio.Path.Companion.toPath
-import platform.Foundation.NSUserDefaults
 
 /** Drives the existing memory watchers once per game frame and feeds the common Android speed policy. */
 internal class IosGamePlayback(
@@ -19,7 +18,6 @@ internal class IosGamePlayback(
     private val battle: IosBattleInput,
 ) {
     private val gba = code != null
-    private val defaults = NSUserDefaults.standardUserDefaults
     val session = GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> NSLog("PokeDaisy: %@: %@", where, error.toString()) }
     private val menu get() = session.menuOpen
     private val map get() = session.mapOpen
@@ -56,10 +54,9 @@ internal class IosGamePlayback(
         val crc = if (gba) runCatching { romCrc32(romPath.toPath()) }.getOrDefault(0L) else 0L
         val romKey = crc.toString(16).padStart(8, '0')
         blocked = BlockedGames.forCrc(romKey) != null
-        val key = "ff_menu_cb2_v2_$romKey"
-        val learned = defaults.stringForKey(key)?.split(',')
-        FfMenuWatch.load(code.orEmpty(), learned?.getOrNull(0)?.toLongOrNull() ?: 0, learned?.getOrNull(1)?.toLongOrNull() ?: 0)
-        FfMenuWatch.onLearned = { field, battle -> defaults.setObject("$field,$battle", key) }
+        val learned = iosPreferences.ffMenuCallbacks(romKey)
+        FfMenuWatch.load(code.orEmpty(), learned.first, learned.second)
+        FfMenuWatch.onLearned = { field, battle -> iosPreferences.setFfMenuCallbacks(romKey, field, battle) }
         ShopWatch.load()
         RegionMapWatch.load(if (gba && !blocked) romPath.toPath() else null)
         fieldReadable = gba && !blocked && PkApiCore.configureField(crc)

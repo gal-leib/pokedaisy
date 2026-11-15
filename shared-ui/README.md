@@ -1,0 +1,9 @@
+# Shared UI
+
+This module compiles the common Compose screens and their models for both Android and iOS.
+They stay in `app/src/main/kotlin`, selected by `sharedUiSources` in the root build, so changes
+remain easy to port upstream. Android excludes these files from its own compilation and links
+this module instead. The apparent absence of `src/commonMain` does not mean the UI is iOS-only.
+
+`src/iosMain` contains the Apple platform adapters and the remaining host orchestration being
+consolidated into common implementations used by both platforms.

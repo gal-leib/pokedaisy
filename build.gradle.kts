@@ -49,6 +49,7 @@ val sharedUiSources by extra(
         "com/pokedaisy/app/DocsApi.kt",
         "com/pokedaisy/app/DocsSearch.kt",
         "com/pokedaisy/app/InputBadges.kt",
+        "com/pokedaisy/app/Prefs.kt",
         "com/pokedaisy/app/BattleInputController.kt",
     ),
 )
