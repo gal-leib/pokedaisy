@@ -965,7 +965,7 @@ JNIEXPORT jstring JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCheatsCheck(JNIEnv* env, jobject thiz, jstring jCode, jint type, jstring jDirective) {
     const char* code = (*env)->GetStringUTFChars(env, jCode, NULL);
     const char* directive = (*env)->GetStringUTFChars(env, jDirective, NULL);
-    char* result = pk_cheats_check(code, (int) type, directive);
+    char* result = pk_api_cheats_check(code, (int) type, directive);
     (*env)->ReleaseStringUTFChars(env, jDirective, directive);
     (*env)->ReleaseStringUTFChars(env, jCode, code);
     if (!result) {
@@ -983,9 +983,7 @@ Java_com_pokedaisy_app_MgbaCore_pkCheatsCheck(JNIEnv* env, jobject thiz, jstring
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCheatsApply(JNIEnv* env, jobject thiz, jstring jText) {
     const char* text = (*env)->GetStringUTFChars(env, jText, NULL);
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int n = g.core ? pk_cheats_apply(g.core, text, strlen(text)) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
+    int n = pk_api_cheats_apply(text);
     (*env)->ReleaseStringUTFChars(env, jText, text);
     return n;
 }

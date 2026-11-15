@@ -9,6 +9,8 @@ import com.pokedaisy.app.core.pkapi.pk_api_load_state
 import com.pokedaisy.app.core.pkapi.pk_api_state_matches_save
 import com.pokedaisy.app.core.pkapi.pk_api_rom_patch
 import com.pokedaisy.app.core.pkapi.pk_api_rom_unpatch
+import com.pokedaisy.app.core.pkapi.pk_api_cheats_check
+import com.pokedaisy.app.core.pkapi.pk_api_cheats_apply
 import com.pokedaisy.app.companion.data.RomOptionPatcher
 import com.pokedaisy.app.core.pkapi.pk_api_field_wild
 import com.pokedaisy.app.core.pkapi.pk_api_field_step
@@ -54,6 +56,15 @@ import kotlinx.cinterop.value
  * Threads, as pk_api.h says: one thread (the game's) starts, runs and stops it; the reads may come from any thread.
  */
 object PkApiCore : EmulatorCore, RomOptionPatcher {
+    /** Existing mGBA GBA parser, independent of a running game. */
+    fun checkCheat(code: String, type: Int, directive: String): String? {
+        val result = pk_api_cheats_check(code, type, directive) ?: return null
+        return try { result.toKString() } finally { platform.posix.free(result) }
+    }
+
+    /** Replace enabled GBA cheats between frames; the C API owns the existing core lock and patch bookkeeping. */
+    fun applyCheats(text: String): Int = pk_api_cheats_apply(text)
+
     /** The keys as [setKeys] takes them (pk_api.h's PK_API_KEY_*; a Game Boy game ignores L / R). */
     const val KEY_A = 1 shl 0
     const val KEY_B = 1 shl 1

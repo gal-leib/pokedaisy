@@ -368,6 +368,17 @@ void pk_api_rom_unpatch(void) {
     pthread_rwlock_unlock(&pk_coreLock);
 }
 
+char* pk_api_cheats_check(const char* code, int type, const char* directive) {
+    return pk_cheats_check(code, type, directive);
+}
+
+int pk_api_cheats_apply(const char* text) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int count = g.core ? pk_cheats_apply(g.core, text, text ? strlen(text) : 0) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return count;
+}
+
 bool pk_api_field_configure(uint32_t crc) {
     return pk_field_configure(g.core && pk_is_gba(g.core) ? crc : 0) != 0;
 }

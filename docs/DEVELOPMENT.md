@@ -4089,3 +4089,16 @@ Existing iOS bindings, including deliberately empty START 2 / SELECT 2, remain u
 Ownership changes quarantine virtual keys too. Touch release clears the virtual set; if a state/hotkey callback
 clears it mid-poll, a second edge pass releases it before the next core frame. Four native tests exercise mapped
 buttons, hotkey precedence, ownership, capture and callback-driven release through the real native poller.
+
+
+### Shared cheat parser and live apply
+
+`pk_api_cheats_check` exposes the existing GBA parser without a running core. Its malloc-owned ASCII answer keeps
+the directive/newline/per-line flags protocol used by `CheatCheck`; JNI and Kotlin/Native free it after copying.
+`pk_api_cheats_apply` owns the same write lock as the previous JNI body and delegates to `pk_cheats_apply`, including
+its separate cheat/game-option patch bookkeeping and original-ROM overlay for readers. No code parser, opcode
+rules or patch engine are copied. The current cheat engine is GBA-only; GB/no-core application is a no-op.
+
+The original-diagnostic `pk_cheats_api` test checks parser results, live RAM writes, replacement/clear, restoration
+of a cheated ROM byte, original-byte reads and preservation of a separate game-option patch. `PkApiCoreTest`
+checks parser/apply through cinterop. The shared entry form and iOS settings host are connected separately.

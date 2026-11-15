@@ -158,4 +158,17 @@ class PkApiCoreTest {
         assertEquals(0L, PkApiCore.romSize())
         assertNull(PkApiCore.video())
     }
+
+    @Test
+    fun cheatParserAndLiveReplacementCrossCinterop() {
+        assertEquals("\n10", PkApiCore.checkCheat("32003000 005A\nnot-a-code", 0, ""))
+        assertTrue(PkApiCore.start("$dir/diagnostic.gba", null))
+        assertEquals(1, PkApiCore.applyCheats("!reset\n# diagnostic RAM\n32003000 005A\n"))
+        repeat(4) { PkApiCore.runFrame() }
+        assertEquals(0x5A, assertNotNull(PkApiCore.readBytes(0x02003000, 1))[0].toInt() and 0xFF)
+        assertEquals(1, PkApiCore.applyCheats("!reset\n# replacement\n32003000 00A5\n"))
+        PkApiCore.runFrame()
+        assertEquals(0xA5, assertNotNull(PkApiCore.readBytes(0x02003000, 1))[0].toInt() and 0xFF)
+        assertEquals(0, PkApiCore.applyCheats(""))
+    }
 }

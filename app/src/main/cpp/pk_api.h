@@ -1,7 +1,7 @@
 // PokeDaisy's emulator core as a plain C API: what a host calls to run a GBA or Game Boy game on mGBA and read its
 // memory, with no JNI in it. Android's MgbaCore.kt reaches it through pokedaisy_jni.c (which adds the DS games on
 // melonDS / DSperate in front of it); the iPad app calls it straight from Kotlin / Swift. The rest of pokedaisy_jni.c
-// (cheats, EXPAND, REWIND, the render core, the game calls...) moves under here area by area.
+// (EXPAND, the render core, the game calls...) moves under here area by area.
 //
 // Threads: the emu thread owns the game - init / deinit, frames, keys, audio. pk_api_read and the ROM reads may come
 // from any thread (they take the core lock); they return false with no game up. GPL-3.0 (see NOTICE).
@@ -51,6 +51,15 @@ int pk_api_video_height(void);
 bool pk_api_rom_patch(uint32_t expectAddr, const uint8_t* expect, int expectLen,
                       uint32_t addr, const uint8_t* value, int len);
 void pk_api_rom_unpatch(void);
+
+/** Check GBA cheat lines without a running core, using mGBA's existing parser and GBACheatType values.
+ * Returns a malloc-owned ASCII string: directive, newline, then one '1'/'0' per line; NULL on allocation failure.
+ * The caller must free it. NULL code/directive mean empty strings. No game state is read or changed. */
+char* pk_api_cheats_check(const char* code, int type, const char* directive);
+/** Replace the running GBA game's enabled cheats with mGBA .cheats text (NULL/empty clears them).
+ * Returns sets loaded, -1 on parse failure, 0 with no GBA game. Game thread between frames; takes the core lock.
+ * Uses the existing patch/overlay bookkeeping; game-option patches remain separate. */
+int pk_api_cheats_apply(const char* text);
 
 /** Field observation only: configure the current GBA ROM by its CRC32 (zero disables), then read PK_API_FIELD_*.
  * Game thread, between frames. Unknown games, Game Boy and no core return zero. Does not enable game patches. */
