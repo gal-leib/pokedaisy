@@ -1,6 +1,5 @@
 package com.pokedaisy.app
 
-import com.pokedaisy.app.companion.NewFeatures
 import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.data.KeyCodes
 import com.pokedaisy.app.companion.data.Logs
@@ -57,16 +56,6 @@ class Hotkeys private constructor(
 
         val prop get() = name.lowercase()
 
-        /** The NEW tag on its row in HOTKEYS (both screens). */
-        val badge: String? get() = when (this) {
-            RESTART_GAME, CLOSE_APP -> NewFeatures.badge(NewFeatures.GAME_HOTKEYS)
-            QUICK_MENU -> NewFeatures.badge(NewFeatures.QUICK_MENU)
-            COMPANION -> NewFeatures.badge(NewFeatures.COMPANION_HOTKEY)
-            MUTE -> NewFeatures.badge(NewFeatures.GAME_VOLUME)
-            FREE_FLIGHT -> NewFeatures.badge(NewFeatures.FREE_FLIGHT)
-            TOUCH_SCREEN, DS_LAYOUT -> NewFeatures.badge(NewFeatures.DS_LAYOUT)
-            else -> null
-        }
         val label get() = name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
     }
 

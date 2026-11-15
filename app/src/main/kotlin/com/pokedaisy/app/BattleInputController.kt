@@ -18,11 +18,6 @@ import com.pokedaisy.app.companion.data.Gfx
 import com.pokedaisy.app.companion.data.InProcessReader
 import com.pokedaisy.app.companion.data.MemoryReader
 
-/** The battle controller's synthetic key channel, implemented by each platform's game input. */
-fun interface ScriptInput {
-    fun setScript(bits: Int, exclusive: Boolean)
-}
-
 /**
  * Drives the real in-game battle menu (FIGHT/BAG/POKEMON/RUN, then a move, or
  * a Pokémon to switch to) via synthetic button presses injected through

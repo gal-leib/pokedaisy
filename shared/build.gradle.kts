@@ -10,7 +10,9 @@ plugins {
     id("com.android.library")
 }
 
-val appSrc = rootDir.resolve("app/src/main/kotlin/com/pokedaisy/app/companion")
+val appSrc = rootDir.resolve("app/src/main/kotlin")
+@Suppress("UNCHECKED_CAST")
+val sharedCoreSources = rootProject.extra["sharedCoreSources"] as List<String>
 val appTest = rootDir.resolve("app/src/test/kotlin/com/pokedaisy/app/companion")
 
 // The emulator core for iOS (pk_api.h: mGBA + the app's portable C), built with Xcode's tools by
@@ -55,8 +57,9 @@ kotlin {
 
     sourceSets {
         commonMain {
-            kotlin.srcDir(appSrc.resolve("data"))
-            kotlin.srcDir(appSrc.resolve("i18n"))
+            kotlin.srcDir(appSrc)
+            kotlin.include(sharedCoreSources)
+            kotlin.include("com/pokedaisy/app/game/**")
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("org.jetbrains.kotlinx:atomicfu:0.23.1")

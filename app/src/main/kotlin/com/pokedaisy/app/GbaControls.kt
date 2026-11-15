@@ -53,13 +53,6 @@ object GbaControls {
         }
         /** Its row's name in GAME BUTTONS: the GBA's own buttons say so, the others are their own. */
         val title get() = if (group == Group.ALL && !dpad) "GBA $label" else label
-        /** START 2 / SELECT 2 / TO COMPANION are new rows (they were all X / Y once); TO COMPANION keeps X's tag. */
-        val badge: String? get() = when (this) {
-            TO_COMPANION -> com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.X_COMPANION)
-            START_2, SELECT_2 -> com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.GBA_BUTTONS)
-            UP, DOWN, LEFT, RIGHT -> com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.DPAD_KEYS)
-            else -> null
-        }
         /** A line under its row: what it does (English; translated where drawn). */
         val subtitle: String? get() = when (this) {
             START_2 -> "A second START"

@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.badge
 import kotlin.time.Clock
 import com.pokedaisy.app.companion.SkinSystem
 import com.pokedaisy.app.companion.DsCore

@@ -3683,16 +3683,21 @@ For focused JVM tests, use `make test-quick MODULE=shared T='*RomFilesTest'` (`M
 A filter must match a test in that module; unfiltered `make test-quick` still runs both modules.
 ui-preview still compiles the same files straight into its desktop build.
 
+The canonical key codes, `GbaControls`, `Hotkeys`, `GbaInput`, `ScriptInput` and `KeyCapture` also compile in
+`shared/`, from their existing app paths (`sharedCoreSources` in the root build). Both native hosts can use the same
+bindings, chord capture, deferred taps, turbo and script ownership. `AndroidGbaInput.kt` converts Android motion
+events to the common axis policy; UI badges stay in `shared-ui/`. The app excludes these files from its own compile.
+
 ### The companion's screens (`shared-ui/`)
 
-The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/`, in place. Its `ScriptInput`
-interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
+The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/`, in place. The core module's
+`ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
 multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
 
 `shared-ui/` compiles the companion's screens for Android and iOS the same way, where they live: `companion/ui`, the
 `companion/*.kt` settings and state beside them, the co-op screens' model (`companion/coop`, without the transport and
 session files, which are Android / JVM only: sockets, Android NSD, Bouncy Castle, OkHttp), the manual reader
-(`DocsApi.kt`, `DocsSearch.kt`), `cheats/Cheats.kt` and the controls' bindings (`GbaControls.kt`, `Hotkeys.kt`), against
+(`DocsApi.kt`, `DocsSearch.kt`), `cheats/Cheats.kt` and the binding rows' NEW badges (`InputBadges.kt`), against
 `:shared` and Compose Multiplatform 1.7. The app links it and leaves those files out of its own compile and lint (the
 root build's `sharedUiSources` / `sharedUiAppOnly` name them for both); ui-preview still compiles them straight into its
 desktop build. Their tests stay the app's (Paparazzi and the rest under `app/src/test`), so a declaration the app or its

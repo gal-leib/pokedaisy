@@ -37,6 +37,8 @@ kotlin {
             kotlin.srcDir(app)
             kotlin.include(sharedUiSources)
             kotlin.exclude(sharedUiAppOnly)
+            @Suppress("UNCHECKED_CAST")
+            kotlin.exclude(rootProject.extra["sharedCoreSources"] as List<String>)
             dependencies {
                 api(project(":shared"))
                 // Compose Multiplatform 1.7.x, as shared/ (Compose 1.7 on Android, the app's BOM picks the exact version).
