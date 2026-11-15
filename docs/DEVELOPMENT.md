@@ -4105,8 +4105,12 @@ Tests cover state/input ownership, saved choices, viewport exclusions, folds and
 `GameScreenScreenshotTest` renders the real shared root with a stand-in game surface. `GamePicture` shares intrinsic
 picture fitting between the Android renderer adapter and the native UIKit controller slot. `GamePanelLayout` remains
 only the stand-in geometry helper for application settings before a game is running; the legacy three-slot screen is removed.
-LibraryPreferences stores
-portable library UI state with stable ROM IDs; JSON writes complete before the observable UI state changes.
+`LibraryPreferences` owns library choices, favorites, play history, ordering, quick views and search for both hosts.
+Android uses common `Prefs` over SharedPreferences and `LibraryAddedDates` over the existing `rom-added.tsv`;
+iOS uses the same model and preferences through a compatibility codec for its installed `library_preferences`
+JSON. No data migration is required. Initial-library NEW suppression, 24-hour arrival tags, recent-list fallback
+and favorites-first sorting share one policy. Platform discovery, game metadata, pickers and launches remain
+host adapters. JSON writes complete before observable choices change, and unknown JSON fields are retained.
 
 The iPad uses these presenters for its full-window library, Files-based setup and application settings. Its native
 adapter supplies file operations, preferences and launch actions; Swift only switches application/game controllers.

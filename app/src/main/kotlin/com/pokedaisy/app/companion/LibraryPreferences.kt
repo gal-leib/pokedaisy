@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.companion.data.LibraryView
 import kotlin.time.Clock
-import kotlinx.serialization.json.*
 
 /** Stable sort IDs used by the library hosts. */
 enum class LibrarySort(val id: Int, val label: String) {
@@ -13,17 +12,19 @@ enum class LibrarySort(val id: Int, val label: String) {
     companion object { fun of(id: Int) = entries.firstOrNull { it.id == id } ?: NAME }
 }
 
-/** Portable library preferences for hosts without Android's existing Prefs. IDs should survive container changes. */
-class LibraryPreferences(
-    read: () -> String?, private val write: (String) -> Unit,
-    private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-) {
-    private data class Record(
-        val grid: Boolean = true, val sort: LibrarySort = LibrarySort.NAME, val view: LibraryView = LibraryView.ALL,
-        val favorites: Set<String> = emptySet(), val played: Map<String, Long> = emptyMap(),
-        val added: Map<String, Long> = emptyMap(), val last: String? = null,
-    )
-    private var record by mutableStateOf(decode(read()))
+/** Library choices, favorites, history, sorting and filtering for both hosts. Storage codecs preserve installed formats. */
+class LibraryPreferences private constructor(private val storage: Storage, private val now: () -> Long) {
+    private data class Storage(val prefs: com.pokedaisy.app.Prefs, val added: LibraryAddedDates)
+    constructor(prefs: com.pokedaisy.app.Prefs, added: LibraryAddedDates,
+                now: () -> Long = { Clock.System.now().toEpochMilliseconds() }) : this(Storage(prefs, added), now)
+    constructor(read: () -> String?, write: (String) -> Unit,
+                now: () -> Long = { Clock.System.now().toEpochMilliseconds() }) : this(legacy(read, write), now)
+    private val prefs get() = storage.prefs
+    private data class Record(val grid: Boolean, val sort: LibrarySort, val view: LibraryView,
+        val favorites: Set<String>, val played: Map<String, Long>, val added: Map<String, Long>, val last: String?)
+    private fun read() = Record(prefs.libraryViewMode == 1, LibrarySort.of(prefs.librarySort), LibraryView.of(prefs.libraryView),
+        prefs.favoriteRoms, prefs.romPlayTimes(), storage.added.all().mapValues { it.value.millis }, prefs.lastRomPath)
+    private var record by mutableStateOf(read())
     val grid get() = record.grid
     val sort get() = record.sort
     val view get() = record.view
@@ -31,40 +32,58 @@ class LibraryPreferences(
     val played get() = record.played
     val added get() = record.added
     val last get() = record.last
-
-    fun setGrid(on: Boolean) = update(record.copy(grid = on))
-    fun setSort(sort: LibrarySort) = update(record.copy(sort = sort))
-    fun setView(view: LibraryView) = update(record.copy(view = view))
-    fun toggleFavorite(id: String) = update(record.copy(favorites =
-        if (id in record.favorites) record.favorites - id else record.favorites + id))
-    fun recordPlay(id: String) = update(record.copy(played = record.played + (id to now()), last = id))
-    fun recordAdded(ids: List<String>) {
-        val fresh = ids.filter { it !in record.added }
-        if (fresh.isNotEmpty()) update(record.copy(added = record.added + fresh.associateWith { now() }))
+    fun reload() { storage.added.reload(); record = read() }
+    fun setGrid(on: Boolean) { prefs.libraryViewMode = if (on) 1 else 0; record = read() }
+    fun setSort(sort: LibrarySort) { prefs.librarySort = sort.id; record = read() }
+    fun setView(view: LibraryView) { prefs.libraryView = view.id; record = read() }
+    fun setFavorite(id: String, on: Boolean) {
+        prefs.favoriteRoms = if (on) favorites + id else favorites - id
+        record = read()
     }
-
-    private fun update(value: Record) {
-        val encoded = buildJsonObject {
-            put("grid", value.grid); put("sort", value.sort.id); put("view", value.view.id)
-            put("favorites", JsonArray(value.favorites.map(::JsonPrimitive)))
-            putJsonObject("played") { value.played.forEach { (id, time) -> put(id, time) } }
-            putJsonObject("added") { value.added.forEach { (id, time) -> put(id, time) } }
-            value.last?.let { put("last", it) }
-        }.toString()
-        write(encoded)
-        record = value
+    fun toggleFavorite(id: String) = setFavorite(id, id !in favorites)
+    fun recordPlay(id: String) { prefs.recordRomPlayed(id, now()); record = read() }
+    fun recordAdded(ids: List<String>, initial: Boolean = false) { storage.added.record(ids, initial, now()); record = read() }
+    fun forget(id: String) {
+        storage.added.forget(id); prefs.favoriteRoms = favorites - id
+        if (last == id) prefs.lastRomPath = null
+        record = read()
     }
+    fun isNew(id: String) = storage.added.isNew(id, now())
 
-    private fun decode(raw: String?): Record = runCatching {
-        val obj = raw?.let { Json.parseToJsonElement(it) as? JsonObject } ?: return@runCatching Record()
-        fun primitive(key: String) = obj[key] as? JsonPrimitive
-        fun dates(key: String) = (obj[key] as? JsonObject)?.mapNotNull { (id, time) ->
-            (time as? JsonPrimitive)?.longOrNull?.takeIf { it >= 0 }?.let { id to it }
-        }?.toMap().orEmpty()
-        Record(grid = primitive("grid")?.booleanOrNull ?: true,
-            sort = LibrarySort.of(primitive("sort")?.intOrNull ?: 0),
-            view = LibraryView.of(primitive("view")?.intOrNull ?: 0),
-            favorites = (obj["favorites"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }?.toSet().orEmpty(),
-            played = dates("played"), added = dates("added"), last = primitive("last")?.contentOrNull)
-    }.getOrDefault(Record())
+    fun <T> ordered(roms: List<T>, order: LibrarySort = sort, id: (T) -> String): List<T> {
+        val recent = prefs.recentRomPaths()
+        val sorted = when (order) {
+            LibrarySort.NAME -> roms
+            LibrarySort.LAST_PLAYED -> roms.sortedWith(compareByDescending<T> { played[id(it)] ?: 0L }
+                .thenBy { recent.indexOf(id(it)).let { i -> if (i < 0) Int.MAX_VALUE else i } })
+            LibrarySort.DATE_ADDED -> roms.sortedByDescending { added[id(it)] ?: 0L }
+        }
+        val (top, rest) = sorted.partition { id(it) in favorites }
+        return top + rest
+    }
+    fun <T> filtered(roms: List<T>, view: LibraryView, id: (T) -> String,
+                     platform: (T) -> com.pokedaisy.app.companion.data.RomCategory?,
+                     category: (T) -> com.pokedaisy.app.companion.data.RomCategory? = platform): List<T> = when (view) {
+        LibraryView.ALL -> roms
+        LibraryView.FAVORITES -> roms.filter { id(it) in favorites }
+        LibraryView.RECENT -> {
+            val recent = prefs.recentRomPaths()
+            roms.filter { id(it) in played || id(it) in recent }.sortedWith(compareByDescending<T> { played[id(it)] ?: 0L }
+                .thenBy { recent.indexOf(id(it)).let { i -> if (i < 0) Int.MAX_VALUE else i } })
+        }
+        LibraryView.HACKS -> roms.filter { category(it) == com.pokedaisy.app.companion.data.RomCategory.HACK }
+        else -> roms.filter { platform(it) == view.platform }
+    }
+    private companion object {
+        fun legacy(read: () -> String?, write: (String) -> Unit): Storage {
+            val backend = LegacyLibraryStore(read, write)
+            return Storage(com.pokedaisy.app.Prefs(backend, com.pokedaisy.app.Prefs.Defaults(libraryListsJson = true)), backend.added)
+        }
+    }
+}
+
+fun matchesLibrarySearch(query: String, names: List<String>): Boolean {
+    fun searchable(value: String) = com.pokedaisy.app.companion.i18n.stripAccents(value).lowercase()
+    val all = names.map(::searchable)
+    return searchable(query).split(' ').filter { it.isNotEmpty() }.all { word -> all.any { word in it } }
 }

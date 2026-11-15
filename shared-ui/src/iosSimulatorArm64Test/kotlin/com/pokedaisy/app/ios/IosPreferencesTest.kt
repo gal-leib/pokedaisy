@@ -18,6 +18,7 @@ class IosPreferencesTest {
             d.setBool(false, "game_muted"); d.setInteger(0, "game_volume")
             d.setDouble(0.625, "side_panel_width"); d.setObject("134217729,134217733", "ff_menu_cb2_v2_test")
             val store = DefaultsPreferenceStore(d)
+            assertTrue("game_muted" in store.keys())
             val prefs = Prefs(store, Prefs.Defaults(hotkeysEnabled = false))
             assertFalse(prefs.gameMuted); assertEquals(0, prefs.gameVolume)
             assertEquals(0.625f, prefs.sidePanelWidth)

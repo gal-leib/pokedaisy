@@ -275,6 +275,9 @@ grid, or refresh after changing files. Hold a game to mark it as a favorite or c
 `FAVORITES` and `RECENT` keep the games you want close by. Your choices, display mode and game history are kept when
 you reopen the app. The platform views show the consoles your library contains.
 
+Favorites come first in every sort order, and `RECENT` lists the games you played most recently first.
+Search ignores case and accents, whether you search by the displayed name or the file name.
+
 Open `SETTINGS` from the library to change appearance, language, playback defaults and touch controls before playing.
 `RUN SETUP` reopens the shared setup pages. On iPad, games picked in Files are copied into PokeDaisy's `roms` folder,
 and battery saves stay in `saves`. You can reach both folders through Files.

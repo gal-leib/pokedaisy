@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion
 /** Primitive settings storage. Writes publish one batch; null removes a key. Values are Boolean, Int, Long,
  * Float or String, as in the installed Android preferences. No settings policy belongs in the adapters. */
 interface PreferenceStore {
+    fun keys(): Set<String> = emptySet()
     fun contains(key: String): Boolean
     fun getBoolean(key: String, default: Boolean): Boolean
     fun getInt(key: String, default: Int): Int

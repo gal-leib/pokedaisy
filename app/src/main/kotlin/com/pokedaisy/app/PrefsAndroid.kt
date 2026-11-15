@@ -10,6 +10,7 @@ fun Prefs(context: Context): Prefs = Prefs(AndroidPreferenceStore(context),
 
 private class AndroidPreferenceStore(context: Context) : PreferenceStore {
     private val p = context.getSharedPreferences("pokedaisy", Context.MODE_PRIVATE)
+    override fun keys(): Set<String> = p.all.keys
     override fun contains(key: String) = p.contains(key)
     override fun getBoolean(key: String, default: Boolean) = p.getBoolean(key, default)
     override fun getInt(key: String, default: Int) = p.getInt(key, default)

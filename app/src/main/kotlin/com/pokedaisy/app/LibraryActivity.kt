@@ -168,6 +168,7 @@ internal val BLOCKED_BADGE_SHADOW = com.pokedaisy.app.companion.ui.LibraryBadgeC
 class LibraryActivity : ComponentActivity() {
 
     private lateinit var prefs: Prefs
+    private val libraryPreferences by lazy { com.pokedaisy.app.companion.LibraryPreferences(prefs, RomAdded.forContext(this)) }
     private lateinit var romsDir: File
     private lateinit var coversDir: File
 
@@ -399,6 +400,7 @@ class LibraryActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         isResumed = true
+        libraryPreferences.reload()
         // Brought back on the bottom screen (its icon tapped there while open): over to the top one again.
         if (Screens.reopenOnMainDisplay(this)) return
         com.pokedaisy.app.companion.ui.OptionColors.inGame = false
@@ -453,13 +455,9 @@ class LibraryActivity : ComponentActivity() {
     private var sort by mutableStateOf(LibrarySort.NAME)
     private var pickingSort by mutableStateOf(false)
     /** The grid view (else the list), the classic library's and the launcher's alike (Prefs.libraryViewMode). */
-    private var gridViewState: androidx.compose.runtime.MutableState<Boolean>? = null
     private var gridView: Boolean
-        get() = (gridViewState ?: mutableStateOf(prefs.libraryViewMode == 1).also { gridViewState = it }).value
-        set(v) {
-            (gridViewState ?: mutableStateOf(v).also { gridViewState = it }).value = v
-            prefs.libraryViewMode = if (v) 1 else 0
-        }
+        get() = libraryPreferences.grid
+        set(v) { libraryPreferences.setGrid(v) }
 
     /** The open quick view (the pills over the games, Prefs.libraryView). */
     private var quickView by mutableStateOf(LibraryView.ALL)
@@ -501,13 +499,13 @@ class LibraryActivity : ComponentActivity() {
     private fun quickViewsOf(library: List<File>): QuickViews {
         val platforms = library.associateWith { GameTitles.platform(this, it) }
         val categories = library.associateWith { GameTitles.category(this, it) }
-        return QuickViews(LibraryView.entries.associateWith { libraryViewOf(this, prefs, library, it, platforms::get, categories::get) })
+        return QuickViews(LibraryView.entries.associateWith { libraryPreferences.filtered(library, it, { file -> file.absolutePath }, platforms::get, categories::get) })
     }
 
     private fun pickQuickView(view: LibraryView) {
         toolsOpen = false
         quickView = view
-        prefs.libraryView = view.id
+        libraryPreferences.setView(view)
         refreshLauncherGames()
     }
 
@@ -534,7 +532,7 @@ class LibraryActivity : ComponentActivity() {
         @Suppress("UNUSED_EXPRESSION") revision
         val m = rememberGbaTextMetrics()
         val small = rememberGbaTextMetrics(textScale = 1f)
-        val library = remember(revision, sort, unsupportedRoms, searchQuery) { sortLibrary(this@LibraryActivity, prefs, shownRoms(), sort) }
+        val library = remember(revision, sort, unsupportedRoms, searchQuery) { libraryPreferences.ordered(shownRoms(), sort) { it.absolutePath } }
         // Each game's console (a hack's is its base game's), once per revision: the quick views filter on it.
         val views = remember(revision, library) { quickViewsOf(library) }
         val view = views.open(quickView)
@@ -649,7 +647,7 @@ class LibraryActivity : ComponentActivity() {
             if (pickingSort) {
                 OptionSelector(
                     tr("SORT BY"), LibrarySort.entries.toList(), sort, { tr(it.label) }, m,
-                    onPick = { sort = it; prefs.librarySort = it.id; pickingSort = false; refreshLauncherGames() },
+                    onPick = { sort = it; libraryPreferences.setSort(it); pickingSort = false; refreshLauncherGames() },
                     onDismiss = { pickingSort = false },
                 )
             }
@@ -848,15 +846,13 @@ class LibraryActivity : ComponentActivity() {
                     onDismiss = { deleting = null },
                     onConfirm = {
                         rom.delete()
-                        RomAdded.forget(this@LibraryActivity, rom)
-                        prefs.favoriteRoms = prefs.favoriteRoms - rom.absolutePath
+                        libraryPreferences.forget(rom.absolutePath)
                         prefs.setRomDisplayName(rom, null)
                         prefs.setRomSourcePath(rom, null)
                         prefs.setRomCoverManual(rom, false)
                         prefs.setRomCoverSource(rom, null)
                         coverFile(rom).delete()
                         GameMedia.forget(GameMedia.root(this@LibraryActivity), rom)
-                        if (prefs.lastRomPath == rom.absolutePath) prefs.lastRomPath = null
                         deleting = null
                         bump()
                     },
@@ -1099,7 +1095,7 @@ class LibraryActivity : ComponentActivity() {
     }
 
     private fun setFavorite(rom: File, on: Boolean) {
-        prefs.favoriteRoms = if (on) prefs.favoriteRoms + rom.absolutePath else prefs.favoriteRoms - rom.absolutePath
+        libraryPreferences.setFavorite(rom.absolutePath, on)
         bump()
     }
 
@@ -1207,6 +1203,7 @@ class LibraryActivity : ComponentActivity() {
 
     private fun listRoms(): List<File> = RomFolder.libraryRoms(this, prefs).also { roms ->
         RomAdded.record(this, roms, initial = setup != null || linkingFolder)
+        libraryPreferences.reload()
     }
 
     /** A folder was just linked: its first scan's ROMs are the library being set up, not new games. */
@@ -1240,8 +1237,7 @@ class LibraryActivity : ComponentActivity() {
         // The game puts its own window on the second screen.
         secondScreen.dismiss()
         launcher.menu = null
-        prefs.lastRomPath = rom.absolutePath
-        prefs.pushRecentRom(rom.absolutePath)
+        libraryPreferences.recordPlay(rom.absolutePath)
         // Opened on the bottom screen, the game still goes to the top one (Screens.mainDisplayLaunch).
         val onMain = Screens.mainDisplayLaunch(this)
         val intent = Intent(this, PokeDaisyActivity::class.java).putExtra(EXTRA_ROM, rom.absolutePath)
@@ -1561,7 +1557,7 @@ class LibraryActivity : ComponentActivity() {
     /** The launcher's games: the open quick view of the library in its order (favorites first), the last played
      * selected at first. */
     private fun refreshLauncherGames() {
-        val views = quickViewsOf(sortLibrary(this, prefs, shownRoms(), sort))
+        val views = quickViewsOf(libraryPreferences.ordered(shownRoms(), sort) { it.absolutePath })
         launcherViews = views
         launcher.views = views.shown
         val open = views.open(quickView)

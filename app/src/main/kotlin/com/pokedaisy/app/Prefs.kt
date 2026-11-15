@@ -3,6 +3,7 @@ package com.pokedaisy.app
 import com.pokedaisy.app.companion.PreferenceStore
 import com.pokedaisy.app.companion.edit
 import kotlin.time.Clock
+import kotlinx.serialization.json.*
 import com.pokedaisy.app.companion.DS_RESOLUTION_MAX
 import com.pokedaisy.app.companion.FfMode
 import com.pokedaisy.app.companion.GameAspect
@@ -20,7 +21,14 @@ class Prefs(
 ) {
     /** Existing host defaults where the installed apps differ. An explicitly saved value always wins. */
     data class Defaults(val hotkeysEnabled: Boolean = true, val sidePanelDocked: Boolean = false,
-                        val companionWindow: Boolean = true, val battleStyleNames: Boolean = false)
+                        val companionWindow: Boolean = true, val battleStyleNames: Boolean = false,
+                        val libraryListsJson: Boolean = false)
+
+    private fun libraryList(raw: String?): List<String> = if (defaults.libraryListsJson) runCatching {
+        (raw?.let(Json::parseToJsonElement) as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+    }.getOrDefault(emptyList()) else raw?.split("\n")?.filter { it.isNotBlank() }.orEmpty()
+    private fun libraryList(values: Collection<String>): String = if (defaults.libraryListsJson)
+        JsonArray(values.map(::JsonPrimitive)).toString() else values.joinToString("\n")
 
     var lastRomPath: String?
         get() = p.getString("last_rom", null)
@@ -34,12 +42,23 @@ class Prefs(
      * different callers and different lifetimes.
      */
     fun recentRomPaths(): List<String> =
-        p.getString("recent_roms", null)?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
+        libraryList(p.getString("recent_roms", null))
 
     fun pushRecentRom(path: String) {
-        val updated = (listOf(path) + recentRomPaths().filter { it != path }).take(RECENT_CAP)
-        p.edit().putString("recent_roms", updated.joinToString("\n")).putLong("played_$path", Clock.System.now().toEpochMilliseconds()).apply()
+        recordPlay(path, Clock.System.now().toEpochMilliseconds(), last = false)
     }
+
+    /** Library launch: keep the last game, recent list and timestamp in the same storage batch. */
+    fun recordRomPlayed(path: String, now: Long = Clock.System.now().toEpochMilliseconds()) = recordPlay(path, now, last = true)
+
+    private fun recordPlay(path: String, now: Long, last: Boolean) {
+        val updated = (listOf(path) + recentRomPaths().filter { it != path }).take(RECENT_CAP)
+        p.edit().putString("recent_roms", libraryList(updated)).putLong("played_$path", now)
+            .also { if (last) it.putString("last_rom", path) }.apply()
+    }
+
+    fun romPlayTimes(): Map<String, Long> = p.keys().filter { it.startsWith("played_") }
+        .associate { it.removePrefix("played_") to p.getLong(it, 0L) }
 
     /** When the ROM at [path] was last started (the library's LAST PLAYED order); 0 = never, or before this was kept. */
     fun romLastPlayed(path: String): Long = p.getLong("played_$path", 0L)
@@ -798,8 +817,8 @@ class Prefs(
 
     /** The player's favorite games (by path): first in the library whatever its order, a star on each. */
     var favoriteRoms: Set<String>
-        get() = p.getString("favorite_roms", null)?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
-        set(v) = p.edit().putString("favorite_roms", v.joinToString("\n")).apply()
+        get() = libraryList(p.getString("favorite_roms", null)).toSet()
+        set(v) = p.edit().putString("favorite_roms", libraryList(v)).apply()
 
     /** Crash reports (CrashReports.kt): off until the player opts in. */
     var crashReportsEnabled: Boolean

@@ -9,6 +9,7 @@ internal val iosPreferences = Prefs(DefaultsPreferenceStore(NSUserDefaults.stand
     Prefs.Defaults(hotkeysEnabled = false, sidePanelDocked = true, companionWindow = false, battleStyleNames = true))
 
 internal class DefaultsPreferenceStore(private val d: NSUserDefaults) : PreferenceStore {
+    override fun keys(): Set<String> = d.dictionaryRepresentation().keys.filterIsInstance<String>().toSet()
     override fun contains(key: String) = d.objectForKey(key) != null
     override fun getBoolean(key: String, default: Boolean) = if (contains(key)) d.boolForKey(key) else default
     override fun getInt(key: String, default: Int) = if (contains(key)) d.integerForKey(key).toInt() else default

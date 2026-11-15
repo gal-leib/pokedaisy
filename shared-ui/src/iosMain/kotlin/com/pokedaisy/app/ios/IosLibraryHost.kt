@@ -15,12 +15,10 @@ import com.pokedaisy.app.companion.LibrarySort
 import com.pokedaisy.app.companion.NewFeatures
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.companion.i18n.L10n
-import com.pokedaisy.app.companion.i18n.stripAccents
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.*
 import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.game.RomPicker
-import kotlin.time.Clock
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import platform.Foundation.NSUserDefaults
@@ -89,32 +87,18 @@ internal class IosLibraryHost(
         "gb" -> RomCategory.GB; "gbc" -> RomCategory.GBC; else -> RomCategory.GBA
     }
     private fun entries(): List<LibraryGame> {
-        val now = Clock.System.now().toEpochMilliseconds()
         val games = paths.map { path ->
             val id = key(path)
             LibraryGame(path, label(path), "roms/$id", playing = prefs.last == id,
-                isNew = prefs.added[id]?.let { now - it in 0 until 24 * 60 * 60 * 1000L } == true,
+                isNew = prefs.isNew(id),
                 hasSave = RomPicker.savePathFor(path).toPath().length > 0, favorite = id in prefs.favorites)
-        }.filter { game ->
-            val words = stripAccents(query).lowercase().split(' ').filter { it.isNotBlank() }
-            val text = stripAccents("${game.label} ${key(game.id)}").lowercase()
-            words.all { it in text }
-        }.sortedBy { it.label.lowercase() }
-        val ordered = when (prefs.sort) {
-            LibrarySort.NAME -> games
-            LibrarySort.LAST_PLAYED -> games.sortedByDescending { prefs.played[key(it.id)] ?: 0 }
-            LibrarySort.DATE_ADDED -> games.sortedByDescending { prefs.added[key(it.id)] ?: 0 }
-        }
-        val (favorites, others) = ordered.partition { it.favorite }
-        return favorites + others
+        }.filter { game -> com.pokedaisy.app.companion.matchesLibrarySearch(query, listOf(game.label, key(game.id))) }
+            .sortedBy { it.label.lowercase() }
+        return prefs.ordered(games) { key(it.id) }
     }
 
-    private fun filtered(games: List<LibraryGame>, view: LibraryView): List<LibraryGame> = when (view) {
-        LibraryView.ALL -> games
-        LibraryView.FAVORITES -> games.filter { it.favorite }
-        LibraryView.RECENT -> games.filter { key(it.id) in prefs.played }.sortedByDescending { prefs.played[key(it.id)] }
-        else -> games.filter { category(it.id) == view.platform }
-    }
+    private fun filtered(games: List<LibraryGame>, view: LibraryView): List<LibraryGame> =
+        prefs.filtered(games, view, { key(it.id) }, { category(it.id) })
 
     @Composable
     private fun Library() {

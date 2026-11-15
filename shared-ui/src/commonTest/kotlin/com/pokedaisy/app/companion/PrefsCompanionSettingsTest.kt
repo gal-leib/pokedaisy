@@ -8,6 +8,7 @@ import kotlin.test.*
 class PrefsCompanionSettingsTest {
     internal class Store : PreferenceStore {
         val data = mutableMapOf<String, Any?>()
+        override fun keys(): Set<String> = data.keys.toSet()
         override fun contains(key: String) = key in data
         override fun getBoolean(key: String, default: Boolean) = data[key] as? Boolean ?: default
         override fun getInt(key: String, default: Int) = data[key] as? Int ?: default
