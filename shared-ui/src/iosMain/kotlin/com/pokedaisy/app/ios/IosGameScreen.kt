@@ -99,6 +99,7 @@ internal class IosGameScreen(
                             compactText = minOf(maxWidth, maxHeight) >= 600.dp, content = companion)
                     }
                 },
+                pictureOverlay = { game?.keyCapture?.let { KeyCapturePopup(it) } },
                 dismissSideOnGameTap = !visible,
                 onFrames = { measured, _ -> frames = measured; touch.stage = stage(measured, visible) })
         }

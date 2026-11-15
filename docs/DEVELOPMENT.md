@@ -4030,3 +4030,20 @@ after layout writes so the preview and rows refresh when the editor closes.
 
 Hosts can supply touchStageInOtherOrientation when their rotated layout differs from the phone stand-in. The iPad
 uses its saved common panel state and measured screen/grip dimensions there too, so the rotated in-game preview matches the current layout.
+
+
+### iOS game-button bindings
+
+`GameInput` converts GameController buttons and keyboard key codes to the shared `KeyCodes`; it takes one hardware
+snapshot per display refresh, even when slow-motion pacing owes no game frame. Fast batches reuse it; turbo and
+battle scripts still advance per game frame. `PolledGameKeys` turns the snapshot into events for the existing
+`GbaInput` and `KeyCapture`.
+Raw-key quarantine runs at both modal edges, including edges between frames, and capture callbacks invalidate the
+current poll. Touch and axes retain independent `ManualInputGate` owners. Turbo is filtered as a sustained hold
+before its frame pulse. The companion's controller navigation uses the player's mappings; keyboard letters stay
+with text fields while it owns input. App suspension cancels capture and quarantines held input on return.
+
+`IosGameInputBindings` seeds only the old iOS defaults, in `Documents/bindings/controls.properties`, then delegates
+reading, conflict removal and persistence to `GbaControls`. Existing files are never reseeded. The shared settings
+and capture popup are used in the game; library settings poll only while capture is active and stop on disposal.
+Hotkey wiring is a separate parity change.

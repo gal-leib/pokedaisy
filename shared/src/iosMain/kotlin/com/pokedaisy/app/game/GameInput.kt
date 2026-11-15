@@ -1,93 +1,120 @@
 package com.pokedaisy.app.game
 
-import com.pokedaisy.app.core.PkApiCore
+import com.pokedaisy.app.GbaInput
+import com.pokedaisy.app.companion.KeyCapture
+import com.pokedaisy.app.companion.data.KeyCodes
 import platform.GameController.*
 
-/**
- * The game's keys ([PkApiCore.KEY_A] ...), read once a frame on the game's thread: every connected controller, a
- * hardware keyboard, and whatever the app's own touch controls hold ([touchKeys], set by whoever draws them).
- *
- * A controller: its A / B, Menu = START, Options = SELECT, shoulders, D-pad and left stick. A keyboard, as mGBA's
- * defaults: arrows, X = A, Z = B, A = L, S = R, Return = START, Backspace or right Shift = SELECT.
- */
+/** GameController only supplies canonical keys and axes; shared models own mapping, capture and turbo. */
 class GameInput {
-    /** The keys the on-screen controls hold (set on the main thread, the game's). */
-    var touchKeys: Int = 0
-    var touchTurbo: Int = 0
+    var touchKeys = 0
+    var touchTurbo = 0
     private var frame = 0L
+    private val buttons = PolledGameKeys()
+    val capture: KeyCapture get() = buttons.capture
+    private val touchGate = ManualInputGate()
+    private val axesGate = ManualInputGate()
 
-    private val gate = ManualInputGate()
+    init {
+        buttons.input.setControls(IosGameInputBindings.load())
+        capture.onActiveChanged = { ownership(ManualInputGate.Owner.BINDING, it) }
+    }
+
     var companionCaptured = false
         set(value) {
             if (field == value) return
             field = value
-            gate.setBlocked(ManualInputGate.Owner.COMPANION, value, heldKeys())
+            ownership(ManualInputGate.Owner.COMPANION, value)
         }
     var onCompanionButtons: (Int) -> Unit = {}
-    fun editorCaptured(on: Boolean) = gate.setBlocked(ManualInputGate.Owner.EDITOR, on, heldKeys())
+    fun editorCaptured(on: Boolean) = ownership(ManualInputGate.Owner.EDITOR, on)
+    fun backgroundCaptured(on: Boolean) = ownership(ManualInputGate.Owner.BACKGROUND, on)
 
-    fun controllerKeys(): Int {
-        var keys = 0
-        for (c in GCController.controllers()) {
-            val pad = (c as? GCController)?.extendedGamepad ?: continue
-            keys = keys or padKeys(pad)
-        }
-        return keys
+    private fun ownership(owner: ManualInputGate.Owner, on: Boolean) {
+        touchGate.setBlocked(owner, on, touchKeys or touchTurbo)
+        val hardware = hardware()
+        axesGate.setBlocked(owner, on, hardware.axes)
+        buttons.quarantine(hardware.keys)
     }
-    private fun keyboardKeys() = GCKeyboard.coalescedKeyboard()?.keyboardInput?.let(::keyboardKeys) ?: 0
-    private fun heldKeys() = touchKeys or touchTurbo or controllerKeys() or keyboardKeys()
 
+    fun reloadBindings() {
+        buttons.quarantine(hardware().keys)
+        buttons.input.setControls(IosGameInputBindings.load())
+    }
+
+    fun controllerKeys(): Int = controllerKeys(hardware())
+    private fun controllerKeys(h: Hardware): Int = h.controllers.fold(h.axes) { bits, code ->
+        bits or (buttons.input.buttonFor(code) ?: 0)
+    }
+
+    /** UI and hardware ownership are polled at display pace, including slow-motion refreshes with no game frame. */
+    fun poll() {
+        val h = hardware()
+        if (companionCaptured && !capture.active) onCompanionButtons(controllerKeys(h))
+        buttons.poll(h.keys, touchGate.blocked)
+        val allowed = touchGate.filter(touchKeys or touchTurbo)
+        buttons.input.setTouchBits(touchKeys and allowed, touchTurbo and allowed)
+        buttons.input.setAxes(axesGate.filter(h.axes))
+    }
+
+    /** The native batch reuses the manual snapshot; turbo advances at game-frame pace. */
     fun keys(): Int {
-        val controllers = controllerKeys()
-        // Keyboard letters continue to belong to text fields; they never become companion controller shortcuts.
-        if (companionCaptured) onCompanionButtons(controllers)
-        val hardware = controllers or keyboardKeys()
-        val allowed = gate.filter(touchKeys or touchTurbo or hardware)
-        val turbo = if ((frame++ / 2) % 2 == 0L) touchTurbo else 0
-        return (touchKeys or turbo or hardware) and allowed
+        val turbo = if ((frame++ / 2) % 2 == 0L) buttons.input.turboMask else 0
+        return buttons.input.mask or turbo or buttons.input.tapMask()
     }
 
-    private fun padKeys(pad: GCExtendedGamepad): Int {
-        var k = 0
-        if (pad.buttonA.pressed) k = k or PkApiCore.KEY_A
-        if (pad.buttonB.pressed) k = k or PkApiCore.KEY_B
-        if (pad.buttonMenu.pressed) k = k or PkApiCore.KEY_START
-        if (pad.buttonOptions?.pressed == true) k = k or PkApiCore.KEY_SELECT
-        if (pad.leftShoulder.pressed || pad.leftTrigger.pressed) k = k or PkApiCore.KEY_L
-        if (pad.rightShoulder.pressed || pad.rightTrigger.pressed) k = k or PkApiCore.KEY_R
-        val x = pad.leftThumbstick.xAxis.value
-        val y = pad.leftThumbstick.yAxis.value
-        if (pad.dpad.up.pressed || y > STICK) k = k or PkApiCore.KEY_UP
-        if (pad.dpad.down.pressed || y < -STICK) k = k or PkApiCore.KEY_DOWN
-        if (pad.dpad.left.pressed || x < -STICK) k = k or PkApiCore.KEY_LEFT
-        if (pad.dpad.right.pressed || x > STICK) k = k or PkApiCore.KEY_RIGHT
-        return k
-    }
+    /** Library settings need capture polling without starting the emulator. */
+    fun pollCapture() = buttons.poll(hardware().keys, blocked = true)
 
-    private fun keyboardKeys(input: GCKeyboardInput): Int {
-        var k = 0
-        for ((code, key) in KEYBOARD) {
-            if (input.buttonForKeyCode(code)?.pressed == true) k = k or key
+    private data class Hardware(val controllers: Set<Int>, val keys: Set<Int>, val axes: Int)
+    private fun hardware(): Hardware {
+        val pads = pads()
+        val controllers = pads.flatMap { it.canonicalKeys() }.toSet()
+        val keyboard = buildSet {
+            val keyboard = GCKeyboard.coalescedKeyboard()?.keyboardInput ?: return@buildSet
+            for ((native, canonical) in KEYBOARD) if (keyboard.buttonForKeyCode(native)?.pressed == true) add(canonical)
         }
-        return k
+        val axes = pads.fold(0) { bits, pad -> bits or pad.canonicalAxes() }
+        return Hardware(controllers, controllers + keyboard, axes)
     }
+
+    private fun pads(): List<GCExtendedGamepad> = GCController.controllers().mapNotNull { (it as? GCController)?.extendedGamepad }
 
     private companion object {
-        /** How far the stick goes before it's a direction. */
-        const val STICK = 0.5f
-
         val KEYBOARD = listOf(
-            GCKeyCodeUpArrow to PkApiCore.KEY_UP,
-            GCKeyCodeDownArrow to PkApiCore.KEY_DOWN,
-            GCKeyCodeLeftArrow to PkApiCore.KEY_LEFT,
-            GCKeyCodeRightArrow to PkApiCore.KEY_RIGHT,
-            GCKeyCodeKeyX to PkApiCore.KEY_A,
-            GCKeyCodeKeyZ to PkApiCore.KEY_B,
-            GCKeyCodeKeyA to PkApiCore.KEY_L,
-            GCKeyCodeKeyS to PkApiCore.KEY_R,
-            GCKeyCodeReturnOrEnter to PkApiCore.KEY_START,
-            GCKeyCodeDeleteOrBackspace to PkApiCore.KEY_SELECT,
-            GCKeyCodeRightShift to PkApiCore.KEY_SELECT,
-        )
+            GCKeyCodeUpArrow to "DPAD_UP", GCKeyCodeDownArrow to "DPAD_DOWN",
+            GCKeyCodeLeftArrow to "DPAD_LEFT", GCKeyCodeRightArrow to "DPAD_RIGHT",
+            GCKeyCodeReturnOrEnter to "ENTER", GCKeyCodeDeleteOrBackspace to "DEL", GCKeyCodeEscape to "ESCAPE",
+            GCKeyCodeSpacebar to "SPACE", GCKeyCodeTab to "TAB", GCKeyCodeHyphen to "MINUS",
+            GCKeyCodeEqualSign to "EQUALS", GCKeyCodeOpenBracket to "LEFT_BRACKET", GCKeyCodeCloseBracket to "RIGHT_BRACKET",
+            GCKeyCodeBackslash to "BACKSLASH", GCKeyCodeSemicolon to "SEMICOLON", GCKeyCodeQuote to "APOSTROPHE",
+            GCKeyCodeComma to "COMMA", GCKeyCodePeriod to "PERIOD", GCKeyCodeSlash to "SLASH", GCKeyCodeGraveAccentAndTilde to "GRAVE",
+            GCKeyCodeLeftShift to "SHIFT_LEFT", GCKeyCodeRightShift to "SHIFT_RIGHT",
+            GCKeyCodeLeftControl to "CTRL_LEFT", GCKeyCodeRightControl to "CTRL_RIGHT",
+            GCKeyCodeLeftAlt to "ALT_LEFT", GCKeyCodeRightAlt to "ALT_RIGHT",
+            GCKeyCodeLeftGUI to "META_LEFT", GCKeyCodeRightGUI to "META_RIGHT",
+        ).map { (code, name) -> code to KeyCodes.code(name)!! } +
+            ('A'..'Z').mapIndexed { index, key -> (GCKeyCodeKeyA + index) to KeyCodes.code(key.toString())!! } +
+            (1..12).map { n -> (GCKeyCodeF1 + n - 1) to KeyCodes.code("F$n")!! } +
+            (1..9).map { n -> (GCKeyCodeOne + n - 1) to KeyCodes.code(n.toString())!! } +
+            listOf(GCKeyCodeZero to KeyCodes.code("0")!!)
     }
 }
+
+internal fun GCExtendedGamepad.canonicalKeys(): Set<Int> = buildSet {
+    if (buttonA.pressed) add(KeyCodes.BUTTON_A)
+    if (buttonB.pressed) add(KeyCodes.BUTTON_B)
+    if (buttonX.pressed) add(KeyCodes.BUTTON_X)
+    if (buttonY.pressed) add(KeyCodes.BUTTON_Y)
+    if (buttonMenu.pressed) add(KeyCodes.BUTTON_START)
+    if (buttonOptions?.pressed == true) add(KeyCodes.BUTTON_SELECT)
+    if (leftShoulder.pressed) add(KeyCodes.BUTTON_L1)
+    if (rightShoulder.pressed) add(KeyCodes.BUTTON_R1)
+    if (leftTrigger.pressed) add(KeyCodes.BUTTON_L2)
+    if (rightTrigger.pressed) add(KeyCodes.BUTTON_R2)
+    if (leftThumbstickButton?.pressed == true) add(KeyCodes.BUTTON_THUMBL)
+    if (rightThumbstickButton?.pressed == true) add(KeyCodes.BUTTON_THUMBR)
+}
+
+internal fun GCExtendedGamepad.canonicalAxes(): Int =
+    GbaInput.axisBits(leftThumbstick.xAxis.value, -leftThumbstick.yAxis.value, dpad.xAxis.value, -dpad.yAxis.value)

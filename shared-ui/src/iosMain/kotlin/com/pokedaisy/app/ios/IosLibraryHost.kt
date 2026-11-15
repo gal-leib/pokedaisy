@@ -118,6 +118,21 @@ internal class IosLibraryHost(
 
     @Composable
     private fun Library() {
+        val capturing = appSettings.keyCapture.active
+        androidx.compose.runtime.DisposableEffect(capturing) {
+            val timer = if (capturing) platform.Foundation.NSTimer.scheduledTimerWithTimeInterval(1.0 / 60, repeats = true) {
+                appSettings.pollKeyCapture()
+            } else null
+            onDispose { timer?.invalidate() }
+        }
+        androidx.compose.runtime.DisposableEffect(appSettings) {
+            val center = platform.Foundation.NSNotificationCenter.defaultCenter
+            val observer = center.addObserverForName(platform.UIKit.UIApplicationWillResignActiveNotification, null, null) {
+                appSettings.keyCapture.cancel()
+            }
+            onDispose { center.removeObserver(observer); appSettings.keyCapture.cancel() }
+        }
+
         val m = rememberGbaTextMetrics()
         val small = rememberGbaTextMetrics(1f)
         val games = entries()

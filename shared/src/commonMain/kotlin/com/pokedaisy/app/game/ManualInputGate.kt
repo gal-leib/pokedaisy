@@ -2,7 +2,7 @@ package com.pokedaisy.app.game
 
 /** Manual game keys withheld by UI owners; a held key needs a release before it can return to the game. */
 class ManualInputGate {
-    enum class Owner { COMPANION, EDITOR }
+    enum class Owner { COMPANION, EDITOR, BINDING, BACKGROUND }
     private val owners = mutableSetOf<Owner>()
     private var suppressed = 0
     val blocked get() = owners.isNotEmpty()

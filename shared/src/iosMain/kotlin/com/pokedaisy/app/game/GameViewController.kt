@@ -46,6 +46,8 @@ class GameViewController(
     private val queue = renderer?.device?.newCommandQueue()
     private val audio = GameAudio()
     private val input = GameInput()
+    val keyCapture get() = input.capture
+    fun reloadBindings() = input.reloadBindings()
     private val pacer = FramePacer()
     private val observers = mutableListOf<NSObjectProtocol>()
     private var running = false
@@ -145,6 +147,8 @@ class GameViewController(
     fun pause(): Boolean {
         if (!running || !active) return true
         gameView.paused = true
+        input.capture.cancel()
+        input.backgroundCaptured(true)
         active = false
         audio.stop()
         return beforeSuspend()
@@ -153,6 +157,7 @@ class GameViewController(
     /** Runs again after [pause]. */
     fun resume() {
         if (!running || uiPaused) return
+        input.backgroundCaptured(false)
         active = true
         pacer.reset()
         audio.start()
@@ -189,7 +194,11 @@ class GameViewController(
     }
 
     private fun refresh(view: MTKView) {
-        if (!running) return
+        if (!running || !active || uiPaused) return
+        // Poll once per display refresh: capture stays responsive at low speeds, and FF batches avoid repeated
+        // GameController queries. A controller action can close/restart the game or open the editor here.
+        input.poll()
+        if (!running || !active || uiPaused) return
         val rate = frameSpeed().takeIf { it.isFinite() && it in 0.0..64.0 } ?: 1.0
         val now = CACurrentMediaTime()
         if (rate != audioSpeed) {
@@ -203,7 +212,6 @@ class GameViewController(
         for (frame in 0 until frames) {
             // Unlimited FF still leaves time for the companion and touch events on the main thread.
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
-            // A companion controller action can close/restart the game or open the editor from keys().
             val held = input.keys()
             if (!running || !active || uiPaused) break
             val keys = frameKeys(held)

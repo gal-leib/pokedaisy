@@ -42,6 +42,14 @@ The D-pad and the analog stick always move; they can't be remapped. The four D-p
 
 ![The top screen's GAME BUTTONS page: ALL GAMES, DS GAMES and GBA AND GAME BOY, a row for each button with the keys it's on](shots/settings-buttons.png "GAME BUTTONS on the top screen")
 
+### iPhone and iPad bindings
+
+On iPhone and iPad, `GAME BUTTONS` uses the same binding rows and button capture. Connect a controller or hardware keyboard, tap a row, press its new key, then release it. `CANCEL` or Escape leaves the binding alone. The D-pad and left stick always move. You can bind another key to a D-pad row, `TURBO A`, `TURBO B`, `START 2` or `SELECT 2`.
+
+Your existing iOS defaults stay the same: X is A, Z is B, A and S are L and R, Return is START, and Backspace or right Shift is SELECT. A controller's shoulders and triggers press L and R. Extra X and Y bindings start empty. Changing a row replaces all its old keys. The keyboard letters keep working in text fields while the companion window is open.
+
+Bindings are kept in `PokeDaisy/bindings/controls.properties` in Files. The keys use the same canonical names as Android, so you can copy a binding file between platforms. Buttons held while a capture or companion window closes need a release before they can reach the game again.
+
 ## X takes your buttons to the companion
 
 On a handheld with two screens, or a phone held upright with a controller, press `X` (the `TO COMPANION` button in `GAME BUTTONS`) while you walk around in a GBA or Game Boy game and your buttons move down to the companion, like the menu on a DS game's touch screen. A silver strip slides up along the bottom of the game with an arrow pointing down at the companion, and `L` and `R` slide in at the ends of the companion's tab bar.

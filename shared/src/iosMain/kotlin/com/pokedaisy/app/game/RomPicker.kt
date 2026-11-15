@@ -59,6 +59,9 @@ object RomPicker {
     /** The app's folder of games. */
     val romsDir: String get() = documents("roms")
 
+    /** Editable game-button and hotkey files, using the same format as Android. */
+    val bindingsDir: String get() = documents("bindings")
+
     /** State files, visible in Files alongside battery saves. */
     val statesDir: String get() = documents("states")
 

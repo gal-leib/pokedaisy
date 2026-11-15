@@ -230,6 +230,9 @@ interface CompanionSettings {
     /** Waits for the keys to bind (the game's activity gets every key); null where nothing can be pressed (previews). */
     val keyCapture: KeyCapture? get() = null
 
+    /** Platform introduction badge for GAME BUTTONS and its binding rows. */
+    val gameButtonsBadge: String? get() = null
+
     /** Current GBA-button bindings, by display name (e.g. "BUTTON_A", "Z"). */
     fun gbaControlBindings(): Map<GbaControls.Btn, List<String>>
 

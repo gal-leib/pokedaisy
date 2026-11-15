@@ -27,7 +27,7 @@ import com.pokedaisy.app.game.GameViewController
 
 /**
  * The companion's SETTINGS on the iPad: shared battle and appearance options, playback and sound, kept in the
- * app's defaults. Only supported rows are shown ([shownRows]); shaders, EXPAND and key bindings wait for later ports.
+ * app's defaults. Only supported rows are shown ([shownRows]); shaders, EXPAND and hotkeys wait for later ports.
  */
 internal class IosCompanionSettings(
     private val romPath: String?,
@@ -44,13 +44,17 @@ internal class IosCompanionSettings(
     private val options: () -> IosGameOptions? = { null },
 ) : CompanionSettings {
     private val d = NSUserDefaults.standardUserDefaults
+    private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
+    override val keyCapture get() = game?.keyCapture ?: libraryInput!!.capture
+    fun pollKeyCapture() { libraryInput?.pollCapture() }
+    private fun reloadBindings() { game?.reloadBindings() ?: libraryInput?.reloadBindings() }
 
     private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
 
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
 
     var optionsChanged: () -> Unit = {}
@@ -205,8 +209,15 @@ internal class IosCompanionSettings(
     override fun setBikeSpeed(v: Float) = setSceneSpeed("bike", v)
     override val surfSpeed get() = sceneSpeed("surf")
     override fun setSurfSpeed(v: Float) = setSceneSpeed("surf", v)
-    override fun gbaControlBindings(): Map<GbaControls.Btn, List<String>> = emptyMap()
-    override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {}
+    override val gameButtonsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_BINDINGS)
+    override val buttonGroup = GbaControls.Group.GBA
+    override fun gbaControlBindings() = GbaControls.rawBindings(com.pokedaisy.app.game.IosGameInputBindings.directory)
+    override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {
+        GbaControls.setBindingNamed(com.pokedaisy.app.game.IosGameInputBindings.directory, btn, keyName); reloadBindings()
+    }
+    override fun clearGbaControlBinding(btn: GbaControls.Btn) {
+        GbaControls.clearBinding(com.pokedaisy.app.game.IosGameInputBindings.directory, btn); reloadBindings()
+    }
     override val hotkeysEnabled = false
     override fun setHotkeysEnabled(on: Boolean) {}
     override fun hotkeyBindings(): Map<Hotkeys.Action, List<String>> = emptyMap()

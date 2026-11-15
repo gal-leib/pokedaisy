@@ -26,9 +26,19 @@ sharing are not connected on iOS.
 ## Speed and sound
 
 SETTINGS has FF (a persistent toggle), FF SPEED (including INFINITE), GAME SPEED (kept per game), GAME VOLUME and MUTE GAME.
-Fast-forward runs everywhere for now, with pitched, sped-up sound; INFINITE is silent and yields between bounded batches
-of frames so the main thread still handles touch and the companion. SMART mode, scene speeds, steady music and speed
-hotkeys wait for later PRs.
+SMART mode and per-scene speeds use Android's shared playback policy and existing memory watchers. Sound is pitched
+and sped up; INFINITE is silent and yields between bounded batches so the main thread handles touch and the companion.
+Steady music and speed hotkeys remain later parity work.
+
+## Game options and bindings
+
+Supported GBA games offer INSTANT TEXT, REUSABLE TMS, AUTO-RUN, RUN INDOORS and WILD ENCOUNTERS through the existing
+shared finders and portable core policies. Unsupported games show N/A; Game Boy field options remain future work.
+
+GAME BUTTONS uses the same binding rows, capture model and input mapper as Android, including TURBO A/B and optional
+X/Y bindings. Files live in Documents/bindings, in the shared properties format. Existing iOS keyboard/trigger defaults
+are preserved. The native adapter maps GameController codes and axes; shared models own binding and capture behavior.
+Held buttons are quarantined across capture, modal and background transitions. Library capture polls without a core.
 
 ## Save states
 

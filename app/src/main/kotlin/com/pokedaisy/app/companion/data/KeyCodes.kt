@@ -22,6 +22,11 @@ object KeyCodes {
     const val BACKSLASH = 73
     const val BUTTON_A = 96
     const val BUTTON_B = 97
+    const val BUTTON_X = 99
+    const val BUTTON_Y = 100
+    const val BUTTON_THUMBL = 106
+    const val BUTTON_THUMBR = 107
+    const val ESCAPE = 111
     const val BUTTON_L1 = 102
     const val BUTTON_R1 = 103
     const val BUTTON_START = 108
