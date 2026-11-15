@@ -234,8 +234,8 @@ Java_com_pokedaisy_app_MgbaCore_pkWideConfigure(JNIEnv* env, jobject thiz, jint 
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkFieldConfigure(JNIEnv* env, jobject thiz, jint crc, jint wildFlag, jboolean wildOff) {
     bool gba = g.core && pk_is_gba(g.core);
-    pk_field_configure(gba ? (uint32_t) crc : 0);
-    pk_field_wild(gba ? (uint32_t) wildFlag : 0, wildOff == JNI_TRUE);
+    pk_api_field_configure(gba ? (uint32_t) crc : 0);
+    pk_api_field_wild(gba ? (uint32_t) wildFlag : 0, wildOff == JNI_TRUE);
 }
 
 // This frame's PK_FIELD_* bits (pk_field_state; 0 = not a game it knows); runIndoors lets the player run indoors,
@@ -247,7 +247,7 @@ Java_com_pokedaisy_app_MgbaCore_pkFieldState(JNIEnv* env, jobject thiz, jboolean
         pk_nds_set_wild_off(wildKeep < 100);
         return pk_nds_field_bits();
     }
-    return g.core && pk_is_gba(g.core) ? pk_field_state(g.core, runIndoors, wildKeep) : 0;
+    return pk_api_field_step(runIndoors == JNI_TRUE, wildKeep);
 }
 
 // PLAYER LOOK: the player's sprite set up again from its graphics record (after the look changed, or a state loaded).

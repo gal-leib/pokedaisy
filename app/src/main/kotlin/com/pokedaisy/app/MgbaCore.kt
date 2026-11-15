@@ -129,7 +129,7 @@ object MgbaCore {
     const val FIELD_TEXT = com.pokedaisy.app.companion.data.GameField.TEXT
     const val FIELD_BIKE = com.pokedaisy.app.companion.data.GameField.BIKE
     /** WILD ENCOUNTERS set the game's switch: keep calling (with 100) until it's been put back. */
-    const val FIELD_WILD_HELD = 32
+    const val FIELD_WILD_HELD = com.pokedaisy.app.companion.data.GameField.WILD_HELD
     const val FIELD_SURF = com.pokedaisy.app.companion.data.GameField.SURF
     /** [FIELD_BIKE] / [FIELD_SURF] come from the game's own player state (FIELD SPEED's BIKE / SURF rows work). */
     const val FIELD_AVATAR = com.pokedaisy.app.companion.data.GameField.AVATAR
@@ -155,7 +155,7 @@ object MgbaCore {
     const val FIELD_TOP_ONLY = 131072
     /** A GBA game: a window up on the field's text layer while its controls are free (a START menu that doesn't lock them,
      *  Recharged Yellow's): AUTO-RUN keeps its B out of it (GitHub #610). */
-    const val FIELD_WINDOW = 262144
+    const val FIELD_WINDOW = com.pokedaisy.app.companion.data.GameField.WINDOW
     /** WIDE: the window to draw around the frame from the next frame on ([WideCamera]), in the frame's pixels
      * (its top-left 0, 0); [w] 0 = none. Any thread. */
     external fun pkWideSetView(x: Int, y: Int, w: Int, h: Int)

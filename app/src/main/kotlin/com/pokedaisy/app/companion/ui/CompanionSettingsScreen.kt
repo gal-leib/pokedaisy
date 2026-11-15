@@ -620,7 +620,7 @@ private fun homeRows(
         groupTitle(tk("GAMEPLAY")),
         // The game's own switch for random encounters (WildEncounters.kt): ON (the game's rate) or OFF.
         SettingRow(tk("WILD ENCOUNTERS"), if (s.wildEncountersSupported) wildEncountersLabel(s.wildEncounters) else tk("N/A"),
-            enabled = s.wildEncountersSupported) {
+            enabled = s.wildEncountersSupported, labelBadge = s.fieldOptionsBadge) {
             if (s.wildEncountersSupported) { s.setWildEncounters(if (s.wildEncounters == 0) 100 else 0); changed() }
         },
         // A text box's words appear at once, nothing else sped up (InstantText.kt: the game's text routine patched).
@@ -698,11 +698,11 @@ private fun homeRows(
         SettingRow(
             tk("AUTO-RUN"),
             when { s.autoRunBuiltIn -> tk("ON"); s.fieldReadable -> onOff(s.autoRun); else -> tk("N/A") },
-            enabled = s.fieldReadable && !s.autoRunBuiltIn,
+            enabled = s.fieldReadable && !s.autoRunBuiltIn, labelBadge = s.fieldOptionsBadge,
             subtitle = if (s.autoRunBuiltIn) "This game has its own auto-run" else null,
         ) { if (s.fieldReadable) { s.setAutoRun(!s.autoRun); changed() } },
         // Every map lets the player run (buildings too); FireRed / Emerald engines.
-        SettingRow(tk("RUN INDOORS"), if (s.runIndoorsSupported) onOff(s.runIndoors) else tk("N/A"), enabled = s.runIndoorsSupported) { if (s.runIndoorsSupported) { s.setRunIndoors(!s.runIndoors); changed() } },
+        SettingRow(tk("RUN INDOORS"), if (s.runIndoorsSupported) onOff(s.runIndoors) else tk("N/A"), enabled = s.runIndoorsSupported, labelBadge = s.fieldOptionsBadge) { if (s.runIndoorsSupported) { s.setRunIndoors(!s.runIndoors); changed() } },
         // This game's cheats on / off (the codes are typed or imported in the top screen's Settings).
         SettingRow(tk("CHEATS"), cheatsValue(s), opensPage = true) { navigate(Page.CHEATS) },
         groupTitle(tk("SCREEN")),

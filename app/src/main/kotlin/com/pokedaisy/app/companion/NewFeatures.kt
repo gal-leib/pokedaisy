@@ -198,11 +198,13 @@ object NewFeatures {
     const val IPAD_TOUCH = "ipad_touch"
     const val IPAD_APP_UI = "ipad_app_ui"
     const val IOS_GAME_PICKER = "ios_game_picker"
+    const val IOS_FIELD_OPTIONS = "ios_field_options"
     const val IOS_GAME_OPTIONS = "ios_game_options"
     const val IOS_SCENE_SPEEDS = "ios_scene_speeds"
     const val IOS_GAME_SCREEN = "ios_game_screen"
 
     val ALL = listOf(
+        IOS_FIELD_OPTIONS,
         IOS_GAME_OPTIONS,
         IOS_SCENE_SPEEDS,
         IOS_GAME_SCREEN,

@@ -47,6 +47,8 @@ _Static_assert(PK_API_FIELD_TEXT == PK_FIELD_TEXT, "field bit TEXT");
 _Static_assert(PK_API_FIELD_BIKE == PK_FIELD_BIKE, "field bit BIKE");
 _Static_assert(PK_API_FIELD_SURF == PK_FIELD_SURF, "field bit SURF");
 _Static_assert(PK_API_FIELD_AVATAR == PK_FIELD_AVATAR, "field bit AVATAR");
+_Static_assert(PK_API_FIELD_WILD_HELD == PK_FIELD_WILD_HELD, "field bit WILD_HELD");
+_Static_assert(PK_API_FIELD_WINDOW == PK_FIELD_WINDOW, "field bit WINDOW");
 
 struct pk_session pk_session;
 pthread_rwlock_t pk_coreLock = PTHREAD_RWLOCK_INITIALIZER;
@@ -348,7 +350,26 @@ bool pk_api_field_configure(uint32_t crc) {
 }
 
 int pk_api_field_state(void) {
-    return g.core && pk_is_gba(g.core) ? pk_field_state(g.core, 0, 100) : 0;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int state = g.core && pk_is_gba(g.core) ? pk_field_observe(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return state;
+}
+
+bool pk_api_field_wild(uint32_t addr, bool wasOff) {
+    if (addr != 0 && (addr < 0x02000000u || addr >= 0x02040000u)) return false;
+    if (!g.core || !pk_is_gba(g.core)) return false;
+    pk_field_wild(addr, wasOff);
+    return true;
+}
+
+int pk_api_field_step(bool runIndoors, int wildKeep) {
+    if (wildKeep < 0) wildKeep = 0;
+    if (wildKeep > 100) wildKeep = 100;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int state = g.core && pk_is_gba(g.core) ? pk_field_state(g.core, runIndoors, wildKeep) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return state;
 }
 
 void pk_api_set_keys(uint32_t keys) {

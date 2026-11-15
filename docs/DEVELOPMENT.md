@@ -3746,6 +3746,13 @@ become available after a trustworthy avatar read. No new ROM address tables are 
 each game frame. A scene change ends the current batch immediately, including uncapped FF, so a newly opened menu
 does not consume the remaining fast frames. Steady music and speed hotkeys are still unavailable on iOS.
 
+The GBA field options use `pk_api_field_wild` to bind the shared finder's verified EWRAM switch, then
+`pk_api_field_step` once per frame for the existing indoor/encounter policy. JNI delegates the same operations to
+that API; the DS path stays separate. Field stepping owns the core write lock. `pk_field_observe` reads flags
+without changing the encounter switch, ownership or RNG. A resumed OFF state keeps the original ownership rule.
+`AutoRunPolicy` is compiled in place for both hosts and runs on manual keys before battle scripts. The native
+table and field-callback guards remain required; Game Boy's separate field routines have not been wired on iOS.
+
 The iPad STATES bridge is the common `StateSlotController` over `StateFiles`: slot saves, loads, delete and both
 undos, using the existing screen. The host supplies native read/write callbacks, a thumbnail and a cached companion
 snapshot. `GameViewController.withState` stops queued audio, finishes a battery save, releases scripted input, then

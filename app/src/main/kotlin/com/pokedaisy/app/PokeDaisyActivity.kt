@@ -1603,7 +1603,7 @@ class PokeDaisyActivity : Activity() {
             if (::engine.isInitialized) engine.runIndoors = on
         }
         // Ruby / Sapphire tell indoor maps by their type (flash, weather and the region map read it too): not theirs.
-        override val runIndoorsSupported get() = fieldGame != WideScreen.OFF && !romCode.startsWith("AXV") && !romCode.startsWith("AXP")
+        override val runIndoorsSupported get() = fieldGame != WideScreen.OFF && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode)
         override val wildEncounters get() = Prefs(this@PokeDaisyActivity).wildEncounters
         override fun setWildEncounters(percent: Int) {
             if (percent == 0) com.pokedaisy.app.companion.FeatureTips.used(TipId.WILD)

@@ -119,3 +119,9 @@ removing edits happens between frames through the same locked, expected-byte-che
 The two features share rollback rules, so a failed text patch preserves a valid TM patch and partial features are
 removed. ROM files are never rewritten. Unsupported and blocked games remain unavailable; games with their own
 reusable TMs show the existing built-in state. Choices persist in NSUserDefaults.
+
+AUTO-RUN, RUN INDOORS and WILD ENCOUNTERS use the existing GBA field tables and encounter-switch finder.
+`AutoRunPolicy` is shared with Android, before battle automation, so modal input ownership and scripts keep their
+keys. Only the game's free field can invert B; menus, dialogue, battles, bikes, surfing, sneaking and built-in
+auto-run are preserved. Ruby/Sapphire indoor rules remain unavailable. The native field step owns the write lock;
+field observation does not change encounter ownership or its RNG. Unknown tables and Game Boy stay N/A.

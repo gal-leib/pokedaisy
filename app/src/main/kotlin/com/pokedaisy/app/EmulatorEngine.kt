@@ -1,6 +1,7 @@
 package com.pokedaisy.app
 
 import com.pokedaisy.app.companion.DsCore
+import com.pokedaisy.app.companion.data.AutoRunPolicy
 import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.data.SnapshotCache
 import com.pokedaisy.app.companion.data.delete
@@ -1219,12 +1220,8 @@ class EmulatorEngine(
                 // battle, a menu screen (B leaves it) or on a bike (the Acro Bike's wheelie is B). Nor with A held: the
                 // expansion's DexNav creeps on A (Seaglass & co.), but checks B's run first, so a held B scared the
                 // Pokémon off. A while walking does nothing in the other games.
-                if (autoRun && !ownAutoRun && (gba || nds) && keys and DIRECTIONS != 0 && keys and CoreKey.A == 0 &&
-                    fieldState and AUTO_RUN_BLOCKERS == MgbaCore.FIELD_KNOWN && fieldScreen
-                ) keys = keys xor CoreKey.B
-                else if (!autoRun && !ownAutoRun && (gba || nds) && keys and DIRECTIONS != 0 &&
-                    fieldState and AUTO_RUN_BLOCKERS == MgbaCore.FIELD_KNOWN && fieldScreen
-                ) {
+                if (autoRun && (gba || nds)) keys = AutoRunPolicy.apply(keys, fieldState, fieldScreen, ownAutoRun)
+                else if (!autoRun && !ownAutoRun && (gba || nds) && AutoRunPolicy.walking(keys, fieldState, fieldScreen)) {
                     walkFrames++
                     if (keys and CoreKey.B != 0) runFrames++
                 }
@@ -2251,9 +2248,7 @@ class EmulatorEngine(
         const val DS_MUSIC_MAX_FRAMES = 4
         /** pkFieldState's bits that keep AUTO-RUN off: a script holding the field, a battle, a bike, a window up with the
          *  controls free (a START menu that doesn't lock them: B closed it, GitHub #610) (known must be set). */
-        const val AUTO_RUN_BLOCKERS = MgbaCore.FIELD_KNOWN or MgbaCore.FIELD_LOCKED or MgbaCore.FIELD_BATTLE or MgbaCore.FIELD_BIKE or
-            MgbaCore.FIELD_SURF or   // under the sea B is what surfaces (TrySetupDiveEmergeScript): GitHub #338
-            MgbaCore.FIELD_WINDOW
+        const val AUTO_RUN_BLOCKERS = AutoRunPolicy.BLOCKERS
         /** The D-pad's bits: one held = the player walking (the look-around glides back). */
         const val DIRECTIONS = CoreKey.UP or CoreKey.DOWN or CoreKey.LEFT or CoreKey.RIGHT
     }

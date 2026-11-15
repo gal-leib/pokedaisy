@@ -56,9 +56,17 @@ void pk_api_rom_unpatch(void);
  * Game thread, between frames. Unknown games, Game Boy and no core return zero. Does not enable game patches. */
 bool pk_api_field_configure(uint32_t crc);
 int pk_api_field_state(void);
+/** Bind the verified EWRAM encounter-switch address after field_configure; zero disables it.
+ * wasOff restores ownership when resuming a state saved while encounters were off. Game thread only. */
+bool pk_api_field_wild(uint32_t addr, bool wasOff);
+/** Run the existing field policy once per frame, including optional indoor running and encounter control.
+ * wildKeep is clamped to 0..100; no known GBA field returns zero without writes. Game thread only. */
+int pk_api_field_step(bool runIndoors, int wildKeep);
+
 enum {
     PK_API_FIELD_KNOWN = 1, PK_API_FIELD_LOCKED = 2, PK_API_FIELD_BATTLE = 4, PK_API_FIELD_TEXT = 8,
-    PK_API_FIELD_BIKE = 16, PK_API_FIELD_SURF = 64, PK_API_FIELD_AVATAR = 128
+    PK_API_FIELD_BIKE = 16, PK_API_FIELD_WILD_HELD = 32, PK_API_FIELD_SURF = 64, PK_API_FIELD_AVATAR = 128,
+    PK_API_FIELD_WINDOW = 262144
 };
 
 /** Runs one frame: the picture into pk_api_video, its sound into pk_api_audio. */

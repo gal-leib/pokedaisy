@@ -21,6 +21,9 @@ internal class IosGamePlayback(
     private var menu = false
     private var map = false
     private var field = 0
+    val fieldState get() = field
+    val onField get() = gba && !blocked && FfMenuWatch.onField
+    var readField: () -> Int = PkApiCore::fieldState
     var blocked = false
         private set
     private var base = 1f
@@ -75,7 +78,7 @@ internal class IosGamePlayback(
         if (!gba || blocked || telemetry.snapshot.value.blocked != null) { field = 0; menu = false; map = false; return }
         map = RegionMapWatch.isOpen(InProcessReader)
         menu = FfMenuWatch.tick(InProcessReader) && !ShopWatch.isOpen(InProcessReader)
-        field = if (fieldReadable) PkApiCore.fieldState() else 0
+        field = if (fieldReadable) readField() else 0
         if (field and GameField.AVATAR != 0) fieldMovesReadable = true
     }
 

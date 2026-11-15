@@ -56,6 +56,7 @@ interface CompanionSettings {
     val fieldReadable: Boolean get() = false
 
     /** AUTO-RUN: B held while walking (holding it walks) - see [com.pokedaisy.app.Prefs.autoRun]. */
+    val fieldOptionsBadge: String? get() = null
     val autoRun: Boolean get() = false
     /** The game has its own, on by default ([com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN]): the row says so. */
     val autoRunBuiltIn: Boolean get() = false

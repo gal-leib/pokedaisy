@@ -50,10 +50,20 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
 
     var optionsChanged: () -> Unit = {}
+    override val autoRun get() = bool("auto_run", false)
+    override fun setAutoRun(on: Boolean) { d.setBool(on, "auto_run"); optionsChanged() }
+    override val autoRunBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
+    override val runIndoors get() = bool("run_indoors", false)
+    override fun setRunIndoors(on: Boolean) { d.setBool(on, "run_indoors"); optionsChanged() }
+    override val runIndoorsSupported get() = fieldReadable && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode.orEmpty())
+    override val wildEncounters get() = if (d.objectForKey("wild_encounters") != null && d.integerForKey("wild_encounters") == 0L) 0 else 100
+    override fun setWildEncounters(percent: Int) { d.setInteger(if (percent == 0) 0L else 100L, "wild_encounters"); optionsChanged() }
+    override val wildEncountersSupported get() = fieldReadable && options()?.wildFlagFound == true
+    override val fieldOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_OPTIONS)
     override val instantText get() = bool("instant_text", false)
     override fun setInstantText(on: Boolean) { d.setBool(on, "instant_text"); optionsChanged() }
     override val instantTextSupported get() = options()?.instantTextSupported == true

@@ -242,11 +242,15 @@ object PokeDaisyHost {
             settings!!.playbackChanged = { settings?.let(p::settingsChanged) }
             p.settingsChanged(settings!!)
             g.frameSpeed = p::speed
-            options = IosGameOptions(romPath) { code != null && !p.blocked && telemetry.snapshot.value.blocked == null }.also { o ->
+            val bKeys = battle!!::keys
+            val gameOptions = IosGameOptions(romPath, code) { code != null && !p.blocked && telemetry.snapshot.value.blocked == null }.also { o ->
                 settings!!.optionsChanged = { settings?.let(o::settingsChanged) }
                 o.settingsChanged(settings!!)
+                p.readField = o::fieldState
+                g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField)) }
             }
-            g.afterFrame = { p.tick(); options?.tick() }
+            options = gameOptions
+            g.afterFrame = { p.tick(); gameOptions.tick() }
         }
         g.beforeStateChange = { battle?.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,

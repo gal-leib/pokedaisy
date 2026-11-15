@@ -29,6 +29,7 @@ static void closed(void) {
     CHECK(!pk_api_rom_patch(0x08000000, &zero, 1, 0x08000000, &zero, 1), "patch with no game");
     pk_api_rom_unpatch();
     CHECK(!pk_api_field_configure(0xDD88761C) && pk_api_field_state() == 0, "field observation without a game");
+    CHECK(!pk_api_field_wild(0x02000020, false) && pk_api_field_step(true, 0) == 0, "field options without a game");
 }
 
 static void gameBoy(const char* dir) {
@@ -41,6 +42,7 @@ static void gameBoy(const char* dir) {
     uint8_t zero = 0;
     CHECK(!pk_api_rom_patch(0x08000000, &zero, 1, 0x08000000, &zero, 1), "GBA option patch applied to Game Boy");
     CHECK(!pk_api_field_configure(0xDD88761C) && pk_api_field_state() == 0, "GBA field table applied to Game Boy");
+    CHECK(!pk_api_field_wild(0x02000020, false) && pk_api_field_step(true, 0) == 0, "GBA field options applied to Game Boy");
     CHECK(pk_api_video_width() == 160 && pk_api_video_height() == 144, "size %dx%d",
           pk_api_video_width(), pk_api_video_height());
     CHECK(pk_api_rom_size() == 32768, "ROM size %lld", (long long) pk_api_rom_size());
@@ -102,6 +104,20 @@ static void gba(const char* dir) {
     CHECK(core->busRead8(core, 0x080000A0) == original, "unpatch did not restore live ROM");
     CHECK(pk_api_field_configure(0xDD88761C), "known GBA field table");
     CHECK(pk_api_field_state() & PK_API_FIELD_KNOWN, "field observer missing its known bit");
+    CHECK(!pk_api_field_wild(0x04000130, false), "I/O accepted as encounter switch");
+    core->busWrite8(core, 0x02000020, 0);
+    CHECK(pk_api_field_wild(0x02000020, false), "verified EWRAM switch refused");
+    CHECK(pk_api_field_step(false, 0) & PK_API_FIELD_WILD_HELD, "OFF did not take encounter ownership");
+    CHECK(core->busRead8(core, 0x02000020) == 1, "OFF did not hold the switch");
+    CHECK(pk_api_field_state() & PK_API_FIELD_WILD_HELD, "observer lost encounter ownership");
+    CHECK(core->busRead8(core, 0x02000020) == 1, "observation changed the encounter switch");
+    pk_api_field_step(false, 100);
+    CHECK(core->busRead8(core, 0x02000020) == 0, "ON did not restore encounters");
+    core->busWrite8(core, 0x02000020, 1);
+    CHECK(pk_api_field_wild(0x02000020, true), "resumed OFF switch refused");
+    pk_api_field_step(false, 100);
+    CHECK(core->busRead8(core, 0x02000020) == 0, "resumed OFF ownership was not restored");
+    CHECK(pk_api_field_wild(0, false), "disabling switch refused");
     CHECK(!pk_api_field_configure(0x12345678) && pk_api_field_state() == 0, "unknown CRC retained a field table");
     char code[5] = "";
     CHECK(pk_api_rom_code(code) && !strcmp(code, "BPRE"), "game code \"%s\"", code);

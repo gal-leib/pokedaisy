@@ -235,6 +235,12 @@ A phone held upright and held sideways each get their own layout: you edit the o
 
 Both show `N/A` on a game PokeDaisy can't read the field of yet.
 
+On iPhone and iPad, both options work in supported GBA games and remember your choices. Auto-run follows the same
+rules: it leaves menus, conversations, battles, bikes, surfing and the game's own auto-run alone. On a new game,
+walk around for a few seconds so the field can be recognized. Game Boy games show `N/A` for now.
+
+If you turn indoor running off while inside a building, leave and re-enter to restore that map's normal rule.
+
 ## WILD ENCOUNTERS
 
 `WILD ENCOUNTERS` turns wild Pokémon jumping out at you in grass, caves and water on or off. It's in the companion's `GAMEPLAY` group:
@@ -245,6 +251,10 @@ Both show `N/A` on a game PokeDaisy can't read the field of yet.
 Only random encounters change. Fishing, moves that lure wild Pokémon out and battles the story sets up still happen, and items that keep wild Pokémon away work as usual on top. The change applies at once, no restart needed.
 
 It works on the Game Boy Advance originals in every language and on almost every supported hack, including the ones rebuilt from newer source code like SoulGold, Lazarus and Recharged Yellow. On the Game Boy it works in Red, Blue, Yellow (in every language), Yellow Legacy, PureRed, PureBlue, Crystal and Crystal Legacy. On Emerald Rogue, Quetzal, Monomyth and the other Game Boy games it shows `N/A`.
+
+On iPhone and iPad, the toggle works where the GBA game's field and encounter switch are known. It can briefly show
+`N/A` while the game is checked. Your choice is remembered, including after resuming a saved state. Turning it back
+on restores random encounters when you return to the free field. Game Boy support is still to come on iOS.
 
 ## SHINY ODDS
 

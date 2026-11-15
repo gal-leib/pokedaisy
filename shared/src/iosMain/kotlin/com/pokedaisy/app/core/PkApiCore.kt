@@ -10,6 +10,8 @@ import com.pokedaisy.app.core.pkapi.pk_api_state_matches_save
 import com.pokedaisy.app.core.pkapi.pk_api_rom_patch
 import com.pokedaisy.app.core.pkapi.pk_api_rom_unpatch
 import com.pokedaisy.app.companion.data.RomOptionPatcher
+import com.pokedaisy.app.core.pkapi.pk_api_field_wild
+import com.pokedaisy.app.core.pkapi.pk_api_field_step
 import com.pokedaisy.app.core.pkapi.pk_api_field_configure
 import com.pokedaisy.app.core.pkapi.pk_api_field_state
 import com.pokedaisy.app.core.pkapi.pk_api_audio
@@ -133,6 +135,9 @@ object PkApiCore : EmulatorCore, RomOptionPatcher {
     /** Read-only field observation for scene speeds; never enables patches or wild encounter changes. */
     fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
     fun fieldState(): Int = pk_api_field_state()
+    fun configureWild(addr: Long, wasOff: Boolean): Boolean =
+        addr in 0L..0xFFFFFFFFL && pk_api_field_wild(addr.toUInt(), wasOff)
+    fun stepField(runIndoors: Boolean, wildKeep: Int): Int = pk_api_field_step(runIndoors, wildKeep)
 
     /** Extended states include the battery save: a manual load rewinds it too. Game thread only. */
     fun saveState(path: String): Boolean = pk_api_save_state(path)
