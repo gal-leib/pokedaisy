@@ -1,30 +1,32 @@
-package com.pokedaisy.app.ios
+package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.BattleInputController
 import com.pokedaisy.app.ScriptInput
 import com.pokedaisy.app.battleSwitchAddrsFor
-import com.pokedaisy.app.companion.BattleInput
-import com.pokedaisy.app.companion.TelemetryStore
-import com.pokedaisy.app.companion.data.GameKind
-import com.pokedaisy.app.companion.data.isGen1
-import com.pokedaisy.app.companion.data.isGen2
+import com.pokedaisy.app.companion.data.*
 
-/** The shared battle menu driver on the iPad. Called on the main/game thread, once per emulated frame. */
-internal class IosBattleInput(
+/** Per-game battle wiring. Hosts schedule [poll] and controller ticks between frames; [keys] supplies
+ * the frame-based polling/mixing used by a host without its own ScriptInput channel. */
+class GameBattleInput(
     private val telemetry: TelemetryStore,
     private val romCode: String?,
     private val romRev: Int,
-    private val changed: () -> Unit,
-    private val silent: () -> Boolean,
+    input: ScriptInput? = null,
+    reader: MemoryReader = InProcessReader,
+    writer: ((Long, ByteArray) -> Boolean)? = null,
+    var changed: () -> Unit = {},
+    private val silent: () -> Boolean = { false },
+    private val retryUnshownBattle: Boolean = false,
 ) : BattleInput {
     private var script = 0
     private var exclusive = false
     private var frames = 0
     private var lastState: Pair<Int, Int>? = null
-    private val controller = BattleInputController(ScriptInput { bits, ownsKeys ->
-        script = bits
-        exclusive = ownsKeys
-    }).apply {
+    var stateObserved: (Int) -> Unit = {}
+    val controller = BattleInputController(ScriptInput { bits, owns ->
+        script = bits; exclusive = owns
+        input?.setScript(bits, owns)
+    }, reader, writer = writer).apply {
         stateNow = { telemetry.refreshBattleInputFast()?.second }
     }
 
@@ -36,26 +38,27 @@ internal class IosBattleInput(
     val holdPicture get() = controller.holdFrame
     val quietPress get() = controller.muteGame
 
-    fun keys(held: Int): Int {
-        // A fresh state before the very first tap, then about 15 checks per game second, including during FF.
-        if (frames++ % 4 == 0) {
-            telemetry.refreshBattleInputFast()?.let { state ->
-                controller.onState(state.first, state.second, telemetry.battleMenuCursor())
-                if (state != lastState) {
-                    lastState = state
-                    changed()
-                }
-            }
+    fun poll() {
+        telemetry.refreshBattleInputFast()?.let { state ->
+            controller.onState(state.first, state.second, telemetry.battleMenuCursor())
+            stateObserved(state.second)
+            val waiting = retryUnshownBattle && state.second != BATTLE_INPUT_NONE && !telemetry.snapshot.value.showsBattle
+            if (state != lastState || waiting) { lastState = state; changed() }
         }
+    }
+
+    fun keys(held: Int): Int {
+        if (frames++ % 4 == 0) poll()
         controller.tick()
         return if (exclusive) script else held or script
     }
 
-    /** Uses detected addresses only; an unmapped game keeps its own party menu. */
+    /** Only detected addresses enable switching; disconnected samples retain the last trusted mapping. */
     fun sampled() {
         val snapshot = telemetry.snapshot.value
-        controller.gen1 = snapshot.game.isGen1 || snapshot.game.isGen2
         controller.runAsksFirst = snapshot.battleOpponent.any { it.shiny }
+        if (!snapshot.connected) return
+        controller.gen1 = snapshot.game.isGen1 || snapshot.game.isGen2
         controller.cursorAddrs = telemetry.knownCursorAddrs()?.let { (action, move) ->
             BattleInputController.CursorAddrs(action, move,
                 if (snapshot.game == GameKind.ELITE_REDUX) BattleInputController.MenuCells.ELITE_REDUX

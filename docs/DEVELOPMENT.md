@@ -3785,10 +3785,12 @@ that controller without replacing it. Files-based games/saves, the shared librar
 resume/state bridges live in the Kotlin hosts. Settings expose only supported capabilities. Fonts come from the app's
 own assets. CI generates and builds the simulator app without signing; `iosApp/README.md` describes local builds.
 
-The iPad battle controls use `IosBattleInput`, an adapter over the shared `BattleInputController`. `GameViewController.frameKeys`
-runs it before every emulated frame, after combining the touch, controller and keyboard input; scripted presses own
-those keys only while a sequence is active. Fast battle-state checks run every four game frames and request a full
-companion sample on a transition. Detected cursor and party-menu addresses configure its closed-loop navigation;
+`GameBattleInput` owns the battle controller, fast state polling, transition notifications and detected menu/party
+configuration on both hosts. Android keeps its elapsed-time poll cadence, native script-input channel, RAM writer and
+DS stylus driver; it requests another full sample while battle data is still arriving. iOS uses its frame-based poll
+cadence and key mixer: `GameViewController.frameKeys` runs it before every emulated frame after combining touch,
+controller and keyboard input. Scripted presses own those keys only while a sequence is active. Fast iOS checks run
+every four game frames and request a full companion sample on a transition. Detected cursor and party-menu addresses configure its closed-loop navigation;
 without memory writes it walks the cursors. Party switching uses `battleSwitchAddrsFor`, the Android activity's verified mappings shared in place, including each hack's structure size and grid layout. It is offered only where those mappings support it.
 The shared battle view, style, focus, info and one-tap settings persist in `NSUserDefaults`.
 

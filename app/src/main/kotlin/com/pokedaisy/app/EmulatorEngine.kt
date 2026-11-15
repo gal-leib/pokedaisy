@@ -51,6 +51,7 @@ class EmulatorEngine(
     private val input: GbaInput,
     private val states: SaveStates,
     private val ffMusicCache: FfMusicCache,
+    private val battle: com.pokedaisy.app.companion.GameBattleInput,
 ) {
     private var thread: Thread? = null
     @Volatile var running = false
@@ -278,7 +279,7 @@ class EmulatorEngine(
     /** Bottom-screen touch battle control (see PLAN.md Phase 5):
      * drives the real battle menu via synthetic button presses through the
      * same touch-overlay bitmask the on-screen D-pad uses. */
-    private val battleInput = BattleInputController(input, writer = { a, b -> MgbaCore.pkWriteBytes(a, b) })
+    private val battleInput = battle.controller
 
     /** A DS game's battle picks: the game's own touch-screen buttons pressed with the stylus ([NdsBattleTaps]). */
     private val ndsTaps = NdsBattleTaps()
@@ -308,47 +309,13 @@ class EmulatorEngine(
     fun battleCancelInput() { battleInput.cancel(); ndsTaps.cancel() }
 
     /** Where [battleSwitchTo] finds the party menu; null = not supported for this game. */
-    var battleSwitchAddrs: BattleInputController.SwitchAddrs?
+    val battleSwitchAddrs: BattleInputController.SwitchAddrs?
         get() = battleInput.switchAddrs
-        set(v) { battleInput.switchAddrs = v }
-
-    /** Where the battle menus keep their cursors (picks go straight there); null = the blind walk. */
-    var battleCursorAddrs: BattleInputController.CursorAddrs?
-        get() = battleInput.cursorAddrs
-        set(v) { battleInput.cursorAddrs = v }
-
-    /** A fresh read of the battle input state, for RUN's follow-up (see [BattleInputController.stateNow]). */
-    var battleStateNow: (() -> Int?)?
-        get() = battleInput.stateNow
-        set(v) { battleInput.stateNow = v }
-
-    /** The foe in battle is shiny: RUN leaves the game's "are you sure?" to the player ([BattleInputController.runAsksFirst]). */
-    var battleRunAsksFirst: Boolean
-        get() = battleInput.runAsksFirst
-        set(v) { battleInput.runAsksFirst = v }
 
     /** Switch to the party mon with this personality. Call from the UI thread. */
     fun battleSwitchTo(personality: Long) = battleInput.switchTo(personality)
 
-    /** Invoked on the emu thread at a faster, fixed cadence than [onSample]
-     * (not gated by its ~1 Hz throttle) — wire this to a fast, 2-byte
-     * telemetry peek (TelemetrySampler.sampleBattleInputFast) and feed the
-     * result back via [setBattleMenuState], so the touch battle UI reacts to
-     * a menu transition within a fraction of a second, not up to a second
-     * late. */
-    var onBattleInputSample: (() -> Unit)? = null
-
-    /** Feed the latest (battleActiveBattler, battleInputState) from the fast
-     * poll above. */
-    fun setBattleMenuState(activeBattler: Int, state: Int, cursor: Int = -1) {
-        ndsTaps.onState(state)
-        battleInput.onState(activeBattler, state, cursor)
-    }
-
-    /** A Gen 1 game's battle menus (steered from their read cursor - see [BattleInputController.gen1]). */
-    var battleGen1Menus: Boolean
-        get() = battleInput.gen1
-        set(v) { battleInput.gen1 = v }
+    init { battle.stateObserved = ndsTaps::onState }
 
     fun setFastForwardHeld(on: Boolean) {
         if (ffHeld == on) return
@@ -1330,7 +1297,7 @@ class EmulatorEngine(
                 // 66 ms gap is dozens of game frames, and the turbo would run on into the battle.
                 if (battleInput.holdFrame || nowMs - lastBattleInputSample >= 66L) {
                     lastBattleInputSample = nowMs
-                    runCatching { onBattleInputSample?.invoke() }
+                    runCatching { battle.poll() }
                 }
 
                 gameSession.observeScreens(gba, nds && fieldState and MgbaCore.FIELD_MENU != 0)

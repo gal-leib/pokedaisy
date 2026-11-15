@@ -15,7 +15,7 @@ internal class IosGamePlayback(
     private val romPath: String,
     private val code: String?,
     private val telemetry: TelemetryStore,
-    private val battle: IosBattleInput,
+    private val battle: GameBattleInput,
 ) {
     private val gba = code != null
     val session = GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> NSLog("PokeDaisy: %@: %@", where, error.toString()) }

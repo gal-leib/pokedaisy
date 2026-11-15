@@ -74,7 +74,7 @@ object PokeDaisyHost {
 
     // The running game's SETTINGS; null = NO GAME RUNNING.
     private var settings by mutableStateOf<IosCompanionSettings?>(null)
-    private var battle by mutableStateOf<IosBattleInput?>(null)
+    private var battle by mutableStateOf<com.pokedaisy.app.companion.GameBattleInput?>(null)
     private var slots by mutableStateOf<StateSlotController?>(null)
     private var stateError by mutableStateOf<String?>(null)
     private var restartFresh = false
@@ -259,7 +259,7 @@ object PokeDaisyHost {
                 s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
                 s.rewindChanged()
             }
-        battle = IosBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
+        battle = com.pokedaisy.app.companion.GameBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }

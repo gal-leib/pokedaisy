@@ -76,8 +76,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.pokedaisy.app.companion.data.isGen2
-import com.pokedaisy.app.companion.data.isGen1
 import com.pokedaisy.app.companion.data.delete
 import okio.Path.Companion.toOkioPath
 import okio.source
@@ -155,9 +153,6 @@ class PokeDaisyActivity : Activity() {
     /** Opened by a frontend through [LaunchActivity] (see [exitGame]). */
     private var fromFrontend = false
     private var romKey: String = ""      // ROM CRC32, for per-ROM prefs
-    // The battle state the companion's snapshot was last refreshed for (emu thread; see onBattleInputSample).
-    private var lastUiBattler = -1
-    private var lastUiBattleState = -1
     /** WIDE's native tables for this ROM ([WideScreen.gameFor]); OFF for a game it doesn't know. */
     private var wideGame = WideScreen.OFF
     /** The running game is one its makers asked PokéDaisy not to read ([com.pokedaisy.app.companion.data.BlockedGames], by
@@ -1435,21 +1430,11 @@ class PokeDaisyActivity : Activity() {
     /** The cart's own encounter rates, by map, for WILD ENCOUNTERS back on (MgbaCore.pkNdsWildRates). */
     @Volatile private var dsWildRates: (() -> IntArray)? = null
 
-    /** The loaded ROM's header code / revision byte, for [switchAddrsFor]. */
+    /** The loaded ROM's header code / revision byte, for battle input and language selection. */
     @Volatile private var romCode = ""
     @Volatile private var romRev = -1
     /** The loaded cart is Origin HeartGold's ([com.pokedaisy.app.companion.data.OriginHeartGold]: a Japanese header). */
     @Volatile private var romOrigin = false
-
-    /**
-     * Where the battle POKéMON pane's switch finds the party menu: retail
-     * FireRed rev 1 / Emerald (gPartyMenu, gPlayerParty from the decomp ELFs,
-     * checked against each ROM's literal pools), the language ports and the hacks below. Keyed on the detected game too, so LeafGreen,
-     * FireRed rev 0, Ruby/Sapphire and hacks that share a header code (Seaglass)
-     * stay out.
-     */
-    private fun switchAddrsFor(game: com.pokedaisy.app.companion.data.GameKind?): BattleInputController.SwitchAddrs? =
-        battleSwitchAddrsFor(telemetry, game, romCode, romRev)
 
     /** Backs the bottom-screen "Settings" tab. Unlike SettingsActivity (which
      * only writes Prefs, picked up next launch), this also live-applies to the
@@ -2300,7 +2285,9 @@ class PokeDaisyActivity : Activity() {
         val appContext = applicationContext
         FfMenuWatch.onLearned = { field, battle -> Prefs(appContext).setFfMenuCallbacks(crc, field, battle) }
 
-        engine = EmulatorEngine(input, states!!, ffMusicCache).apply {
+        val battleSession = com.pokedaisy.app.companion.GameBattleInput(telemetry, gameCode, romRev,
+            input = input, writer = { a, b -> MgbaCore.pkWriteBytes(a, b) }, retryUnshownBattle = true)
+        engine = EmulatorEngine(input, states!!, ffMusicCache, battleSession).apply {
             hudEngine.value = this
             lateFramesSource = { view.lateFrames }
             // The game screen's fastest mode, which no tick that waits for the refresh can outrun (VsyncCheck, GitHub #350).
@@ -2382,7 +2369,7 @@ class PokeDaisyActivity : Activity() {
                 // guesswork), and learns the field's main callback from the player moving.
                 telemetry.knownGMain()?.let { (addr, inBattleOff) -> FfMenuWatch.useKnownGMain(addr, inBattleOff) }
                 if (snap.connected) FfMenuWatch.notePosition(snap.x, snap.y, snap.mapGroup, snap.mapNum, snap.inBattle)
-                if (snap.connected) battleSwitchAddrs = switchAddrsFor(snap.game)
+                battleSession.sampled()
                 // SHINY ODDS: the foe party of a game it knows (retail FireRed / Emerald), handed to the engine.
                 if (snap.connected) telemetry.knownShinyTarget().let { t ->
                     if (t != shinyTarget) {
@@ -2391,20 +2378,8 @@ class PokeDaisyActivity : Activity() {
                         syncShinyAchievements()
                     }
                 }
-                // The menus' cursors, so a FIGHT / move tap goes straight to its cell (NativeConfig.actionCursor).
-                if (snap.connected) battleCursorAddrs = telemetry.knownCursorAddrs()
-                    ?.let { (action, move) ->
-                        // Elite Redux's own menu: FIGHT / INFO over POKéMON / RUN, valued 0 / 3 over 1 / 2, moves in a column.
-                        val menus = if (snap.game == com.pokedaisy.app.companion.data.GameKind.ELITE_REDUX)
-                            BattleInputController.MenuCells.ELITE_REDUX else BattleInputController.MenuCells.GEN3
-                        BattleInputController.CursorAddrs(action = action, move = move, menus = menus)
-                    }
                 // WILD ENCOUNTERS on a Game Boy game is held by the engine, frame by frame.
                 if (snap.connected && romIsGameBoy) engine.gbField = gbField()
-                // A shiny foe: RUN leaves Unbound's "Are you sure you want to run away?" to the player.
-                engine.battleRunAsksFirst = snap.battleOpponent.any { it.shiny }
-                if (snap.connected) battleGen1Menus = snap.game.isGen1 ||
-                    snap.game.isGen2   // the same 2x2 menu and move column
                 // party.isNotEmpty(), not just connected: `connected` flips true as
                 // soon as the native addresses are found, which can be
                 // well before the save's party has actually loaded into RAM (e.g.
@@ -2425,23 +2400,8 @@ class PokeDaisyActivity : Activity() {
                 com.pokedaisy.app.companion.data.SnapshotCache.write(state.toOkioPath(), telemetry.forState())
             }
             onResumeResult = { loaded -> if (!loaded) { telemetry.dropCached(); runOnUiThread { waitForPlay() } } }
-            battleStateNow = { telemetry.refreshBattleInputFast()?.second }   // the emu thread, before a RUN follow-up press
-            onBattleInputSample = {   // runs on the emu thread, ~15x/sec
-                telemetry.refreshBattleInputFast()?.let { (battler, state) ->
-                    setBattleMenuState(battler, state, telemetry.battleMenuCursor())
-                    // The companion draws from the full snapshot, sampled once a second: a new battle
-                    // state gets one at once (the BATTLE tab at a battle's start, the buttons back each
-                    // turn, the move grid after FIGHT), and so does every sample of a battle whose
-                    // battlers can't be read yet - not up to a second later.
-                    val shown = telemetry.snapshot.value
-                    val waiting = state != com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE && !shown.showsBattle
-                    if (battler != lastUiBattler || state != lastUiBattleState || waiting) {
-                        lastUiBattler = battler
-                        lastUiBattleState = state
-                        startSample(this, afterSample)
-                    }
-                }
-            }
+            // Fast polls and transition-triggered full samples share the same game session on both hosts.
+            battleSession.changed = { startSample(this, afterSample) }
             ffMaxSpeed = Prefs(this@PokeDaisyActivity).ffMaxSpeed
             ffMusicMode = Prefs(this@PokeDaisyActivity).ffMusicMode
             ffMode = Prefs(this@PokeDaisyActivity).ffMode
