@@ -2135,6 +2135,7 @@ class PokeDaisyActivity : Activity() {
     private var freshLaunch = true
 
     private fun loadRom(romFile: File) {
+        gameSampler?.close(); gameSampler = null
         if (::engine.isInitialized) engine.gameOptions.cancelDiscovery()
         freshLaunch = true
         // An archive unpacks once (cached after) - ~0.5 s for 32 MiB, on the black screen.
@@ -2392,7 +2393,11 @@ class PokeDaisyActivity : Activity() {
                     runOnUiThread { showHud(notes.joinToString("\n"), NUZLOCKE_NOTICE_MS) }
                 }
             }
-            onSample = { startSample(this, afterSample) }   // runs on the emu thread
+            gameSampler = com.pokedaisy.app.companion.GameSampler.forGame(telemetry, romIsGameBoy, romIsNds,
+                game = object : kotlinx.coroutines.CoroutineDispatcher() {
+                    override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) = postToEmu(block::run)
+                }, current = { ::engine.isInitialized && engine === this && running }, after = afterSample)
+            onSample = { startSample(this) }   // runs on the emu thread
             // Every savestate carries the companion's data beside it, read fresh: a launch that
             // resumes from it shows that at once instead of LOADING (TelemetryStore.showCached).
             onStateSaved = { state ->
@@ -2401,7 +2406,7 @@ class PokeDaisyActivity : Activity() {
             }
             onResumeResult = { loaded -> if (!loaded) { telemetry.dropCached(); runOnUiThread { waitForPlay() } } }
             // Fast polls and transition-triggered full samples share the same game session on both hosts.
-            battleSession.changed = { startSample(this, afterSample) }
+            battleSession.changed = { startSample(this) }
             ffMaxSpeed = Prefs(this@PokeDaisyActivity).ffMaxSpeed
             ffMusicMode = Prefs(this@PokeDaisyActivity).ffMusicMode
             ffMode = Prefs(this@PokeDaisyActivity).ffMode
@@ -3024,62 +3029,18 @@ class PokeDaisyActivity : Activity() {
         return true
     }
 
-    /** The companion's sample decoder: one thread, one sample at a time (see [startSample]). */
-    private val samplerThread = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-        Thread(r, "pokedaisy-sample").apply { isDaemon = true }
-    }
-    /** A sample is being decoded: its RAM copy ([sampleBuffers]) is in use. */
-    private val sampling = java.util.concurrent.atomic.AtomicBoolean(false)
-    /** One was asked for meanwhile (a battle's menu changed): it's taken as soon as that one is in. */
-    @Volatile private var sampleAgain = false
-    private var sampleBuffers: com.pokedaisy.app.companion.data.RamSnapshot.Buffers? = null
+    private var gameSampler: com.pokedaisy.app.companion.GameSampler? = null
 
-    /**
-     * Emu thread: the companion's full sample. A GBA / DS game's RAM is copied here, between frames (a fraction of a
-     * millisecond), and read and decoded on [samplerThread]; [after] then runs back on the emu thread. Decoding it here
-     * took 3-15 ms between two frames on the RP6 / Thor, and each one past ~8 ms cost the screen a refresh: a stutter
-     * once a second, four times a second in a battle, worst on a DS (GitHub #215). A Game Boy game is still read here.
-     */
-    private fun startSample(e: EmulatorEngine, after: (com.pokedaisy.app.companion.data.SnapshotView) -> Unit) {
-        if (romIsGameBoy) {
-            after(telemetry.refresh())
-            return
-        }
-        if (!sampling.compareAndSet(false, true)) {
-            sampleAgain = true
-            return
-        }
-        val buffers = sampleBuffers?.takeIf { it.nds == romIsNds }
-            ?: com.pokedaisy.app.companion.data.RamSnapshot.Buffers(romIsNds).also { sampleBuffers = it }
-        val ram = com.pokedaisy.app.companion.data.RamSnapshot.capture(buffers)
-        if (ram == null) {
-            sampling.set(false)
-            return
-        }
-        samplerThread.execute {
-            val snap = try {
-                telemetry.refresh(ram)
-            } catch (t: Throwable) {
-                Log.e("pokedaisy", "sample failed", t)
-                null
-            } finally {
-                sampling.set(false)
-            }
-            e.postToEmu {
-                if (snap != null) after(snap)
-                if (sampleAgain) {
-                    sampleAgain = false
-                    startSample(e, after)
-                }
-            }
-        }
+    /** Requests originate between frames; common sampling owns capture, decode, coalescing and delivery. */
+    private fun startSample(e: EmulatorEngine) {
+        if (::engine.isInitialized && engine === e) gameSampler?.request()
     }
 
     override fun onDestroy() {
         if (::engine.isInitialized) engine.gameOptions.cancelDiscovery()
         if (::touchControls.isInitialized) touchControls.releaseInputWindows()
         stopListeningForFold()
-        samplerThread.shutdown()
+        gameSampler?.close(); gameSampler = null
         com.pokedaisy.app.companion.FeatureTips.available = { false }
         Hotkeys.dsActive = { false }
         // Gone while the game slept (onPause held it): stop it now, as a close would have.

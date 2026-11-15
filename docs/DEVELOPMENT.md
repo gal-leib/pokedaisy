@@ -3726,6 +3726,14 @@ The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/
 `ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
 multiplatform. The menu navigation and its tests stay the same when another platform supplies that input channel.
 
+`GameSampler` owns RAM capture, coroutine decoding, request coalescing and delivery for both game hosts.
+Captures stay between frames on the game thread, one RAM image remains in use until its decode ends,
+and a burst of requests queues one follow-up. Game Boy reads remain synchronous on the game thread.
+Android retains its frame-based cadence and dispatches results through the engine queue; iOS uses the
+same sampler with a coroutine timer and main-thread delivery. Closing prevents queued work or results
+from configuring another game. `TelemetryStore.deferredRefresh` binds an image to its original sampler
+and generation before queueing it, including when a worker starts after the next game has reset telemetry.
+
 `GameCheats` owns the per-game list, storage updates, enabled text and bounded import reader for
 both game hosts and Android's library cheat editor. Stores and formats remain `CheatStore`'s; imports
 stay off until enabled. The stream reader stops at 1 MiB plus one byte, including document providers

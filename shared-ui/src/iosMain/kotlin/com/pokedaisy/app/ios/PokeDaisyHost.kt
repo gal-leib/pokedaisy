@@ -34,7 +34,6 @@ import com.pokedaisy.app.companion.ui.CompanionScreen
 import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.game.GameViewController
 import com.pokedaisy.app.game.RomPicker
-import kotlinx.atomicfu.atomic
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
@@ -44,15 +43,11 @@ import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSLocale
-import platform.Foundation.NSTimer
 import platform.UIKit.UIViewController
 import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
-import platform.darwin.dispatch_async
-import platform.darwin.dispatch_get_main_queue
-import platform.darwin.dispatch_get_global_queue
 
 /** How often the companion reads the running game (Android's sampler runs about this often too). */
-private const val SAMPLE_SECONDS = 0.5
+private const val SAMPLE_MILLIS = 500L
 
 /** A save larger than this isn't one (a GBA flash chip is 128 KB; a Game Boy cart's RAM less). */
 private const val MAX_SAVE_BYTES = 1 shl 20
@@ -87,10 +82,7 @@ object PokeDaisyHost {
     private var cheats: com.pokedaisy.app.companion.GameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
-    private var timer: NSTimer? = null
-    // 1 while a read is on its way, so a slow one never piles up behind the next.
-    private val reading = atomic(false)
-    private val sampleBuffers = com.pokedaisy.app.companion.data.RamSnapshot.Buffers(false)
+    private var sampler: com.pokedaisy.app.companion.GameSampler? = null
 
     /** Sets the shared screens' hosts (fonts, pictures, settings, the manual). Safe to call more than once. */
     fun start() {
@@ -327,7 +319,11 @@ object PokeDaisyHost {
             initialIndex = defaults.integerForKey("state_slot").toInt(),
             selected = { defaults.setInteger(it.toLong(), "state_slot") })
         prefetchArt(romPath)
-        timer = NSTimer.scheduledTimerWithTimeInterval(SAMPLE_SECONDS, repeats = true) { _ -> sample() }
+        sampler = com.pokedaisy.app.companion.GameSampler.forGame(telemetry,
+            gameBoy = !romPath.lowercase().endsWith(".gba"), game = kotlinx.coroutines.Dispatchers.Main,
+            current = { game === g && g.isRunning }, after = {
+                battle?.sampled(); playback?.sampled(); settings?.let { options?.settingsChanged(it) }
+            }).also { it.startPeriodic(SAMPLE_MILLIS) }
         return g
     }
 
@@ -356,8 +352,8 @@ object PokeDaisyHost {
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
         stateError = null
-        timer?.invalidate()
-        timer = null
+        sampler?.close()
+        sampler = null
         options?.close()
         options = null
         cheats = null
@@ -404,31 +400,5 @@ object PokeDaisyHost {
         }.getOrNull()
     }
 
-    private fun sample() {
-        val current = game ?: return
-        if (!current.isRunning || !reading.compareAndSet(false, true)) return
-        // As Android's startSample: copy RAM on the game thread, decode that stable image off-thread.
-        // The core's read lock protects lifetime/ROM mapping; it does not serialize a live frame or a game call.
-        if (PkApiCore.platform() == com.pokedaisy.app.companion.data.EmulatorCore.PLATFORM_GB) {
-            try {
-                telemetry.refresh()
-                battle?.sampled(); playback?.sampled(); settings?.let { options?.settingsChanged(it) }
-            } finally { reading.value = false }
-            return
-        }
-        val ram = com.pokedaisy.app.companion.data.RamSnapshot.capture(sampleBuffers)
-        if (ram == null) { reading.value = false; return }
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
-            try {
-                runCatching { telemetry.refresh(ram) }.onSuccess {
-                    dispatch_async(dispatch_get_main_queue()) {
-                        // A slow sample from the previous game must never configure a newly opened one.
-                        if (game === current) { battle?.sampled(); playback?.sampled(); settings?.let { options?.settingsChanged(it) } }
-                    }
-                }
-            } finally {
-                reading.value = false
-            }
-        }
-    }
+    private fun sample() { sampler?.request() }
 }
