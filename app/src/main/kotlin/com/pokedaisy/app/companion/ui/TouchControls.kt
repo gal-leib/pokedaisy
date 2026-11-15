@@ -335,6 +335,8 @@ fun TouchControls(
     val skinImage by rememberSkinImage(skin, fit)
     val presses = tracker ?: remember { TouchPressTracker(TouchPressed()) }
     presses.input = input
+    // GBA/GB X/Y are remappable controller keys; only DS has native X/Y game bits. Both hosts use this mode.
+    presses.xyKeys = !ds
     val pressed = presses.pressed
     val currentFit by rememberUpdatedState(fit)
     val currentPlaced by rememberUpdatedState(placed)

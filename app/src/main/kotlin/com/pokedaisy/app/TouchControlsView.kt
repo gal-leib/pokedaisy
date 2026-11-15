@@ -184,7 +184,7 @@ class TouchControlsView(context: Context) : FrameLayout(context) {
                     gameAspect = gameAspect, gameBoy = !shoulders, ffOn = ffOn, ds = dsButtons, skin = skin,
                     modifier = androidx.compose.ui.Modifier.fillMaxSize(),
                     onPlaced = { placed = it; onPlaced?.invoke() },
-                    tracker = tracker.also { it.xyKeys = !dsButtons },
+                    tracker = tracker,
                     onHitModel = { hitModel = it; syncInputWindows() },
                     unavailable = unavailable,
                 )
