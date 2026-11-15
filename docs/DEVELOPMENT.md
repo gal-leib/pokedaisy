@@ -3627,6 +3627,14 @@ visibility so delayed calls cannot reach the next game. Render/audio and each ho
 remain with the host. `GameSessionTest` exercises this ordering, waits, busy gates, failures, close and
 fade/field settling on JVM and iOS.
 
+`FieldItemSupportCache` shares Android's per-ROM code checks and retry-on-read-failure behavior.
+`FieldItemUse` shares the bag/party actions and queued result delivery, including NOT_NOW becoming
+IN_BATTLE. Android delegates its standard actions and keeps DS, GB and TM orchestration; iOS supplies
+its live game session and main-thread result delivery. A result from a replaced session is dropped.
+iOS now uses Android's `RamSnapshot.capture` before background telemetry decoding, so a sample does
+not read live GBA RAM while frames or item calls run. GB sampling stays on the game thread, as on Android;
+the core read lock protects core lifetime and ROM mapping, not whole frames.
+
 Field actions reach the existing call machinery through `pk_api_call_safe`, `pk_api_call`,
 `pk_api_gb_call_at` and `pk_api_write`, on the game thread between frames. Android JNI delegates to these;
 its DS write branch stays with the DS core. `PkApiCore` implements the existing `GameCalls` interface so

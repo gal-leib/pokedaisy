@@ -784,7 +784,7 @@ class EmulatorEngine(
         cheatsDirty = true
     }
 
-    private val gameSession by lazy {
+    val gameSession by lazy {
         com.pokedaisy.app.game.GameSession(gameCalls, MgbaCore::pkCallSafe) { where, error ->
             Log.e("pokedaisy", where, error)
         }

@@ -85,9 +85,11 @@ object PokeDaisyHost {
     private var playback: IosGamePlayback? = null
     private var options: IosGameOptions? = null
     private var cheats: IosGameCheats? = null
+    private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
     private var timer: NSTimer? = null
     // 1 while a read is on its way, so a slow one never piles up behind the next.
     private val reading = atomic(false)
+    private val sampleBuffers = com.pokedaisy.app.companion.data.RamSnapshot.Buffers(false)
 
     /** Sets the shared screens' hosts (fonts, pictures, settings, the manual). Safe to call more than once. */
     fun start() {
@@ -128,7 +130,7 @@ object PokeDaisyHost {
         val snapshot by telemetry.snapshot.collectAsState()
         Box(Modifier.fillMaxSize()) {
             CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle, gamePick = telemetry.gamePick,
-                back = panels.back, keys = panels.keys)
+                back = panels.back, keys = panels.keys, itemUse = items)
             stateError?.let { message ->
                 OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
                     onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
@@ -265,6 +267,24 @@ object PokeDaisyHost {
             g.beforeFrame = p::beforeFrame
             g.afterFrame = { p.tick(); gameOptions.tick() }
         }
+        val p = playback!!
+        val fields = com.pokedaisy.app.companion.data.FieldItemSupportCache()
+        fun live() = game === g && g.isRunning && code != null && !p.blocked && telemetry.snapshot.value.blocked == null
+        val sharedItems = com.pokedaisy.app.companion.FieldItemUse(
+            support = { if (live()) fields.get(telemetry.snapshot.value.game, code.orEmpty(), revision, telemetry.knownFieldItems()) else null },
+            session = { p.session.takeIf { live() } },
+            inBattle = { telemetry.snapshot.value.inBattle },
+            deliver = { result -> result(); if (live()) sample() },
+        )
+        items = object : com.pokedaisy.app.companion.ItemUse by sharedItems {
+            override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_ITEMS)
+            override fun openPc(done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
+                sharedItems.openPc { outcome ->
+                    if (outcome.result == com.pokedaisy.app.companion.data.ItemUseResult.USED && screen?.state?.side?.windowOpen == true) screen?.state?.hide()
+                    done(outcome)
+                }
+            }
+        }
         g.beforeRewind = battle!!::cancel
         val currentSettings = settings!!
         cheats = IosGameCheats(romPath, g) { currentSettings.cheatsEnabled }
@@ -312,6 +332,7 @@ object PokeDaisyHost {
         options?.close()
         options = null
         cheats = null
+        items = null
         playback?.close()
         playback = null
         battle?.cancel()
@@ -356,9 +377,20 @@ object PokeDaisyHost {
     private fun sample() {
         val current = game ?: return
         if (!current.isRunning || !reading.compareAndSet(false, true)) return
+        // As Android's startSample: copy RAM on the game thread, decode that stable image off-thread.
+        // The core's read lock protects lifetime/ROM mapping; it does not serialize a live frame or a game call.
+        if (PkApiCore.platform() == com.pokedaisy.app.companion.data.EmulatorCore.PLATFORM_GB) {
+            try {
+                telemetry.refresh()
+                battle?.sampled(); playback?.sampled(); settings?.let { options?.settingsChanged(it) }
+            } finally { reading.value = false }
+            return
+        }
+        val ram = com.pokedaisy.app.companion.data.RamSnapshot.capture(sampleBuffers)
+        if (ram == null) { reading.value = false; return }
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
             try {
-                runCatching { telemetry.refresh() }.onSuccess {
+                runCatching { telemetry.refresh(ram) }.onSuccess {
                     dispatch_async(dispatch_get_main_queue()) {
                         // A slow sample from the previous game must never configure a newly opened one.
                         if (game === current) { battle?.sampled(); playback?.sampled(); settings?.let { options?.settingsChanged(it) } }

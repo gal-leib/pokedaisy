@@ -416,8 +416,6 @@ class PokeDaisyActivity : Activity() {
     /** USE / GIVE / TAKE, the way the game does them (FieldItems.kt): the retail games in every language mapped so
      * far, the hacks that are retail code edited in place and the rebuilds whose config carries its own (Recharged
      * Emerald); the code CRCs decide the rest. */
-    private fun fieldItemsFor(game: com.pokedaisy.app.companion.data.GameKind?): List<com.pokedaisy.app.companion.data.FieldItemFns> =
-        com.pokedaisy.app.companion.data.fieldItemsCandidatesForGame(game, romCode, romRev, telemetry.knownFieldItems())
 
     /** WHICH GAME IS THIS?: the player's answers, taken by the sampler on its next pass (the emulator thread). */
     private val gamePick get() = telemetry.gamePick
@@ -437,29 +435,11 @@ class PokeDaisyActivity : Activity() {
         }
     }
 
-    /** [fieldItemsFor]'s support on the loaded ROM (its code checked, the holdable items read from it),
-     * built once per ROM - the bag's buttons and marks read it while drawing. */
-    @Volatile private var fieldSupport: Pair<String, com.pokedaisy.app.companion.data.FieldItemSupport?>? = null
+    private val fieldSupport = com.pokedaisy.app.companion.data.FieldItemSupportCache()
 
     private fun fieldItemSupport(): com.pokedaisy.app.companion.data.FieldItemSupport? {
-        if (romBlocked != null) return null
-        val game = telemetry.snapshot.value.game
-        // The config's text key and tables too: Emerald Kaizo runs as EMERALD and keeps no classic FLY (fieldItemsForGame);
-        // Recharged Emerald shares retail Emerald's code, revision and kind, but not its functions.
-        val candidates = fieldItemsFor(game).ifEmpty { return null }
-        val key = "$romCode/$romRev/$game/${com.pokedaisy.app.companion.data.romGameCode}/" +
-            candidates.joinToString(",") { "${it.varGet}/${it.items}" }
-        fieldSupport?.let { (k, v) -> if (k == key) return v }
-        if (!::engine.isInitialized || !engine.running) return null
-        // ROM bytes only (the core lock keeps a closing game's core safe); a read that fails isn't cached. The first
-        // table whose code is in the ROM (SoulGold's builds share one game).
-        val support = runCatching {
-            candidates.firstNotNullOfOrNull { fns ->
-                com.pokedaisy.app.companion.data.fieldItemSupport(fns) { addr, len -> com.pokedaisy.app.companion.data.InProcessReader.readCoreMemory(addr, len) }
-            }
-        }.getOrElse { return null }
-        fieldSupport = key to support
-        return support
+        if (romBlocked != null || !::engine.isInitialized || !engine.running) return null
+        return fieldSupport.get(telemetry.snapshot.value.game, romCode, romRev, telemetry.knownFieldItems())
     }
 
     /** TRADE EVOLUTIONS' calls for the loaded ROM ([com.pokedaisy.app.companion.data.tradeEvoFor]), its code checked once
@@ -578,43 +558,24 @@ class PokeDaisyActivity : Activity() {
             ?: com.pokedaisy.app.companion.data.gen5ConfigFor(game)?.repelStepsOff) != null
     }
 
-    private val itemUse = object : com.pokedaisy.app.companion.ItemUse {
-        override val repelVar get() = fieldItemSupport()?.fns?.repelVar?.takeIf { it != 0 }   // 0: none mapped (Monomyth: PC only)
-        override fun repelSteps(v: Int) = fieldItemSupport()?.fns?.repelSteps(v) ?: v
+    private val sharedItemUse = com.pokedaisy.app.companion.FieldItemUse(
+        support = ::fieldItemSupport,
+        session = { if (::engine.isInitialized && engine.running) engine.gameSession else null },
+        inBattle = { telemetry.snapshot.value.inBattle },
+        deliver = { result -> runOnUiThread(result) },
+    )
+
+    private val itemUse = object : com.pokedaisy.app.companion.ItemUse by sharedItemUse {
         /** A DS game's Repels ([com.pokedaisy.app.companion.data.useGen4Repel], Black's [com.pokedaisy.app.companion.data.useGen5Repel]);
          * nothing else yet. */
         private fun dsRepel(itemId: Int) = dsRepelKnown() && com.pokedaisy.app.companion.data.GEN4_REPEL_KINDS.any { it.first == itemId }
         override fun canUse(itemId: Int) = dsRepel(itemId) || tmSupport(itemId) || fieldItemSupport()?.canUse(itemId) == true
-        override fun canGive(itemId: Int) = fieldItemSupport()?.canGive(itemId) == true
-        override fun marked(itemId: Int) = dsRepel(itemId) || tmSupport(itemId) || fieldItemSupport()?.marked(itemId) == true
-        override fun picksMon(itemId: Int) = fieldItemSupport()?.picksMon(itemId) == true
-        override fun picksMove(itemId: Int) = fieldItemSupport()?.picksMove(itemId) == true
+        override fun marked(itemId: Int) = dsRepel(itemId) || tmSupport(itemId) || sharedItemUse.marked(itemId)
 
         /** [work] on the emu thread with the game's functions, [done] with its answer on the main thread;
          * [failed] when there's no game to ask (or the work throws). */
-        private fun <T> onGame(failed: T, done: (T) -> Unit, work: (com.pokedaisy.app.companion.data.FieldItemSupport, com.pokedaisy.app.companion.data.GameCalls, Boolean) -> T) {
-            val support = fieldItemSupport()
-            if (support == null || !::engine.isInitialized || !engine.running) {
-                done(failed)
-                return
-            }
-            val inBattle = telemetry.snapshot.value.inBattle
-            engine.requestFieldItemJob(inBattle) { calls, busy ->
-                val out = runCatching { work(support, calls, busy) }.getOrElse { Log.e("pokedaisy", "item use failed", it); failed }
-                Log.i("pokedaisy", "item use: $out")
-                runOnUiThread { done(if (inBattle) inBattleInstead(out) else out) }
-            }
-        }
-
-        /** In a battle, "not now" says why: a battle, not "close the menus and battles". */
-        @Suppress("UNCHECKED_CAST")
-        private fun <T> inBattleInstead(out: T): T = when {
-            out is com.pokedaisy.app.companion.data.ItemUseOutcome && out.result == com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW ->
-                out.copy(result = com.pokedaisy.app.companion.data.ItemUseResult.IN_BATTLE) as T
-            out is com.pokedaisy.app.companion.data.PartyTargets && out.result == com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW ->
-                out.copy(result = com.pokedaisy.app.companion.data.ItemUseResult.IN_BATTLE) as T
-            else -> out
-        }
+        private fun <T> onGame(failed: T, done: (T) -> Unit, work: (com.pokedaisy.app.companion.data.FieldItemSupport, com.pokedaisy.app.companion.data.GameCalls, Boolean) -> T) =
+            sharedItemUse.onGame(failed, done, work)
 
         private val failed = com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.FAILED)
 
@@ -635,18 +596,13 @@ class PokeDaisyActivity : Activity() {
                                 com.pokedaisy.app.companion.data.gen4ConfigFor(game)!!, calls, itemId, steps, free)
                     }.getOrElse { Log.e("pokedaisy", "repel failed", it); failed }
                     Log.i("pokedaisy", "item use (DS): $out")
-                    runOnUiThread { done(if (inBattle) inBattleInstead(out) else out) }
+                    runOnUiThread { done(if (inBattle) com.pokedaisy.app.companion.fieldItemBattleResult(out) else out) }
                 }
                 return
             }
             if (tmSupport(itemId)) return openTmScreen(itemId, done)
-            onGame(failed, done) { s, calls, busy -> com.pokedaisy.app.companion.data.useFieldItem(s.fns, itemId, busy, calls) }
+            sharedItemUse.use(itemId, done)
         }
-
-        override fun targets(itemId: Int, give: Boolean, done: (com.pokedaisy.app.companion.data.PartyTargets) -> Unit) =
-            onGame(com.pokedaisy.app.companion.data.PartyTargets(com.pokedaisy.app.companion.data.ItemUseResult.FAILED), done) { s, calls, busy ->
-                com.pokedaisy.app.companion.data.partyTargets(s, itemId, give, busy, calls)
-            }
 
         /** A TM / HM: the game's own TM screen (TmTeach.kt), in two steps like FLY - the checks, the controls locked and
          * the fade to black, then once it's black the game's party menu, sent back to the field when it closes. */
@@ -672,22 +628,6 @@ class PokeDaisyActivity : Activity() {
             }
         }
 
-        override fun useOn(itemId: Int, target: com.pokedaisy.app.companion.data.PartyTarget, moveIndex: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) =
-            onGame(failed, done) { s, calls, busy -> com.pokedaisy.app.companion.data.useOnMon(s, itemId, target, moveIndex, busy, calls) }
-
-        override fun give(itemId: Int, target: com.pokedaisy.app.companion.data.PartyTarget, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) =
-            onGame(failed, done) { s, calls, busy -> com.pokedaisy.app.companion.data.giveToMon(s, itemId, target, busy, calls) }
-
-        override fun canTake() = fieldItemSupport()?.canTake == true
-
-        override fun heldItems(done: (com.pokedaisy.app.companion.data.PartyTargets) -> Unit) =
-            onGame(com.pokedaisy.app.companion.data.PartyTargets(com.pokedaisy.app.companion.data.ItemUseResult.FAILED), done) { s, calls, _ ->
-                com.pokedaisy.app.companion.data.partyHeldItems(s, calls)
-            }
-
-        override fun take(target: com.pokedaisy.app.companion.data.PartyTarget, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) =
-            onGame(failed, done) { s, calls, busy -> com.pokedaisy.app.companion.data.takeFromMon(s, target, busy, calls) }
-
         override fun canPc() = dsCalls() || fieldItemSupport()?.canPc == true || gbField() != null
 
         // The PC is worked with the game's buttons: an open companion window steps aside once it's up.
@@ -712,9 +652,7 @@ class PokeDaisyActivity : Activity() {
                 }
                 return
             }
-            onGame(failed, opened) { s, calls, busy ->
-                com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.openPc(s.fns, busy, calls))
-            }
+            sharedItemUse.openPc(opened)
         }
 
         override fun canReorderParty() = !romIsNds && !romIsGameBoy && ::engine.isInitialized && engine.running &&

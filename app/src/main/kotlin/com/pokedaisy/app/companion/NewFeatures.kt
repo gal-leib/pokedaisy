@@ -17,6 +17,7 @@ object NewFeatures {
     const val IOS_REWIND = "ios_rewind"
     const val IOS_TOUCH_XY = "ios_touch_xy"
     const val IOS_CHEATS = "ios_cheats"
+    const val IOS_FIELD_ITEMS = "ios_field_items"
 
     /** SETTINGS > HUD (companion.ui.FieldHud). */
     const val HUD = "hud"
@@ -216,6 +217,7 @@ object NewFeatures {
         IOS_REWIND,
         IOS_TOUCH_XY,
         IOS_CHEATS,
+        IOS_FIELD_ITEMS,
         IOS_FIELD_OPTIONS,
         IOS_GAME_OPTIONS,
         IOS_SCENE_SPEEDS,
