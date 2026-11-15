@@ -77,7 +77,7 @@ object PokeDaisyHost {
     private var game: GameViewController? = null
     private val touch = IosTouchControls({ game }, { settings })
     private var screen: IosGameScreen? = null
-    private var playback: IosGamePlayback? = null
+    private var playback: com.pokedaisy.app.companion.GamePlayback? = null
     private var options: com.pokedaisy.app.companion.GameOptions? = null
     private var cheats: com.pokedaisy.app.companion.GameCheats? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
@@ -233,14 +233,14 @@ object PokeDaisyHost {
             matchesSave = { PkApiCore.stateMatchesSave(it.toString()) },
             enabled = { defaults.objectForKey("auto_resume") == null || defaults.boolForKey("auto_resume") },
             snapshot = stateSnapshot, loaded = stateLoaded)
-        g.onCoreStarted = { playback?.start(); options?.start(romPath.toPath(), PkApiCore::configureWild); cheats?.start(); g.withState { resume.restore() } }
+        val (code, revision) = (if (romPath.lowercase().endsWith(".gba"))
+            com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)
+        g.onCoreStarted = { playback?.start(romPath.toPath(), code, if (code != null) runCatching { com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()) }.getOrDefault(0L) else 0L); options?.start(romPath.toPath(), PkApiCore::configureWild); cheats?.start(); g.withState { resume.restore() } }
         g.beforeSuspend = {
             val saved = g.withState { resume.save() }
             if (!saved) resumeFailed()
             saved
         }
-        val (code, revision) = (if (romPath.lowercase().endsWith(".gba"))
-            com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)
         settings = IosCompanionSettings(romPath, code, g,
             onClose = { finishClose() },
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
@@ -257,10 +257,12 @@ object PokeDaisyHost {
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
         }
-        playback = IosGamePlayback(romPath, code, telemetry, battle!!).also { p ->
-            settings!!.playbackChanged = { settings?.let(p::settingsChanged) }
-            p.settingsChanged(settings!!)
-            g.frameSpeed = p::speed
+        playback = com.pokedaisy.app.companion.GamePlayback(
+            com.pokedaisy.app.game.GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> com.pokedaisy.app.companion.data.Logs.i("$where: $error") },
+            telemetry, iosPreferences, battle!!, PkApiCore::configureField, { PkApiCore.configureField(0) }).also { p ->
+            settings!!.playbackChanged = { settings?.let { p.settingsChanged(it, it.ffActive, it.slowmoHeld) } }
+            p.settingsChanged(settings!!, settings!!.ffActive, settings!!.slowmoHeld)
+            g.frameSpeed = { p.speed().let { if (it.isInfinite()) 0.0 else it.toDouble() } }
             val bKeys = battle!!::keys
             val gameOptions = com.pokedaisy.app.companion.GameOptions(PkApiCore,
                 { code != null && !p.blocked && telemetry.snapshot.value.blocked == null }).also { o ->

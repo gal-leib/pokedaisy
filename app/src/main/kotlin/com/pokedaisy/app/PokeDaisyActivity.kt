@@ -58,12 +58,10 @@ import com.pokedaisy.app.companion.ui.MenuKey
 import com.pokedaisy.app.overlay.OverlayChoice
 import com.pokedaisy.app.overlay.OverlayStore
 import com.pokedaisy.app.companion.FfMusicMode
-import com.pokedaisy.app.companion.data.FfMenuWatch
 import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.TipId
 import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.companion.data.RomArt
-import com.pokedaisy.app.companion.data.RegionMapWatch
 import com.pokedaisy.app.companion.data.RomRegionMap
 import com.pokedaisy.app.companion.data.displayName
 import com.pokedaisy.app.companion.ui.CompanionScreen
@@ -2136,7 +2134,7 @@ class PokeDaisyActivity : Activity() {
 
     private fun loadRom(romFile: File) {
         gameSampler?.close(); gameSampler = null
-        if (::engine.isInitialized) engine.gameOptions.cancelDiscovery()
+        if (::engine.isInitialized) { engine.gameOptions.cancelDiscovery(); engine.playback.close() }
         freshLaunch = true
         // An archive unpacks once (cached after) - ~0.5 s for 32 MiB, on the black screen.
         val r = RomArchive.playable(romFile, cacheDir) ?: romFile
@@ -2262,8 +2260,6 @@ class PokeDaisyActivity : Activity() {
         // from the ROM on every launch - a few KB of reads (see RomRegionMap).
         if (gba) RomRegionMap.load(filesDir.toOkioPath(), crc, r.toOkioPath()) else RomRegionMap.current = null   // not the last GBA game's
         // SMART FF steps aside while the game's region map or a menu is up (see EmulatorEngine).
-        if (gba) RegionMapWatch.load(r.toOkioPath())
-        val (menuField, menuBattle) = Prefs(this).ffMenuCallbacks(crc)
         // The game code and revision: a GBA header's 0xAC / 0xBC, a DS header's 0x0C / 0x1E.
         val header = RomIdentity.header(r, nds)
         val gameCode = header?.first.orEmpty()
@@ -2279,14 +2275,9 @@ class PokeDaisyActivity : Activity() {
         // The ZOOM picked last time on this game: the camera holds 1x until the field has been up a moment, then eases
         // out to it (WideCamera.reset), so it comes back once the game has loaded rather than over its title screen.
         view.camera.level = Prefs(this).zoomLevelFor(romKey)
-        FfMenuWatch.load(gameCode, menuField, menuBattle)
-        com.pokedaisy.app.companion.data.ShopWatch.load()
-        val appContext = applicationContext
-        FfMenuWatch.onLearned = { field, battle -> Prefs(appContext).setFfMenuCallbacks(crc, field, battle) }
-
         val battleSession = com.pokedaisy.app.companion.GameBattleInput(telemetry, gameCode, romRev,
             input = input, writer = { a, b -> MgbaCore.pkWriteBytes(a, b) }, retryUnshownBattle = true)
-        engine = EmulatorEngine(input, states!!, ffMusicCache, battleSession).apply {
+        engine = EmulatorEngine(input, states!!, ffMusicCache, battleSession, Prefs(this), telemetry).apply {
             hudEngine.value = this
             lateFramesSource = { view.lateFrames }
             // The game screen's fastest mode, which no tick that waits for the refresh can outrun (VsyncCheck, GitHub #350).
@@ -2366,8 +2357,7 @@ class PokeDaisyActivity : Activity() {
                 }
                 // SMART FF reads the game's own gMain once the game is known (no scan
                 // guesswork), and learns the field's main callback from the player moving.
-                telemetry.knownGMain()?.let { (addr, inBattleOff) -> FfMenuWatch.useKnownGMain(addr, inBattleOff) }
-                if (snap.connected) FfMenuWatch.notePosition(snap.x, snap.y, snap.mapGroup, snap.mapNum, snap.inBattle)
+                playback.sampled()
                 battleSession.sampled()
                 // SHINY ODDS: the foe party of a game it knows (retail FireRed / Emerald), handed to the engine.
                 if (snap.connected) telemetry.knownShinyTarget().let { t ->
@@ -2413,6 +2403,7 @@ class PokeDaisyActivity : Activity() {
             restoreSpeedIndex(Prefs(this@PokeDaisyActivity).speedIndexFor(romKey))
             applyFieldPrefs(this)
         }
+        engine.playback.start(r.toOkioPath(), gameCode, crc.toLong(16), gba)
         if (gba && romBlocked == null) {
             val current = engine
             current.gameOptions.start(r.toOkioPath(), configureWild = { flag, _ ->
@@ -3062,6 +3053,7 @@ class PokeDaisyActivity : Activity() {
         lookGender.cancel()
         playScope.cancel()
         com.pokedaisy.app.companion.ui.GameStart.waiting = false
+        if (::engine.isInitialized) engine.playback.close()
         super.onDestroy()
     }
 

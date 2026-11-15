@@ -40,7 +40,7 @@ internal class IosCompanionSettings(
     private val onEditTouch: () -> Unit,
     private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
     private val gameScreen: () -> IosGameScreen? = { null },
-    private val playback: () -> IosGamePlayback? = { null },
+    private val playback: () -> com.pokedaisy.app.companion.GamePlayback? = { null },
     private val options: () -> com.pokedaisy.app.companion.GameOptions? = { null },
     private val cheatHost: () -> com.pokedaisy.app.companion.GameCheats? = { null },
 ) : com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences) {

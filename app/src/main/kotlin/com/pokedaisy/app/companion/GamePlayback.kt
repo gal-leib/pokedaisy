@@ -1,0 +1,122 @@
+package com.pokedaisy.app.companion
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.pokedaisy.app.companion.data.*
+import com.pokedaisy.app.Prefs
+import kotlin.concurrent.Volatile
+import com.pokedaisy.app.game.GameSession
+import okio.Path
+
+/** Shared per-game watchers, playback settings and field observations. Hosts retain frame scheduling and exceptional modes. */
+class GamePlayback(
+    val session: GameSession,
+    private val telemetry: TelemetryStore,
+    private val prefs: Prefs,
+    private val battle: GameBattleInput,
+    private val configureField: (Long) -> Boolean = { false },
+    private val disableField: () -> Unit = {},
+) {
+    private var gba = false
+    private var learnedCallback: ((Long, Long) -> Unit)? = null
+    private val menu get() = session.menuOpen
+    private val map get() = session.mapOpen
+    private var field = 0
+    val fieldState get() = field
+    val onField get() = gba && !blocked && FfMenuWatch.onField
+    var readField: () -> Int = { 0 }
+    var blocked = false
+        private set
+    @Volatile var baseSpeed = 1f
+    @Volatile var fastForward = false
+    @Volatile var slowMotion = false
+    @Volatile var ffMaxSpeed = 2f
+    @Volatile var ffMode = FfMode.SMART
+    @Volatile var battleSpeed = 0f
+    @Volatile var textSpeed = 0f
+    @Volatile var menuSpeed = 0f
+    @Volatile var bikeSpeed = 0f
+    @Volatile var surfSpeed = 0f
+    var fieldReadable by mutableStateOf(false)
+        private set
+    var fieldMovesReadable by mutableStateOf(false)
+        private set
+
+    fun settingsChanged(s: CompanionSettings, fastForward: Boolean, slowMotion: Boolean) {
+        this.slowMotion = slowMotion
+        baseSpeed = s.gameSpeed; this.fastForward = fastForward; ffMaxSpeed = s.ffMaxSpeed; ffMode = s.ffMode
+        battleSpeed = s.battleSpeed; textSpeed = s.textSpeed; menuSpeed = s.menuSpeed
+        bikeSpeed = s.bikeSpeed; surfSpeed = s.surfSpeed
+    }
+
+    fun start(romPath: Path, code: String?, crc: Long, gba: Boolean = code != null) {
+        this.gba = gba
+        session.reset()
+        val romKey = crc.toString(16).padStart(8, '0')
+        blocked = BlockedGames.forCrc(romKey) != null
+        val learned = prefs.ffMenuCallbacks(romKey)
+        FfMenuWatch.load(code.orEmpty(), learned.first, learned.second)
+        val preferences = prefs
+        learnedCallback = { field, battle -> preferences.setFfMenuCallbacks(romKey, field, battle) }
+        FfMenuWatch.onLearned = learnedCallback
+        ShopWatch.load()
+        RegionMapWatch.load(if (gba && !blocked) romPath else null)
+        fieldReadable = gba && !blocked && configureField(crc)
+        fieldMovesReadable = false
+    }
+
+    fun sampled() {
+        val snapshot = telemetry.snapshot.value
+        if (snapshot.blocked != null) {
+            blocked = true
+            disableField()
+            fieldReadable = false
+            fieldMovesReadable = false
+            return
+        }
+        if (!gba) return
+        telemetry.knownGMain()?.let { (addr, offset) -> FfMenuWatch.useKnownGMain(addr, offset) }
+        if (snapshot.connected) FfMenuWatch.notePosition(snapshot.x, snapshot.y, snapshot.mapGroup, snapshot.mapNum, snapshot.inBattle)
+    }
+
+    fun beforeFrame() {
+        session.servicePosted()
+        // As Android with an unknown GB scene: each GB helper validates its own field RAM.
+        session.serviceField(gba, gbOnField = true)
+    }
+
+    fun tick() {
+        val readable = gba && !blocked && telemetry.snapshot.value.blocked == null
+        session.observeScreens(readable)
+        session.observeField(readable && FfMenuWatch.onField && !map, -1, battle.gameState, battle.holdPicture)
+        fieldChanged(if (readable && fieldReadable) readField() else 0)
+    }
+
+    fun fieldChanged(bits: Int) {
+        field = bits
+        if (!fieldMovesReadable && bits and GameField.AVATAR != 0) fieldMovesReadable = true
+    }
+    fun resetFieldMoves() { fieldMovesReadable = false }
+
+    fun requestedSpeed(scene: PlaybackPolicy.Scene): Float = PlaybackPolicy.requestedSpeed(fastForward, ffMaxSpeed, slowMotion,
+        PlaybackPolicy.sceneSpeed(scene, baseSpeed, battleSpeed, textSpeed, menuSpeed, bikeSpeed, surfSpeed))
+
+    fun smartSpeed(requested: Float, battleState: Int, menu: Boolean, map: Boolean, waiting: Boolean = false): Float =
+        PlaybackPolicy.smartSpeed(requested, ffMode == FfMode.SMART, battleState, menu, map, waiting)
+
+    /** Common uncapped value is infinity; each renderer converts its own pacing sentinel. */
+    fun speed(): Float {
+        if (battle.holdPicture) return Float.POSITIVE_INFINITY
+        val scene = PlaybackPolicy.scene(battle.gameState, menu, map, gba && FfMenuWatch.battling, field)
+        return smartSpeed(requestedSpeed(scene), battle.gameState, menu, map)
+    }
+
+    fun close() {
+        session.close()
+        if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {
+            FfMenuWatch.onLearned = null
+            RegionMapWatch.load(null)
+        }
+    }
+}

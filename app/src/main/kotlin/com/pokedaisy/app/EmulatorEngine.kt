@@ -52,6 +52,8 @@ class EmulatorEngine(
     private val states: SaveStates,
     private val ffMusicCache: FfMusicCache,
     private val battle: com.pokedaisy.app.companion.GameBattleInput,
+    private val preferences: Prefs,
+    private val telemetry: com.pokedaisy.app.companion.TelemetryStore,
 ) {
     private var thread: Thread? = null
     @Volatile var running = false
@@ -72,7 +74,9 @@ class EmulatorEngine(
     @Volatile private var speedIdx = 0          // index into SPEED_STEPS
 
     /** Cap for hold/toggle fast-forward. 0 = unlimited. (Phase 4: make configurable.) */
-    @Volatile var ffMaxSpeed = 2f
+    var ffMaxSpeed
+        get() = playback.ffMaxSpeed
+        set(v) { playback.ffMaxSpeed = v }
 
     /** Debug builds: an `audio_tap` file put in here records the next [AudioTap.SECONDS] s of what the track is given
      * (`audio-tap.pcm`, 48 kHz stereo s16le) and, per frame, what the core made, what the track took and the rate
@@ -94,16 +98,25 @@ class EmulatorEngine(
 
     /** SETTINGS > SCENE SPEEDS (GitHub #43 / #85): the speed in a battle, while a text box is up on the field, and on
      * a menu screen, while fast-forward is off; 0 = GAME SPEED's, as on the field. FF and slow-mo still win. */
-    @Volatile var battleSpeed = 0f
-    @Volatile var textSpeed = 0f
-    @Volatile var menuSpeed = 0f
+    var battleSpeed
+        get() = playback.battleSpeed
+        set(v) { playback.battleSpeed = v }
+    var textSpeed
+        get() = playback.textSpeed
+        set(v) { playback.textSpeed = v }
+    var menuSpeed
+        get() = playback.menuSpeed
+        set(v) { playback.menuSpeed = v }
     /** ... and riding a bike / surfing on the field (batch 2 of #43 / #85): the whole game at that speed meanwhile. */
-    @Volatile var bikeSpeed = 0f
-    @Volatile var surfSpeed = 0f
+    var bikeSpeed
+        get() = playback.bikeSpeed
+        set(v) { playback.bikeSpeed = v }
+    var surfSpeed
+        get() = playback.surfSpeed
+        set(v) { playback.surfSpeed = v }
 
     /** The field read knows the player's bike / surf state on this game ([MgbaCore.FIELD_AVATAR]): BIKE / SURF SPEED. */
-    @Volatile var fieldMovesKnown = false
-        private set
+    val fieldMovesKnown get() = playback.fieldMovesReadable
 
     /** The field read has the player's controls locked (a script, a text box, the START menu); false where the game's
      * field isn't read. X's jump to the companion waits for it to clear. */
@@ -214,7 +227,9 @@ class EmulatorEngine(
     /** The game's own audio is paused this frame (FF with a STEADY clip or none yet, slow-mo, rewind, a held frame). */
     @Volatile var gameAudioPaused = false
     /** SMART: 1x while a menu screen or the region map is up ([FfMenuWatch], [RegionMapWatch]) - not a shop's ([ShopWatch]). */
-    @Volatile var ffMode = FfMode.SMART
+    var ffMode
+        get() = playback.ffMode
+        set(v) { playback.ffMode = v }
 
     @Volatile var currentSlot = 0
         private set
@@ -340,7 +355,7 @@ class EmulatorEngine(
 
     /** Restore a persisted on/off state without flashing the HUD or re-firing
      * [onFastForwardToggledChanged] (same pattern as [restoreSpeedIndex]). */
-    fun restoreFastForwardToggled(on: Boolean) { ffToggled = on }
+    fun restoreFastForwardToggled(on: Boolean) { ffToggled = on; playback.fastForward = ffHeld || ffToggled }
 
     val fastForwardToggled: Boolean get() = ffToggled
 
@@ -377,7 +392,7 @@ class EmulatorEngine(
     val speedIndex: Int get() = speedIdx
 
     /** Restore a persisted speed index without flashing the HUD. */
-    fun restoreSpeedIndex(i: Int) { speedIdx = i.coerceIn(0, SPEED_STEPS.size - 1) }
+    fun restoreSpeedIndex(i: Int) { speedIdx = i.coerceIn(0, SPEED_STEPS.size - 1); playback.baseSpeed = gameSpeed }
 
     /** The game speeds the companion's GAME SPEED offers ([speedIndex] picks one), slowest first. */
     val gameSpeeds: List<Float> get() = SPEED_STEPS.sorted()
@@ -595,12 +610,8 @@ class EmulatorEngine(
         }
     }
 
-    /** The speed for what's on screen with FF off: SCENE SPEEDS' pick for it, else GAME SPEED's step. */
-    private fun sceneSpeed(): Float = PlaybackPolicy.sceneSpeed(scene, SPEED_STEPS[speedIdx],
-        battleSpeed, textSpeed, menuSpeed, bikeSpeed, surfSpeed)
-
-    /** The speed the player asked for (FF, slow-mo, the speed steps); Float.POSITIVE_INFINITY = "run uncapped". */
-    private fun requestedSpeed(): Float = PlaybackPolicy.requestedSpeed(ffHeld || ffToggled, ffMaxSpeed, slowmoHeld, sceneSpeed())
+    /** Shared requested speed; rewind, scenic flight and DS holds remain in effectiveSpeed. */
+    private fun requestedSpeed(): Float = playback.requestedSpeed(scene)
 
     /** What the emulator actually runs at: [requestedSpeed], unless SMART is holding it at 1x for now. */
     private fun effectiveSpeed(): Float {
@@ -619,7 +630,7 @@ class EmulatorEngine(
         // SMART: menus and the region map's cursor can't be steered sped up -
         // 1x while one is up, and FF (still on) picks up again when it closes.
         // A battle runs fast but where it waits for the player (its menus, bag and party).
-        return PlaybackPolicy.smartSpeed(s, ffMode == FfMode.SMART, battleInput.gameState, menuOpen, mapOpen, battleWaiting)
+        return playback.smartSpeed(s, battleInput.gameState, menuOpen, mapOpen, battleWaiting)
     }
 
     /** No hold carried past a core (a held touch screen would stay frozen in the next game). */
@@ -646,6 +657,7 @@ class EmulatorEngine(
     private fun speedTag(s: Float): String = if (s.isInfinite()) "ff" else "${s}x"
 
     private fun announceSpeed() {
+        playback.baseSpeed = gameSpeed; playback.fastForward = ffHeld || ffToggled; playback.slowMotion = slowmoHeld
         val label = when {
             ffHeld || ffToggled -> tr("Fast-forward")
             slowmoHeld -> tr("Slow-motion ½×")
@@ -745,6 +757,11 @@ class EmulatorEngine(
         com.pokedaisy.app.game.GameSession(gameCalls, MgbaCore::pkCallSafe) { where, error ->
             Log.e("pokedaisy", where, error)
         }
+    }
+
+    val playback by lazy {
+        com.pokedaisy.app.companion.GamePlayback(gameSession, telemetry, preferences, battle,
+            configureField = { fieldGame != WideScreen.OFF })
     }
 
     /** Runs [job] on the emu thread before the next frame; dropped if the game closes first. */
@@ -1368,7 +1385,7 @@ class EmulatorEngine(
                     MgbaCore.pkFieldConfigure(if (gba) fieldGame else WideScreen.OFF, wildFlag.toInt(), wildEncounters < 100)
                     fieldApplied = fieldGame
                     wildApplied = wildFlag
-                    fieldMovesKnown = false
+                    playback.resetFieldMoves()
                 }
                 // WILD ENCOUNTERS on a Game Boy game: held every frame while OFF, put back once on the field when ON.
                 gbField?.let { gf ->
@@ -1396,7 +1413,7 @@ class EmulatorEngine(
                         if (n > 0) Log.i("pokedaisy", "shiny odds: foe made shiny (1 in $shinyOdds)")
                     }.onFailure { Log.w("pokedaisy", "shiny odds failed", it) }
                 }
-                if (fieldState and MgbaCore.FIELD_AVATAR != 0) fieldMovesKnown = true
+                playback.fieldChanged(fieldState)
                 val bike = MgbaCore.FIELD_AVATAR or MgbaCore.FIELD_BIKE
                 riding = (fieldState and bike) == bike
                 val battleState = battleInput.gameState

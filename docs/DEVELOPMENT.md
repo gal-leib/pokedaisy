@@ -3620,7 +3620,7 @@ static library `pk_api`, which the app's `CMakeLists.txt` links and any other ho
 
 `GameSession` (`shared/src/commonMain/.../game/`) owns queued between-frame work, field-job delays,
 safe-call waits, menu/map observation and the settled on-field signal. Both `EmulatorEngine` and
-`IosGamePlayback` drive it from their existing loops. Posted work runs before dirty patches, then field
+`GamePlayback` drive it from their existing loops. Posted work runs before dirty patches, then field
 work; a callback's newly queued work waits for the next batch. Co-op holds skip field service without
 advancing delays, and iOS rewind skips the forward-work hook. Close/reset drop both queues and field
 visibility so delayed calls cannot reach the next game. Render/audio and each host's state operations
@@ -3822,9 +3822,13 @@ The iPad playback settings update `GameViewController` on the main thread: `Fram
 capped speed, with real-time catch-up bounded before scaling; unlimited FF runs batches with an 8 ms budget.
 `pk_api_set_audio_rate` requests fewer samples per emulated frame during FF (pitched audio at the device's 48 kHz).
 `GameAudio` sets mixer volume for GAME VOLUME / MUTE GAME. Normal speed is per ROM path; FF and volume are app-wide.
-`IosGamePlayback` runs the existing `FfMenuWatch`, `ShopWatch` and `RegionMapWatch` each game frame and uses
-`PlaybackPolicy`, the same scene priority and speed selection Android's engine calls. Learned menu callbacks are
-stored per ROM CRC under the existing v2 key. A map scan from a closed game cannot overwrite the next game's watch.
+`GamePlayback` shares watcher setup, learned menu callbacks, telemetry-fed position learning, live speed settings,
+requested speed, SMART gating and field readability. Both hosts use it with the existing `PlaybackPolicy`.
+Android retains its frame order, DS holds, rewind and scenic-flight overrides; iOS drives the same session from
+its display callbacks and maps common infinity to its native pacing sentinel. Learned menu callbacks stay under
+the existing per-CRC v2 key. Closing an older owner cannot remove the next game's callback or region-map watch;
+the stored callback captures preferences without retaining the old game host. A stale map scan cannot publish
+into the next game either. The iOS-only playback class has been removed.
 `pk_api_field_configure` and `pk_api_field_state` expose the existing GBA field tables for observation with game patches
 disabled. Unknown CRCs and Game Boy return no field state, so TEXT / BIKE / SURF rows remain N/A there. Bike/surf
 become available after a trustworthy avatar read. No new ROM address tables are maintained by iOS.
