@@ -553,6 +553,11 @@ interface CompanionSettings {
 
     /** Turns the game's cheat [index] (in [cheats]) on or off; the game picks it up on the next frame. */
     fun setCheatEnabled(index: Int, on: Boolean) {}
+    val cheatsBadge: String? get() = null
+    val cheatsEditable: Boolean get() = false
+    fun addCheat(cheat: com.pokedaisy.app.cheats.Cheat) {}
+    fun removeCheat(index: Int) {}
+    fun importCheats(onResult: (com.pokedaisy.app.cheats.CheatStore.Import?) -> Unit) {}
 
     /** Display name of the currently-detected game (e.g. "Pokémon Heart and
      * Soul") — see [com.pokedaisy.app.companion.data.GameKind.displayName]. */

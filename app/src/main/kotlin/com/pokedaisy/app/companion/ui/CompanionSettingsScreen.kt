@@ -59,10 +59,14 @@ val STATUS_BAR_PLACES = listOf(tk("OFF"), tk("GAME"), tk("COMPANION"))
 
 fun statusBarLabel(on: Boolean, onCompanion: Boolean) = STATUS_BAR_PLACES[if (!on) 0 else if (onCompanion) 2 else 1]
 
-internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), CHEATS(tk("CHEATS")), TWEAKS(tk("TWEAKS")), COOP_PARTNERS(tk("PARTNERS")), HELP(tk("HELP")) }
+internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), CHEATS(tk("CHEATS")), CHEAT_ADD(tk("ADD CODE")), TWEAKS(tk("TWEAKS")), COOP_PARTNERS(tk("PARTNERS")), HELP(tk("HELP")) }
 
 /** Where BACK from a page goes: SHADERS opens from DISPLAY OPTIONS, the rest from HOME. */
-internal val Page.parent: Page get() = if (this == Page.SHADERS) Page.DISPLAY else Page.HOME
+internal val Page.parent: Page get() = when (this) {
+    Page.SHADERS -> Page.DISPLAY
+    Page.CHEAT_ADD -> Page.CHEATS
+    else -> Page.HOME
+}
 
 /**
  * The bottom-screen SETTINGS tab, laid out like FireRed's OPTION screen over
@@ -117,6 +121,8 @@ fun CompanionSettingsScreen(
     val capturedKeys = capture?.keys
     DisposableEffect(page, capture) { onDispose { capture?.cancel() } }
     var confirm by remember { mutableStateOf<Confirm?>(null) }
+    var cheatNotice by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var removingCheats by remember(page) { mutableStateOf(false) }
     var selector by remember { mutableStateOf<Selector?>(null) }
     // TOUCH CONTROLS > SKINS: the imported skins (read on the way in) and their pick-list.
     val touchSkinUi = remember { TouchSkinUi() }
@@ -161,7 +167,7 @@ fun CompanionSettingsScreen(
             }
             // EDIT LAYOUT saves over the game, outside this page: its revision redraws TOUCH CONTROLS.
             val touchRevision = settings?.touchRevision ?: 0
-            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision) {
+            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision, removingCheats) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
@@ -268,7 +274,18 @@ fun CompanionSettingsScreen(
                     ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
-                    Page.CHEATS -> cheatRows(settings) { tick++ } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.CHEATS -> cheatRows(settings, changed = { tick++ }, removing = removingCheats,
+                        onAdd = { page = Page.CHEAT_ADD },
+                        onImport = { settings.importCheats { result -> cheatNotice = cheatImportNotice(result); tick++ } },
+                        onRemoveMode = { removingCheats = !removingCheats },
+                        onRemove = { index ->
+                            settings.cheats.getOrNull(index)?.let { cheat ->
+                                confirm = Confirm(tk("REMOVE CHEAT?"), cheat.name, tk("REMOVE")) {
+                                    settings.removeCheat(index); tick++
+                                }
+                            }
+                        }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.CHEAT_ADD -> emptyList()
                     // Small preferences, each on by default (CompanionTweaks).
                     Page.TWEAKS -> CompanionTweaks.Tweak.entries.map { t ->
                         // LIGHT COMPANION keeps the animations off whatever these say (CompanionTweaks.get).
@@ -296,6 +313,10 @@ fun CompanionSettingsScreen(
                 if (page == Page.HELP) {
                     val source = remember { DocsSources.get() }
                     DocsReader(ui.docs, m, source, Modifier.fillMaxWidth().weight(1f), searchable = application)
+                } else if (page == Page.CHEAT_ADD && settings != null) {
+                    CheatAddForm(m, rememberGbaTextMetrics(textScale = 1f), ds = false, nextNumber = settings.cheats.size + 1,
+                        onCancel = { page = Page.CHEATS }, onAdd = { settings.addCheat(it); tick++; page = Page.CHEATS },
+                        modifier = Modifier.fillMaxWidth().weight(1f))
                 } else if (application && page == Page.HOME) {
                     AppSettingsHome(rows, m, appSearch, { appSearch = it },
                         Modifier.fillMaxWidth().weight(1f), scroll = homeScroll, footer = applicationFooter)
@@ -415,6 +436,10 @@ fun CompanionSettingsScreen(
                 onDismiss = { selector = null },
                 badge = sel.badge, note = sel.note,
             )
+        }
+        cheatNotice?.let { (title, message) ->
+            OptionConfirm(title, message, tk("OK"), m, onConfirm = { cheatNotice = null },
+                onDismiss = { cheatNotice = null }, cancelLabel = null)
         }
         confirm?.let { c ->
             OptionConfirm(
@@ -709,7 +734,7 @@ private fun homeRows(
         // Every map lets the player run (buildings too); FireRed / Emerald engines.
         SettingRow(tk("RUN INDOORS"), if (s.runIndoorsSupported) onOff(s.runIndoors) else tk("N/A"), enabled = s.runIndoorsSupported, labelBadge = s.fieldOptionsBadge) { if (s.runIndoorsSupported) { s.setRunIndoors(!s.runIndoors); changed() } },
         // This game's cheats on / off (the codes are typed or imported in the top screen's Settings).
-        SettingRow(tk("CHEATS"), cheatsValue(s), opensPage = true) { navigate(Page.CHEATS) },
+        SettingRow(tk("CHEATS"), cheatsValue(s), labelBadge = s.cheatsBadge, opensPage = true) { navigate(Page.CHEATS) },
         groupTitle(tk("SCREEN")),
         // The game at the GBA's 3:2, stretched to fill the top screen, or WIDE (the overworld drawn past
         // its edges); WIDE is tagged BETA, or NOT YET on a game it doesn't know (which shows it as ORIGINAL).
@@ -1013,25 +1038,29 @@ private fun cheatsValue(s: CompanionSettings): String =
 
 /**
  * CHEATS: the master switch, then one row per cheat of this game, each flipping
- * live (the game loads it on the next frame). Adding codes needs a keyboard, so
- * that's the top screen's Settings > CHEATS; with none yet, this page says so.
+ * live. Hosts with a keyboard can use the same entry form and import result UI as the top-screen settings.
  */
-private fun cheatRows(s: CompanionSettings, changed: () -> Unit): List<SettingRow> {
+private fun cheatRows(s: CompanionSettings, changed: () -> Unit, removing: Boolean,
+                      onAdd: () -> Unit, onImport: () -> Unit, onRemoveMode: () -> Unit,
+                      onRemove: (Int) -> Unit): List<SettingRow> {
     fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
     val master = s.cheatsEnabled
     val cheats = s.cheats
-    return listOf(SettingRow(tk("CHEATS"), onOff(master), subtitle = "GameShark, Action Replay and CodeBreaker codes") { s.setCheatsEnabled(!master); changed() }) +
-        if (cheats.isEmpty()) {
-            listOf(
+    return listOf(SettingRow(tk("CHEATS"), onOff(master), labelBadge = s.cheatsBadge,
+        subtitle = "GameShark, Action Replay and CodeBreaker codes") { s.setCheatsEnabled(!master); changed() }) +
+        (if (cheats.isEmpty()) {
+            listOfNotNull(
                 SettingRow(tk("NO CHEATS FOR THIS GAME"), null, enabled = false) {},
-                SettingRow(tk("ADD THEM IN SETTINGS ON THE TOP SCREEN"), null, enabled = false) {},
+                if (!s.cheatsEditable) SettingRow(tk("ADD THEM IN SETTINGS ON THE TOP SCREEN"), null, enabled = false) {} else null,
             )
-        } else {
-            // Greyed out with the master switch off, like HOTKEYS' binds.
-            cheats.mapIndexed { i, c ->
-                SettingRow(c.name, onOff(c.enabled), enabled = master) { s.setCheatEnabled(i, !c.enabled); changed() }
-            }
-        }
+        } else cheats.mapIndexed { i, c ->
+            if (removing) SettingRow(c.name, tk("REMOVE")) { onRemove(i) }
+            else SettingRow(c.name, onOff(c.enabled), enabled = master) { s.setCheatEnabled(i, !c.enabled); changed() }
+        }) + if (s.cheatsEditable) listOfNotNull(
+            SettingRow(tk("ADD CODE"), null, labelBadge = s.cheatsBadge, opensPage = true, onClick = onAdd),
+            SettingRow(tk("IMPORT FILE"), null, onClick = onImport),
+            if (cheats.isNotEmpty()) SettingRow(tk(if (removing) "DONE" else "REMOVE"), null, onClick = onRemoveMode) else null,
+        ) else emptyList()
 }
 
 

@@ -46,7 +46,7 @@ import platform.posix.memcpy
 /**
  * The iPad app's hosts for the shared screens, the iOS side of what PokeDaisyApp sets on Android: fonts from the app
  * bundle, pictures through Skia, THEME / DARK MODE in NSUserDefaults, the manual from the website kept in [filesDir],
- * dates the device's way. Cheat codes stay unchecked until the iOS core has mGBA's parser (CheatParser left unset).
+ * dates the device's way, and cheat validation through the same native GBA parser as Android.
  */
 object IosHosts {
     fun install(filesDir: Path) {
@@ -58,6 +58,7 @@ object IosHosts {
         FontSource.current = BundleFonts
         PictureCodec.current = SkiaPictures
         DeviceDates.current = FoundationDates
+        com.pokedaisy.app.cheats.CheatParser.current = com.pokedaisy.app.cheats.CheatParser(com.pokedaisy.app.core.PkApiCore::checkCheat)
         val defaults = NSUserDefaults.standardUserDefaults
         val seen = defaults.stringForKey("new_feature_since").orEmpty().split(",").mapNotNull { entry ->
             val parts = entry.split(":", limit = 2)

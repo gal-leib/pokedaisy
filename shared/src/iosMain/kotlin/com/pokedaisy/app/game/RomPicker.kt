@@ -34,6 +34,11 @@ object RomPicker {
 
     /** A copied data file from Files; read it during [onPicked]. Cancelled = null. */
     fun pickSave(from: UIViewController, onPicked: (String?) -> Unit) {
+        pickData(from, onPicked)
+    }
+
+    /** A copied data file, also used for cheat imports; read it during [onPicked]. Cancelled = null. */
+    fun pickData(from: UIViewController, onPicked: (String?) -> Unit) {
         present(from, listOf(UTTypeData), multiple = false) { urls -> onPicked(urls.firstOrNull()?.path) }
     }
 

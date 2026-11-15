@@ -87,6 +87,14 @@ xcodebuild -project iosApp/PokeDaisy.xcodeproj -scheme PokeDaisy -sdk iphonesimu
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
+## Cheats
+
+A running GBA game offers CHEATS with a master switch, per-code toggles, ADD CODE, IMPORT FILE and confirmed removal.
+The entry form is the same Compose form Android Settings uses. The shared models normalize and validate codes,
+parse RetroArch/mGBA files and store by original ROM CRC; the existing native engine applies only enabled codes.
+Files imports are bounded to 1 MiB, start disabled and pause the game/pad while the native picker is open. Code
+entry uses shared keyboard-focus ownership, so typing does not trigger gameplay or hotkeys. GB cheats stay hidden.
+
 ## Shared touch customization
 
 The companion's TOUCH CONTROLS page, preview and EDIT LAYOUT are the existing shared Compose screens. Preferences use

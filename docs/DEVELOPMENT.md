@@ -4101,4 +4101,12 @@ rules or patch engine are copied. The current cheat engine is GBA-only; GB/no-co
 
 The original-diagnostic `pk_cheats_api` test checks parser results, live RAM writes, replacement/clear, restoration
 of a cheated ROM byte, original-byte reads and preservation of a separate game-option patch. `PkApiCoreTest`
-checks parser/apply through cinterop. The shared entry form and iOS settings host are connected separately.
+checks parser/apply through cinterop. `CheatAddForm` is extracted from Android Settings and called there and by the shared companion's editable CHEATS
+page. Validation, normalization, code types, directives and import-result wording remain single implementations.
+Android's existing companion stays toggle-only; iOS exposes add/remove/import for a running GBA game. New codes
+start enabled, imports disabled, and the master switch controls native application.
+
+`IosGameCheats` stores `CheatStore` files by the ROM's original CRC under app support, applies enabled code text
+between frames and leaves the native lock/patch ownership to pk_api. `IosHosts` installs the stateless parser for
+`CheatCheck`. The Files picker reuses `RomPicker.pickData`, pauses input/frames, bounds imports to 1 MiB and binds
+its callback to the same running game. Shared text fields own keyboard input while typing codes.

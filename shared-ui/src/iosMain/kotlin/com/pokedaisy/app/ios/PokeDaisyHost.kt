@@ -84,6 +84,7 @@ object PokeDaisyHost {
     private var screen: IosGameScreen? = null
     private var playback: IosGamePlayback? = null
     private var options: IosGameOptions? = null
+    private var cheats: IosGameCheats? = null
     private var timer: NSTimer? = null
     // 1 while a read is on its way, so a slow one never piles up behind the next.
     private val reading = atomic(false)
@@ -226,7 +227,7 @@ object PokeDaisyHost {
             matchesSave = { PkApiCore.stateMatchesSave(it.toString()) },
             enabled = { defaults.objectForKey("auto_resume") == null || defaults.boolForKey("auto_resume") },
             snapshot = stateSnapshot, loaded = stateLoaded)
-        g.onCoreStarted = { playback?.start(); options?.start(); g.withState { resume.restore() } }
+        g.onCoreStarted = { playback?.start(); options?.start(); cheats?.start(); g.withState { resume.restore() } }
         g.beforeSuspend = {
             val saved = g.withState { resume.save() }
             if (!saved) resumeFailed()
@@ -238,7 +239,7 @@ object PokeDaisyHost {
             onRestart = { if (prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen }, playback = { playback }, options = { options })
+            }, onEditTouch = touch::edit, readTouchStage = touch::readStage, gameScreen = { screen }, playback = { playback }, options = { options }, cheatHost = { cheats })
             .also { s ->
                 L10n.apply(s.appLanguage, code)
                 s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
@@ -265,6 +266,7 @@ object PokeDaisyHost {
         }
         g.beforeRewind = battle!!::cancel
         val currentSettings = settings!!
+        cheats = IosGameCheats(romPath, g) { currentSettings.cheatsEnabled }
         g.beforeStateChange = { currentSettings.releaseRewind(); battle?.cancel(); touch.releaseKeys() }
         slots = StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
@@ -308,6 +310,7 @@ object PokeDaisyHost {
         timer = null
         options?.close()
         options = null
+        cheats = null
         playback?.close()
         playback = null
         battle?.cancel()

@@ -42,6 +42,7 @@ internal class IosCompanionSettings(
     private val gameScreen: () -> IosGameScreen? = { null },
     private val playback: () -> IosGamePlayback? = { null },
     private val options: () -> IosGameOptions? = { null },
+    private val cheatHost: () -> IosGameCheats? = { null },
 ) : CompanionSettings {
     private val d = NSUserDefaults.standardUserDefaults
     private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
@@ -57,8 +58,31 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "REWIND")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "REWIND", "CHEATS")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
+        .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
+
+    override val cheats get() = cheatHost()?.list.orEmpty()
+    override val cheatsEnabled get() = bool("cheats_enabled", false)
+    override fun setCheatsEnabled(on: Boolean) { d.setBool(on, "cheats_enabled"); cheatHost()?.apply() }
+    override val cheatsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_CHEATS)
+    override val cheatsEditable get() = cheatHost()?.editable == true
+    override fun setCheatEnabled(index: Int, on: Boolean) {
+        if (index in cheats.indices) cheatHost()?.save(cheats.mapIndexed { i, c -> if (i == index) c.copy(enabled = on) else c })
+    }
+    override fun addCheat(cheat: com.pokedaisy.app.cheats.Cheat) { cheatHost()?.save(cheats + cheat) }
+    override fun removeCheat(index: Int) { cheatHost()?.save(cheats.filterIndexed { i, _ -> i != index }) }
+    override fun importCheats(onResult: (com.pokedaisy.app.cheats.CheatStore.Import?) -> Unit) {
+        val g = game ?: return
+        val host = cheatHost() ?: return
+        val from = g.view.window?.rootViewController ?: return
+        g.uiPaused = true
+        g.pause()
+        com.pokedaisy.app.game.RomPicker.pickData(from) { path ->
+            try { if (path != null && g.isRunning && cheatHost() === host) onResult(runCatching { host.import(path) }.getOrNull()) }
+            finally { g.uiPaused = false; g.resume() }
+        }
+    }
 
     var optionsChanged: () -> Unit = {}
     override val rewind get() = bool("rewind", false)

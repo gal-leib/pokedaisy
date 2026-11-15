@@ -78,10 +78,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.achievements.RetroAchievements
 import com.pokedaisy.app.cheats.Cheat
-import com.pokedaisy.app.cheats.CheatCheck
-import com.pokedaisy.app.cheats.CheatCodes
 import com.pokedaisy.app.cheats.CheatStore
-import com.pokedaisy.app.cheats.CheatType
 import com.pokedaisy.app.companion.ui.AppBackdrop
 import com.pokedaisy.app.companion.ui.AspectPicker
 import com.pokedaisy.app.companion.ui.aspectLabel
@@ -1576,56 +1573,9 @@ class SettingsActivity : ComponentActivity() {
 
     @Composable
     private fun CheatAddScreen(m: GbaTextMetrics, small: GbaTextMetrics) {
-        var name by remember { mutableStateOf("") }
-        var code by remember { mutableStateOf("") }
-        var type by remember { mutableStateOf(CheatType.AUTO) }
-        var error by remember { mutableStateOf<String?>(null) }
-        Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Hint(
-                if (cheatDs) tr("Type or paste an Action Replay DS code, one line or many.")
-                else tr("Type or paste a GameShark, Action Replay or CodeBreaker code, one line or many. AUTO works out which it is; pick the type when a code doesn't take."),
-                m, small,
-            )
-            OptionListWindow(m, Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(horizontal = m.u * 4)) {
-                    GbaText(tr("NAME"), OptionColors.label, OptionColors.labelShadow, m, Modifier.padding(vertical = m.u * 2))
-                    OptionTextField(name, { name = it; error = null }, small, placeholder = tr("e.g. INFINITE MONEY"))
-                    Spacer(Modifier.height(m.u * 4))
-                    GbaText(tr("CODE"), OptionColors.label, OptionColors.labelShadow, m, Modifier.padding(vertical = m.u * 2))
-                    OptionTextField(code, { code = it.uppercase(); error = null }, small, placeholder = "XXXXXXXX YYYYYYYY", minLines = 3, code = true)
-                    Spacer(Modifier.height(m.u * 2))
-                    // Back by the list row's own inset, so TYPE lines up with NAME and CODE. A DS game has one kind of code.
-                    if (!cheatDs) OptionLine(tk("TYPE"), type.label, selected = false, m, Modifier.offset(x = -m.u * 4), height = m.rowHeight * 1.2f) {
-                        val types = CheatType.entries
-                        selector = Selector(tk("TYPE"), types.map { it.label }, type.label) { l -> type = types.first { it.label == l }; error = null }
-                    }
-                    error?.let {
-                        GbaText(it, OptionColors.value, OptionColors.valueShadow, small, Modifier.padding(top = m.u * 4), maxLines = 4)
-                    }
-                    Row(Modifier.padding(vertical = m.u * 4), horizontalArrangement = Arrangement.spacedBy(m.u * 4)) {
-                        OptionButton(tk("CANCEL"), m, onClick = { screen = Screen.CHEATS })
-                        OptionButton(tk("ADD"), m, emphasis = true, enabled = code.isNotBlank(), onClick = {
-                            val lines = CheatCodes.normalize(code)
-                            val label = name.trim().ifEmpty { tr("CHEAT {0}", cheatList.size + 1) }
-                            val r = CheatCheck.check(Cheat(label, lines), type, ds = cheatDs)
-                            val ok = r.cheat
-                            if (ok == null) {
-                                error = when {
-                                    r.bad.isEmpty() -> tr("That isn't a code.")
-                                    cheatDs -> tr("{0} isn't an Action Replay DS line.", r.bad.joinToString(", "))
-                                    type == CheatType.AUTO -> tr("mGBA can't read {0}.", r.bad.joinToString(", "))
-                                    else -> tr("mGBA can't read {0} as a {1} code.", r.bad.joinToString(", "), tr(type.label))
-                                }
-                            } else {
-                                // Typed in to be used: on (the master switch still decides).
-                                saveCheats(cheatList + ok.copy(enabled = true))
-                                screen = Screen.CHEATS
-                            }
-                        })
-                    }
-                }
-            }
-        }
+        com.pokedaisy.app.companion.ui.CheatAddForm(m, small, cheatDs, cheatList.size + 1,
+            onCancel = { screen = Screen.CHEATS },
+            onAdd = { saveCheats(cheatList + it); screen = Screen.CHEATS })
     }
 
     // ---- hidden games -------------------------------------------------------
@@ -2290,16 +2240,8 @@ class SettingsActivity : ComponentActivity() {
         }
 
         /** What IMPORT FILE says once it's done (null: the file couldn't be read). */
-        fun cheatImportNotice(r: CheatStore.Import?): Pair<String, String> = when {
-            r == null -> tk("CAN'T READ THAT FILE") to tr("Pick a RetroArch .cht or an mGBA .cheats file.")
-            r.added == 0 && r.badCheats == 0 && r.duplicates == 0 ->
-                tk("NO CHEATS FOUND") to tr("That file has no cheats in a format PokeDaisy reads (RetroArch .cht, mGBA .cheats).")
-            else -> (if (r.added == 0) tk("NO CHEATS ADDED") else tr("{0} CHEATS ADDED", r.added)) to listOfNotNull(
-                tr("They start OFF: tap one to turn it on.").takeIf { r.added > 0 },
-                tr("{0} left out: mGBA can't read {1} of their code lines.", r.badCheats, r.badLines).takeIf { r.badCheats > 0 },
-                tr("{0} were already in the list.", r.duplicates).takeIf { r.duplicates > 0 },
-            ).joinToString(" ")
-        }
+        fun cheatImportNotice(r: CheatStore.Import?): Pair<String, String> =
+            com.pokedaisy.app.companion.ui.cheatImportNotice(r)
         const val COFFEE_URL = com.pokedaisy.app.companion.ui.AppLinks.COFFEE_URL
 
         fun rateLabel(v: Float) = if (v <= 0f) tk("INFINITE") else if (v % 1f == 0f) "${v.toInt()}×" else "$v×"
