@@ -5,10 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.GbaControls
 import com.pokedaisy.app.Hotkeys
-import com.pokedaisy.app.companion.BattleStyle
 import com.pokedaisy.app.companion.CompanionSettings
-import com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
-import com.pokedaisy.app.companion.FfMode
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.GameAspect
 import com.pokedaisy.app.companion.GridStrength
@@ -17,9 +14,6 @@ import com.pokedaisy.app.companion.Smoothing
 import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.data.displayName
-import com.pokedaisy.app.companion.i18n.L10n
-import com.pokedaisy.app.companion.i18n.LANGUAGE_AUTO
-import com.pokedaisy.app.companion.ui.theme.ThemeStore
 import com.pokedaisy.app.companion.ui.theme.pickTheme
 import com.pokedaisy.app.companion.ui.theme.themeById
 import platform.Foundation.NSUserDefaults

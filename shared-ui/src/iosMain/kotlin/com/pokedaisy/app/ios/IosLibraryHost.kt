@@ -39,7 +39,7 @@ internal class IosLibraryHost(
     private var paths by mutableStateOf(PokeDaisyHost.games())
     private var section by mutableStateOf(LibrarySection.GAMES)
     private var setupFromSettings = false
-    private var setupStep by mutableStateOf<Int?>(if (!defaults.boolForKey("setup_done") && paths.isEmpty()) 0 else null)
+    private var setupStep by mutableStateOf<Int?>(if (!iosPreferences.setupDone && paths.isEmpty()) 0 else null)
     private var query by mutableStateOf("")
     private var searching by mutableStateOf(false)
     private var sorting by mutableStateOf(false)
@@ -175,7 +175,7 @@ internal class IosLibraryHost(
         SetupFrame(step, 2, step > 0 || setupFromSettings, busy = false, last = step == 1, skipping = step == 0 && paths.isEmpty(),
             m, onBack = { setupStep = if (step == 0) null else step - 1 },
             onNext = {
-                if (step == 0) setupStep = 1 else { defaults.setBool(true, "setup_done"); setupStep = null }
+                if (step == 0) setupStep = 1 else { iosPreferences.setupDone = true; setupStep = null }
             }) {
             if (step == 0) SetupRomsPage(SetupRomsModel(if (paths.isEmpty()) emptyList() else listOf("PokeDaisy/roms"),
                 paths.map(::label), linked = false), m, small, onChoose = ::addGames)

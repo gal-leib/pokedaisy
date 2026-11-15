@@ -51,14 +51,14 @@ gamedata: ## Regenerate the per-game code from gamedata/ (NativeConfigsGen.kt, t
 	python3 scripts/gen_gamedata.py
 	python3 scripts/gen_nds_ports.py
 
-# Unfiltered runs cover both modules. Focused runs select one owner so a misspelled filter fails in Gradle.
+# Unfiltered runs cover app, shared core and shared UI. Focused runs select one owner so a misspelled filter fails in Gradle.
 # Example: make test-quick MODULE=shared T='*RomFilesTest'
 ifneq ($(strip $(T)),)
-ifeq ($(filter app shared,$(MODULE)),)
-$(error T requires MODULE=app or MODULE=shared)
+ifeq ($(filter app shared shared-ui,$(MODULE)),)
+$(error T requires MODULE=app, MODULE=shared or MODULE=shared-ui)
 endif
 endif
-UNIT_TESTS = $(if $(T),:$(MODULE):testDebugUnitTest --tests '$(T)',:app:testDebugUnitTest :shared:testDebugUnitTest)
+UNIT_TESTS = $(if $(T),:$(MODULE):testDebugUnitTest --tests '$(T)',:app:testDebugUnitTest :shared:testDebugUnitTest :shared-ui:testDebugUnitTest)
 
 test-quick: ## Everyday unit tests: no Paparazzi renders or BestEffortTest, forks in parallel (MODULE=shared T='*FooTest' to pick)
 	./gradlew $(UNIT_TESTS) -Pquick

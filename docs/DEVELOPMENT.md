@@ -4305,3 +4305,10 @@ tests on JVM and Native, with added delayed-close checks.
 `StateResume` remains a synchronous transaction helper rather than a background resource. Android creates it
 with each core-thread operation's rejection adapter; iOS retains it behind `withState`. Neither needs a second
 loaded-game lifecycle or a factory wrapper. The native exit save can finish after manual slots are retired.
+
+Android's REWIND setting also quarantines the common held-action ownership before changing ring capacity,
+matching iOS. A newly pressed input source can then start a fresh hold after the setting changes.
+
+The default Make unit-test targets and CI's JVM step include `shared-ui` alongside `app` and `shared`; failure
+reports include all three. Use `make test-quick MODULE=shared-ui T='*GameRuntimeTest'` for a focused common UI
+model check. Native CI already runs both shared modules' simulator tests.

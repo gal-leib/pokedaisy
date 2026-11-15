@@ -41,7 +41,6 @@ import okio.buffer
 import okio.use
 import platform.Foundation.NSFileManager
 import platform.UIKit.UIViewController
-import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 
 /** How often the companion reads the running game (Android's sampler runs about this often too). */
 private const val SAMPLE_MILLIS = 500L

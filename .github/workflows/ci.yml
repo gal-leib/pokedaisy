@@ -59,7 +59,7 @@ jobs:
       # ROM-backed tests skip here (no ROMs in CI - they run on the release runner);
       # fixtures, guards, Paparazzi renders and everything else run.
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest :shared:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :shared:testDebugUnitTest :shared-ui:testDebugUnitTest --stacktrace
 
       - name: Debug APK (Kotlin + the native mGBA / rcheevos build)
         run: ./gradlew :app:assembleDebug --stacktrace
@@ -72,6 +72,7 @@ jobs:
           path: |
             app/build/reports/tests/
             shared/build/reports/tests/
+            shared-ui/build/reports/tests/
           retention-days: 7
 
   # The companion's data and language code (shared/) for the iPad, with the emulator core under it (pk_api.h through

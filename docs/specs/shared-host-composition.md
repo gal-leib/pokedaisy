@@ -76,3 +76,13 @@ when paired devices are reachable, with save backup/readback verification. Keep 
 Line count is evidence of deletion, not the completion criterion. Do not move an iOS-only implementation into a
 common folder or introduce forwarding layers merely to shrink a host file. Split a milestone into capability PRs
 when necessary; update this plan with evidence and unresolved limitations as each slice completes.
+
+
+D4 source audit: [shared-host-composition-audit.md](shared-host-composition-audit.md) records the remaining
+platform responsibilities and future reductions without claiming an absolute minimum line count. Android now
+uses the common picture-fit helper, and iOS setup uses common preferences. Android rewind configuration also
+releases common hold ownership before changing capacity. Combined local verification is complete: Android
+native save/load/undo, resume/fresh-marker protection and editor/input recovery pass; iPhone/iPad each pass
+layout, live editor and library/manual checks; iPhone FF and binding capture/persistence checks pass too. The
+signed generic device build succeeds and verifies. Physical installation awaits reachable paired devices.
+CI continues on the current PR heads; each capability remains a separate upstream-portable PR.

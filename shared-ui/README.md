@@ -12,3 +12,8 @@ Both hosts now use common preferences, companion settings, game actions, cheats,
 sampling, playback policy, ROM identity, save importing, library models, state slots, automatic resume and the
 offline manual cache. Screen preferences and theme storage also have one implementation. Their source locations
 under `app/` are intentional; platform entry points supply native effects and capabilities to those models.
+
+The [host composition plan](../docs/specs/shared-host-composition.md) and
+[remaining-host audit](../docs/specs/shared-host-composition-audit.md) describe controller ownership, native
+transports and the remaining composition sites. Settings persistence uses a concrete delegate; `GameRuntime`
+owns the loaded game's controller lifetime on both platforms.

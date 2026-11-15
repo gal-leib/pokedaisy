@@ -1596,7 +1596,10 @@ class PokeDaisyActivity : Activity() {
         override val rewindSupported get() = !romIsNds
         override fun setRewind(on: Boolean) {
             stored.setRewind(on)
-            if (::engine.isInitialized) engine.rewindEntries = rewindEntries(on)
+            if (::engine.isInitialized) {
+                gameActions.release(Hotkeys.Action.REWIND_HOLD)
+                engine.rewindEntries = rewindEntries(on)
+            }
             runOnUiThread { syncTouchExtras() }
         }
         override fun setFfMode(mode: FfMode) {
@@ -4257,11 +4260,9 @@ class PokeDaisyActivity : Activity() {
         val game = if (::portraitPanel.isInitialized && portraitPanel.expand) {
             picture
         } else hudFrame.value?.translate(fieldHudBounds.left, fieldHudBounds.top) ?: run {
-            val gw = minOf(view.width.toFloat(), view.height * aspect)
-            val gh = gw / aspect
-            val l = picture.left + (view.width - gw) / 2
-            val t = picture.top + if (portrait) 0f else (view.height - gh) / 2
-            androidx.compose.ui.geometry.Rect(l, t, l + gw, t + gh)
+            com.pokedaisy.app.companion.ui.fittedGamePicture(
+                view.width.toFloat(), view.height.toFloat(), aspect, topAligned = portrait)
+                .translate(picture.left, picture.top)
         }
         return com.pokedaisy.app.companion.TouchStage(
             w, h, resources.displayMetrics.density, portrait, game, area,
