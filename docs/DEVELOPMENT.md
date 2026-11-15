@@ -4132,7 +4132,10 @@ The iPad uses these presenters for its full-window library, Files-based setup an
 adapter supplies file operations, preferences and launch actions; Swift only switches application/game controllers.
 `IosGameScreen` supplies preferences and input/focus callbacks to the same `GameScreenState` and `GameScreen` used by
 Android, including modal/docked/unlocked/hidden landscape panels, portrait hiding/sizing and common chrome. Choices
-persist under Android's keys, retaining the established iOS docked default. `ManualInputGate` independently captures
+initialize and persist through `GameScreenState(Prefs)`, retaining the established iOS docked default and Android's
+separate DS portrait ratio. `PrefsThemeStore` is the same THEME/DARK MODE adapter on both platforms. Controller
+repeat timing uses Kotlin's monotonic clock; library key-capture polling uses a lifecycle-bound coroutine instead
+of an Apple timer. `ManualInputGate` independently captures
 window/editor owners and quarantines held keys until released; the native input poll applies it before scripted battle
 input. Controller buttons steer common companion keys/focus actions, while keyboard letters remain text input. Pointer
 ownership changes restart only the controls' gesture tracker. The native Metal controller is never replaced by a panel

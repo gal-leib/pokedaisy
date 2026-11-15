@@ -202,7 +202,7 @@ object PokeDaisyHost {
         val resume = StateResume(files,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             matchesSave = { PkApiCore.stateMatchesSave(it.toString()) },
-            enabled = { defaults.objectForKey("auto_resume") == null || defaults.boolForKey("auto_resume") },
+            enabled = { iosPreferences.autoResume },
             snapshot = stateSnapshot, loaded = stateLoaded)
         val (code, revision) = (if (romPath.lowercase().endsWith(".gba"))
             com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)

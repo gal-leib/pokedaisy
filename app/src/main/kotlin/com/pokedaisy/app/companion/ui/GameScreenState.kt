@@ -29,6 +29,19 @@ class GameScreenState(
     private val windowChanged: (Boolean) -> Unit = {},
     private val companionHidden: () -> Unit = {},
 ) {
+    /** One installed preference contract for both hosts, including Android's separate DS companion ratio. */
+    constructor(prefs: com.pokedaisy.app.Prefs, windowChanged: (Boolean) -> Unit = {}, companionHidden: () -> Unit = {}) : this(
+        side = SidePanelState(window = prefs.companionWindow, docked = prefs.sidePanelDocked, widthFraction = prefs.sidePanelWidth),
+        portrait = PortraitPanelState(ratio = prefs.portraitCompanionRatio, hidden = prefs.portraitCompanionHidden,
+            underGame = prefs.portraitCompanionUnderGame),
+        saveSide = { prefs.sidePanelWidth = it.widthFraction; prefs.sidePanelDocked = it.docked },
+        savePortrait = {
+            if (it.canHide) { prefs.portraitCompanionRatio = it.ratio; prefs.portraitCompanionHidden = it.hidden }
+            else prefs.portraitDsRatio = it.ratio
+        },
+        windowChanged = windowChanged, companionHidden = companionHidden,
+    )
+
     var side by mutableStateOf(side)
         private set
     var portrait by mutableStateOf(portrait)

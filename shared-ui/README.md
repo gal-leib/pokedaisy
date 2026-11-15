@@ -7,3 +7,8 @@ this module instead. The apparent absence of `src/commonMain` does not mean the 
 
 `src/iosMain` contains the Apple platform adapters and the remaining host orchestration being
 consolidated into common implementations used by both platforms.
+
+Both hosts now use common preferences, companion settings, game actions, cheats, option patches, battle input,
+sampling, playback policy, ROM identity, save importing, library models, state slots, automatic resume and the
+offline manual cache. Screen preferences and theme storage also have one implementation. Their source locations
+under `app/` are intentional; platform entry points supply native effects and capabilities to those models.

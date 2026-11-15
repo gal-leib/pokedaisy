@@ -8,7 +8,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.BestEffortStore
-import com.pokedaisy.app.companion.data.isFile
 import com.pokedaisy.app.companion.data.mkdirs
 import com.pokedaisy.app.companion.data.readBytes
 import com.pokedaisy.app.companion.ui.DeviceDates
@@ -32,7 +31,6 @@ import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSDateFormatterShortStyle
 import platform.Foundation.NSURL
-import platform.Foundation.NSUserDefaults
 import platform.Foundation.dateWithTimeIntervalSince1970
 import platform.Foundation.dataWithContentsOfURL
 import platform.posix.memcpy
@@ -47,7 +45,7 @@ object IosHosts {
         filesDir.mkdirs()
         RomArt.filesDir = filesDir
         BestEffortStore.dir = filesDir
-        ThemeStore.current = DefaultsThemeStore
+        ThemeStore.current = com.pokedaisy.app.companion.ui.theme.PrefsThemeStore(iosPreferences)
         val docs = com.pokedaisy.app.DocsCache.at(filesDir / "docs",
             NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "dev")
         DocsSources.current = com.pokedaisy.app.CachedDocsSource(docs, SkiaPictures::decode)
@@ -59,19 +57,6 @@ object IosHosts {
         com.pokedaisy.app.companion.NewFeatures.init(iosPreferences.newFeatureSince,
             save = { iosPreferences.newFeatureSince = it })
     }
-}
-
-/** THEME and DARK MODE, under Prefs' keys and defaults (8 = POKéDAISY, the old 0-7 read as it; 0 = dark mode OFF). */
-private object DefaultsThemeStore : ThemeStore {
-    override var appTheme: Int
-        get() = iosPreferences.appTheme
-        set(v) { iosPreferences.appTheme = v }
-    override var themeBeforeSeasonal: Int
-        get() = iosPreferences.themeBeforeSeasonal
-        set(v) { iosPreferences.themeBeforeSeasonal = v }
-    override var darkMode: Int
-        get() = iosPreferences.darkMode
-        set(v) { iosPreferences.darkMode = v }
 }
 
 /** A file's bytes from the URL (a file:// or https:// one), or null. Blocking. */

@@ -21,8 +21,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.pokedaisy.app.companion.ui.GameScreen
 import com.pokedaisy.app.companion.ui.GameScreenFrames
 import com.pokedaisy.app.companion.ui.GameScreenState
-import com.pokedaisy.app.companion.ui.PortraitPanelState
-import com.pokedaisy.app.companion.ui.SidePanelState
 
 /**
  * Android's game-screen adapter. Shared Compose owns the renderer/control areas, panels and chrome. Native views
@@ -36,15 +34,7 @@ class GameScreenView(
     private val prefs = Prefs(context)
     var onWindow: (Boolean) -> Unit = {}
     var onCompanionHidden: () -> Unit = {}
-    val panels = GameScreenState(
-        side = SidePanelState(window = prefs.companionWindow, docked = prefs.sidePanelDocked, widthFraction = prefs.sidePanelWidth),
-        portrait = PortraitPanelState(ratio = prefs.portraitCompanionRatio, hidden = prefs.portraitCompanionHidden,
-            underGame = prefs.portraitCompanionUnderGame),
-        saveSide = { prefs.sidePanelWidth = it.widthFraction; prefs.sidePanelDocked = it.docked },
-        savePortrait = {
-            if (it.canHide) { prefs.portraitCompanionRatio = it.ratio; prefs.portraitCompanionHidden = it.hidden }
-            else prefs.portraitDsRatio = it.ratio
-        },
+    val panels = GameScreenState(prefs,
         windowChanged = { onWindow(it) },
         companionHidden = { contentView.findFocus()?.clearFocus(); onCompanionHidden() },
     )

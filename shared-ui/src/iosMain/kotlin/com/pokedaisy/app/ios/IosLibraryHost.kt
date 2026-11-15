@@ -103,11 +103,11 @@ internal class IosLibraryHost(
     @Composable
     private fun Library() {
         val capturing = appSettings.keyCapture.active
-        androidx.compose.runtime.DisposableEffect(capturing) {
-            val timer = if (capturing) platform.Foundation.NSTimer.scheduledTimerWithTimeInterval(1.0 / 60, repeats = true) {
+        LaunchedEffect(capturing) {
+            if (capturing) while (true) {
+                kotlinx.coroutines.delay(16)
                 appSettings.pollKeyCapture()
-            } else null
-            onDispose { timer?.invalidate() }
+            }
         }
         androidx.compose.runtime.DisposableEffect(appSettings) {
             val center = platform.Foundation.NSNotificationCenter.defaultCenter

@@ -19,8 +19,8 @@ import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.*
 import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.game.GameViewController
-import platform.Foundation.NSUserDefaults
-import platform.QuartzCore.CACurrentMediaTime
+import kotlin.time.DurationUnit
+import kotlin.time.TimeSource
 import kotlin.math.roundToInt
 
 /** iOS storage, controller and input-ownership adapter. Screen assembly and every panel gesture are shared. */
@@ -29,7 +29,9 @@ internal class IosGameScreen(
     private val touch: IosTouchControls,
     private val gameBoy: Boolean,
 ) {
-    private val d = NSUserDefaults.standardUserDefaults
+    private val prefs = iosPreferences
+    private val repeatClock = TimeSource.Monotonic.markNow()
+    private fun menuTime() = repeatClock.elapsedNow().toDouble(DurationUnit.SECONDS)
     val back = CompanionBack()
     val keys = CompanionKeys()
     private val textInputFocus = TextInputFocus { game?.keyboardInputCaptured = it }
@@ -47,21 +49,11 @@ internal class IosGameScreen(
         game?.companionInputCaptured = true
         rewindUnavailable = true
     }
-    private fun bool(key: String, default: Boolean) = if (d.objectForKey(key) == null) default else d.boolForKey(key)
-    private fun number(key: String, default: Float) = if (d.objectForKey(key) == null) default else d.doubleForKey(key).toFloat()
-
-    val state = GameScreenState(
-        // Preserve iOS's existing docked default. These are Android's preference keys and shared state thereafter.
-        side = SidePanelState(window = bool("companion_window", false), docked = bool("side_panel_docked", true),
-            widthFraction = number("side_panel_width", .5f)),
-        portrait = PortraitPanelState(ratio = number("portrait_companion_ratio", PortraitLayout.DEFAULT_RATIO),
-            hidden = bool("portrait_companion_hidden", false), underGame = IosTouchPreferences.underGame),
-        saveSide = { d.setDouble(it.widthFraction.toDouble(), "side_panel_width"); d.setBool(it.docked, "side_panel_docked") },
-        savePortrait = { d.setDouble(it.ratio.toDouble(), "portrait_companion_ratio"); d.setBool(it.hidden, "portrait_companion_hidden") },
+    val state = GameScreenState(prefs,
         windowChanged = { on ->
             menuSuppressed = game?.controllerButtons ?: 0
             previousButtons = 0
-            nextRepeat = CACurrentMediaTime() + .35
+            nextRepeat = menuTime() + .35
             game?.companionInputCaptured = on
             touch.releaseKeys()
         },
@@ -70,7 +62,7 @@ internal class IosGameScreen(
     val portrait get() = state.portrait.enabled
     var window: Boolean
         get() = state.side.window
-        set(on) { d.setBool(on, "companion_window"); state.setSide(state.side.copy(window = on)) }
+        set(on) { prefs.companionWindow = on; state.setSide(state.side.copy(window = on)) }
 
     init {
         game?.onCompanionButtons = ::controllerInput
@@ -150,7 +142,7 @@ internal class IosGameScreen(
         menuSuppressed = menuSuppressed and buttons
         val current = buttons and menuSuppressed.inv()
         val pressed = current and previousButtons.inv()
-        val now = CACurrentMediaTime()
+        val now = menuTime()
         val repeated = if (now >= nextRepeat) current and DIRECTIONS else 0
         if (pressed != 0) nextRepeat = now + .35 else if (repeated != 0) nextRepeat = now + .1
         previousButtons = current
