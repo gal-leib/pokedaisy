@@ -71,6 +71,10 @@ class GameViewController(
         get() = input.touchTurbo
         set(value) { input.touchTurbo = value }
 
+    var touchButtonKeys: Set<Int>
+        get() = input.touchButtonKeys
+        set(value) { input.touchButtonKeys = value }
+
     /** A modal editor is open: foreground notifications must not start frames underneath it. */
     var uiPaused: Boolean = false
         set(value) { field = value; input.editorCaptured(value) }

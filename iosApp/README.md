@@ -30,17 +30,24 @@ SMART mode and per-scene speeds use Android's shared playback policy and existin
 and sped up; INFINITE is silent and yields between bounded batches so the main thread handles touch and the companion.
 Steady music remains later parity work.
 
+REWIND is off by default. The existing native diff ring keeps the same 600 snapshots as Android, sampled every two
+frames. REWIND HOLD and the shared touch extra have independent hold owners. Rewind ignores FF pacing, flushes/mutes
+sound and bypasses queued battle keys; state loads start a new history. Its native diagnostics verify GB/GBA rewind
+and that newer battery-save data survives it.
+
 ## Game options and bindings
 
 Supported GBA games offer INSTANT TEXT, REUSABLE TMS, AUTO-RUN, RUN INDOORS and WILD ENCOUNTERS through the existing
 shared finders and portable core policies. Unsupported games show N/A; Game Boy field options remain future work.
 
 GAME BUTTONS uses the same binding rows, capture model and input mapper as Android, including TURBO A/B and optional
-X/Y bindings. Files live in Documents/bindings, in the shared properties format. Existing iOS keyboard/trigger defaults
+X/Y bindings. The shared touch pad also exposes X AND Y: these emit the controller's canonical keys through those
+same bindings and hotkeys. Existing unbound X/Y mappings stay unbound; configure START 2 / SELECT 2 or a hotkey first.
+Files live in Documents/bindings, in the shared properties format. Existing iOS keyboard/trigger defaults
 are preserved. The native adapter maps GameController codes and axes; shared models own binding and capture behavior.
 Held buttons are quarantined across capture, modal and background transitions. Library capture polls without a core.
 
-HOTKEYS uses the shared chord engine and capture UI, with the speed, state, slot, exit/restart, companion and mute
+HOTKEYS uses the shared chord engine and capture UI, with the speed, rewind, state, slot, exit/restart, companion and mute
 actions iOS currently supports. It starts off, preserving the old trigger mappings. Hardware and touch FF holds
 have independent ownership; shared playback policy prioritizes FF, then half speed, then scene/base speed. Chord
 and hold state resets at capture, modal and background boundaries. Other actions are omitted until their feature

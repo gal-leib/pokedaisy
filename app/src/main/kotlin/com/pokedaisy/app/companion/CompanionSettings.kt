@@ -201,6 +201,7 @@ interface CompanionSettings {
     fun setTouchStyle(style: TouchControlsStyle)
     /** Controls and skin import supported by this host. Stored choices for other hosts are kept. */
     val touchButtons: Set<TouchButton> get() = TouchButton.entries.toSet()
+    val touchXyBadge: String? get() = null
     val touchSkinsSupported: Boolean get() = true
     val touchBadge: String? get() = NewFeatures.badge(NewFeatures.TOUCH_CONTROLS)
 

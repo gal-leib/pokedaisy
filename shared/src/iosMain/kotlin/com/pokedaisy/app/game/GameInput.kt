@@ -10,13 +10,15 @@ import platform.GameController.*
 class GameInput {
     var touchKeys = 0
     var touchTurbo = 0
+    /** On-screen X/Y are canonical controller keys, so the existing bindings and hotkeys decide their meaning. */
+    var touchButtonKeys: Set<Int> = emptySet()
     private var frame = 0L
     private val buttons = PolledGameKeys()
     val capture: KeyCapture get() = buttons.capture
     var onHotkey: (Hotkeys.Event) -> Unit
         get() = buttons.onHotkey
         set(value) { buttons.onHotkey = value }
-    fun setHotkeys(model: Hotkeys?) = buttons.setHotkeys(model, hardware().keys)
+    fun setHotkeys(model: Hotkeys?) = buttons.setHotkeys(model, hardware().keys + touchButtonKeys)
     private val touchGate = ManualInputGate()
     private val axesGate = ManualInputGate()
 
@@ -36,7 +38,7 @@ class GameInput {
         set(value) {
             if (field == value) return
             field = value
-            buttons.quarantine(hardware().keys)
+            buttons.quarantine(hardware().keys + touchButtonKeys)
         }
     fun editorCaptured(on: Boolean) = ownership(ManualInputGate.Owner.EDITOR, on)
     fun backgroundCaptured(on: Boolean) = ownership(ManualInputGate.Owner.BACKGROUND, on)
@@ -45,11 +47,11 @@ class GameInput {
         touchGate.setBlocked(owner, on, touchKeys or touchTurbo)
         val hardware = hardware()
         axesGate.setBlocked(owner, on, hardware.axes)
-        buttons.quarantine(hardware.keys)
+        buttons.quarantine(hardware.keys + touchButtonKeys)
     }
 
     fun reloadBindings() {
-        buttons.quarantine(hardware().keys)
+        buttons.quarantine(hardware().keys + touchButtonKeys)
         buttons.input.setControls(IosGameInputBindings.load())
     }
 
@@ -62,6 +64,7 @@ class GameInput {
     fun poll() {
         val h = hardware()
         if (companionCaptured && !capture.active) onCompanionButtons(controllerKeys(h))
+        val beforeButtons = touchButtonKeys
         val beforeTouch = touchKeys
         val beforeTurbo = touchTurbo
         val allowed = touchGate.filter(touchKeys or touchTurbo)
@@ -69,7 +72,10 @@ class GameInput {
         val axes = axesGate.filter(h.axes)
         buttons.input.setAxes(axes)
         if (axes != 0 || allowed != 0) buttons.letThrough()
-        buttons.poll(if (keyboardCaptured && !capture.active) h.controllers else h.keys, touchGate.blocked)
+        fun held() = (if (keyboardCaptured && !capture.active) h.controllers else h.keys) + touchButtonKeys
+        buttons.poll(held(), touchGate.blocked)
+        // A state/hotkey callback can release the initiating on-screen key during this same poll.
+        if (touchButtonKeys != beforeButtons) buttons.poll(held(), touchGate.blocked)
         // State operations can release touch from a hotkey callback during this poll.
         if (touchKeys != beforeTouch || touchTurbo != beforeTurbo) {
             val after = touchGate.filter(touchKeys or touchTurbo)

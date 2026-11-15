@@ -48,7 +48,7 @@ internal class IosTouchControls(
 
     fun releaseKeys() {
         inputEpoch++
-        game()?.let { it.touchKeys = 0; it.touchTurbo = 0 }
+        game()?.let { it.touchKeys = 0; it.touchTurbo = 0; it.touchButtonKeys = emptySet() }
         settings()?.holdFastForward(false)
         settings()?.holdTouchRewind(false)
         ffDownAt = null
@@ -138,6 +138,11 @@ internal class IosTouchControls(
             TouchButton.SAVE_STATE -> if (down) slots()?.let { it.requestSave(it.currentIndex) }
             TouchButton.LOAD_STATE -> if (down) slots()?.let { it.requestLoad(it.currentIndex) }
             TouchButton.REWIND -> s.holdTouchRewind(down)
+            TouchButton.X, TouchButton.Y -> game()?.let { g ->
+                val code = if (button == TouchButton.X) com.pokedaisy.app.companion.data.KeyCodes.BUTTON_X
+                    else com.pokedaisy.app.companion.data.KeyCodes.BUTTON_Y
+                g.touchButtonKeys = if (down) g.touchButtonKeys + code else g.touchButtonKeys - code
+            }
             else -> Unit
         }
     }

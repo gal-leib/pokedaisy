@@ -4076,3 +4076,16 @@ Touch and hardware holds have separate owners; state operations release both bef
 background/editor transitions quarantine input. Starting rewind avoids `withState`, whose touch release would
 cancel the initiating finger. When rewind is off, its hold shows the existing translated settings hint through
 the shared confirmation UI. Chord holds stay active until their last alias releases, including capture cleanup.
+
+
+### iOS touch X/Y
+
+The shared touch controls' X/Y actions feed canonical `BUTTON_X` / `BUTTON_Y` keys into `GameInput`, alongside
+hardware keys. They reach the existing `PolledGameKeys`, `GbaInput`, key capture and hotkey chord engine rather
+than reimplementing their meaning in the touch host. The hardware and touch key sets are combined before edge
+detection, so releasing one source cannot release an alias held by the other. Text focus filters only the keyboard.
+Existing iOS bindings, including deliberately empty START 2 / SELECT 2, remain unchanged.
+
+Ownership changes quarantine virtual keys too. Touch release clears the virtual set; if a state/hotkey callback
+clears it mid-poll, a second edge pass releases it before the next core frame. Four native tests exercise mapped
+buttons, hotkey precedence, ownership, capture and callback-driven release through the real native poller.

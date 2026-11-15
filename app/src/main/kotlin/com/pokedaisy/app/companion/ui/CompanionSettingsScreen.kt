@@ -264,7 +264,7 @@ fun CompanionSettingsScreen(
                         skins = touchSkins, skinUi = touchSkinUi.takeIf { settings.touchSkinsSupported },
                         skinSystem = settings.touchStage?.let { if (it.ds) SkinSystem.DS else if (it.gameBoy) SkinSystem.GB else SkinSystem.GBA } ?: SkinSystem.GBA,
                         feel = settings::feelVibration,
-                        buttons = settings.touchButtons,
+                        buttons = settings.touchButtons, xyBadge = settings.touchXyBadge,
                     ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }

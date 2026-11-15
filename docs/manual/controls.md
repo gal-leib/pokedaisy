@@ -216,6 +216,8 @@ The `EXTRA BUTTONS` group adds buttons the GBA doesn't have. Turn each one on or
 - **`REWIND`** (on to start with): rewinds the game for as long as you hold it, in GBA and Game Boy games. Turn `REWIND` on in Settings first; until then a press tells you where.
 - **`X AND Y`** (on to start with): X and Y buttons in GBA and Game Boy games, which have none of their own, round A, B, X and Y as on a DS: X on top, A right, B below, Y left. They work like a controller's X and Y, so they do whatever you put on them: by default X is `START 2` and `TO COMPANION`, Y is `SELECT 2`, and you can give them a hotkey under `HOTKEYS`. A DS game always shows its own X and Y.
 
+On iPhone and iPad, `X AND Y` uses the same buttons, layouts and editor. Each touch goes through your `GAME BUTTONS` and `HOTKEYS` bindings, just like a controller's X or Y. Existing iOS bindings are kept: if these keys are unbound, assign `START 2`, `SELECT 2` or a hotkey before using them. Closing a window, changing bindings or opening the layout editor releases held touch keys.
+
 ### Skins
 
 A skin replaces the drawn buttons with a picture of a whole controller. PokeDaisy reads skins made for the Delta emulator: `.deltaskin` files, which you can find on skin sites for Delta. Use ones made for the GBA or the Game Boy Color (a Game Boy Color skin is used for Game Boy games too). DS skins don't work yet.

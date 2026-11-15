@@ -102,7 +102,8 @@ internal class IosCompanionSettings(
     override fun setTouchStyle(style: TouchControlsStyle) { IosTouchPreferences.style = style }
     override val touchButtons get() = IosTouchPreferences.buttons
     override val touchSkinsSupported = false
-    override val touchBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
+    override val touchXyBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TOUCH_XY)
+    override val touchBadge get() = touchXyBadge ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_TOUCH)
     override val companionViewBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
     override val companionWindow get() = gameScreen()?.takeUnless { it.portrait }?.window

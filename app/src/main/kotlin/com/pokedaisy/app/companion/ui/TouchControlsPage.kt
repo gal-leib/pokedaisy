@@ -63,6 +63,7 @@ fun touchControlsRows(
     /** VIBRATION / STRENGTH just changed: one buzz at the new strength (0 = off), com.pokedaisy.app.TouchHaptics. */
     feel: (Int) -> Unit = {},
     buttons: Set<TouchButton> = TouchButton.entries.toSet(),
+    xyBadge: String? = null,
 ): List<SettingRow> {
     fun onOff(b: Boolean) = if (b) tk("ON") else tk("OFF")
     fun <T> List<T>.after(t: T): T = this[(indexOf(t) + 1) % size]
@@ -138,7 +139,7 @@ fun touchControlsRows(
         // A GBA / Game Boy game's X and Y: the device's X / Y keys (a DS game always has its own).
         tk("X AND Y"), onOff(style.xyButtons), enabled = !skinned,
         subtitle = if (skinned) skinNote else "GBA and Game Boy: X and Y keys for GAME BUTTONS and HOTKEYS",
-        labelBadge = NewFeatures.badge(NewFeatures.TOUCH_MORE_BUTTONS),
+        labelBadge = xyBadge ?: NewFeatures.badge(NewFeatures.TOUCH_MORE_BUTTONS),
     ) { if (!skinned) set(style.copy(xyButtons = !style.xyButtons)) }.takeIf { TouchButton.X in buttons && TouchButton.Y in buttons })
 }
 

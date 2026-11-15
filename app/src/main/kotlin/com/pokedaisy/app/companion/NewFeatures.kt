@@ -15,6 +15,7 @@ object NewFeatures {
     const val IOS_GAME_BINDINGS = "ios_game_bindings"
     const val IOS_GAME_HOTKEYS = "ios_game_hotkeys"
     const val IOS_REWIND = "ios_rewind"
+    const val IOS_TOUCH_XY = "ios_touch_xy"
 
     /** SETTINGS > HUD (companion.ui.FieldHud). */
     const val HUD = "hud"
@@ -212,6 +213,7 @@ object NewFeatures {
         IOS_GAME_BINDINGS,
         IOS_GAME_HOTKEYS,
         IOS_REWIND,
+        IOS_TOUCH_XY,
         IOS_FIELD_OPTIONS,
         IOS_GAME_OPTIONS,
         IOS_SCENE_SPEEDS,
