@@ -703,7 +703,15 @@ class PokeDaisyActivity : Activity() {
         session = { if (::engine.isInitialized && engine.running) engine.gameSession else null },
     )
 
-    private val itemUse = object : com.pokedaisy.app.companion.ItemUse by sharedItemUse {
+    private val partyActions = com.pokedaisy.app.companion.FieldPartyActions(
+        sharedItemUse, { if (::engine.isInitialized && engine.running) engine.gameSession else null },
+        { telemetry.snapshot.value },
+        { if (romIsNds || romIsGameBoy) null else telemetry.knownPartyReorderConfig() },
+        { if (::engine.isInitialized) engine.fieldState else 0 },
+        { result -> runOnUiThread(result) },
+    )
+
+    private val itemUse = object : com.pokedaisy.app.companion.ItemUse by partyActions {
         /** A DS game's Repels ([com.pokedaisy.app.companion.data.useGen4Repel], Black's [com.pokedaisy.app.companion.data.useGen5Repel]);
          * nothing else yet. */
         private fun dsRepel(itemId: Int) = dsRepelKnown() && com.pokedaisy.app.companion.data.GEN4_REPEL_KINDS.any { it.first == itemId }
@@ -756,43 +764,6 @@ class PokeDaisyActivity : Activity() {
             sharedItemUse.openPc(opened)
         }
 
-        override fun canReorderParty() = !romIsNds && !romIsGameBoy && ::engine.isInitialized && engine.running &&
-            telemetry.knownPartyReorderConfig() != null
-        override fun reorderParty(a: Int, b: Int, done: (com.pokedaisy.app.companion.data.PartySwapResult) -> Unit) {
-            val cfg = telemetry.knownPartyReorderConfig()
-            val snap = telemetry.snapshot.value
-            if (cfg == null || !::engine.isInitialized || !engine.running) return done(com.pokedaisy.app.companion.data.PartySwapResult.FAILED)
-            if (snap.inBattle) return done(com.pokedaisy.app.companion.data.PartySwapResult.IN_BATTLE)
-            engine.requestFieldItemJob(false) { calls, busy ->
-                val r = if (busy || engine.fieldLocked) com.pokedaisy.app.companion.data.PartySwapResult.NOT_NOW
-                else com.pokedaisy.app.companion.data.swapPartySlots(calls, cfg.playerParty, cfg.monStride, snap.party.size, a, b)
-                runOnUiThread { done(r) }
-            }
-        }
-        override fun canSwapBox() = com.pokedaisy.app.companion.data.boxSwapFor(fieldItemSupport()?.fns, com.pokedaisy.app.companion.data.activeNativeConfig) != null
-
-        override fun swapBox(
-            box: Int, slot: Int, boxPersonality: Long, partySlot: Int, partyPersonality: Long,
-            done: (com.pokedaisy.app.companion.data.BoxSwapResult) -> Unit,
-        ) = onBoxes(done) { fields, fns, calls, busy ->
-            com.pokedaisy.app.companion.data.swapWithBox(fields, fns, box, slot, boxPersonality, partySlot, partyPersonality, busy, calls)
-        }
-
-        override fun depositToBox(
-            partySlot: Int, partyPersonality: Long, box: Int,
-            done: (com.pokedaisy.app.companion.data.BoxSwapResult) -> Unit,
-        ) = onBoxes(done) { fields, fns, calls, busy ->
-            com.pokedaisy.app.companion.data.depositToBox(fields, fns, partySlot, partyPersonality, box, busy, calls)
-        }
-
-        override fun withdrawFromBox(
-            box: Int, slot: Int, boxPersonality: Long,
-            done: (com.pokedaisy.app.companion.data.BoxSwapResult) -> Unit,
-        ) = onBoxes(done) { fields, fns, calls, busy ->
-            com.pokedaisy.app.companion.data.withdrawFromBox(fields, fns, box, slot, boxPersonality, busy, calls)
-        }
-
-
         override fun canTradeEvolve() = Prefs(this@PokeDaisyActivity).tradeEvolutions && tradeEvoFns() != null
 
         override fun tradeEvolveTargets(done: (Map<Long, Int>) -> Unit) {
@@ -811,21 +782,6 @@ class PokeDaisyActivity : Activity() {
                 if (r == com.pokedaisy.app.companion.data.TradeEvoResult.EVOLVING) closeCompanionWindow()
                 done(r)
             }) { s, calls, busy -> com.pokedaisy.app.companion.data.tradeEvolve(s.fns, evo, slot, personality, busy, calls) }
-        }
-
-        /** A PC move ([move]) on the emu thread, its NOT_NOW told apart from a battle's. */
-        private fun onBoxes(
-            done: (com.pokedaisy.app.companion.data.BoxSwapResult) -> Unit,
-            move: (com.pokedaisy.app.companion.data.FieldItemFns, com.pokedaisy.app.companion.data.BoxSwapFns,
-                   com.pokedaisy.app.companion.data.GameCalls, Boolean) -> com.pokedaisy.app.companion.data.BoxSwapResult,
-        ) {
-            val inBattle = telemetry.snapshot.value.inBattle
-            onGame(com.pokedaisy.app.companion.data.BoxSwapResult.FAILED, { r ->
-                done(if (inBattle && r == com.pokedaisy.app.companion.data.BoxSwapResult.NOT_NOW) com.pokedaisy.app.companion.data.BoxSwapResult.IN_BATTLE else r)
-            }) { s, calls, busy ->
-                val fns = com.pokedaisy.app.companion.data.boxSwapFor(s.fns, com.pokedaisy.app.companion.data.activeNativeConfig) ?: return@onGame com.pokedaisy.app.companion.data.BoxSwapResult.FAILED
-                move(s.fns, fns, calls, busy)
-            }
         }
 
         /** A DS game whose PC pk_nds_call knows (Platinum, HeartGold / SoulSilver, Black). */

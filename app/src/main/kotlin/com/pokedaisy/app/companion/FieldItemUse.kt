@@ -14,6 +14,8 @@ class FieldItemUse(
     private val deliver: (() -> Unit) -> Unit,
 ) : ItemUse {
     private val failed = ItemUseOutcome(ItemUseResult.FAILED)
+    /** Verified field layout for other actions sharing this loaded game. */
+    fun supportedFields(): FieldItemFns? = support()?.fns
     override val repelVar get() = support()?.fns?.repelVar?.takeIf { it != 0 }
     override fun repelSteps(v: Int) = support()?.fns?.repelSteps(v) ?: v
     /** Whether verified native TM teaching is available for this bag item. */
@@ -120,6 +122,7 @@ fun <T> fieldActionBattleResult(out: T): T = when {
     out is ItemUseOutcome && out.result == ItemUseResult.NOT_NOW -> out.copy(result = ItemUseResult.IN_BATTLE) as T
     out is PartyTargets && out.result == ItemUseResult.NOT_NOW -> out.copy(result = ItemUseResult.IN_BATTLE) as T
     out is FlyTargets && out.result == FlyResult.NOT_NOW -> out.copy(result = FlyResult.IN_BATTLE) as T
+    out is BoxSwapResult && out == BoxSwapResult.NOT_NOW -> BoxSwapResult.IN_BATTLE as T
     out is FlyResult && out == FlyResult.NOT_NOW -> FlyResult.IN_BATTLE as T
     out is CenterResult && out == CenterResult.NOT_NOW -> CenterResult.IN_BATTLE as T
     out is FlashResult && out == FlashResult.NOT_NOW -> FlashResult.IN_BATTLE as T

@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.SkikoComposeUiTest
 import com.pokedaisy.app.companion.data.isGen5
 import com.pokedaisy.app.companion.data.save.BoxSlot
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -525,6 +526,7 @@ fun companion(
     coop: com.pokedaisy.app.companion.coop.CoopState? = null,
     coopPairList: List<com.pokedaisy.app.companion.coop.CoopPair> = emptyList(),
     lock: com.pokedaisy.app.companion.coop.lock.CoopLockUi? = null,
+    partyStorage: Boolean = false,
     snap: () -> SnapshotView = ::snapshot,
 ): () -> (@Composable () -> Unit) = {
     previewCapture = com.pokedaisy.app.companion.KeyCapture()
@@ -534,7 +536,7 @@ fun companion(
     val content: @Composable () -> Unit = {
         CompanionScreen(
             sv, FakeSlots(), FakeSettings(hints, initialTabs = barTabs, oneTap = oneTap, expandOffer = expandOffer, expand = expand, battleFocus = battleFocus, coop = coop, coopPairList = coopPairList, lock = lock, style = style), FakeBattleInput(busy), initialTab = tab,
-            initialMonIndex = mon, initialCardBack = cardBack, back = back, initialSettingsRow = settingsRow, itemUse = if (items) PreviewItemUse(sv.party, bagFull) else null,
+            initialMonIndex = mon, initialCardBack = cardBack, back = back, initialSettingsRow = settingsRow, itemUse = if (items) PreviewItemUse(sv.party, bagFull, partyStorage) else null,
         )
     }
     content
@@ -548,8 +550,10 @@ fun centerSnapshot() = snapshot().let { s -> s.copy(party = s.party.mapIndexed {
  * BagPalette shows the row mark, though the app has it on FireRed rev 1 only so far. The lead holds
  * nothing, the second a QUICK CLAW; a Potion helps whoever is below full HP.
  */
-class PreviewItemUse(private val party: List<MonView>, private val bagFull: Boolean = false) : com.pokedaisy.app.companion.ItemUse {
+class PreviewItemUse(private val party: List<MonView>, private val bagFull: Boolean = false, private val partyStorage: Boolean = false) : com.pokedaisy.app.companion.ItemUse {
     override fun canTake() = true
+    override fun canReorderParty() = partyStorage
+    override val partyBadge get() = if (partyStorage) "NEW" else null
     // BOXES' SWAP: the button shows, a pick goes through.
     override fun canSwapBox() = true
     override fun swapBox(box: Int, slot: Int, boxPersonality: Long, partySlot: Int, partyPersonality: Long, done: (com.pokedaisy.app.companion.data.BoxSwapResult) -> Unit) =
@@ -1652,6 +1656,15 @@ fun main(args: Array<String>) {
         },
         // DEPOSIT: the party summary's button, its box pick, and the move into BOX2 with its message.
         Shot("$g-party-detail-deposit", bw, bh, bd, companion("PARTY", mon = 1, items = true, snap = ::boxesSnapshot)),
+        Shot("$g-party-storage-narrow", 600, 800, 1.5f, companion("PARTY", mon = 1, items = true, partyStorage = true,
+            snap = { boxesSnapshot().let { s -> s.copy(
+                pokedex = com.pokedaisy.app.companion.data.PokedexState(com.pokedaisy.app.companion.data.POKEDEX_EMERALD, emptySet(), emptySet(), true),
+                party = s.party.mapIndexed { i, m -> m.copy(personality = 0x1000L + i,
+                    stats = com.pokedaisy.app.companion.data.MonStats(List(6) { 1 }, List(6) { 0 }, 0, List(6) { 20 })) }) } })) {
+            for (label in listOf("STATS", "LEARN", "SWITCH", "CENTER", "DEPOSIT")) {
+                onAllNodesWithText(label, ignoreCase = true).onFirst().assertIsDisplayed()
+            }
+        },
         Shot("$g-party-deposit-pick", bw, bh, bd, companion("PARTY", mon = 1, items = true, snap = ::boxesSnapshot)) {
             onAllNodesWithText("DEPOSIT", ignoreCase = true).onFirst().performClick()
         },

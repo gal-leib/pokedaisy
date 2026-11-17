@@ -96,6 +96,7 @@ interface ItemUse {
     fun center(): CenterSupport? = null
     val centerBadge: String? get() = null
     val relearnBadge: String? get() = null
+    val partyBadge: String? get() = null
 
     /** HEAL: the whole party, as the nurse does. */
     fun centerHeal(done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) = done(com.pokedaisy.app.companion.data.CenterResult.FAILED)
