@@ -2,10 +2,19 @@ package com.pokedaisy.app.companion.ui
 
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
 import kotlin.test.*
 import kotlinx.coroutines.*
 
 class OverlayPresenceTest {
+    private class Focus : FocusManager {
+        var clears = 0
+        override fun clearFocus(force: Boolean) { assertTrue(force); clears++ }
+        override fun moveFocus(focusDirection: FocusDirection) = false
+    }
+
     private class EmptyApplier : AbstractApplier<Unit>(Unit) {
         override fun insertBottomUp(index: Int, instance: Unit) {}
         override fun insertTopDown(index: Int, instance: Unit) {}
@@ -79,5 +88,40 @@ class OverlayPresenceTest {
         assertEquals(listOf("overlay back", "overlay key"), handled)
         assertTrue(companionBack.back()); assertTrue(companionKeys.key(MenuKey.A))
         assertEquals(listOf("overlay back", "overlay key", "companion back", "companion key"), handled)
+    }
+
+    @Test fun aModalTakesTextFocusOnceBeforeNotifyingItsHost() = scene {
+        val focus = Focus()
+        var active by mutableStateOf(false)
+        var revision by mutableStateOf(0)
+        val acquiredAt = mutableListOf<Int>()
+        composition.setContent {
+            revision
+            CompositionLocalProvider(LocalFocusManager provides focus) {
+                OverlayPresence(active, takesFocus = true) { if (it) acquiredAt += focus.clears }
+            }
+        }
+        settle(); assertEquals(0, focus.clears)
+        active = true
+        settle(); assertEquals(1, focus.clears); assertEquals(1, acquiredAt.first())
+        // A later redraw must leave the overlay's own newly focused text field alone.
+        revision++
+        settle(); assertEquals(1, focus.clears)
+        active = false
+        settle(); assertEquals(1, focus.clears)
+        active = true
+        settle(); assertEquals(2, focus.clears)
+        composition.dispose(); assertEquals(2, focus.clears)
+    }
+
+    @Test fun aNonModalPresenceDoesNotStealTextFocus() = scene {
+        val focus = Focus()
+        composition.setContent {
+            CompositionLocalProvider(LocalFocusManager provides focus) {
+                OverlayPresence(true) {}
+            }
+        }
+        settle(); assertEquals(0, focus.clears)
+        composition.dispose(); assertEquals(0, focus.clears)
     }
 }
