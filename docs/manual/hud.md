@@ -76,6 +76,8 @@ The action buttons move left when touch controls occupy the right margin. If no 
 game controls. You can turn battle buttons off independently of the field HUD.
 
 HUD windows and battle move/party lists take your controller and bound keyboard buttons while they are open.
+Opening one finishes text entry in the companion and dismisses its keyboard. Text fields inside the new window
+still work normally.
 `B` or `START` backs out of the current overlay. Held gameplay buttons must be released before they can play again.
 WILD's `KEEP OPEN` keeps gameplay available. The Quick Menu shortcut still works from a modal overlay;
 editing controls or capturing a binding keeps priority over it.

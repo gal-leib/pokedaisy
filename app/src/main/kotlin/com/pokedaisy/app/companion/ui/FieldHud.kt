@@ -548,8 +548,8 @@ fun FieldHud(
         panel = p
     }
     val panelOpen = panel != null
-    OverlayPresence(panelOpen, onPanel)
-    OverlayPresence(fieldHudCapturesInput(panel, wildKept), onInputCapture)
+    OverlayPresence(panelOpen, changed = onPanel)
+    OverlayPresence(fieldHudCapturesInput(panel, wildKept), takesFocus = true, changed = onInputCapture)
     val alpha by animateFloatAsState(if (shown) 1f else 0f, tween(if (shown) 220 else 120), label = "field-hud")
     if (alpha == 0f && !shown) return
 
