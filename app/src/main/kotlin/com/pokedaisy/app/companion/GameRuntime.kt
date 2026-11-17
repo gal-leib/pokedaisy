@@ -52,6 +52,20 @@ class GameRuntime(
         private set
     var registeredItems: RegisteredItemUse? = null
         private set
+    var gameBoyFields: GameBoyFieldActions? = null
+        private set
+    private val gameBoySupport = GameBoyFieldSupport()
+
+    fun bindGameBoyFields(enabled: () -> Boolean, rom: (Long, Int) -> ByteArray?,
+                          deliver: (() -> Unit) -> Unit, handedOver: () -> Unit): GameBoyFieldActions =
+        gameBoyFields ?: GameBoyFieldActions(session,
+            {
+                val snapshot = telemetry.snapshot.value
+                if (!closed.value && enabled() && snapshot.connected && snapshot.cachedTabs == null)
+                    gameBoySupport.get(snapshot.game, rom) else null
+            },
+            { telemetry.snapshot.value.inBattle }, deliver, handedOver,
+        ).also { gameBoyFields = it; if (closed.value) it.close() }
 
     fun bindRegisteredItems(support: () -> FieldItemSupport?, press: (Int) -> Unit,
                             rejected: () -> Unit): RegisteredItemUse = registeredItems ?: RegisteredItemUse(
@@ -59,6 +73,11 @@ class GameRuntime(
         { telemetry.snapshot.value.inBattle }, { riding }, { fieldMovesReadable },
         press, { if (!closed.value) rejected() },
     ).also { registeredItems = it; if (closed.value) it.cancel() }
+
+    /** Between frames, while the old state still exists: native save/load/rewind adapters share this cleanup. */
+    fun cancelFieldActions() {
+        try { registeredItems?.cancel() } finally { gameBoyFields?.cancel() }
+    }
 
     fun bindActions(settings: CompanionSettings, slots: StateSlots, selectSlot: (Int) -> Unit,
                     hold: (Hotkeys.Action, Boolean) -> Unit, companion: () -> Unit): GameActions =
@@ -213,6 +232,7 @@ class GameRuntime(
         }
         release(::quiesce)
         release { registeredItems?.cancel() }
+        release { gameBoyFields?.close() }
         battle.changed = {}
         release { actions?.close() }
         release { cheats?.close() }

@@ -152,4 +152,9 @@ class QuickMenuScreenshotTest {
 
     @Test fun healedFilling() = healed(900)
     @Test fun healedDone() = healed(2300)
+    @Test fun gen1FlyList() {
+        com.pokedaisy.app.companion.data.activeGame = com.pokedaisy.app.companion.data.GameKind.RED
+        shot(fly = FlyTargets(FlyResult.OK, listOf(0, 1, 5)),
+            snapshot = FieldHudScreenshotTest.snapshot.copy(game = com.pokedaisy.app.companion.data.GameKind.RED))
+    }
 }

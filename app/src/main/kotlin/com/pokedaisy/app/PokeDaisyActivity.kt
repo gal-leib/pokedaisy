@@ -692,42 +692,16 @@ class PokeDaisyActivity : Activity() {
     private fun tmSupport(itemId: Int): Boolean =
         tmFns()?.teaches(itemId) == true && fieldItemSupport()?.fns?.party != null && fieldItemSupport()?.fns?.bagActions == true
 
-    /** A Game Boy game's PC / FLY / WILD ENCOUNTERS ([com.pokedaisy.app.companion.data.GbField]): English Yellow and
-     * Crystal, their code checked in the cart once per ROM. */
-    @Volatile private var gbFieldCache: Pair<String, com.pokedaisy.app.companion.data.GbField?>? = null
-
-    private fun gbField(): com.pokedaisy.app.companion.data.GbField? {
-        if (!romIsGameBoy) return null
-        val game = telemetry.snapshot.value.game
-        val field = com.pokedaisy.app.companion.data.GbField.forGame(game) ?: return null
-        val key = "$game/${com.pokedaisy.app.companion.data.romLanguage}/${field.javaClass.simpleName}"
-        gbFieldCache?.let { (k, v) -> if (k == key) return v }
-        if (!::engine.isInitialized || !engine.running) return null
-        val ok = runCatching { field.codeMatches { off, len -> MgbaCore.pkRomRead(off, len) } }.getOrElse { return null }
-        Log.i("pokedaisy", "Game Boy field actions (${field.javaClass.simpleName}): ${if (ok) "code found" else "code not found"}")
-        val v = field.takeIf { ok }
-        gbFieldCache = key to v
-        return v
+    /** The shared GB coordinator verifies ROM code and owns queued PC / FLY results. */
+    private fun gameBoyFields(): com.pokedaisy.app.companion.GameBoyFieldActions? {
+        if (!::engine.isInitialized) return null
+        val current = engine
+        return current.playback.bindGameBoyFields(
+            enabled = { romIsGameBoy && engine === current && current.running && romBlocked == null },
+            rom = { off, len -> MgbaCore.pkRomRead(off, len) },
+            deliver = { result -> runOnUiThread(result) }, handedOver = ::closeCompanionWindow)
     }
-
-    /** Runs a Game Boy field action ([start], emu thread: true = the game has it, or has it queued) and, [GbField.TAKE_FRAMES]
-     * later, [done] (main thread) with whether the game took it - a queued one it didn't take is withdrawn. */
-    private fun gbFieldAction(
-        field: com.pokedaisy.app.companion.data.GbField,
-        start: (com.pokedaisy.app.companion.data.GameCalls) -> Boolean,
-        refused: () -> Unit,
-        done: (Boolean) -> Unit,
-    ) {
-        engine.requestFieldItemJob(telemetry.snapshot.value.inBattle) { calls, busy ->
-            val started = !busy && runCatching { start(calls) }.getOrElse { Log.e("pokedaisy", "Game Boy field action failed", it); false }
-            if (!started) { runOnUiThread(refused); return@requestFieldItemJob }
-            engine.requestFieldItemJob(false, com.pokedaisy.app.companion.data.GbField.TAKE_FRAMES) { c, _ ->
-                val took = runCatching { field.taken(c) }.getOrDefault(false)
-                Log.i("pokedaisy", "Game Boy field action: ${if (took) "taken" else "not taken, withdrawn"}")
-                runOnUiThread { done(took) }
-            }
-        }
-    }
+    private fun gbField() = gameBoyFields()?.field
 
     /** A DS game whose Repel steps the reader knows (Platinum, HeartGold / SoulSilver, Black). */
     private fun dsRepelKnown(): Boolean {
@@ -821,20 +795,8 @@ class PokeDaisyActivity : Activity() {
                 done(o)
             }
             if (dsCalls()) return dsAction(MgbaCore.NDS_ACTION_PC, intArrayOf(0, 0, 0, 0), done = opened)
-            val gb = gbField()
-            if (gb != null && ::engine.isInitialized && engine.running) {
-                val notNow = com.pokedaisy.app.companion.data.ItemUseOutcome(
-                    if (telemetry.snapshot.value.inBattle) com.pokedaisy.app.companion.data.ItemUseResult.IN_BATTLE
-                    else com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW,
-                )
-                var result = com.pokedaisy.app.companion.data.ItemUseResult.FAILED
-                gbFieldAction(gb, { c -> result = gb.openPc(c); result == com.pokedaisy.app.companion.data.ItemUseResult.USED },
-                    refused = { done(if (result == com.pokedaisy.app.companion.data.ItemUseResult.FAILED) failed else notNow) }) { took ->
-                    if (took) closeCompanionWindow()
-                    done(if (took) com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.USED) else notNow)
-                }
-                return
-            }
+            val gb = gameBoyFields()
+            if (gb?.available == true) return gb.openPc(done)
             sharedItemUse.openPc(opened)
         }
 
@@ -1445,22 +1407,8 @@ class PokeDaisyActivity : Activity() {
                 if (!::engine.isInitialized || !engine.running) return done(com.pokedaisy.app.companion.data.FlyTargets(com.pokedaisy.app.companion.data.FlyResult.FAILED))
                 return dsTargets(done)
             }
-            val gb = gbField()
-            if (gb != null && ::engine.isInitialized && engine.running) {
-                val inBattle = telemetry.snapshot.value.inBattle
-                engine.requestFieldItemJob(inBattle) { calls, busy ->
-                    val out = when {
-                        busy -> com.pokedaisy.app.companion.data.FlyTargets(
-                            if (inBattle) com.pokedaisy.app.companion.data.FlyResult.IN_BATTLE else com.pokedaisy.app.companion.data.FlyResult.NOT_NOW,
-                        )
-                        else -> runCatching { gb.flyTargets(calls) }
-                            .getOrElse { com.pokedaisy.app.companion.data.FlyTargets(com.pokedaisy.app.companion.data.FlyResult.FAILED) }
-                    }
-                    Log.i("pokedaisy", "fly targets: $out")
-                    runOnUiThread { done(out) }
-                }
-                return
-            }
+            val gb = gameBoyFields()
+            if (gb?.available == true) return gb.targets(done)
             sharedClassicFly.targets(done)
         }
 
@@ -1512,18 +1460,8 @@ class PokeDaisyActivity : Activity() {
                 }
                 return
             }
-            val gb = gbField()
-            if (gb != null && ::engine.isInitialized && engine.running) {
-                var result = com.pokedaisy.app.companion.data.FlyResult.NOT_NOW
-                gbFieldAction(gb, { c -> result = gb.fly(mapsec, targets, c); result == com.pokedaisy.app.companion.data.FlyResult.OK },
-                    refused = { done(result) }) { took ->
-                    Log.i("pokedaisy", "fly to $mapsec: ${if (took) "flying" else "not taken"}")
-                    // The flight is the game's to show: the window over it goes.
-                    if (took) closeCompanionWindow()
-                    done(if (took) com.pokedaisy.app.companion.data.FlyResult.OK else com.pokedaisy.app.companion.data.FlyResult.NOT_NOW)
-                }
-                return
-            }
+            val gb = gameBoyFields()
+            if (gb?.available == true) return gb.fly(mapsec, targets, done)
             val support = fieldItemSupport()
             if (support == null || !support.canFly || !::engine.isInitialized || !engine.running) {
                 done(com.pokedaisy.app.companion.data.FlyResult.FAILED)
@@ -2537,7 +2475,6 @@ class PokeDaisyActivity : Activity() {
         shinyTarget = null
         if (::engine.isInitialized) engine.setShinyTarget(null)
         syncShinyAchievements()
-        gbFieldCache = null
         if (::engine.isInitialized) engine.gbField = null
         // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
         // GameOptions' discovery).

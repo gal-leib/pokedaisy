@@ -299,7 +299,12 @@ object PokeDaisyHost {
             if (live()) fields.get(snapshot, code.orEmpty(), revision, telemetry.knownFieldItems()) else null
         }
         val currentSession = { p.session.takeIf { live() } }
-        val registeredItems = p.bindRegisteredItems(readSupport, g::setPress) {
+        val gbFields = p.bindGameBoyFields(
+            enabled = { game === g && g.isRunning && code == null && !p.blocked && telemetry.snapshot.value.blocked == null },
+            rom = PkApiCore::rom, deliver = { it() }, handedOver = {
+                if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
+            })
+        p.bindRegisteredItems(readSupport, g::setPress) {
             if (live()) screen?.showQuickNotice(com.pokedaisy.app.companion.ui.itemUseMessage(
                 com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW)))
         }
@@ -312,11 +317,25 @@ object PokeDaisyHost {
             if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
         }
         fly = object : com.pokedaisy.app.companion.FlyAction by classicFly {
-            override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_CLASSIC_FLY)
+            override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
+                if (gbFields.available) com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS
+                else com.pokedaisy.app.companion.NewFeatures.IOS_CLASSIC_FLY)
+            override fun canFly() = gbFields.available || classicFly.canFly()
+            override fun targets(done: (com.pokedaisy.app.companion.data.FlyTargets) -> Unit) {
+                if (gbFields.available) gbFields.targets(done) else classicFly.targets(done)
+            }
+            override fun fly(mapsec: Int, targets: com.pokedaisy.app.companion.data.FlyTargets,
+                             done: (com.pokedaisy.app.companion.data.FlyResult) -> Unit) {
+                if (gbFields.available) gbFields.fly(mapsec, targets, done) else classicFly.fly(mapsec, targets, done)
+            }
         }
         items = object : com.pokedaisy.app.companion.ItemUse by sharedItems {
-            override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_ITEMS)
+            override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
+                if (gbFields.available) com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS
+                else com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_ITEMS)
+            override fun canPc() = gbFields.available || sharedItems.canPc()
             override fun openPc(done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
+                if (gbFields.available) return gbFields.openPc(done)
                 sharedItems.openPc { outcome ->
                     if (outcome.result == com.pokedaisy.app.companion.data.ItemUseResult.USED && screen?.state?.side?.windowOpen == true) screen?.state?.hide()
                     done(outcome)
@@ -331,7 +350,7 @@ object PokeDaisyHost {
             enabled = { currentSettings.cheatsEnabled },
             submit = { text -> if (g.isRunning && PkApiCore.applyCheats(text) < 0) com.pokedaisy.app.companion.data.Logs.i("cheats didn't load") })
         val currentBattle = battle!!
-        g.beforeRewind = { registeredItems.cancel(); currentBattle.cancel() }
+        g.beforeRewind = { p.cancelFieldActions(); currentBattle.cancel() }
         val currentOptions = p.options
         g.onCoreStarted = {
             if (game === g) {
@@ -341,7 +360,7 @@ object PokeDaisyHost {
                 g.withState { resume.restore() }
             }
         }
-        g.beforeStateChange = { registeredItems.cancel(); currentSettings.releaseRewind(); currentBattle.cancel(); touch.releaseKeys() }
+        g.beforeStateChange = { p.cancelFieldActions(); currentSettings.releaseRewind(); currentBattle.cancel(); touch.releaseKeys() }
         slots = p.bindStates { StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },

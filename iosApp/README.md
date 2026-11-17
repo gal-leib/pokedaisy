@@ -166,6 +166,12 @@ field observation does not change encounter ownership or its RNG. Unknown tables
 
 ## Field HUD
 
+Game Boy PC and classic FLY reuse `GameBoyFieldActions` on Android and iOS. The loaded runtime verifies the
+existing `GbField` ROM signatures once per helper, queues work through `GameSession`, waits for the game's
+acceptance, and withdraws unaccepted scripts/warps. State operations and teardown retire pending deliveries before
+the core changes. Native hosts provide ROM reads, result dispatch and the companion-window handoff only. Supported
+GB/GBC families and language/revision checks remain those of `GbField.forGame`; GB wild-encounter options are separate.
+
 BIKE and ROD in Quick Menu use the same `RegisteredItemUse` as Android. It owns the temporary SELECT registration,
 bounded retry and SoulGold wheel timing, and restores on completion or before state/rewind/close operations. The
 iOS adapter only forwards its separate synthetic press channel to the existing shared `GbaInput`. Availability
