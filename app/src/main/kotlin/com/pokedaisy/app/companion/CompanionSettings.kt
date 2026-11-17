@@ -292,7 +292,7 @@ interface CompanionSettings : StoredCompanionSettings {
      * SETTINGS shows the emulator's rows only. */
     val gameBlocked: Boolean get() = false
 
-    /** A host that runs only part of the app (the iPad app, so far): SETTINGS' HOME shows only these rows (English
+    /** A host that runs only part of the app (the iPad app, so far): SETTINGS' HOME and DISPLAY OPTIONS show only these rows (English
      * labels), each group's title kept over the ones left. Null = every row. */
     val shownRows: Set<String>? get() = null
 
@@ -397,6 +397,7 @@ interface CompanionSettings : StoredCompanionSettings {
      * Imported in the top screen's Settings (a file picker); picked here, live. */
     val overlayChoices: List<Pair<String, String>> get() = emptyList()
     val overlay: String get() = ""
+    val overlayBadge: String? get() = null
     fun setOverlay(key: String) {}
 
 

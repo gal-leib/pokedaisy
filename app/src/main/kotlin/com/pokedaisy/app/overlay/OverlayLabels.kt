@@ -12,7 +12,7 @@ fun overlayChoices(store: OverlayStore): List<Pair<OverlayChoice, String>> {
     return OverlayChoice.all(store).map { c ->
         val base = when (c) {
             OverlayChoice.None -> tk("NONE")
-            is OverlayChoice.BuiltIn -> builtInLabel(c.style)
+            is OverlayChoice.BuiltIn -> com.pokedaisy.app.companion.ui.builtInFrameLabel(c.style)
             is OverlayChoice.Imported -> imported.firstOrNull { it.id == c.id }?.name ?: c.id.uppercase()
         }
         var label = base
@@ -25,8 +25,3 @@ fun overlayChoices(store: OverlayStore): List<Pair<OverlayChoice, String>> {
 /** The label of [key] ([OverlayChoice.key]) among [choices]; NONE for one that's gone (a removed import). */
 fun overlayLabel(choices: List<Pair<OverlayChoice, String>>, key: String): String =
     choices.firstOrNull { it.first.key == key }?.second ?: choices.first().second
-
-private fun builtInLabel(style: BuiltInFrames.Style) = when (style) {
-    BuiltInFrames.Style.DAISY -> tk("DAISY")
-    BuiltInFrames.Style.BEZEL -> tk("BEZEL")
-}

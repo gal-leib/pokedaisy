@@ -60,8 +60,8 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP")
-        .let { if (game == null) it - "GAME SPEED" - "FF" else it }
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY")
+        .let { if (game == null) it - "GAME SPEED" - "FF" - "DISPLAY OPTIONS" else it }
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
     override val cheats get() = cheatHost()?.list.orEmpty()
@@ -271,6 +271,14 @@ internal class IosCompanionSettings(
     override fun setLookAround(on: Boolean) { iosPreferences.lookAround = on; gameScreen()?.refreshPicture() }
     override val expandZoomOnText get() = iosPreferences.expandZoomOnText
     override fun setExpandZoomOnText(on: Boolean) { iosPreferences.expandZoomOnText = on; gameScreen()?.refreshPicture() }
+    override val overlayChoices get() = if (game != null) com.pokedaisy.app.companion.ui.builtInOverlayChoices() else emptyList()
+    override val overlay get() = iosPreferences.overlay
+    override val overlayBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCREEN_BORDERS)
+    override fun setOverlay(key: String) {
+        if (key.isNotEmpty() && com.pokedaisy.app.overlay.BuiltInFrames.style(key) == null) return
+        iosPreferences.overlay = key
+        gameScreen()?.refreshPicture()
+    }
     override val gbaColors = false
     override fun setGbaColors(on: Boolean) {}
     override val screenFilter = ScreenFilter.NONE
