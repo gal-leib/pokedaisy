@@ -27,6 +27,7 @@ object NewFeatures {
     const val IOS_CLASSIC_FLY = "ios_classic_fly"
     const val IOS_GB_FIELD_ACTIONS = "ios_gb_field_actions"
     const val IOS_GB_ENCOUNTERS = "ios_gb_encounters"
+    const val IOS_PARTY_SERVICES = "ios_party_services"
     const val IOS_EXPAND = "ios_expand"
     const val IOS_FLASH = "ios_flash"
     const val IOS_HEAL = "ios_heal"
@@ -291,6 +292,7 @@ object NewFeatures {
         IOS_HEAL,
         IOS_FLASH,
         IOS_EXPAND,
+        IOS_PARTY_SERVICES,
         IOS_QUICK_MENU,
         REGISTERED_ITEMS,
         IOS_FIELD_OPTIONS,
