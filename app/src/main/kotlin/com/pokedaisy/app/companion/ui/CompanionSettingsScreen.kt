@@ -273,7 +273,8 @@ fun CompanionSettingsScreen(
                         buttons = settings.touchButtons, xyBadge = settings.touchXyBadge,
                     ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
-                    Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it })
+                        .let { rows -> settings.shownRows?.let { onlyRows(rows, it) } ?: rows } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.CHEATS -> cheatRows(settings, changed = { tick++ }, removing = removingCheats,
                         onAdd = { page = Page.CHEAT_ADD },
                         onImport = { settings.importCheats { result -> cheatNotice = cheatImportNotice(result); tick++ } },
@@ -1154,7 +1155,7 @@ private fun displayRows(s: CompanionSettings, changed: () -> Unit, navigate: (Pa
         // A frame around the game: NONE, the built-in ones, the player's imports (added on the top screen). Live.
         s.overlayChoices.takeIf { it.isNotEmpty() }?.let { choices ->
             val current = choices.firstOrNull { it.first == s.overlay }?.second ?: choices.first().second
-            SettingRow(tk("OVERLAY"), current, subtitle = "A frame around the game") {
+            SettingRow(tk("OVERLAY"), current, subtitle = "A frame around the game", labelBadge = s.overlayBadge) {
                 select(Selector(tk("OVERLAY"), choices.map { it.second }, current) { l ->
                     choices.firstOrNull { it.second == l }?.let { s.setOverlay(it.first) }
                 })

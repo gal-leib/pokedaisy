@@ -167,6 +167,8 @@ The first GBA had no light behind its screen. Light from the room went in throug
 - `DAISY`: PokeDaisy's blue with a dot grid and the flower mark in the margin.
 - `BEZEL`: a plain dark surround.
 
+On iPhone and iPad, pick `NONE`, `DAISY` or `BEZEL` from the shared `DISPLAY OPTIONS` > `OVERLAY` row while a game is running. The choice is remembered. A selected touch skin supplies its own frame instead; `EXPAND` uses the expanded picture without a border. Importing RetroArch overlays is currently available on Android.
+
 They're drawn at the game's own pixel size and the game is shown at a whole-number scale inside them, so everything stays crisp (the game is a little smaller than without a frame).
 
 ![The game inside the DAISY frame: a blue border with a dot pattern and the PokeDaisy flower beside the screen](shots/overlay-daisy.png)

@@ -53,11 +53,13 @@ internal class IosGameScreen(
     private var portraitGripHeight = 0
     private var density = 1f
     private var pictureAspect by mutableStateOf(prefs.gameAspect)
+    private var borderStyle by mutableStateOf(com.pokedaisy.app.overlay.BuiltInFrames.style(prefs.overlay))
     private var expandedSupported by mutableStateOf(game?.wideSupported == true)
     val expanded get() = pictureAspect == com.pokedaisy.app.companion.GameAspect.WIDE && expandedSupported
     private val stretched get() = pictureAspect == com.pokedaisy.app.companion.GameAspect.STRETCH
     fun refreshPicture() {
         pictureAspect = prefs.gameAspect
+        borderStyle = com.pokedaisy.app.overlay.BuiltInFrames.style(prefs.overlay)
         expandedSupported = game?.wideSupported == true
         game?.expanded = expanded
         game?.stretch = stretched
@@ -144,12 +146,21 @@ internal class IosGameScreen(
             val strip = if (visible && IosTouchPreferences.underGame)
                 TouchGeometry.naturalHeight(IosTouchPreferences.style, constraints.maxWidth.toFloat(), density, gameBoy) else 0
             SideEffect {
-                game?.stretch = stretched || skinViewport(constraints.maxWidth, constraints.maxHeight, upright) != null
+                game?.stretch = stretched || skinViewport(constraints.maxWidth, constraints.maxHeight, upright) != null ||
+                    (!upright && !expanded && borderStyle != null)
                 state.setSide(state.side.withEnabled(!upright))
                 state.setPortrait(state.portrait.copy(enabled = upright, underGame = IosTouchPreferences.underGame, padStrip = strip, expand = expanded))
             }
             GameScreen(state, gameHeight = { (it / aspect).roundToInt() },
-                game = { GamePicture(aspect, upright, Modifier.fillMaxSize(), fill = expanded || stretched, viewport = { w, h -> skinViewport(w, h, upright) }, content = gameContent) },
+                game = {
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        GamePicture(aspect, upright, Modifier.fillMaxSize(), fill = expanded || stretched,
+                            viewport = { w, h -> pictureViewport(w, h, upright) }, content = gameContent)
+                        borderStyle?.takeIf { !upright && !expanded && skinViewport(constraints.maxWidth, constraints.maxHeight, upright) == null }?.let {
+                            GameBorder(it, constraints.maxWidth, constraints.maxHeight, gameBoy, Modifier.fillMaxSize())
+                        }
+                    }
+                },
                 controls = { if (visible) touch.Controls(gameBoy, upright) },
                 gameOverlay = { CompositionLocalProvider(LocalCompanionBack provides overlayBack, LocalCompanionKeys provides overlayKeys,
                     LocalTextInputFocus provides textInputFocus, content = gameOverlay) },
@@ -198,7 +209,7 @@ internal class IosGameScreen(
 
     private fun stage(f: GameScreenFrames, visible: Boolean, w: Int = state.width, h: Int = state.height,
                       upright: Boolean = state.portrait.enabled): TouchStage {
-        val picture = (skinViewport(f.game.width.toInt(), f.game.height.toInt(), upright, f.controls.width)
+        val picture = (pictureViewport(f.game.width.toInt(), f.game.height.toInt(), upright, f.controls.width)
             ?: fittedGamePicture(f.game.width, f.game.height, aspect, upright, fill = expanded || stretched)).translate(f.game.left, f.game.top)
         val area = if (visible) f.controls else Rect(0f, h.toFloat(), w.toFloat(), h.toFloat())
         val companion = f.companion.takeIf { f.companionShown && (upright || !state.side.isWindow) }
@@ -217,8 +228,15 @@ internal class IosGameScreen(
         return skinFit(skin, controlsW, h.toFloat(), portrait = false)?.game
     }
 
+    private fun pictureViewport(w: Int, h: Int, upright: Boolean, controlsWidth: Float? = null): Rect? {
+        skinViewport(w, h, upright, controlsWidth)?.let { return it }
+        if (upright || expanded || borderStyle == null) return null
+        val r = com.pokedaisy.app.overlay.BuiltInFrames.placement(w, h, if (gameBoy) 160 else 240, if (gameBoy) 144 else 160, stretched).game
+        return Rect(r.x, r.y, r.x + r.w, r.y + r.h)
+    }
+
     fun coreFrame(): Rect? = frames?.let { f ->
-        val skin = skinViewport(f.game.width.toInt(), f.game.height.toInt(), state.portrait.enabled, f.controls.width)
+        val skin = pictureViewport(f.game.width.toInt(), f.game.height.toInt(), state.portrait.enabled, f.controls.width)
         if (skin != null && !expanded) skin else if (skin != null)
             fittedGamePicture(skin.width, skin.height, aspect).translate(skin.left, skin.top)
         else fittedGamePicture(f.game.width, f.game.height, aspect, state.portrait.enabled && !expanded, fill = stretched)
