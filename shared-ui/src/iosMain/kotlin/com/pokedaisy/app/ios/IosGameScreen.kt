@@ -1,5 +1,6 @@
 package com.pokedaisy.app.ios
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -11,6 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import com.pokedaisy.app.CompanionShaders
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
@@ -57,7 +60,12 @@ internal class IosGameScreen(
     private var expandedSupported by mutableStateOf(game?.wideSupported == true)
     val expanded get() = pictureAspect == com.pokedaisy.app.companion.GameAspect.WIDE && expandedSupported
     private val stretched get() = pictureAspect == com.pokedaisy.app.companion.GameAspect.STRETCH
+    private var companionShaders by mutableStateOf(readCompanionShaders())
+    private var companionCell by mutableStateOf(0f)
+    private fun readCompanionShaders() = CompanionShaders.settings(
+        prefs.gbaColors, prefs.screenFilter, prefs.gridStrength, prefs.companionShaders)
     fun refreshPicture() {
+        companionShaders = readCompanionShaders()
         pictureAspect = prefs.gameAspect
         gameOverlays.key = prefs.overlay
         expandedSupported = game?.wideSupported == true
@@ -122,6 +130,7 @@ internal class IosGameScreen(
 
     init {
         game?.onPictureChanged = ::refreshPicture
+        game?.onGamePixel = { companionCell = CompanionShaders.cellSize(it, density) }
         refreshPicture()
         game?.onCompanionButtons = ::controllerInput
         game?.onCompanionAim = quickMenu::aim
@@ -143,6 +152,10 @@ internal class IosGameScreen(
             val upright = maxHeight >= maxWidth
             density = LocalDensity.current.density
             portraitGripHeight = with(LocalDensity.current) { (rememberGbaTextMetrics().u.toPx() * 24).roundToInt() }
+            val effect = IosCompanionEffects.effect(companionShaders,
+                companionCell.takeIf { it > 0f } ?: CompanionShaders.cellSize(0f, density))
+            val chrome = Modifier.graphicsLayer { renderEffect = effect }
+            val compactText = minOf(maxWidth, maxHeight) >= 600.dp
             val visible = IosTouchPreferences.visible
             val strip = if (visible && IosTouchPreferences.underGame)
                 TouchGeometry.naturalHeight(IosTouchPreferences.style, constraints.maxWidth.toFloat(), density, gameBoy) else 0
@@ -166,13 +179,17 @@ internal class IosGameScreen(
                 },
                 controls = { if (visible) touch.Controls(gameBoy, upright) },
                 gameOverlay = { CompositionLocalProvider(LocalCompanionBack provides overlayBack, LocalCompanionKeys provides overlayKeys,
-                    LocalTextInputFocus provides textInputFocus, content = gameOverlay) },
+                    LocalTextInputFocus provides textInputFocus) {
+                        Box(chrome, propagateMinConstraints = true) { gameOverlay() }
+                    } },
                 companion = {
                     CompositionLocalProvider(LocalCompanionTopInset provides (frames?.portrait?.topInset(state.gripHeight) ?: 0),
                         LocalCompanionBack provides back, LocalCompanionKeys provides keys, LocalTextInputFocus provides textInputFocus) {
                         // The same host/call site in either orientation keeps tab, scroll and navigation state.
-                        SidePanelHost(window = !upright && state.side.isWindow, onClose = state::hide, keys = keys,
-                            compactText = minOf(maxWidth, maxHeight) >= 600.dp, content = companion)
+                        Box(chrome, propagateMinConstraints = true) {
+                            SidePanelHost(window = !upright && state.side.isWindow, onClose = state::hide, keys = keys,
+                                compactText = compactText, content = companion)
+                        }
                     }
                 },
                 pictureOverlay = {
@@ -191,7 +208,7 @@ internal class IosGameScreen(
                             onConfirm = dismiss, onDismiss = dismiss, cancelLabel = null)
                     }
                 },
-                dismissSideOnGameTap = !visible,
+                dismissSideOnGameTap = !visible, chromeModifier = chrome,
                 onFrames = { measured, _ -> frames = measured; touch.stage = stage(measured, visible) })
         }
     }
@@ -310,6 +327,7 @@ internal class IosGameScreen(
         quickMenu.close()
         textInputFocus.clear()
         state.setSide(state.side.withEnabled(false))
+        game?.onGamePixel = null
         game?.onCompanionButtons = {}
         game?.onCompanionAim = { _, _ -> false }
         game?.overlayMenuInputCaptured = false

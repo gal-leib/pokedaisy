@@ -107,6 +107,13 @@ class GameRenderer private constructor(
         doubleArrayOf(it.offX.toDouble(),it.offY.toDouble(),(it.offX+frameW*it.scale).toDouble(),(it.offY+frameH*it.scale).toDouble())
     } ?: if (stretch) doubleArrayOf(0.0,0.0,targetW,targetH) else fitRect(frameW,frameH,targetW,targetH)
 
+    /** Height of one emulated pixel in drawable pixels, including camera zoom and stretch. */
+    fun gamePixelHeight(targetW: Double, targetH: Double): Float {
+        if (frameH <= 0) return 0f
+        val r = rect(targetW, targetH)
+        return ((r[3] - r[1]) / frameH).toFloat()
+    }
+
     /** Encode intermediate passes before the drawable's encoder is opened. */
     fun prepare(buffer: MTLCommandBufferProtocol, targetW: Double, targetH: Double) {
         val original = texture ?: return

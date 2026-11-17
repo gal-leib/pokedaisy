@@ -364,6 +364,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val overlayChoices: List<Pair<String, String>> get() = emptyList()
     val overlay: String get() = ""
     val shadersBadge: String? get() = null
+    val companionShadersBadge: String? get() = null
     val overlayBadge: String? get() = null
     val overlayRevision: Int get() = 0
     val importOverlay: (((OverlayImport.Completed) -> Unit) -> Unit)? get() = null
