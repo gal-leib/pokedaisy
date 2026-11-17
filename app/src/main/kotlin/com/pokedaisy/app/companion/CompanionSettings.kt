@@ -165,6 +165,10 @@ interface CompanionSettings : StoredCompanionSettings {
     val touchButtons: Set<TouchButton> get() = TouchButton.entries.toSet()
     val touchXyBadge: String? get() = null
     val touchSkinsSupported: Boolean get() = true
+    val touchSkinsBadge: String? get() = NewFeatures.badge(NewFeatures.TOUCH_SKINS)
+    /** Null keeps import in the platform's app settings. The callback reports the native picker's completed import. */
+    val importTouchSkin: (((Pair<String, String>) -> Unit) -> Unit)? get() = null
+    fun deleteTouchSkin(skin: InstalledSkin) {}
     val touchBadge: String? get() = NewFeatures.badge(NewFeatures.TOUCH_CONTROLS)
 
     /** A host has newly enabled ROM-detection recovery through SETTINGS > PLAYS AS. */

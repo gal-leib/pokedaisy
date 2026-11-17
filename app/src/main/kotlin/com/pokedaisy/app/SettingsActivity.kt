@@ -1119,7 +1119,7 @@ class SettingsActivity : ComponentActivity() {
             onDeleteSkin = { skin ->
                 skinStore.delete(skin.id)
                 val st = prefs.touchControlsStyle
-                prefs.touchControlsStyle = st.copy(skinGba = st.skinGba.takeIf { it != skin.id }, skinGb = st.skinGb.takeIf { it != skin.id })
+                prefs.touchControlsStyle = st.withoutSkin(skin.id)
                 revision++
             },
         ) { mod ->
@@ -1202,16 +1202,9 @@ class SettingsActivity : ComponentActivity() {
             }.getOrNull().also { temp.delete() }
                 ?: com.pokedaisy.app.companion.DeltaSkinStore.ImportResult(emptyList(), listOf("it couldn't be opened"))
             runOnUiThread {
-                val added = result.added
-                if (added.size == 1) {
-                    val skin = added.first()
-                    skin.skin.system?.let { prefs.touchControlsStyle = prefs.touchControlsStyle.withSkin(it, skin.id) }
-                }
-                touchSkinUi.notice = when {
-                    added.isEmpty() -> tk("NOT A SKIN WE CAN USE") to tr("PokeDaisy reads Delta skins for GBA and Game Boy games: {0}", result.refused.joinToString("; "))
-                    added.size == 1 -> tk("SKIN ADDED") to tr("{0} is on for {1} games.", added.first().skin.name, tr(added.first().skin.system?.label ?: ""))
-                    else -> tk("SKINS ADDED") to tr("{0} skins added. Pick one under SKINS.", added.size)
-                }
+                val completed = com.pokedaisy.app.companion.TouchSkinImport.complete(result, prefs.touchControlsStyle)
+                prefs.touchControlsStyle = completed.style
+                touchSkinUi.notice = completed.notice
                 revision++
             }
         }.start()

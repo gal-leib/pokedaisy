@@ -38,12 +38,12 @@ object RomPicker {
     }
 
     /** A copied data file, also used for cheat imports; read it during [onPicked]. Cancelled = null. */
-    fun pickData(from: UIViewController, onPicked: (String?) -> Unit) {
-        present(from, listOf(UTTypeData), multiple = false) { urls -> onPicked(urls.firstOrNull()?.path) }
+    fun pickData(from: UIViewController, onPicked: (String?) -> Unit): Boolean {
+        return present(from, listOf(UTTypeData), multiple = false) { urls -> onPicked(urls.firstOrNull()?.path) }
     }
 
-    private fun present(from: UIViewController, types: List<UTType>, multiple: Boolean, onPicked: (List<NSURL>) -> Unit) {
-        if (delegate != null) return
+    private fun present(from: UIViewController, types: List<UTType>, multiple: Boolean, onPicked: (List<NSURL>) -> Unit): Boolean {
+        if (delegate != null) return false
         val picker = UIDocumentPickerViewController(forOpeningContentTypes = types, asCopy = true)
         picker.allowsMultipleSelection = multiple
         val d = object : NSObject(), UIDocumentPickerDelegateProtocol {
@@ -58,7 +58,13 @@ object RomPicker {
         }
         delegate = d
         picker.delegate = d
-        from.presentViewController(picker, animated = true, completion = null)
+        return try {
+            from.presentViewController(picker, animated = true, completion = null)
+            true
+        } catch (error: Throwable) {
+            delegate = null
+            false
+        }
     }
 
     /** The app's folder of games. */

@@ -62,7 +62,7 @@ internal class IosLibraryHost(
     fun controller(): UIViewController {
         appSettings = IosCompanionSettings(null, null, null,
             onClose = {}, onRestart = {}, onDisableResume = ::disableResume,
-            onEditTouch = { touch.editStandalone(settingsStage()) }, readTouchStage = ::settingsStage)
+            onEditTouch = { touch.editStandalone(settingsStage()) }, readTouchStage = ::settingsStage, presentFrom = { host })
         L10n.apply(appSettings.appLanguage, null)
         host = ComposeUIViewController(configure = { configureUiAutomation() }) {
             LaunchedEffect(paths, saveRefresh) {
