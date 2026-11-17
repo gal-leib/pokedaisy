@@ -27,6 +27,7 @@ object NewFeatures {
     const val IOS_CLASSIC_FLY = "ios_classic_fly"
     const val IOS_GB_FIELD_ACTIONS = "ios_gb_field_actions"
     const val IOS_GB_ENCOUNTERS = "ios_gb_encounters"
+    const val IOS_GAMEPLAY_MODIFIERS = "ios_gameplay_modifiers"
     const val IOS_TRADE_EVOLUTION = "ios_trade_evolution"
     const val IOS_PARTY_STORAGE = "ios_party_storage"
     const val IOS_MOVE_SCREENS = "ios_move_screens"
@@ -267,6 +268,7 @@ object NewFeatures {
         IOS_MOVE_SCREENS,
         IOS_PARTY_STORAGE,
         IOS_TRADE_EVOLUTION,
+        IOS_GAMEPLAY_MODIFIERS,
         IOS_QUICK_MENU,
         REGISTERED_ITEMS,
         IOS_FIELD_OPTIONS,

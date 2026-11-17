@@ -694,7 +694,7 @@ private fun homeRows(
         // the first Pokémon when nobody knows the move (HmFree.kt); the companion's FLY and FLASH follow it.
         SettingRow(
             tk("NO HMS NEEDED"), if (s.hmFreeSupported) onOff(s.hmFree) else tk("N/A"),
-            enabled = s.hmFreeSupported, labelBadge = NewFeatures.badge(NewFeatures.HM_FREE),
+            enabled = s.hmFreeSupported, labelBadge = s.gameplayModifiersBadge ?: NewFeatures.badge(NewFeatures.HM_FREE),
             subtitle = "Field moves with the badge alone",
         ) {
             if (s.hmFreeSupported) { s.setHmFree(!s.hmFree); changed() }
@@ -703,7 +703,7 @@ private fun homeRows(
         // Three values: a pick-list.
         SettingRow(
             tk("EXP SHARE"), if (s.expShareSupported) s.expShare.label else tk("N/A"),
-            enabled = s.expShareSupported, labelBadge = NewFeatures.badge(NewFeatures.EXP_SHARE),
+            enabled = s.expShareSupported, labelBadge = s.gameplayModifiersBadge ?: NewFeatures.badge(NewFeatures.EXP_SHARE),
             subtitle = "The whole party gains EXP from a win",
         ) {
             if (s.expShareSupported) {
@@ -724,7 +724,7 @@ private fun homeRows(
                 !s.levelCap -> tk("OFF")
                 else -> s.levelCapLevel?.let { tr("LV {0}", it) } ?: tk("ON")
             },
-            enabled = s.levelCapSupported, labelBadge = NewFeatures.badge(NewFeatures.LEVEL_CAP),
+            enabled = s.levelCapSupported, labelBadge = s.gameplayModifiersBadge ?: NewFeatures.badge(NewFeatures.LEVEL_CAP),
             subtitle = "Stops at the next boss's top level",
         ) {
             if (s.levelCapSupported) { s.setLevelCap(!s.levelCap); changed() }

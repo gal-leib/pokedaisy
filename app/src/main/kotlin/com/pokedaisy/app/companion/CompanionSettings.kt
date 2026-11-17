@@ -72,6 +72,8 @@ interface CompanionSettings : StoredCompanionSettings {
     val reusableTmsSupported: Boolean get() = false
     /** The game's own TMs never run out ([com.pokedaisy.app.companion.data.ReusableTms.BUILT_IN]): the row says so. */
     val reusableTmsBuiltIn: Boolean get() = false
+    /** Platform introduction badge shared by HM, EXP and level-cap settings. */
+    val gameplayModifiersBadge: String? get() = null
     /** EXP SHARE - see [com.pokedaisy.app.Prefs.expShare]; [expShareSupported]: the game's getexp is known
      * ([com.pokedaisy.app.companion.data.ExpShare]). */
     val expShareSupported: Boolean get() = false
