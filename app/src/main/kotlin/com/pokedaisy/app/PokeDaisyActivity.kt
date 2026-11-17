@@ -1803,7 +1803,7 @@ class PokeDaisyActivity : Activity() {
         }
         override val battleButtons get() = Prefs(this@PokeDaisyActivity).battleButtons
         override fun setBattleButtons(on: Boolean) {
-            Prefs(this@PokeDaisyActivity).battleButtons = on
+            stored.setBattleButtons(on)
             runOnUiThread { syncGameScreen() }
         }
         override val fieldHudStyle get() = Prefs(this@PokeDaisyActivity).fieldHudStyle
@@ -4402,17 +4402,13 @@ class PokeDaisyActivity : Activity() {
         }
         // BATTLE BUTTONS: one screen held sideways, a single battle the game's touch input can steer (its state read
         // at least once this battle - it reads NONE in games without it).
-        var battleRead by remember { androidx.compose.runtime.mutableStateOf(false) }
-        androidx.compose.runtime.LaunchedEffect(snap.inBattle, snap.battleInputState) {
-            battleRead = snap.inBattle && (battleRead || snap.battleInputState != com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
-        }
+        val battleRead = com.pokedaisy.app.companion.ui.rememberBattleButtonsRead(snap)
         // A DS game: only where DS LAYOUT floats its touch screen (the others, PICTURE IN PICTURE's inset too, show the
         // game's own panel), and out of the way while the floating touch screen is up (a bag, a party, a prompt).
         val dsIdle = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
         val dsWanted by (engine?.dsTouchWanted ?: dsIdle).collectAsState()
         val dsWindowUp = dsFloats.value && (dsWanted || dsWindowManual.value)
-        val buttonsWanted = battleButtonsOn.value && hudSingleScreen.value && !hudUpright.value && snap.hasData && !snap.unsupported &&
-            snap.inBattle && !snap.isDoubleBattle && (!romIsNds || dsFloats.value && !dsPip.value)
+        val buttonsWanted = com.pokedaisy.app.companion.battleButtonsWanted(battleButtonsOn.value, hudSingleScreen.value, hudUpright.value, snap) && (!romIsNds || dsFloats.value && !dsPip.value)
         val buttons = buttonsWanted && battleRead && !dsWindowUp
         // Where BATTLE BUTTONS can't stand in for a DS battle's command panel, that panel floats in too.
         androidx.compose.runtime.SideEffect { engine?.dsBattleMenuFloats = dsFloats.value && !dsPip.value && !buttonsWanted }
@@ -4469,7 +4465,7 @@ class PokeDaisyActivity : Activity() {
                 modifier = androidx.compose.ui.Modifier.graphicsLayer { alpha = hudAlpha },
                 core = coreFrame.value,
                 clearTop = hudClear.value.first, clearBottom = hudClear.value.second,
-                onWindow = { battlePicking.value = it },
+                onWindow = { battlePicking.value = it }, avoid = hudAvoid.value,
             )
             com.pokedaisy.app.companion.ui.QuickMenu(quickMenu, snap, quickActions, quickShown.value, hudStyle.value.look)
             // Co-op joined battles: the join prompt, the waits, the notices - over the game, HUD on or off.

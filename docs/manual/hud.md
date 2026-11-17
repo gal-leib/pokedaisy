@@ -69,4 +69,8 @@ Open `SETTINGS` > `HUD` to change its layout, look, size and visible parts. Your
 The HUD makes room for your touch controls. Its party, map, bag and wild windows use the same screens and supported
 field actions as the companion. Opening `QUICK MENU` closes any open HUD window.
 
-Battle buttons are not available on iPhone or iPad yet.
+`BATTLE BUTTONS` also work in supported single battles when you hold the device sideways and there is room beside
+the game. `FIGHT`, the party list and `RUN` use the same battle controls as the companion. They stay hidden until
+the game can read battle commands, and during double battles. Opening the companion window or `QUICK MENU` hides them.
+The action buttons move left when touch controls occupy the right margin. If no column is clear, use the regular
+game controls. You can turn battle buttons off independently of the field HUD.

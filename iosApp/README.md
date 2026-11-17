@@ -169,4 +169,6 @@ field observation does not change encounter ownership or its RNG. Unknown tables
 Landscape GBA games reuse the shared `FieldHud` over the native picture. `GameRuntime` publishes the settled
 `GameSession` field signal; Android and iOS use the same visibility rule and persisted HUD settings. Shared
 control placements reserve room around custom touch layouts. HUD windows reuse the companion's existing field
-actions and close when Quick Menu opens. Portrait continues to use the companion. Battle buttons remain a separate step.
+actions and close when Quick Menu opens. Portrait continues to use the companion. Battle buttons reuse the same shared renderer and `GameBattleInput` in supported single battles. The readiness
+latch is shared with Android, resets between battles, and the controls' shared edge-clearance keeps the lists
+clear of touch rows. Both overlay settings retain the existing installed preference format.

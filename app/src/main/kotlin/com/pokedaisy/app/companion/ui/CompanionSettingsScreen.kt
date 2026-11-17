@@ -870,7 +870,7 @@ private fun homeRows(
         // One screen: FIGHT, POKéMON and RUN in the room beside a battle (BattleButtons).
         SettingRow(
             tk("BATTLE BUTTONS"), onOff(s.battleButtons), subtitle = "FIGHT, POKéMON and RUN beside a battle",
-            labelBadge = NewFeatures.badge(NewFeatures.BATTLE_BUTTONS),
+            labelBadge = s.battleButtonsBadge ?: NewFeatures.badge(NewFeatures.BATTLE_BUTTONS),
         ) { s.setBattleButtons(!s.battleButtons); changed() }.takeIf { !s.usesSecondScreen },
         // STATUS BAR, SHADERS, OVERLAY (and an upright phone's COMPANION): on their own page.
         SettingRow(tk("DISPLAY OPTIONS"), null, subtitle = "Status bar, shaders, overlay", opensPage = true) { navigate(Page.DISPLAY) },

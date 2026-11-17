@@ -73,6 +73,15 @@ import kotlin.math.floor
 /** What the battle buttons have open over the game. */
 enum class BattleButtonsWindow { MOVES, PARTY }
 
+@Composable
+fun rememberBattleButtonsRead(snapshot: SnapshotView): Boolean {
+    val state = remember { com.pokedaisy.app.companion.BattleOverlayState() }
+    LaunchedEffect(snapshot.inBattle, snapshot.battleInputState) {
+        state.observe(snapshot.inBattle, snapshot.battleInputState)
+    }
+    return state.read
+}
+
 /**
  * The battle buttons in the room right of [core] (px: where the GBA's own picture is in this box; null = its middle
  * at the box's height, EXPAND's battle). [shown] false fades them out. No room for them (STRETCH, a docked side
@@ -92,6 +101,8 @@ fun BattleButtons(
     /** A window opened / closed (one screen: the side panel's edge tab steps aside for it). */
     onWindow: (Boolean) -> Unit = {},
     initialWindow: BattleButtonsWindow? = null,
+    /** Touch-control bounds in this overlay's pixels; the action column moves left to keep them reachable. */
+    avoid: List<Rect> = emptyList(),
 ) {
     var window by remember { mutableStateOf(initialWindow) }
     val state = snapshot.battleInputState
@@ -132,13 +143,20 @@ fun BattleButtons(
         val moves = active?.moves.orEmpty().take(4)
         val wild = snapshot.enemyParty.isEmpty()
         val columnW = maxOf(u * MIN_WIDTH, minOf(room, u * MAX_WIDTH))
+        val edgePx = with(density) { (u * EDGE).toPx() }
+        val columnPx = with(density) { columnW.toPx() }
+        val lane = com.pokedaisy.app.companion.battleButtonsLane(Rect(0f, 0f, boxW + edgePx, boxH),
+            columnPx + edgePx, avoid)
+        if (lane == null && window == null) return@BoxWithConstraints
+        val shift = lane?.let { (boxW - columnPx - it.left).coerceAtLeast(0f) } ?: 0f
+
         BoxWithConstraints(
             // At least MIN_WIDTH: past a 16:9 screen's narrow margin into the picture's top-right corner, where a
             // battle has only its background (the user's call: larger buttons over smaller room).
             // Out of sight while FIGHT's / POKéMON's list is over them (a greyed-out row would show them through).
             // Running off the screen's right edge ([EDGE] GBA pixels past it): no right border or corners, a tab coming out
             // of the side.
-            Modifier.align(Alignment.TopEnd).offset(x = u * EDGE).width(columnW + u * EDGE).fillMaxHeight()
+            Modifier.align(Alignment.TopEnd).offset(x = u * EDGE - with(density) { shift.toDp() }).width(columnW + u * EDGE).fillMaxHeight()
                 .graphicsLayer { translationX = slide * size.width }
                 .padding(top = top, bottom = with(density) { clearBottom.toDp() } + u * 3)
                 .padding(start = u * 2),

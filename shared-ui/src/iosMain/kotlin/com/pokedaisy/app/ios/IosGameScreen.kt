@@ -182,6 +182,13 @@ internal class IosGameScreen(
         stage(f, IosTouchPreferences.visible).game.translate(-f.game.left, -f.game.top)
     }
 
+    fun hudClear(): Pair<Int, Int> {
+        val f = frames ?: return 0 to 0
+        val p = touch.placed?.takeIf { IosTouchPreferences.visible } ?: return 0 to 0
+        val picture = stage(f, true).game
+        return TouchGeometry.hudClear(p, picture.left - f.controls.left, picture.right - f.controls.left)
+    }
+
     fun hudAvoid(): List<Rect> = frames?.let { f ->
         if (!IosTouchPreferences.visible) emptyList() else touch.placed?.items.orEmpty().map {
             Rect(it.left, it.top, it.right, it.bottom).translate(f.controls.left - f.game.left, f.controls.top - f.game.top)
