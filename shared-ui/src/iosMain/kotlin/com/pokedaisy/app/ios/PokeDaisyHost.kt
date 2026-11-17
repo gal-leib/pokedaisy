@@ -316,10 +316,12 @@ object PokeDaisyHost {
             if (live()) screen?.showQuickNotice(com.pokedaisy.app.companion.ui.itemUseMessage(
                 com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW)))
         }
+        val verifiedTms = com.pokedaisy.app.companion.FieldTmSupport(PkApiCore::read)
         val sharedItems = com.pokedaisy.app.companion.FieldItemUse(
             support = readSupport, session = currentSession,
             inBattle = { telemetry.snapshot.value.inBattle },
             centerMetadata = { if (live()) p.options.discovery.center else null },
+            tmMetadata = { if (live()) verifiedTms.get(telemetry.snapshot.value, code, revision) else null },
             handedOver = { if (screen?.state?.side?.windowOpen == true) screen?.state?.hide() },
             deliver = { result -> result(); if (live()) sample() },
         )
@@ -346,6 +348,8 @@ object PokeDaisyHost {
             }
         }
         items = object : com.pokedaisy.app.companion.ItemUse by sharedItems {
+            override val relearnBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_MOVE_SCREENS)
+            override fun useBadge(itemId: Int) = relearnBadge.takeIf { sharedItems.canTeach(itemId) }
             override val centerBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PARTY_SERVICES)
             override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
                 if (gbFields.available) com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS

@@ -1102,6 +1102,7 @@ fun ItemsScreen(
                 onFavorite = { FavoriteItems.toggle(item.itemId) },
                 actionFocus = actionFocus,
                 message = message,
+                useBadge = itemUse?.useBadge(item.itemId),
                 // An item used or given away to the last leaves the bag: nothing left to tap.
                 onUse = itemUse?.takeIf { it.canUse(item.itemId) && items.any { i -> i.itemId == item.itemId } }?.let { use ->
                     {
@@ -1639,6 +1640,7 @@ private fun ItemDescriptionBar(
     onFavorite: (() -> Unit)? = null,
     /** What the last USE / GIVE did, in place of the description. */
     message: String? = null,
+    useBadge: String? = null,
     /** USE / GIVE buttons; null = none for this item here. */
     onUse: (() -> Unit)? = null,
     onGive: (() -> Unit)? = null,
@@ -1706,7 +1708,7 @@ private fun ItemDescriptionBar(
                 if (onUse != null || onGive != null) {
                     Spacer(Modifier.weight(1f))
                     Row(horizontalArrangement = Arrangement.spacedBy(u * 6)) {
-                        if (onUse != null) OptionButton("USE", m, onClick = onUse, modifier = Modifier.action(true))
+                        if (onUse != null) OptionButton("USE", m, onClick = onUse, modifier = Modifier.action(true), labelBadge = useBadge)
                         if (onGive != null) OptionButton("GIVE", m, onClick = onGive, modifier = Modifier.action(onUse == null))
                     }
                 }

@@ -11,6 +11,7 @@ import com.pokedaisy.app.companion.data.PartyTargets
 interface ItemUse {
     /** Newly available item actions on this host. */
     val actionBadge: String? get() = null
+    fun useBadge(itemId: Int): String? = null
 
     /** The game's VAR_REPEL_STEP_COUNT (FireRed 0x4020, Emerald 0x4021): the HUD's REPEL steps; null = not known here. */
     val repelVar: Int? get() = null
@@ -94,6 +95,7 @@ interface ItemUse {
     /** The POKéMON CENTER's services this game has (PokemonCenter.kt); null = none. */
     fun center(): CenterSupport? = null
     val centerBadge: String? get() = null
+    val relearnBadge: String? get() = null
 
     /** HEAL: the whole party, as the nurse does. */
     fun centerHeal(done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) = done(com.pokedaisy.app.companion.data.CenterResult.FAILED)

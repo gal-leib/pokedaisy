@@ -642,9 +642,6 @@ class PokeDaisyActivity : Activity() {
         return v
     }
 
-    /** The TM screen's calls, checked once per ROM; null where the game has none. */
-    @Volatile private var tmCache: Pair<String, com.pokedaisy.app.companion.data.TmFns?>? = null
-
     private fun retailFieldKey(): Pair<String, Boolean>? {
         if (romIsGameBoy || romIsNds) return null
         // A rebuild on retail's game code (Recharged Emerald): none of retail's code, its builds' own records (the CRCs pick
@@ -654,16 +651,13 @@ class PokeDaisyActivity : Activity() {
         return "$romCode/$romRev/${telemetry.snapshot.value.game}/${com.pokedaisy.app.companion.data.romGameCode}" to hack
     }
 
+    private val verifiedTms by lazy {
+        com.pokedaisy.app.companion.FieldTmSupport(com.pokedaisy.app.companion.data.InProcessReader::readCoreMemory)
+    }
+
     private fun tmFns(): com.pokedaisy.app.companion.data.TmFns? {
-        val (key, hack) = retailFieldKey() ?: return null
-        val tms = com.pokedaisy.app.companion.data.tmCandidatesFor(telemetry.snapshot.value.game, romCode, romRev, hack)
-        if (tms.isEmpty()) return null
-        tmCache?.let { (k, v) -> if (k == key) return v }
-        if (!::engine.isInitialized || !engine.running) return null
-        val read = { addr: Long, len: Int -> com.pokedaisy.app.companion.data.InProcessReader.readCoreMemory(addr, len) }
-        val found = runCatching { tms.firstOrNull { com.pokedaisy.app.companion.data.tmCodeMatches(it, read) } }.getOrElse { return null }
-        Log.i("pokedaisy", "TMs: ${if (found != null) "code found" else "code not found"}")
-        return found.also { tmCache = key to it }
+        if (retailFieldKey() == null || !::engine.isInitialized || !engine.running) return null
+        return verifiedTms.get(telemetry.snapshot.value, romCode, romRev)
     }
 
     private val fieldFlash by lazy {
@@ -675,10 +669,6 @@ class PokeDaisyActivity : Activity() {
             { telemetry.snapshot.value }, com.pokedaisy.app.companion.data.InProcessReader::readCoreMemory,
             ::closeCompanionWindow)
     }
-
-    /** USE opens the game's TM screen for [itemId] here: the TM calls and the bag's (CheckBagHasItem, the party). */
-    private fun tmSupport(itemId: Int): Boolean =
-        tmFns()?.teaches(itemId) == true && fieldItemSupport()?.fns?.party != null && fieldItemSupport()?.fns?.bagActions == true
 
     /** The shared GB coordinator verifies ROM code and owns queued PC / FLY results. */
     private fun gameBoyFields(): com.pokedaisy.app.companion.GameBoyFieldActions? {
@@ -703,6 +693,7 @@ class PokeDaisyActivity : Activity() {
         session = { if (::engine.isInitialized && engine.running) engine.gameSession else null },
         inBattle = { telemetry.snapshot.value.inBattle },
         centerMetadata = ::centerFound,
+        tmMetadata = ::tmFns,
         handedOver = ::closeCompanionWindow,
         deliver = { result -> runOnUiThread(result) },
     )
@@ -716,8 +707,8 @@ class PokeDaisyActivity : Activity() {
         /** A DS game's Repels ([com.pokedaisy.app.companion.data.useGen4Repel], Black's [com.pokedaisy.app.companion.data.useGen5Repel]);
          * nothing else yet. */
         private fun dsRepel(itemId: Int) = dsRepelKnown() && com.pokedaisy.app.companion.data.GEN4_REPEL_KINDS.any { it.first == itemId }
-        override fun canUse(itemId: Int) = dsRepel(itemId) || tmSupport(itemId) || fieldItemSupport()?.canUse(itemId) == true
-        override fun marked(itemId: Int) = dsRepel(itemId) || tmSupport(itemId) || sharedItemUse.marked(itemId)
+        override fun canUse(itemId: Int) = dsRepel(itemId) || sharedItemUse.canUse(itemId)
+        override fun marked(itemId: Int) = dsRepel(itemId) || sharedItemUse.marked(itemId)
 
         /** [work] on the emu thread with the game's functions, [done] with its answer on the main thread;
          * [failed] when there's no game to ask (or the work throws). */
@@ -747,32 +738,7 @@ class PokeDaisyActivity : Activity() {
                 }
                 return
             }
-            if (tmSupport(itemId)) return openTmScreen(itemId, done)
             sharedItemUse.use(itemId, done)
-        }
-
-        /** A TM / HM: the game's own TM screen (TmTeach.kt), in two steps like FLY - the checks, the controls locked and
-         * the fade to black, then once it's black the game's party menu, sent back to the field when it closes. */
-        private fun openTmScreen(itemId: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
-            val tm = tmFns() ?: return done(failed)
-            onGame(failed, { o ->
-                // The teaching is the game's to show: a companion window over it goes.
-                if (o.result == com.pokedaisy.app.companion.data.ItemUseResult.IN_GAME) closeCompanionWindow()
-                done(o)
-            }) { s, calls, busy ->
-                val r = com.pokedaisy.app.companion.data.tmStart(s.fns, tm, itemId, busy, calls)
-                if (r == com.pokedaisy.app.companion.data.ItemUseResult.USED) {
-                    engine.requestFieldItemJob(false, com.pokedaisy.app.companion.data.TM_FADE_FRAMES) { c, leftField ->
-                        val ok = com.pokedaisy.app.companion.data.tmFinish(tm, itemId, c, leftField)
-                        Log.i("pokedaisy", "TM screen for $itemId: ${when {
-                            ok -> "open"
-                            leftField -> "the game left the field during the fade, not taken"
-                            else -> "failed, field handed back"
-                        }}")
-                    }
-                    com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.IN_GAME)
-                } else com.pokedaisy.app.companion.data.ItemUseOutcome(r)
-            }
         }
 
         override fun canPc() = dsCalls() || fieldItemSupport()?.canPc == true || gbField() != null
@@ -826,29 +792,6 @@ class PokeDaisyActivity : Activity() {
             com.pokedaisy.app.companion.data.withdrawFromBox(fields, fns, box, slot, boxPersonality, busy, calls)
         }
 
-        override fun center(): com.pokedaisy.app.companion.CenterSupport? {
-            val center = centerFound() ?: return null
-            return sharedItemUse.center()?.copy(relearn = center.relearn != null && tmFns() != null)
-        }
-
-        /** The Move Tutor's screen in two steps, like the TM screen's: the checks and the fade, then once it's black the screen. */
-        override fun centerRelearn(slot: Int, personality: Long, done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) {
-            val tm = tmFns() ?: return done(com.pokedaisy.app.companion.data.CenterResult.FAILED)
-            sharedItemUse.onCenter(done, screen = true) { fns, c, calls, busy ->
-                val r = com.pokedaisy.app.companion.data.centerRelearnStart(fns, c, tm, slot, personality, busy, calls)
-                if (r == com.pokedaisy.app.companion.data.CenterResult.OK) {
-                    engine.requestFieldItemJob(false, com.pokedaisy.app.companion.data.TM_FADE_FRAMES) { g, leftField ->
-                        val ok = com.pokedaisy.app.companion.data.centerRelearnFinish(fns, c, tm, slot, personality, g, leftField)
-                        Log.i("pokedaisy", "move relearner for slot $slot: ${when {
-                            ok -> "open"
-                            leftField -> "the game left the field during the fade, not taken"
-                            else -> "failed, field handed back"
-                        }}")
-                    }
-                }
-                r
-            }
-        }
 
         override fun canTradeEvolve() = Prefs(this@PokeDaisyActivity).tradeEvolutions && tradeEvoFns() != null
 
