@@ -297,6 +297,8 @@ It works in the same games as `SHINY ODDS`, and the two go well together. Elsewh
 
 ## EXP SHARE
 
+This setting is also available on iPhone and iPad, with the same supported games.
+
 Normally only the Pokémon that fought gain EXP when you win, so the rest of your team falls behind unless you swap them in. `EXP SHARE`, in the companion's `GAMEPLAY` group, opens a list:
 
 - **`OFF`** (the default) leaves the game's own rules.
@@ -311,6 +313,8 @@ It works in FireRed, LeafGreen and Emerald, in every language and release PokeDa
 
 ## LEVEL CAP
 
+This setting is also available on iPhone and iPad, with the same supported games.
+
 A level cap keeps your team from outgrowing the story, the way many hard-mode hacks do. Turn on `LEVEL CAP` in the companion's `GAMEPLAY` group and no Pokémon goes past the highest level on the next boss's team: the same boss the guide's [NEXT BOSS](guide.md#next-boss-the-next-gym-leader) page shows. The row says the cap now, like `LV 14`.
 
 A Pokémon at the cap gains nothing from a win until you beat that boss. One that reaches the cap during a win stops there, and the rest of that win's EXP is lost. Beat the boss and the cap moves up to the next one's top level by itself. Once every boss is beaten there's no cap.
@@ -320,6 +324,8 @@ Only EXP from battles is capped: items that raise a level and the day care still
 It works in FireRed, LeafGreen and Emerald, in every language and release PokeDaisy supports, and in many hacks built on their code. Where it can't work, or the game has no NEXT BOSS page to follow, the row shows `N/A`. Turning it off puts the game back as it was.
 
 ## NO HMS NEEDED
+
+This setting is also available on iPhone and iPad, with the same supported games.
 
 In the games, the moves you use out on the field (cutting down a small tree, smashing a cracked rock, pushing a boulder, crossing water, climbing a waterfall, diving) need two things: the right badge, and a Pokémon in your party that knows the move. That second part means teaching those moves to Pokémon you'd rather keep for battles, or carrying one around just for them.
 
