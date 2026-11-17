@@ -983,6 +983,7 @@ class EmulatorEngine(
     private fun loop(rom: File, save: File, resume: File?) {
         gameSession.reset()
         onField.value = false
+        playback.fieldChanged(0)
         SaveBackups.snapshot(save)
         // RetroArch's compressed .srm, unpacked first: mGBA would take it as the flash itself and the game start anew.
         RzipSave.unpackForPlay(save)?.let { why ->
@@ -1085,6 +1086,7 @@ class EmulatorEngine(
             running = false
             gameSession.close()
             onField.value = false
+            playback.fieldChanged(0)
             pacedPerFrame = 0   // no frames are coming: the GL thread mustn't wait for one
             pendingSuspend = null
             runCatching { track?.stop() }

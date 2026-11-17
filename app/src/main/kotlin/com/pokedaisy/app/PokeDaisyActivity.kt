@@ -4360,7 +4360,8 @@ class PokeDaisyActivity : Activity() {
         val engine by hudEngine.collectAsState()
         val idle = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
         val onField by (engine?.onField ?: idle).collectAsState()
-        val field = if (romIs3ds) n3dsOnField.value && !n3dsFloating.value else onField
+        val field = if (romIs3ds) n3dsOnField.value && !n3dsFloating.value
+            else engine?.playback?.settledOnField == true
         val shown = com.pokedaisy.app.companion.ui.fieldHudShown(hudOn.value, hudUpright.value, field, snap)
         // One screen, the companion's panel closed: its open button joins the HUD's, and the edge tab steps aside
         // (for BATTLE BUTTONS' party window too, which sits in that corner). As the window it stays put while the
