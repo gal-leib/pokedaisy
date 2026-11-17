@@ -137,4 +137,9 @@ class QuickMenuScreenshotTest {
 
     /** FLY's places (Kanto's towns). */
     @Test fun flyList() = shot(fly = FlyTargets(FlyResult.OK, listOf(88, 89, 90, 91, 92, 93, 94, 95, 96, 97)))
+    @Test fun gen1FlyList() {
+        com.pokedaisy.app.companion.data.activeGame = com.pokedaisy.app.companion.data.GameKind.RED
+        shot(fly = FlyTargets(FlyResult.OK, listOf(0, 1, 5)),
+            snapshot = FieldHudScreenshotTest.snapshot.copy(game = com.pokedaisy.app.companion.data.GameKind.RED))
+    }
 }

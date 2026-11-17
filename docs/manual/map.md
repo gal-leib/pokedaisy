@@ -8,7 +8,7 @@ keywords: [town map, region map, area map, cave map, dungeon map, building map, 
 
 The `MAP` tab is the game's town map, always open. It answers "where am I?" at a glance and "where is that town the guide mentioned?" in two taps, without digging the map out of your bag.
 
-On iPhone and iPad, supported GBA games can use `FLY` from the map with the game's own cut-in and landing. The same badge, party, destination and field checks apply as on Android. Scenic flight is coming with the expanded-rendering support.
+On iPhone and iPad, supported GBA and Game Boy games can use `FLY` from the map with the game's own take-off and landing. The same badge, party, visited-town and field checks apply as on Android. A queued flight the game cannot take is withdrawn; loading a state, rewinding or closing the game retires its pending result. Scenic flight is coming with the expanded-rendering support.
 
 ## You on the map
 

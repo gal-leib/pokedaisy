@@ -1225,7 +1225,9 @@ class EmulatorEngine(
                     }
                 }
                 val rewinding = rewindHeld && rewindWanted > 0
-                if (rewinding) playback.registeredItems?.cancel()
+                if (rewinding) {
+                    playback.cancelFieldActions()
+                }
                 MgbaCore.pkSetRewinding(rewinding)
                 // TURBO A / B: pressed 2 frames, released 2, in game frames - so FF mashes faster too.
                 val reset = if (softResetFrames > 0) { softResetFrames--; SOFT_RESET_KEYS } else 0
@@ -1914,7 +1916,7 @@ class EmulatorEngine(
      * (MgbaCore.pkFinishSave): a game left mid-save and then swiped away from recents came back with its newer save
      * slot half written. 600 frames is ten seconds of game time; they run unpaced, a fraction of that. */
     private fun finishSave() {
-        playback.registeredItems?.cancel()
+        playback.cancelFieldActions()
         val n = MgbaCore.pkFinishSave(600)
         if (n > 0) Log.i("pokedaisy", "let the game finish its save: $n frames")
     }
@@ -2042,7 +2044,7 @@ class EmulatorEngine(
 
     /** Only the native state bytes and Android achievement capture remain platform work. */
     private fun writeCoreState(target: okio.Path): Boolean {
-        playback.registeredItems?.cancel()
+        playback.cancelFieldActions()
         val ok = MgbaCore.pkSaveState(target.toString())
         if (ok) RetroAchievements.afterSaveState(File(target.toString()))
         return ok
@@ -2059,7 +2061,7 @@ class EmulatorEngine(
 
     /** Loads [source] and puts achievement progress back to where that state had it. */
     private fun loadState(source: File): Boolean {
-        playback.registeredItems?.cancel()
+        playback.cancelFieldActions()
         val ok = MgbaCore.pkLoadState(source.absolutePath)
         if (ok) RetroAchievements.afterLoadState(source)
         // A state made in another PLAYER LOOK holds that look's palettes.

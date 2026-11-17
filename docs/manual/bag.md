@@ -93,7 +93,7 @@ It only works while you're walking around. If a menu, a conversation or a battle
 
 ## The PC from anywhere
 
-On iPhone and iPad, supported GBA games also have the bag's `USE`, `GIVE`, `TAKE` and `PC` actions. They use the same game code and checks as Android. The PC closes a companion window so you can work it with the game's controls. Game Boy field actions and TM teaching are coming separately.
+On iPhone and iPad, supported GBA games also have the bag's `USE`, `GIVE`, `TAKE` and `PC` actions. Supported Game Boy games have `PC` too, using the same verified game code as Android. The PC closes a companion window once the game accepts it, so you can work it with the game's controls. An action the game cannot take is withdrawn. TM teaching is coming separately.
 
 In FireRed, LeafGreen, Emerald, Ruby and Sapphire, the bag tab has a `PC` button above the sort button (its small arrow means it opens the game's own screen, not a companion page). Tap it and the game's own PC opens right where you're standing, with the same menu a PC in a Pokémon Center gives you: the Pokémon storage, your own PC with your stored items and mailbox, and the game's other PCs as you unlock them. The Pokémon storage lets you take Pokémon out, put them away and move them between boxes (and, outside Ruby and Sapphire, move their items). Back out of it as usual and you're on the field again.
 

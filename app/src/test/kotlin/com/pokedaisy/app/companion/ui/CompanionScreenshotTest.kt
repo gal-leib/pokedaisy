@@ -1228,6 +1228,13 @@ open class CompanionScreenshotTest {
     private val redRom = "Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb"
     @Test fun redParty() = yellow("red", "PARTY", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     @Test fun redItems() = yellow("red", "ITEMS", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
+    @Test fun redPc() = yellow("red", "ITEMS", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED,
+        itemUse = object : com.pokedaisy.app.companion.ItemUse {
+            override val actionBadge = "NEW"
+            override fun canPc() = true
+            override fun canUse(itemId: Int) = false
+            override fun use(itemId: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {}
+        })
     @Test fun redBattleMoves() =
         yellow("red_battle_move2", "BATTLE", controls = true, cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     @Test fun redMap() = yellow("red", "MAP", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
@@ -1405,6 +1412,7 @@ open class CompanionScreenshotTest {
         guidePage: String? = null,
         /** The save as if it stood on this map (wCurMap): the fixtures are all in a Pokémon Center. */
         onMap: Int? = null,
+        itemUse: com.pokedaisy.app.companion.ItemUse? = null,
     ) {
         activeGame = game
         romLanguage = cfg.language   // another test's ROM may have left Japanese names on
@@ -1467,6 +1475,7 @@ open class CompanionScreenshotTest {
             CompanionScreen(
                 v, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = tab, battleInput = input, initialSettingsPage = page,
                 initialMonIndex = monIndex,
+                itemUse = itemUse,
                 statusBar = if (!statusBar) null else ({ GameStatusBar("Pokémon Yellow", v.location.mapSecName, 3175, "12:34") }),
             )
         }
