@@ -32,6 +32,35 @@ class PkApiCoreTest {
     fun close() = PkApiCore.stop()
 
     @Test
+    fun expandedRendererBridgeKeepsUnknownGamesOnTheirOriginalPicture() {
+        assertTrue(PkApiCore.fieldKnows(0x1F1C08FB))
+        assertTrue(!PkApiCore.fieldKnows(0))
+        assertTrue(PkApiCore.wideKnows(0x1F1C08FB))
+        assertTrue(!PkApiCore.wideKnows(0))
+        assertTrue(!PkApiCore.configureWide(0x1F1C08FB))
+        assertTrue(!PkApiCore.addWideDerived(1, 0x1F1C08FB, intArrayOf()))
+        for (cart in listOf("diagnostic.gb", "diagnostic.gba")) {
+            assertTrue(PkApiCore.start("$dir/$cart", null))
+            val buffer = assertNotNull(PkApiCore.wideVideo())
+            assertTrue(!PkApiCore.configureWide(0))
+            PkApiCore.setWideView(-10, -10, Int.MAX_VALUE, Int.MAX_VALUE)
+            PkApiCore.setWideDraw(false)
+            repeat(3) {
+                PkApiCore.runFrame()
+                assertEquals(buffer, PkApiCore.wideVideo())
+                assertEquals(0, PkApiCore.wideWidth); assertEquals(0, PkApiCore.wideHeight)
+                assertTrue(!PkApiCore.wideSkipped); assertEquals(0, PkApiCore.wideFault)
+                assertNotNull(PkApiCore.video())
+            }
+            PkApiCore.setWideView(0, 0, 0, 0); PkApiCore.setWideDraw(true)
+            PkApiCore.stop()
+            assertNull(PkApiCore.wideVideo()); assertEquals(0, PkApiCore.wideWidth)
+            assertTrue(PkApiCore.wideWantsClose)
+            assertEquals(com.pokedaisy.app.WideCamera.SCENE_OFF, PkApiCore.wideScene)
+        }
+    }
+
+    @Test
     fun gameBoyRunsAndIsRead() {
         val save = "$dir/pk_api_ios.sav"
         unlink(save)
