@@ -23,6 +23,7 @@ import platform.UIKit.UIApplicationWillResignActiveNotification
 import platform.UIKit.UIViewController
 import platform.darwin.NSObject
 import platform.darwin.NSObjectProtocol
+import kotlinx.coroutines.*
 
 /** Up to 5 s of frames for a save the game is writing (pk_api_finish_save); top level, as a Kotlin subclass of an
  * Objective-C class can't have a companion with fields. */
@@ -45,6 +46,15 @@ class GameViewController(
 ) : UIViewController(nibName = null, bundle = null) {
     private val renderer = GameRenderer.create()
     private val queue = renderer?.device?.newCommandQueue()
+    private val effectsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var effectsJob: Job? = null
+    var pictureEffects = PictureEffects()
+        set(value) {
+            if (field == value) return
+            field = value
+            effectsJob?.cancel()
+            effectsJob = effectsScope.launch { renderer?.configureEffects(value) }
+        }
     private val audio = GameAudio()
     private val input = GameInput()
     val keyCapture get() = input.capture
@@ -262,6 +272,7 @@ class GameViewController(
 
     /** Writes the game's save and closes it; the controller then shows nothing. */
     fun close() {
+        effectsScope.cancel()
         observers.forEach { NSNotificationCenter.defaultCenter.removeObserver(it) }
         observers.clear()
         if (running) {
@@ -352,6 +363,7 @@ class GameViewController(
         val pass = view.currentRenderPassDescriptor ?: return
         val drawable = view.currentDrawable ?: return
         val buffer = queue?.commandBuffer() ?: return
+        view.drawableSize.useContents { renderer.prepare(buffer, width, height) }
         val encoder = buffer.renderCommandEncoderWithDescriptor(pass) ?: return
         view.drawableSize.useContents { renderer.encode(encoder, width, height) }
         encoder.endEncoding()

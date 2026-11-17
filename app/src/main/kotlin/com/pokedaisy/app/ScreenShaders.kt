@@ -12,7 +12,7 @@ import com.pokedaisy.app.companion.Smoothing
  * when `uTex` is SMOOTHING's upscaled picture rather than the GBA's pixels: the filters that read a
  * GBA pixel's centre (LCD PAPER, CRT) then read the smoothed picture where they are instead.
  */
-internal object ScreenShaders {
+object ScreenShaders {
 
     /** A screen effect ([ScreenFilter]): [prescale] draws it at a whole multiple of the GBA's
      * size and scales that smoothly onto the view (hard-edged grids and lines, which would come

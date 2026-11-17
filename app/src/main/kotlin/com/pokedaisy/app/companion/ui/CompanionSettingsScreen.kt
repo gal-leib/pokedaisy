@@ -258,7 +258,8 @@ fun CompanionSettingsScreen(
                             }
                         } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     }
-                    Page.SHADERS -> shaderRows(settings) { tick++ } + SettingRow(tk("CANCEL"), null) { page = Page.DISPLAY }
+                    Page.SHADERS -> shaderRows(settings) { tick++ }
+                        .let { rows -> settings.shownRows?.let { onlyRows(rows, it) } ?: rows } + SettingRow(tk("CANCEL"), null) { page = Page.DISPLAY }
                     Page.FIELD_HUD -> fieldHudRows(
                         settings.fieldHud, settings.fieldHudStyle,
                         setOn = { settings.setFieldHud(it); tick++ },
@@ -1181,7 +1182,7 @@ private fun displayRows(s: CompanionSettings, changed: () -> Unit, navigate: (Pa
             })
         },
         // FILTER (LCD / LCD PAPER / SCANLINES / CRT) and GBA COLORS, on their own page.
-        SettingRow(tk("SHADERS"), s.screenFilter.label, opensPage = true, subtitle = "LCD, CRT and scanline looks, smoothing") { navigate(Page.SHADERS) },
+        SettingRow(tk("SHADERS"), s.screenFilter.label, opensPage = true, labelBadge = s.shadersBadge, subtitle = "LCD, CRT and scanline looks, smoothing") { navigate(Page.SHADERS) },
         // A frame around the game: NONE, the built-in ones, the player's imports (added on the top screen). Live.
         s.overlayChoices.takeIf { it.isNotEmpty() }?.let { choices ->
             val current = choices.firstOrNull { it.first == s.overlay }?.second ?: choices.first().second

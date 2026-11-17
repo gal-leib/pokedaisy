@@ -119,6 +119,8 @@ The clock follows your device's 12 or 24 hour setting. Money shows for the games
 
 ## Shaders
 
+On iPhone and iPad, `DISPLAY OPTIONS` > `SHADERS` offers `FILTER`, `GRID`, `GBA COLORS` and `UNLIT SCREEN` for the game picture. Choices are remembered and combine with `ORIGINAL`, `STRETCH`, `EXPAND` and game borders. Smoothing and `ON COMPANION` remain Android features for now.
+
 `SHADERS` opens a page of effects for how the game is drawn. They stack: you can have smoothing, the GBA's colours, the unlit screen and a filter all at once.
 
 ![The SHADERS page with FILTER, GRID, SMOOTHING, GBA COLORS, UNLIT SCREEN and ON COMPANION rows](shots/settings-shaders.png)

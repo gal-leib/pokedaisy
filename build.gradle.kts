@@ -54,6 +54,7 @@ val sharedUiSources by extra(
         "com/pokedaisy/app/Prefs.kt",
         "com/pokedaisy/app/GameSaves.kt",
         "com/pokedaisy/app/BattleInputController.kt",
+        "com/pokedaisy/app/ScreenShaders.kt",
         "com/pokedaisy/app/overlay/OverlayGeometry.kt",
         "com/pokedaisy/app/overlay/Overlays.kt",
         "com/pokedaisy/app/overlay/OverlayLabels.kt",

@@ -63,6 +63,7 @@ internal class IosGameScreen(
         expandedSupported = game?.wideSupported == true
         game?.expanded = expanded
         game?.stretch = stretched
+        game?.pictureEffects = com.pokedaisy.app.companion.MetalScreenEffects.picture(prefs.screenFilter, prefs.gridStrength, prefs.gbaColors, prefs.unlitScreen)
         game?.camera?.let { it.lookAround = prefs.lookAround; it.zoomOnText = prefs.expandZoomOnText }
     }
     private val aspect = if (gameBoy) 160f / 144 else 1.5f
