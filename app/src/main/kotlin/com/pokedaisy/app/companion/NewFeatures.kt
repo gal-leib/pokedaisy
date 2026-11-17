@@ -27,6 +27,7 @@ object NewFeatures {
     const val IOS_CLASSIC_FLY = "ios_classic_fly"
     const val IOS_GB_FIELD_ACTIONS = "ios_gb_field_actions"
     const val IOS_GB_ENCOUNTERS = "ios_gb_encounters"
+    const val IOS_HEAL = "ios_heal"
     const val IOS_QUICK_MENU = "ios_quick_menu"
     /** Shared registered-item transactions; BIKE / ROD also available on iOS. */
     const val REGISTERED_ITEMS = "registered_items"
@@ -285,6 +286,7 @@ object NewFeatures {
         IOS_CLASSIC_FLY,
         IOS_GB_FIELD_ACTIONS,
         IOS_GB_ENCOUNTERS,
+        IOS_HEAL,
         IOS_QUICK_MENU,
         REGISTERED_ITEMS,
         IOS_FIELD_OPTIONS,
