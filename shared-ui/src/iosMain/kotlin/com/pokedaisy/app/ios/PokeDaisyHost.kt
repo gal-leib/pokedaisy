@@ -75,6 +75,7 @@ object PokeDaisyHost {
     private var screen: IosGameScreen? = null
     private var playback: com.pokedaisy.app.companion.GameRuntime? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
+    private var evolution: com.pokedaisy.app.companion.FieldTradeEvolution? = null
     private var flash: com.pokedaisy.app.companion.FieldFlashAction? = null
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
 
@@ -265,7 +266,8 @@ object PokeDaisyHost {
             onRestart = { if (game === g && prepareClose()) { restartFresh = true; onRestartRequested() } },
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
-            }, onEditTouch = { if (game === g) touch.edit() }, readTouchStage = { touch.readStage().takeIf { game === g } }, gameScreen = { screen.takeIf { game === g } }, playback = { currentRuntime })
+            }, onEditTouch = { if (game === g) touch.edit() }, readTouchStage = { touch.readStage().takeIf { game === g } }, gameScreen = { screen.takeIf { game === g } }, playback = { currentRuntime },
+            tradeSupported = { game === g && evolution?.supported() == true })
             .also { s ->
                 L10n.apply(s.appLanguage, code)
                 s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
@@ -351,7 +353,16 @@ object PokeDaisyHost {
             sharedItems, currentSession, { telemetry.snapshot.value }, telemetry::knownPartyReorderConfig,
             { p.fieldState }, { result -> result(); if (live()) sample() },
         )
-        items = object : com.pokedaisy.app.companion.ItemUse by partyActions {
+        val tradeSupport = com.pokedaisy.app.companion.FieldTradeSupport(PkApiCore::read)
+        val trades = com.pokedaisy.app.companion.FieldTradeEvolution(
+            partyActions, sharedItems,
+            { if (live()) tradeSupport.get(telemetry.snapshot.value, code, revision) else null },
+            { settings?.tradeEvolutions == true }, { p.onField },
+            { if (screen?.state?.side?.windowOpen == true) screen?.state?.hide() },
+        )
+        evolution = trades
+        items = object : com.pokedaisy.app.companion.ItemUse by trades {
+            override val evolveBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TRADE_EVOLUTION)
             override val partyBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PARTY_STORAGE)
             override val relearnBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_MOVE_SCREENS)
             override fun useBadge(itemId: Int) = relearnBadge.takeIf { sharedItems.canTeach(itemId) }
@@ -447,6 +458,7 @@ object PokeDaisyHost {
         items = null
         fly = null
         flash = null
+        evolution = null
         playback?.close()
         playback = null
         battle = null
