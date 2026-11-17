@@ -9,6 +9,7 @@ class GameBoyFieldActionsTest {
         val memory = mutableMapOf<Long, Byte>()
         val writes = mutableListOf<Long>()
         val deliveries = mutableListOf<() -> Unit>()
+        val rom = ByteArray(0x10000)
         var called = 0
         var handoffs = 0
         var battling = false
@@ -25,6 +26,8 @@ class GameBoyFieldActionsTest {
                 return true
             }
             override fun gbCallAt(at: Int, fn: Int, a: Int, b: Int, hl: Int): Boolean { called++; return true }
+            override fun rom(off: Long, len: Int): ByteArray? =
+                if (off >= 0 && off + len <= rom.size) rom.copyOfRange(off.toInt(), off.toInt() + len) else null
         }
         val session = GameSession(calls, { error("GB queried GBA call safety") }) { _, e -> throw e }
         val actions = GameBoyFieldActions(session, { field }, { battling }, { deliveries += it }, { handoffs++ })
@@ -36,6 +39,13 @@ class GameBoyFieldActionsTest {
             this[0xD172] = 19 // field move
             this[0xD70A] = 3 // visited towns
             this[0xC1F2] = 0x12 // companion sprite, restored if the warp is withdrawn
+        }
+        fun wildMap() {
+            this[0xD35D] = 12
+            val pointer = 0xCB95 + 2 * 12
+            rom[pointer] = 0; rom[pointer + 1] = 0x60 // bank 3:6000
+            rom[0xE000] = 25; rom[0xE015] = 7 // current map's grass / water rates
+            this[0xD886] = 25; this[0xD8A3] = 7
         }
     }
 
@@ -161,5 +171,66 @@ class GameBoyFieldActionsTest {
             val fields = runtime.bindGameBoyFields({ true }, { _, _ -> reads++; null }, { it() }, {})
             assertFalse(fields.available); assertEquals(0, reads)
         } finally { runtime.close(); activeGame = previousGame; romLanguage = previousLanguage; romGameCode = previousCode }
+    }
+
+    @Test fun offHoldsEachAdvancingFrameAndOnRestoresTheCurrentMapsRatesOnlyOnce() {
+        val h = Harness(); h.wildMap()
+        h.actions.keepEncounters(h.calls, off = true)
+        assertEquals(0, h[0xD886]); assertEquals(0, h[0xD8A3])
+        h[0xD886] = 25 // the game reloaded the map
+        h.actions.keepEncounters(h.calls, off = true); assertEquals(0, h[0xD886])
+        h.actions.keepEncounters(h.calls, off = false)
+        assertEquals(25, h[0xD886]); assertEquals(7, h[0xD8A3])
+        h.writes.clear(); h.actions.keepEncounters(h.calls, off = false)
+        assertTrue(h.writes.isEmpty())
+    }
+
+    @Test fun onWaitsForTheFreeFieldAndProtectsBattleAndTextMemory() {
+        val h = Harness(); h.wildMap()
+        h.actions.keepEncounters(h.calls, off = true)
+        h.actions.keepEncounters(h.calls, off = false, onField = false)
+        assertEquals(0, h[0xD886])
+        h[0xD056] = 1
+        h.actions.keepEncounters(h.calls, off = false); assertEquals(0, h[0xD886])
+        h[0xD886] = 99; h.writes.clear()
+        h.actions.keepEncounters(h.calls, off = true)
+        assertEquals(99, h[0xD886]); assertTrue(h.writes.isEmpty()) // battle's enemy-name bytes
+        h[0xD056] = 0; h[0xD886] = 0; h[0xCFC3] = 1 // font loaded: a text box
+        h.actions.keepEncounters(h.calls, off = false); assertEquals(0, h[0xD886])
+        h[0xCFC3] = 0; h.actions.keepEncounters(h.calls, off = false)
+        assertEquals(25, h[0xD886]); assertEquals(7, h[0xD8A3])
+    }
+
+    @Test fun loadingOrRewindingZeroRatesWhileOnRequiresAFreshRestoration() {
+        val h = Harness(); h.wildMap()
+        h.actions.keepEncounters(h.calls, off = false)
+        h[0xD886] = 0; h[0xD8A3] = 0 // an older state taken while OFF
+        h.actions.cancel()
+        h.actions.keepEncounters(h.calls, off = false)
+        assertEquals(25, h[0xD886]); assertEquals(7, h[0xD8A3])
+    }
+
+    @Test fun failedRestorationRetriesAndTheGamesOwnNonzeroRatesRemainItsOwn() {
+        val h = Harness(); h.wildMap(); h.actions.keepEncounters(h.calls, off = true)
+        // Temporarily unavailable ROM reads must not mark restoration complete.
+        val unavailable = object : GameCalls by h.calls {
+            override fun rom(off: Long, len: Int): ByteArray? = null
+        }
+        h.actions.keepEncounters(unavailable, off = false); assertEquals(0, h[0xD886])
+        h.actions.keepEncounters(h.calls, off = false); assertEquals(25, h[0xD886])
+        h.actions.cancel(); h[0xD886] = 9; h[0xD8A3] = 3; h.writes.clear()
+        h.actions.keepEncounters(h.calls, off = false)
+        assertEquals(9, h[0xD886]); assertEquals(3, h[0xD8A3]); assertTrue(h.writes.isEmpty())
+    }
+
+    @Test fun crystalHoldsItsCooldownAndUnsupportedOrClosedGamesStayUntouched() {
+        val h = Harness(); h.field = GbField.Crystal
+        h.actions.keepEncounters(h.calls, off = true); assertEquals(5, h[0x1D452])
+        h[0x1D452] = 2; h.actions.keepEncounters(h.calls, off = true); assertEquals(5, h[0x1D452])
+        h[0x1D452] = 10; h.actions.keepEncounters(h.calls, off = true); assertEquals(10, h[0x1D452])
+        h.writes.clear(); h.actions.keepEncounters(h.calls, off = false); assertTrue(h.writes.isEmpty())
+        h.field = null; h.actions.keepEncounters(h.calls, off = true); assertTrue(h.writes.isEmpty())
+        h.field = GbField.Crystal; h.actions.close(); h.actions.keepEncounters(h.calls, off = true)
+        assertTrue(h.writes.isEmpty())
     }
 }

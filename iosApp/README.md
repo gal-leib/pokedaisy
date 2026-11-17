@@ -170,7 +170,10 @@ Game Boy PC and classic FLY reuse `GameBoyFieldActions` on Android and iOS. The 
 existing `GbField` ROM signatures once per helper, queues work through `GameSession`, waits for the game's
 acceptance, and withdraws unaccepted scripts/warps. State operations and teardown retire pending deliveries before
 the core changes. Native hosts provide ROM reads, result dispatch and the companion-window handoff only. Supported
-GB/GBC families and language/revision checks remain those of `GbField.forGame`; GB wild-encounter options are separate.
+GB/GBC families and language/revision checks remain those of `GbField.forGame`. The shared encounter keeper also
+holds Gen 1's grass/water rates or Crystal's cooldown every advancing frame. ON retries restoration on a free field;
+state/rewind cleanup resets that tracking so a state's zero rates cannot outlive the current ON preference. Both
+hosts supply the same cached game-option value, without reading preference storage in the frame loop.
 
 BIKE and ROD in Quick Menu use the same `RegisteredItemUse` as Android. It owns the temporary SELECT registration,
 bounded retry and SoulGold wheel timing, and restores on completion or before state/rewind/close operations. The

@@ -30,8 +30,22 @@ class GameBoyFieldActions(
     private val closed = atomic(false)
     private class Pending(val field: GbField, val calls: GameCalls)
     private var pending: Pending? = null
+    private var encounterField: GbField? = null
+    private var encountersHeld: Boolean? = null
     val field get() = if (closed.value) null else support()
     val available get() = field != null
+
+    /** Once per advancing frame. Gen 1 restores the current map's ROM rates only on a free field;
+     * Crystal's helper holds its own encounter cooldown. Each helper protects the RAM it owns. */
+    fun keepEncounters(calls: GameCalls, off: Boolean, onField: Boolean = true) {
+        val fields = field
+        if (fields !== encounterField) { encounterField = fields; encountersHeld = null }
+        if (fields == null) return
+        runCatching {
+            if (off) { fields.holdWild(calls); encountersHeld = true }
+            else if (encountersHeld != false && onField && fields.releaseWild(calls)) encountersHeld = false
+        }.onFailure { Logs.w("Game Boy wild encounters failed", it) }
+    }
 
     private fun send(visit: Int, result: () -> Unit) = deliver {
         if (!closed.value && generation.value == visit) result()
@@ -93,6 +107,7 @@ class GameBoyFieldActions(
     /** Between frames, before replacing the core state. taken() withdraws a script/warp not yet accepted. */
     fun cancel() {
         generation.incrementAndGet()
+        encountersHeld = null // A loaded/rewound state can carry zero rates even while the preference is ON.
         val owner = pending
         pending = null
         if (owner != null) runCatching { owner.field.taken(owner.calls) }

@@ -279,9 +279,10 @@ Only random encounters change. Fishing, moves that lure wild Pokémon out and ba
 
 It works on the Game Boy Advance originals in every language and on almost every supported hack, including the ones rebuilt from newer source code like SoulGold, Lazarus and Recharged Yellow. On the Game Boy it works in Red, Blue, Yellow (in every language), Yellow Legacy, PureRed, PureBlue, Crystal and Crystal Legacy. On Emerald Rogue, Quetzal, Monomyth and the other Game Boy games it shows `N/A`.
 
-On iPhone and iPad, the toggle works where the GBA game's field and encounter switch are known. It can briefly show
+On iPhone and iPad, the toggle works in the same supported Game Boy and GBA games as Android. It can briefly show
 `N/A` while the game is checked. Your choice is remembered, including after resuming a saved state. Turning it back
-on restores random encounters when you return to the free field. Game Boy support is still to come on iOS.
+on restores random encounters when you return to the free field. Resuming or loading a state taken while encounters
+were off still restores the current map's normal rates if your choice is now `ON`. Unsupported games stay `N/A`.
 
 ## SHINY ODDS
 

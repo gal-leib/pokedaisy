@@ -1239,6 +1239,16 @@ open class CompanionScreenshotTest {
         yellow("red_battle_move2", "BATTLE", controls = true, cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     @Test fun redMap() = yellow("red", "MAP", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     @Test fun redSettings() = yellow("red", "SETTINGS", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
+    @Test fun redEncountersOn() = redEncounters(100)
+    @Test fun redEncountersOff() = redEncounters(0)
+    private fun redEncounters(rate: Int) = yellow("red", "SETTINGS",
+        cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED,
+        settingsRow = "WILD ENCOUNTERS", settings = object : com.pokedaisy.app.companion.CompanionSettings by SampleCompanion.Settings() {
+            override val wildEncountersSupported = true
+            override val wildEncounters = rate
+            override val fieldOptionsBadge = com.pokedaisy.app.companion.NewFeatures.NEW_TAG
+            override val shownRows = setOf("WILD ENCOUNTERS")
+        })
     @Test fun redDexEntry() = yellow("red", "DEX", dexEntry = 151, cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     // PureRed / PureBlue v2.7.6: the retail Red save, converted by the game (the purered / pureblue fixtures).
     private val pureRedRom = "Pokemon PureRed (v2.7.6).gb"
@@ -1413,6 +1423,8 @@ open class CompanionScreenshotTest {
         /** The save as if it stood on this map (wCurMap): the fixtures are all in a Pokémon Center. */
         onMap: Int? = null,
         itemUse: com.pokedaisy.app.companion.ItemUse? = null,
+        settings: com.pokedaisy.app.companion.CompanionSettings = SampleCompanion.Settings(),
+        settingsRow: String? = null,
     ) {
         activeGame = game
         romLanguage = cfg.language   // another test's ROM may have left Japanese names on
@@ -1473,9 +1485,10 @@ open class CompanionScreenshotTest {
         }
         snapshot {
             CompanionScreen(
-                v, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = tab, battleInput = input, initialSettingsPage = page,
+                v, SampleCompanion.Slots, settings, initialTab = tab, battleInput = input, initialSettingsPage = page,
                 initialMonIndex = monIndex,
                 itemUse = itemUse,
+                initialSettingsRow = settingsRow,
                 statusBar = if (!statusBar) null else ({ GameStatusBar("Pokémon Yellow", v.location.mapSecName, 3175, "12:34") }),
             )
         }

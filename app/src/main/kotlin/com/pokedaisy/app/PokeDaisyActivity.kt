@@ -2213,7 +2213,6 @@ class PokeDaisyActivity : Activity() {
         shinyTarget = null
         if (::engine.isInitialized) engine.setShinyTarget(null)
         syncShinyAchievements()
-        if (::engine.isInitialized) engine.gbField = null
         Prefs(this).let { p ->
             expandOfferUp.value = wideGame != WideScreen.OFF && !p.expandGameOfferSeen &&
                 p.gameAspect != com.pokedaisy.app.companion.GameAspect.WIDE
@@ -2345,7 +2344,7 @@ class PokeDaisyActivity : Activity() {
                     }
                 }
                 // WILD ENCOUNTERS on a Game Boy game is held by the engine, frame by frame.
-                if (snap.connected && romIsGameBoy) engine.gbField = gbField()
+                if (snap.connected && romIsGameBoy) gameBoyFields()
                 // party.isNotEmpty(), not just connected: `connected` flips true as
                 // soon as the native addresses are found, which can be
                 // well before the save's party has actually loaded into RAM (e.g.

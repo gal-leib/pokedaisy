@@ -50,29 +50,40 @@ class GameRuntime(
         private set
     var cheats: GameCheats? = null
         private set
-    var registeredItems: RegisteredItemUse? = null
-        private set
-    var gameBoyFields: GameBoyFieldActions? = null
-        private set
+    private val registeredItemOwner = atomic<RegisteredItemUse?>(null)
+    val registeredItems get() = registeredItemOwner.value
+    private val gameBoyFieldOwner = atomic<GameBoyFieldActions?>(null)
+    val gameBoyFields get() = gameBoyFieldOwner.value
     private val gameBoySupport = GameBoyFieldSupport()
 
     fun bindGameBoyFields(enabled: () -> Boolean, rom: (Long, Int) -> ByteArray?,
-                          deliver: (() -> Unit) -> Unit, handedOver: () -> Unit): GameBoyFieldActions =
-        gameBoyFields ?: GameBoyFieldActions(session,
+                          deliver: (() -> Unit) -> Unit, handedOver: () -> Unit): GameBoyFieldActions {
+        gameBoyFieldOwner.value?.let { return it }
+        val owner = GameBoyFieldActions(session,
             {
                 val snapshot = telemetry.snapshot.value
                 if (!closed.value && enabled() && snapshot.connected && snapshot.cachedTabs == null)
                     gameBoySupport.get(snapshot.game, rom) else null
             },
             { telemetry.snapshot.value.inBattle }, deliver, handedOver,
-        ).also { gameBoyFields = it; if (closed.value) it.close() }
+        )
+        if (!gameBoyFieldOwner.compareAndSet(null, owner)) { owner.close(); return gameBoyFieldOwner.value!! }
+        if (closed.value) owner.close()
+        return owner
+    }
 
     fun bindRegisteredItems(support: () -> FieldItemSupport?, press: (Int) -> Unit,
-                            rejected: () -> Unit): RegisteredItemUse = registeredItems ?: RegisteredItemUse(
-        session, support, { activeNativeConfig }, { telemetry.snapshot.value.game },
-        { telemetry.snapshot.value.inBattle }, { riding }, { fieldMovesReadable },
-        press, { if (!closed.value) rejected() },
-    ).also { registeredItems = it; if (closed.value) it.cancel() }
+                            rejected: () -> Unit): RegisteredItemUse {
+        registeredItemOwner.value?.let { return it }
+        val owner = RegisteredItemUse(
+            session, support, { activeNativeConfig }, { telemetry.snapshot.value.game },
+            { telemetry.snapshot.value.inBattle }, { riding }, { fieldMovesReadable },
+            press, { if (!closed.value) rejected() },
+        )
+        if (!registeredItemOwner.compareAndSet(null, owner)) { owner.cancel(); return registeredItemOwner.value!! }
+        if (closed.value) owner.cancel()
+        return owner
+    }
 
     /** Between frames, while the old state still exists: native save/load/rewind adapters share this cleanup. */
     fun cancelFieldActions() {

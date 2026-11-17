@@ -5,9 +5,37 @@ import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.game.GameSession
 import kotlin.test.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
+import kotlinx.atomicfu.atomic
 import okio.Path.Companion.toPath
 
 class GameRuntimeTest {
+    @Test fun samplerAndUiBindingsAlwaysReturnTheSameLoadedGameFieldOwners() = runBlocking {
+        repeat(20) {
+            withPlayback { runtime, _, _ ->
+                val owners = runBlocking {
+                    val ready = atomic(0); val go = atomic(false)
+                    val requests = List(16) { async(Dispatchers.Default) {
+                        ready.incrementAndGet()
+                        while (!go.value) yield()
+                        runtime.bindGameBoyFields({ false }, { _, _ -> null }, { it() }, {}) to
+                            runtime.bindRegisteredItems({ null }, {}, {})
+                    } }
+                    while (ready.value != requests.size) yield()
+                    go.value = true
+                    requests.awaitAll()
+                }
+                for ((gb, registered) in owners) {
+                    assertSame(runtime.gameBoyFields, gb)
+                    assertSame(runtime.registeredItems, registered)
+                }
+            }
+        }
+    }
+
     private fun withPlayback(patcher: RomOptionPatcher = object : RomOptionPatcher {
         override fun unpatch() {}
         override fun patch(expectAt: Long, expect: ByteArray, at: Long, value: ByteArray) = true

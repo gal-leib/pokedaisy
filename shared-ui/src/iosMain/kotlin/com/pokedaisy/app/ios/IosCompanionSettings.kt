@@ -101,8 +101,11 @@ internal class IosCompanionSettings(
     }
     override val autoRunBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
     override val runIndoorsSupported get() = fieldReadable && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode.orEmpty())
-    override val wildEncountersSupported get() = fieldReadable && options()?.wildFlagFound == true
-    override val fieldOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_OPTIONS)
+    override val wildEncountersSupported get() = fieldReadable && options()?.wildFlagFound == true ||
+        playback()?.gameBoyFields?.available == true
+    override val fieldOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
+        if (playback()?.gameBoyFields?.available == true) com.pokedaisy.app.companion.NewFeatures.IOS_GB_ENCOUNTERS
+        else com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_OPTIONS)
     override val hmFreeSupported get() = options()?.hmFreeSupported == true
     override val expShareSupported get() = options()?.expShareSupported == true
     override val levelCapSupported get() = options()?.levelCapSupported == true
@@ -212,6 +215,7 @@ internal class IosCompanionSettings(
         com.pokedaisy.app.companion.QuickAction.FF, com.pokedaisy.app.companion.QuickAction.COMPANION)
     override val quickMenuBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.REGISTERED_ITEMS)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS)
+        ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GB_ENCOUNTERS)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_QUICK_MENU)
     override val hotkeysBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_HOTKEYS)
     // Preserve the old triggers as L/R until the player opts in to emulator shortcuts.

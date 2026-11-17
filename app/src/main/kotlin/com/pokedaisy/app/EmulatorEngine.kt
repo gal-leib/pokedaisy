@@ -216,12 +216,6 @@ class EmulatorEngine(
         lookDirty = true
     }
 
-    /** A Game Boy game's PC / FLY / WILD ENCOUNTERS ([com.pokedaisy.app.companion.data.GbField], its code checked), or
-     * null. WILD ENCOUNTERS OFF holds the game's own encounter state every frame ([gbWildHeld]). */
-    @Volatile var gbField: com.pokedaisy.app.companion.data.GbField? = null
-    /** Whether [gbField]'s wild encounters were held last frame (null = not known yet: put back once on the field). */
-    private var gbWildHeld: Boolean? = null
-
     /** ZOOM and the look-around over WIDE: asked for the window to draw before each frame ([EmulatorView.camera]). */
     @Volatile var wideCamera: WideCamera? = null
 
@@ -833,7 +827,7 @@ class EmulatorEngine(
     }
 
     /** A Game Boy game's field, as its scene says (pk_wide_gb.c's screen match: no text box, menu or battle); a game
-     * with no scene (no EXPAND row: the European Yellows, Red / Blue) leaves it to [gbField]'s own RAM checks. */
+     * with no scene (no EXPAND row: the European Yellows, Red / Blue) leaves it to the shared Game Boy field helper's own RAM checks. */
     private val gbOnField get() = wideScene == WideCamera.SCENE_FIELD || wideScene == -1
 
     fun requestSaveState(slot: Int) { if (CoopGuards.battleActive()) return; pendingSave = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
@@ -1440,14 +1434,8 @@ class EmulatorEngine(
                     wildApplied = wildFlag
                     playback.resetFieldMoves()
                 }
-                // WILD ENCOUNTERS on a Game Boy game: held every frame while OFF, put back once on the field when ON.
-                gbField?.let { gf ->
-                    val hold = wildEncounters == 0
-                    runCatching {
-                        if (hold) { gf.holdWild(gameCalls); gbWildHeld = true }
-                        else if (gbWildHeld != false && gbOnField && gf.releaseWild(gameCalls)) gbWildHeld = false
-                    }.onFailure { Log.e("pokedaisy", "Game Boy wild encounters failed", it) }
-                } ?: run { gbWildHeld = null }
+                // The same GB hold/restore policy runs on iOS, only while frames advance.
+                if (!rewinding) playback.gameBoyFields?.keepEncounters(gameCalls, wildEncounters == 0, gbOnField)
                 // A DS game holds its own switch in its field read (pk_nds_field.cpp: the map's rates at 0).
                 val wildKeep = if (wildFlag != 0L || nds) wildEncounters else 100
                 if (nds) {
