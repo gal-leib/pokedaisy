@@ -320,6 +320,7 @@ object PokeDaisyHost {
             support = readSupport, session = currentSession,
             inBattle = { telemetry.snapshot.value.inBattle },
             centerMetadata = { if (live()) p.options.discovery.center else null },
+            handedOver = { if (screen?.state?.side?.windowOpen == true) screen?.state?.hide() },
             deliver = { result -> result(); if (live()) sample() },
         )
         val flashSupport = com.pokedaisy.app.companion.FieldFlashSupport(PkApiCore::read)
@@ -345,6 +346,7 @@ object PokeDaisyHost {
             }
         }
         items = object : com.pokedaisy.app.companion.ItemUse by sharedItems {
+            override val centerBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PARTY_SERVICES)
             override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
                 if (gbFields.available) com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS
                 else com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_ITEMS)

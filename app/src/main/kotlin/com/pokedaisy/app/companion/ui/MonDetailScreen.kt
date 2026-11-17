@@ -335,6 +335,7 @@ fun MonDetailScreen(
                 selected = "",
                 label = { it },
                 m = m,
+                badge = { option -> if (option == tk("NICKNAME") || option == tk("FORGET A MOVE")) itemUse.centerBadge else null },
                 onPick = { o ->
                     centerMenu = false
                     when (o) {

@@ -9,6 +9,7 @@ class FieldItemUse(
     private val session: () -> GameSession?,
     private val inBattle: () -> Boolean,
     private val centerMetadata: () -> PokemonCenter.Found? = { null },
+    private val handedOver: () -> Unit = {},
     private val deliver: (() -> Unit) -> Unit,
 ) : ItemUse {
     private val failed = ItemUseOutcome(ItemUseResult.FAILED)
@@ -22,16 +23,32 @@ class FieldItemUse(
     override fun canTake() = support()?.canTake == true
     override fun canPc() = support()?.canPc == true
     override fun center(): CenterSupport? {
-        if (centerMetadata() == null) return null
+        val center = centerMetadata() ?: return null
         val fields = support()?.fns ?: return null
         if (fields.pc == null || fields.party == null) return null
-        // Other services retain their own adapters until their screen/move-list flows are shared too.
-        return CenterSupport(heal = true, nickname = false, forget = false, relearn = false)
+        // Relearning also needs the verified TM/fade flow; its host adapter remains separate for now.
+        return CenterSupport(heal = true, nickname = center.nickname != null, forget = center.forget != null, relearn = false)
     }
 
     override fun centerHeal(done: (CenterResult) -> Unit) {
         val center = centerMetadata() ?: return done(CenterResult.FAILED)
         onGame(CenterResult.FAILED, done) { fields, calls, busy -> centerHeal(fields.fns, center, busy, calls) }
+    }
+
+    override fun centerNickname(slot: Int, personality: Long, done: (CenterResult) -> Unit) =
+        onCenter(done, screen = true) { fns, center, calls, busy -> centerNickname(fns, center, slot, personality, busy, calls) }
+
+    override fun centerForget(slot: Int, personality: Long, moveIndex: Int, move: Int, done: (CenterResult) -> Unit) =
+        onCenter(done) { fns, center, calls, busy -> centerForget(fns, center, slot, personality, moveIndex, move, busy, calls) }
+
+    /** Additional center flows share the same verified metadata, battle result and current-game screen handoff. */
+    fun onCenter(done: (CenterResult) -> Unit, screen: Boolean = false,
+                 work: (FieldItemFns, PokemonCenter.Found, GameCalls, Boolean) -> CenterResult) {
+        val center = centerMetadata() ?: return done(CenterResult.FAILED)
+        onGame(CenterResult.FAILED, { result ->
+            if (screen && result == CenterResult.OK) handedOver()
+            done(result)
+        }) { fields, calls, busy -> work(fields.fns, center, calls, busy) }
     }
 
     /** Extra game actions (Android's TM / box operations) use the same queued-work and result policy. */

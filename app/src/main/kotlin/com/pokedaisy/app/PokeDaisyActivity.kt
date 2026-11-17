@@ -532,6 +532,7 @@ class PokeDaisyActivity : Activity() {
         session = { if (::engine.isInitialized && engine.running) engine.gameSession else null },
         inBattle = { telemetry.snapshot.value.inBattle },
         centerMetadata = ::centerFound,
+        handedOver = ::closeCompanionWindow,
         deliver = { result -> runOnUiThread(result) },
     )
 
@@ -655,41 +656,14 @@ class PokeDaisyActivity : Activity() {
         }
 
         override fun center(): com.pokedaisy.app.companion.CenterSupport? {
-            val c = centerFound() ?: return null
-            val fns = fieldItemSupport()?.fns?.takeIf { it.pc != null && it.party != null } ?: return null
-            return com.pokedaisy.app.companion.CenterSupport(
-                heal = true, nickname = c.nickname != null, forget = c.forget != null,
-                relearn = c.relearn != null && tmFns() != null && fns.party != null,
-            )
+            val center = centerFound() ?: return null
+            return sharedItemUse.center()?.copy(relearn = center.relearn != null && tmFns() != null)
         }
-
-        private fun onCenter(
-            done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit, screen: Boolean = false,
-            work: (com.pokedaisy.app.companion.data.FieldItemFns, com.pokedaisy.app.companion.data.PokemonCenter.Found,
-                   com.pokedaisy.app.companion.data.GameCalls, Boolean) -> com.pokedaisy.app.companion.data.CenterResult,
-        ) {
-            val c = centerFound() ?: return done(com.pokedaisy.app.companion.data.CenterResult.FAILED)
-            val inBattle = telemetry.snapshot.value.inBattle
-            onGame(com.pokedaisy.app.companion.data.CenterResult.FAILED, { r ->
-                // A screen of the game's (naming, the Move Tutor's) is the game's to show: the window over it goes.
-                if (screen && r == com.pokedaisy.app.companion.data.CenterResult.OK) closeCompanionWindow()
-                done(if (inBattle && r == com.pokedaisy.app.companion.data.CenterResult.NOT_NOW) com.pokedaisy.app.companion.data.CenterResult.IN_BATTLE else r)
-            }) { s, calls, busy -> work(s.fns, c, calls, busy) }
-        }
-
-        override fun centerHeal(done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) =
-            sharedItemUse.centerHeal(done)
-
-        override fun centerNickname(slot: Int, personality: Long, done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) =
-            onCenter(done, screen = true) { fns, c, calls, busy -> com.pokedaisy.app.companion.data.centerNickname(fns, c, slot, personality, busy, calls) }
-
-        override fun centerForget(slot: Int, personality: Long, moveIndex: Int, move: Int, done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) =
-            onCenter(done) { fns, c, calls, busy -> com.pokedaisy.app.companion.data.centerForget(fns, c, slot, personality, moveIndex, move, busy, calls) }
 
         /** The Move Tutor's screen in two steps, like the TM screen's: the checks and the fade, then once it's black the screen. */
         override fun centerRelearn(slot: Int, personality: Long, done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) {
             val tm = tmFns() ?: return done(com.pokedaisy.app.companion.data.CenterResult.FAILED)
-            onCenter(done, screen = true) { fns, c, calls, busy ->
+            sharedItemUse.onCenter(done, screen = true) { fns, c, calls, busy ->
                 val r = com.pokedaisy.app.companion.data.centerRelearnStart(fns, c, tm, slot, personality, busy, calls)
                 if (r == com.pokedaisy.app.companion.data.CenterResult.OK) {
                     engine.requestFieldItemJob(false, com.pokedaisy.app.companion.data.TM_FADE_FRAMES) { g, leftField ->
