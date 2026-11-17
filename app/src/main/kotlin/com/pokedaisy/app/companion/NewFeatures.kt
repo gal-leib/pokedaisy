@@ -21,6 +21,7 @@ object NewFeatures {
     const val IOS_GAME_BINDINGS = "ios_game_bindings"
     const val IOS_GAME_HOTKEYS = "ios_game_hotkeys"
     const val IOS_REWIND = "ios_rewind"
+    const val IOS_TOUCH_SKINS = "ios_touch_skins"
     const val IOS_TOUCH_XY = "ios_touch_xy"
     const val IOS_CHEATS = "ios_cheats"
     const val IOS_FIELD_ITEMS = "ios_field_items"
@@ -288,6 +289,7 @@ object NewFeatures {
         IOS_GAME_HOTKEYS,
         IOS_REWIND,
         IOS_TOUCH_XY,
+        IOS_TOUCH_SKINS,
         IOS_CHEATS,
         IOS_FIELD_ITEMS,
         IOS_CLASSIC_FLY,

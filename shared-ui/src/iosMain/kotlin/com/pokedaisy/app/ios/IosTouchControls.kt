@@ -75,7 +75,7 @@ internal class IosTouchControls(
         // Changing ownership cancels existing fingers; only a new DOWN may play after a modal closes.
         key(inputEpoch) {
             TouchControls(IosTouchPreferences.drawingStyle.forButtons(IosTouchPreferences.buttons - (if (game()?.expanded == true) emptySet() else setOf(TouchButton.ZOOM))), portrait, input, Modifier.fillMaxSize(),
-                gameAspect = if (gameBoy) 160f / 144 else 1.5f, gameBoy = gameBoy, ffOn = settings()?.ffActive == true, onPlaced = { placed = it })
+                gameAspect = if (gameBoy) 160f / 144 else 1.5f, gameBoy = gameBoy, skin = IosTouchSkins.selected(gameBoy), ffOn = settings()?.ffActive == true, onPlaced = { placed = it })
         }
     }
 

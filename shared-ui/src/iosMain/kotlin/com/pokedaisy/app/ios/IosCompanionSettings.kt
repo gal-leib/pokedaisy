@@ -35,6 +35,7 @@ internal class IosCompanionSettings(
     private val readTouchStage: () -> com.pokedaisy.app.companion.TouchStage?,
     private val gameScreen: () -> IosGameScreen? = { null },
     private val playback: () -> com.pokedaisy.app.companion.GameRuntime? = { null },
+    private val presentFrom: () -> platform.UIKit.UIViewController? = { game?.view?.window?.rootViewController },
     private val tradeSupported: () -> Boolean = { false },
     private val stored: com.pokedaisy.app.companion.PrefsCompanionSettings =
         com.pokedaisy.app.companion.PrefsCompanionSettings(iosPreferences,
@@ -119,13 +120,29 @@ internal class IosCompanionSettings(
     override val tradeEvolutionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TRADE_EVOLUTION)
     override val gameOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_OPTIONS)
 
-    override val touchRevision get() = IosTouchPreferences.revision
+    override val touchRevision get() = IosTouchPreferences.revision + IosTouchSkins.revision
     override val touchStyle get() = IosTouchPreferences.style
     override fun setTouchStyle(style: TouchControlsStyle) { IosTouchPreferences.style = style }
     override val touchButtons get() = IosTouchPreferences.buttons
-    override val touchSkinsSupported = false
+    override val touchSkins get() = IosTouchSkins.store.list()
+    override val touchSkinsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TOUCH_SKINS)
+    override val importTouchSkin: (((Pair<String, String>) -> Unit) -> Unit) get() = { done ->
+        presentFrom()?.let { from ->
+            IosTouchSkins.pick(from, before = {
+                actions?.cancelTouch()
+                game?.let { it.uiPaused = true; it.pause() }
+            }, done = { notice ->
+                game?.takeIf { it.isRunning }?.let {
+                    it.uiPaused = false
+                    if (platform.UIKit.UIApplication.sharedApplication.applicationState == platform.UIKit.UIApplicationState.UIApplicationStateActive) it.resume()
+                }
+                notice?.let(done)
+            })
+        }
+    }
+    override fun deleteTouchSkin(skin: com.pokedaisy.app.companion.InstalledSkin) = IosTouchSkins.delete(skin.id)
     override val touchXyBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TOUCH_XY)
-    override val touchBadge get() = touchXyBadge ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
+    override val touchBadge get() = touchSkinsBadge ?: touchXyBadge ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IPAD_TOUCH)
     override val companionViewBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SCREEN)
     override val companionWindow get() = gameScreen()?.takeUnless { it.portrait }?.window

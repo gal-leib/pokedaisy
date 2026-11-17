@@ -127,7 +127,7 @@ fun CompanionSettingsScreen(
     var selector by remember { mutableStateOf<Selector?>(null) }
     // TOUCH CONTROLS > SKINS: the imported skins (read on the way in) and their pick-list.
     val touchSkinUi = remember { TouchSkinUi() }
-    val touchSkins = remember(settings, page) { if (page == Page.TOUCH) settings?.touchSkins.orEmpty() else emptyList() }
+    val touchSkins = remember(settings, page, settings?.touchRevision) { if (page == Page.TOUCH) settings?.touchSkins.orEmpty() else emptyList() }
 
     // The games' own spelling: "POKéMON", not "POKÉMON".
     val gameName = settings?.gameName?.uppercase()?.replace('É', 'é') ?: ""
@@ -274,6 +274,8 @@ fun CompanionSettingsScreen(
                         underGame = settings.uprightUnderGame, setUnderGame = { settings.setPortraitUnderGame(it); tick++ },
                         expand = settings.gameAspect == GameAspect.WIDE && settings.wideSupported, touchShown = settings.touchControlsShown,
                         skins = touchSkins, skinUi = touchSkinUi.takeIf { settings.touchSkinsSupported },
+                        onImportSkin = settings.importTouchSkin?.let { startImport -> { startImport { touchSkinUi.notice = it } } },
+                        skinBadge = settings.touchSkinsBadge,
                         skinSystem = settings.touchStage?.let { if (it.ds) SkinSystem.DS else if (it.gameBoy) SkinSystem.GB else SkinSystem.GBA } ?: SkinSystem.GBA,
                         feel = settings::feelVibration,
                         buttons = settings.touchButtons, xyBadge = settings.touchXyBadge,
@@ -339,6 +341,7 @@ fun CompanionSettingsScreen(
                         expand = settings.gameAspect == GameAspect.WIDE && settings.wideSupported, touchShown = settings.touchControlsShown,
                         skins = touchSkins, skinUi = touchSkinUi.takeIf { settings.touchSkinsSupported }, setStyle = { settings.setTouchStyle(it); tick++ },
                         otherStage = settings.touchStageInOtherOrientation,
+                        onDeleteSkin = settings::deleteTouchSkin,
                     ) { mod ->
                         OptionListWindow(m, mod) {
                             GroupedRows(rows, m, cursor, onClick = { i -> moveCursor(i); rows[i].onClick() }, onFocused = ::moveCursor)

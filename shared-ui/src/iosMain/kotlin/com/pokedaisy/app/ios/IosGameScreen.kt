@@ -144,11 +144,12 @@ internal class IosGameScreen(
             val strip = if (visible && IosTouchPreferences.underGame)
                 TouchGeometry.naturalHeight(IosTouchPreferences.style, constraints.maxWidth.toFloat(), density, gameBoy) else 0
             SideEffect {
+                game?.stretch = stretched || skinViewport(constraints.maxWidth, constraints.maxHeight, upright) != null
                 state.setSide(state.side.withEnabled(!upright))
                 state.setPortrait(state.portrait.copy(enabled = upright, underGame = IosTouchPreferences.underGame, padStrip = strip, expand = expanded))
             }
             GameScreen(state, gameHeight = { (it / aspect).roundToInt() },
-                game = { GamePicture(aspect, upright, Modifier.fillMaxSize(), fill = expanded || stretched, content = gameContent) },
+                game = { GamePicture(aspect, upright, Modifier.fillMaxSize(), fill = expanded || stretched, viewport = { w, h -> skinViewport(w, h, upright) }, content = gameContent) },
                 controls = { if (visible) touch.Controls(gameBoy, upright) },
                 gameOverlay = { CompositionLocalProvider(LocalCompanionBack provides overlayBack, LocalCompanionKeys provides overlayKeys,
                     LocalTextInputFocus provides textInputFocus, content = gameOverlay) },
@@ -197,7 +198,8 @@ internal class IosGameScreen(
 
     private fun stage(f: GameScreenFrames, visible: Boolean, w: Int = state.width, h: Int = state.height,
                       upright: Boolean = state.portrait.enabled): TouchStage {
-        val picture = fittedGamePicture(f.game.width, f.game.height, aspect, upright, fill = expanded || stretched).translate(f.game.left, f.game.top)
+        val picture = (skinViewport(f.game.width.toInt(), f.game.height.toInt(), upright, f.controls.width)
+            ?: fittedGamePicture(f.game.width, f.game.height, aspect, upright, fill = expanded || stretched)).translate(f.game.left, f.game.top)
         val area = if (visible) f.controls else Rect(0f, h.toFloat(), w.toFloat(), h.toFloat())
         val companion = f.companion.takeIf { f.companionShown && (upright || !state.side.isWindow) }
         return TouchStage(w.toFloat(), h.toFloat(), density, upright, picture, area, companion, aspect, gameBoy)
@@ -207,8 +209,19 @@ internal class IosGameScreen(
         stage(f, IosTouchPreferences.visible).game.translate(-f.game.left, -f.game.top)
     }
 
+    private fun skinViewport(w: Int, h: Int, upright: Boolean, controlsWidth: Float? = null): Rect? {
+        if (upright || !IosTouchPreferences.visible) return null
+        val skin = IosTouchSkins.selected(gameBoy) ?: return null
+        val side = state.side.arrange(state.width)
+        val controlsW = controlsWidth ?: (w + side.gameRightMargin - side.controlsRightMargin).toFloat()
+        return skinFit(skin, controlsW, h.toFloat(), portrait = false)?.game
+    }
+
     fun coreFrame(): Rect? = frames?.let { f ->
-        fittedGamePicture(f.game.width, f.game.height, aspect, state.portrait.enabled && !expanded, fill = stretched)
+        val skin = skinViewport(f.game.width.toInt(), f.game.height.toInt(), state.portrait.enabled, f.controls.width)
+        if (skin != null && !expanded) skin else if (skin != null)
+            fittedGamePicture(skin.width, skin.height, aspect).translate(skin.left, skin.top)
+        else fittedGamePicture(f.game.width, f.game.height, aspect, state.portrait.enabled && !expanded, fill = stretched)
     }
 
     fun hudClear(): Pair<Int, Int> {
