@@ -34,6 +34,7 @@ val sharedCoreSources by extra(
         "com/pokedaisy/app/GbaInput.kt",
         "com/pokedaisy/app/Hotkeys.kt",
         "com/pokedaisy/app/ScriptInput.kt",
+        "com/pokedaisy/app/WideCamera.kt",
         "com/pokedaisy/app/companion/KeyCapture.kt",
     ),
 )
