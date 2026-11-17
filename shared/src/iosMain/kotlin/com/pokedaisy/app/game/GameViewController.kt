@@ -46,6 +46,7 @@ class GameViewController(
 ) : UIViewController(nibName = null, bundle = null) {
     private val renderer = GameRenderer.create()
     private val queue = renderer?.device?.newCommandQueue()
+    var onGamePixel: ((Float) -> Unit)? = null
     private val effectsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var effectsJob: Job? = null
     var pictureEffects = PictureEffects()
@@ -282,6 +283,7 @@ class GameViewController(
             PkApiCore.finishSave(FINISH_SAVE_FRAMES)
             PkApiCore.stop()
         }
+        onGamePixel = null
         onPictureChanged = {}
         onHotkey = {}
         beforeRewind = {}
@@ -363,7 +365,10 @@ class GameViewController(
         val pass = view.currentRenderPassDescriptor ?: return
         val drawable = view.currentDrawable ?: return
         val buffer = queue?.commandBuffer() ?: return
-        view.drawableSize.useContents { renderer.prepare(buffer, width, height) }
+        view.drawableSize.useContents {
+            renderer.prepare(buffer, width, height)
+            onGamePixel?.invoke(renderer.gamePixelHeight(width, height))
+        }
         val encoder = buffer.renderCommandEncoderWithDescriptor(pass) ?: return
         view.drawableSize.useContents { renderer.encode(encoder, width, height) }
         encoder.endEncoding()

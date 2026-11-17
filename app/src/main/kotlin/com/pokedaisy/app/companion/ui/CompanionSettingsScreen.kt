@@ -1299,7 +1299,7 @@ private fun shaderRows(s: CompanionSettings, changed: () -> Unit): List<SettingR
             s.setUnlitScreen(!s.unlitScreen); changed()
         },
         // FILTER and GBA COLORS over this screen too (and the status bar).
-        SettingRow(tk("ON COMPANION"), if (s.companionShaders) tk("ON") else tk("OFF")) { s.setCompanionShaders(!s.companionShaders); changed() },
+        SettingRow(tk("ON COMPANION"), if (s.companionShaders) tk("ON") else tk("OFF"), labelBadge = s.companionShadersBadge) { s.setCompanionShaders(!s.companionShaders); changed() },
     )
 }
 

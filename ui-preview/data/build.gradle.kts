@@ -22,7 +22,7 @@ val desktopTarget = System.getProperty("os.name").lowercase().let { os ->
 
 val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appSrc = fileTree(app) {
-    listOf("companion/data/**", "companion/*.kt", "companion/i18n/**", "companion/coop/**", "FeatureFlags.kt", "MgbaCore.kt", "Prefs.kt", "PrefsAndroid.kt", "cheats/Cheats.kt", "GbaControls.kt", "Hotkeys.kt", "GbaInput.kt", "ScriptInput.kt", "BattleInputController.kt", "InputBadges.kt", "GameVolume.kt", "ScreenShaders.kt", "overlay/Overlays.kt", "overlay/OverlayGeometry.kt", "overlay/OverlayLabels.kt")
+    listOf("companion/data/**", "companion/*.kt", "companion/i18n/**", "companion/coop/**", "FeatureFlags.kt", "MgbaCore.kt", "Prefs.kt", "PrefsAndroid.kt", "cheats/Cheats.kt", "GbaControls.kt", "Hotkeys.kt", "GbaInput.kt", "ScriptInput.kt", "BattleInputController.kt", "InputBadges.kt", "GameVolume.kt", "ScreenShaders.kt", "CompanionShaders.kt", "overlay/Overlays.kt", "overlay/OverlayGeometry.kt", "overlay/OverlayLabels.kt")
         .forEach { include(it) }
     exclude("**/*.java")   // compiled by javac below (companion/coop/x25519)
 }
