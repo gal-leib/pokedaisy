@@ -483,12 +483,6 @@ class EmulatorEngine(
     @Volatile var dsBattleMenuFloats = false
     private var touchFrames = 0
 
-    /**
-     * DAY AND NIGHT ([com.pokedaisy.app.companion.data.DayNight]): the tint the activity wants on the field now (red,
-     * green, blue, 256 = as is; [DayNight.NONE] off, indoors, or a game that isn't a GBA one). The engine eases toward it
-     * on the field's screen (text boxes and the START menu too: their palettes aren't tinted) and back out of it for
-     * battles and menu screens, a few frames either way, and hands each step to the core ([MgbaCore.pkSetTint]).
-     */
     /** FOLLOWER ([com.pokedaisy.app.companion.data.MonArt]): the party lead's sprite to walk behind the player (null =
      * none: the row off, no sprite kept). Shown on the field's own screen, not surfing; set by the activity. */
     @Volatile var follower: com.pokedaisy.app.companion.data.MonArt.Mon? = null
@@ -499,9 +493,6 @@ class EmulatorEngine(
     @Volatile private var lookRefreshPending = false
     private var lookRefreshTries = 0
 
-    @Volatile var dayNightTint: IntArray = com.pokedaisy.app.companion.data.DayNight.NONE
-    private val tintNow = floatArrayOf(256f, 256f, 256f)
-    private val tintSent = intArrayOf(256, 256, 256)
     /** The last frame's EXPAND scene ([WideCamera.SCENE_FIELD] ...), -1 without EXPAND. Emu thread. */
     private var wideScene = -1
 
@@ -615,22 +606,6 @@ class EmulatorEngine(
      * the next frame - null = no frame this tick - and told after each one. Null = no co-op battles (not retail Emerald, no link).
      */
     @Volatile var coopBattles: CoopFrameHook? = null
-
-    /** DAY AND NIGHT, once a frame (emu thread): [tintNow] a step toward [dayNightTint] on the field, toward none off it. */
-    private fun stepTint(field: Boolean) {
-        val want = if (field) dayNightTint else com.pokedaisy.app.companion.data.DayNight.NONE
-        var changed = false
-        for (c in 0..2) {
-            val d = want[c] - tintNow[c]
-            tintNow[c] = if (kotlin.math.abs(d) < TINT_STEP) want[c].toFloat() else tintNow[c] + kotlin.math.sign(d) * TINT_STEP
-            val v = tintNow[c].toInt()
-            if (v != tintSent[c]) { tintSent[c] = v; changed = true }
-        }
-        // While tinted, sent again every second too: a core started since (another game, a restart) has its own
-        // renderer, which the native side hooks when it's told.
-        if (changed || (++tintFrames % 60 == 0 && tintSent.any { it != 256 })) MgbaCore.pkSetTint(tintSent[0], tintSent[1], tintSent[2])
-    }
-    private var tintFrames = 0
 
     private fun logField(speed: Float) {
         if (!BuildConfig.DEBUG) return
@@ -808,7 +783,8 @@ class EmulatorEngine(
 
     val playback by lazy {
         com.pokedaisy.app.companion.GameRuntime(gameSession, telemetry, preferences, battle, optionPatcher, { gba || nds },
-            configureField = { fieldGame != WideScreen.OFF }, restoreOptionPatchesOnClose = false)
+            configureField = { fieldGame != WideScreen.OFF }, restoreOptionPatchesOnClose = false,
+            applyTint = MgbaCore::pkSetTint)
     }
 
     /** Runs [job] on the emu thread before the next frame; dropped if the game closes first. */
@@ -991,8 +967,7 @@ class EmulatorEngine(
         followerSent = null
         followerShown = false
         battleMenuHideSent = -1
-        tintNow.fill(256f)
-        tintSent.fill(256)
+        playback.resetTint()
         endDsHold()
         onCoreReady?.invoke(vw, vh)
 
@@ -1480,8 +1455,7 @@ class EmulatorEngine(
                 if (gba) coopPresence?.onFrame(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
                     battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
                 if (gba) stepBattleMenuHide()
-                if (gba) stepTint(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
-                    battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
+                playback.stepTint()
                 logField(effectiveSpeed())
                 val speed = effectiveSpeed()
                 // FF the player still has on - SMART only holding it at 1x for a menu.
@@ -2129,7 +2103,6 @@ class EmulatorEngine(
 
     internal companion object {
         /** DAY AND NIGHT's ease: per frame, of 256 (a full night's dimming in about half a second). */
-        const val TINT_STEP = 4f
 
         /** PLAYER LOOK's refresh: field frames it's tried again while the palette can't go in yet. */
         const val LOOK_REFRESH_TRIES = 600

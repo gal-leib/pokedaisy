@@ -156,6 +156,8 @@ It works in FireRed, LeafGreen, Ruby, Sapphire and Emerald (both of Emerald's bi
 The vehicles are drawn by PokeDaisy over the game, so your game and your save don't change. The row shows in the games that have `TAKE OFF`, it starts on `BIRD`, and your pick is the same in every game. Changing it in the air swaps your ride at once. The game's own flying animation (`FLY STYLE` set to `CLASSIC`) keeps its bird.
 ### DAY AND NIGHT
 
+On iPhone and iPad, `DAY AND NIGHT` is also in the shared `SETTINGS` under `MAKEOVER`, with the same clock and game support as Android.
+
 With `DAY AND NIGHT` on, the map follows your device's clock: a soft pink at dawn, the game's own colours by day, an orange glow at dusk and a deep blue at night. Only the outdoors changes, and only while you walk around: text boxes and menus keep their colours, buildings stay lit, and battles look as they always do. It eases in and out as you go between them.
 
 It works in every GBA game except those that already change with the time of day themselves (Unbound, Heart and Soul, Elite Redux). It's off to start with. Your game and your save don't change: only the picture does.

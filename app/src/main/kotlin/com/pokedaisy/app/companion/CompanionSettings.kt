@@ -148,6 +148,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val followerReady: Boolean get() = false
     /** DAY AND NIGHT ([com.pokedaisy.app.companion.data.DayNight]): the overworld tinted by the clock. */
     val dayNightSupported: Boolean get() = false
+    val dayNightBadge: String? get() = NewFeatures.badge(NewFeatures.DAY_NIGHT)
     /** TEXT LOOK: the other games' text looks kept ([textLooks], "FIRERED" / "EMERALD"), the one on ([textLook], null =
      * the game's own). */
     val textLooks: List<String> get() = emptyList()

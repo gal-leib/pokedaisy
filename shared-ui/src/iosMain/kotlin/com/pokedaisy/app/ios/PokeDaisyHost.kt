@@ -281,7 +281,8 @@ object PokeDaisyHost {
         var fieldTablesCrc = 0L
         playback = com.pokedaisy.app.companion.GameRuntime(
             com.pokedaisy.app.game.GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> com.pokedaisy.app.companion.data.Logs.i("$where: $error") },
-            telemetry, iosPreferences, battle!!, PkApiCore, { code != null }, { PkApiCore.configureField(fieldTablesCrc) }, { PkApiCore.configureField(0) }).also { p ->
+            telemetry, iosPreferences, battle!!, PkApiCore, { code != null }, { PkApiCore.configureField(fieldTablesCrc) }, { PkApiCore.configureField(0) },
+            applyTint = PkApiCore::setTint).also { p ->
             currentRuntime = p
             val currentSettings = settings!!
             currentSettings.playbackChanged = { p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld) }

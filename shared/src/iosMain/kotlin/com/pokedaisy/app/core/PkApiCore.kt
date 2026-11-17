@@ -23,6 +23,7 @@ import com.pokedaisy.app.core.pkapi.pk_api_field_step
 import com.pokedaisy.app.core.pkapi.pk_api_field_configure
 import com.pokedaisy.app.core.pkapi.pk_api_field_knows
 import com.pokedaisy.app.core.pkapi.pk_api_field_state
+import com.pokedaisy.app.core.pkapi.pk_api_set_tint
 import com.pokedaisy.app.core.pkapi.pk_api_audio
 import com.pokedaisy.app.core.pkapi.pk_api_deinit
 import com.pokedaisy.app.core.pkapi.pk_api_finish_save
@@ -182,6 +183,7 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls {
     fun fieldKnows(crc: Long): Boolean = crc in 0L..0xFFFFFFFFL && pk_api_field_knows(crc.toUInt())
     fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
     fun fieldState(): Int = pk_api_field_state()
+    fun setTint(red: Int, green: Int, blue: Int) = pk_api_set_tint(red, green, blue)
     fun configureWild(addr: Long, wasOff: Boolean): Boolean =
         addr in 0L..0xFFFFFFFFL && pk_api_field_wild(addr.toUInt(), wasOff)
     fun stepField(runIndoors: Boolean, wildKeep: Int): Int = pk_api_field_step(runIndoors, wildKeep)

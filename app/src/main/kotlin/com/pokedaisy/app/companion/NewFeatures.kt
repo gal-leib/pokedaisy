@@ -25,6 +25,7 @@ object NewFeatures {
     const val IOS_SCREEN_BORDERS = "ios_screen_borders"
     const val IOS_OVERLAY_IMPORTS = "ios_overlay_imports"
     const val IOS_SCALEFX_SMOOTHING = "ios_scalefx_smoothing"
+    const val IOS_DAY_NIGHT = "ios_day_night"
     const val IOS_XBR_SMOOTHING = "ios_xbr_smoothing"
     const val IOS_GAME_SMOOTHING = "ios_game_smoothing"
     const val IOS_COMPANION_EFFECTS = "ios_companion_effects"
@@ -267,7 +268,7 @@ object NewFeatures {
         IOS_TOUCH_SKINS,
         IOS_SCREEN_BORDERS,
         IOS_OVERLAY_IMPORTS,
-        IOS_SCREEN_EFFECTS, IOS_COMPANION_EFFECTS, IOS_GAME_SMOOTHING, IOS_XBR_SMOOTHING, IOS_SCALEFX_SMOOTHING,
+        IOS_SCREEN_EFFECTS, IOS_COMPANION_EFFECTS, IOS_GAME_SMOOTHING, IOS_XBR_SMOOTHING, IOS_SCALEFX_SMOOTHING, IOS_DAY_NIGHT,
         IOS_CHEATS,
         IOS_FIELD_ITEMS,
         IOS_CLASSIC_FLY,

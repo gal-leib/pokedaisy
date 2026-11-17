@@ -640,7 +640,7 @@ private fun homeRows(
         } else null,
         // The overworld by the device's clock (DayNight.kt): every GBA game but those with their own.
         if (s.dayNightSupported) {
-            SettingRow(tk("DAY AND NIGHT"), onOff(s.dayNight), labelBadge = NewFeatures.badge(NewFeatures.DAY_NIGHT)) {
+            SettingRow(tk("DAY AND NIGHT"), onOff(s.dayNight), labelBadge = s.dayNightBadge) {
                 s.setDayNight(!s.dayNight); changed()
             }
         } else null,

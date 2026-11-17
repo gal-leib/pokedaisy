@@ -1949,6 +1949,9 @@ fun main(args: Array<String>) {
                 blocked = com.pokedaisy.app.companion.data.BlockedGames.GHOST_GREY)
         }),
         Shot("$g-settings", bw, bh, bd, companion("SETTINGS")),
+        Shot("$g-settings-day-night", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("DAY AND NIGHT").performScrollTo()
+        },
         // MORE (left of the gear): the tabs off the bar as app icons, the TAB BAR link under them.
         Shot("$g-more", bw, bh, bd, companion("MORE")),
         // NUZLOCKE is under MORE in every game the tracker follows; off, the tab says so and offers TURN ON.

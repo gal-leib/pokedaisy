@@ -1145,8 +1145,7 @@ class PokeDaisyActivity : Activity() {
         engine.battleMenuHide = if (on) 1 else 0
     }
 
-    private fun dayNightSupported() = !romIsGameBoy && !romIsNds && romBlocked == null && ::engine.isInitialized &&
-        com.pokedaisy.app.companion.data.activeGame !in com.pokedaisy.app.companion.data.DayNight.OWN_DAY_NIGHT
+    private fun dayNightSupported() = ::engine.isInitialized && engine.playback.dayNightSupported
     /** The game running is a DS cart (melonDS): two screens, touch, X / Y ([loadRom]). */
     @Volatile private var romIsNds = false
     /** The game running is a 3DS cart (Azahar, [n3ds]): no EmulatorEngine game (the engine stays idle), DS LAYOUT for
@@ -1731,17 +1730,11 @@ class PokeDaisyActivity : Activity() {
                 applyFollower()
             }
         }
-        // DAY AND NIGHT: the tint the engine eases to on the field - the clock's, outdoors, while the row is on.
+        // HIDE BATTLE MENU follows the game being detected, the companion and the second screen.
         lookGender.launch {
             while (true) {
                 // HIDE BATTLE MENU follows the game being detected, the companion closed / reopened, a second screen.
                 syncBattleMenuHide()
-                if (::engine.isInitialized) {
-                    val snap = telemetry.snapshot.value
-                    engine.dayNightTint = if (Prefs(this@PokeDaisyActivity).dayNight && dayNightSupported() &&
-                        com.pokedaisy.app.companion.data.DayNight.outdoors(snap.mapType)
-                    ) com.pokedaisy.app.companion.data.DayNight.now() else com.pokedaisy.app.companion.data.DayNight.NONE
-                }
                 kotlinx.coroutines.delay(500)
             }
         }
