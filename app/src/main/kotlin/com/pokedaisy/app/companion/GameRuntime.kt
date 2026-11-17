@@ -50,6 +50,15 @@ class GameRuntime(
         private set
     var cheats: GameCheats? = null
         private set
+    var registeredItems: RegisteredItemUse? = null
+        private set
+
+    fun bindRegisteredItems(support: () -> FieldItemSupport?, press: (Int) -> Unit,
+                            rejected: () -> Unit): RegisteredItemUse = registeredItems ?: RegisteredItemUse(
+        session, support, { activeNativeConfig }, { telemetry.snapshot.value.game },
+        { telemetry.snapshot.value.inBattle }, { riding }, { fieldMovesReadable },
+        press, { if (!closed.value) rejected() },
+    ).also { registeredItems = it; if (closed.value) it.cancel() }
 
     fun bindActions(settings: CompanionSettings, slots: StateSlots, selectSlot: (Int) -> Unit,
                     hold: (Hotkeys.Action, Boolean) -> Unit, companion: () -> Unit): GameActions =
@@ -96,6 +105,7 @@ class GameRuntime(
     private val map get() = session.mapOpen
     private var field = 0
     val fieldState get() = field
+    val riding get() = field and (GameField.AVATAR or GameField.BIKE) == (GameField.AVATAR or GameField.BIKE)
     var settledOnField by mutableStateOf(false)
         private set
     val onField get() = gba && !blocked && FfMenuWatch.onField
@@ -202,6 +212,7 @@ class GameRuntime(
             }
         }
         release(::quiesce)
+        release { registeredItems?.cancel() }
         battle.changed = {}
         release { actions?.close() }
         release { cheats?.close() }

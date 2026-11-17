@@ -87,6 +87,9 @@ class GameInput internal constructor(
         buttons.input.setControls(loadControls())
     }
 
+    /** Registered field items use a separate synthetic press channel from battle automation. */
+    fun setPress(bits: Int) = buttons.input.setPress(bits)
+
     fun controllerKeys(): Int = controllerKeys(hardware())
     private fun controllerKeys(h: Hardware): Int = h.controllers.fold(h.axes) { bits, code ->
         bits or (buttons.input.buttonFor(code) ?: 0)

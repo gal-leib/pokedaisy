@@ -166,6 +166,11 @@ field observation does not change encounter ownership or its RNG. Unknown tables
 
 ## Field HUD
 
+BIKE and ROD in Quick Menu use the same `RegisteredItemUse` as Android. It owns the temporary SELECT registration,
+bounded retry and SoulGold wheel timing, and restores on completion or before state/rewind/close operations. The
+iOS adapter only forwards its separate synthetic press channel to the existing shared `GbaInput`. Availability
+retains Android's recognized GBA layouts and field-code checks; GB/GBC games do not gain unsupported entries.
+
 Landscape GBA games reuse the shared `FieldHud` over the native picture. `GameRuntime` publishes the settled
 `GameSession` field signal; Android and iOS use the same visibility rule and persisted HUD settings. Shared
 control placements reserve room around custom touch layouts. HUD windows reuse the companion's existing field

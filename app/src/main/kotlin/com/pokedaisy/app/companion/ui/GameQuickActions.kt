@@ -5,6 +5,8 @@ import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.FlyAction
 import com.pokedaisy.app.companion.ItemUse
+import com.pokedaisy.app.companion.RegisteredItemUse
+import com.pokedaisy.app.companion.data.KeyItems
 import com.pokedaisy.app.companion.QuickAction
 import com.pokedaisy.app.companion.REPEL_KINDS
 import com.pokedaisy.app.companion.data.CenterResult
@@ -27,6 +29,7 @@ class GameQuickActions(
     private val notice: (String) -> Unit,
     private val active: () -> Boolean,
     private val extra: QuickActions,
+    private val registeredItems: () -> RegisteredItemUse? = { null },
 ) : QuickActions {
     init {
         menu.onRun = ::run
@@ -38,6 +41,7 @@ class GameQuickActions(
         QuickAction.PC -> items()?.canPc() == true
         QuickAction.HEAL -> items()?.center()?.heal == true
         QuickAction.FLY -> fly()?.canFly() == true
+        QuickAction.BIKE, QuickAction.ROD -> registeredItems()?.supported() == true
         QuickAction.REPEL -> REPEL_KINDS.any { items()?.canUse(it.first) == true } || extra.offered(action)
         QuickAction.WILD -> settings.wildEncountersSupported
         QuickAction.SAVE_STATE, QuickAction.LOAD_STATE, QuickAction.FF -> true
@@ -63,6 +67,8 @@ class GameQuickActions(
                 }
             }
             QuickAction.REPEL -> repelKindsIn(snapshot()).firstOrNull()?.let(::repel)
+            QuickAction.BIKE, QuickAction.ROD -> KeyItems.firstIn(snapshot().items,
+                if (action == QuickAction.BIKE) KeyItems.BIKES else KeyItems.RODS)?.let { registeredItems()?.use(it) }
             QuickAction.WILD -> {
                 val now = prefs.wildEncounters
                 val next = if (now != 0) { prefs.wildEncountersBeforeOff = now; 0 }
