@@ -398,6 +398,12 @@ interface CompanionSettings : StoredCompanionSettings {
     val overlayChoices: List<Pair<String, String>> get() = emptyList()
     val overlay: String get() = ""
     val overlayBadge: String? get() = null
+    val overlayRevision: Int get() = 0
+    val importOverlay: (((OverlayImport.Completed) -> Unit) -> Unit)? get() = null
+    fun cancelOverlayImport() {}
+    fun deleteOverlay(id: String) {}
+    fun deleteAllOverlays() {}
+
     fun setOverlay(key: String) {}
 
 

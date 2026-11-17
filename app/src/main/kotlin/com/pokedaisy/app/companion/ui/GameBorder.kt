@@ -13,19 +13,10 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.overlay.BuiltInFrames
 import com.pokedaisy.app.overlay.Frame
 import com.pokedaisy.app.overlay.Sprite
 import kotlin.math.roundToInt
-
-fun builtInOverlayChoices(): List<Pair<String, String>> = listOf("" to tk("NONE")) +
-    BuiltInFrames.Style.entries.map { BuiltInFrames.key(it) to builtInFrameLabel(it) }
-
-fun builtInFrameLabel(style: BuiltInFrames.Style): String = when (style) {
-    BuiltInFrames.Style.DAISY -> tk("DAISY")
-    BuiltInFrames.Style.BEZEL -> tk("BEZEL")
-}
 
 /** Bake static border art once per size/style, rather than doing pixel work on game frames. */
 internal fun borderImage(frame: Frame): ImageBitmap {

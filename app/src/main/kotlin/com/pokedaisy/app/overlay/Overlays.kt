@@ -1,9 +1,15 @@
 package com.pokedaisy.app.overlay
 
-import java.io.ByteArrayInputStream
-import java.io.File
-import java.io.InputStream
-import java.util.zip.ZipInputStream
+import com.pokedaisy.app.companion.data.*
+import okio.Buffer
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toPath
+import okio.SYSTEM
+import okio.buffer
+import okio.openZip
+import okio.use
+import kotlin.random.Random
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -84,21 +90,16 @@ object PngInfo {
         if (head.size < 24) return null
         for (i in SIGNATURE.indices) if (head[i] != SIGNATURE[i]) return null
         // The first chunk is IHDR: length (4), "IHDR" (4), width (4), height (4).
-        if (String(head, 12, 4, Charsets.US_ASCII) != "IHDR") return null
+        if (head.copyOfRange(12, 16).decodeToString() != "IHDR") return null
         fun u32(at: Int) = ((head[at].toInt() and 0xFF) shl 24) or ((head[at + 1].toInt() and 0xFF) shl 16) or
             ((head[at + 2].toInt() and 0xFF) shl 8) or (head[at + 3].toInt() and 0xFF)
         return u32(16) to u32(20)
     }
 
-    fun size(file: File): Pair<Int, Int>? = runCatching {
-        file.inputStream().use { s -> ByteArray(24).also { b -> if (s.readNBytesCompat(b) < 24) return null } }
+    fun size(file: Path): Pair<Int, Int>? = runCatching {
+        FileSystem.SYSTEM.source(file).buffer().use { it.readByteArray(24) }
     }.getOrNull()?.let(::size)
 
-    private fun InputStream.readNBytesCompat(b: ByteArray): Int {
-        var n = 0
-        while (n < b.size) { val r = read(b, n, b.size - n); if (r < 0) break; n += r }
-        return n
-    }
 }
 
 /**
@@ -130,11 +131,13 @@ object OverlayWindow {
             }
         }.firstOrNull(::clear) ?: return null
 
-        val seen = java.util.BitSet(w * h)
+        val seen = LongArray((w * h + 63) / 64)
+        fun seen(i: Int) = seen[i ushr 6] and (1L shl (i and 63)) != 0L
+        fun mark(i: Int) { seen[i ushr 6] = seen[i ushr 6] or (1L shl (i and 63)) }
         val stack = IntArray(w * h)
         var top = 0
         stack[top++] = start
-        seen.set(start)
+        mark(start)
         var count = 0
         var minX = w; var minY = h; var maxX = -1; var maxY = -1
         while (top > 0) {
@@ -146,10 +149,10 @@ object OverlayWindow {
             if (x > maxX) maxX = x
             if (y < minY) minY = y
             if (y > maxY) maxY = y
-            if (x > 0 && !seen[i - 1] && clear(i - 1)) { seen.set(i - 1); stack[top++] = i - 1 }
-            if (x < w - 1 && !seen[i + 1] && clear(i + 1)) { seen.set(i + 1); stack[top++] = i + 1 }
-            if (y > 0 && !seen[i - w] && clear(i - w)) { seen.set(i - w); stack[top++] = i - w }
-            if (y < h - 1 && !seen[i + w] && clear(i + w)) { seen.set(i + w); stack[top++] = i + w }
+            if (x > 0 && !seen(i - 1) && clear(i - 1)) { mark(i - 1); stack[top++] = i - 1 }
+            if (x < w - 1 && !seen(i + 1) && clear(i + 1)) { mark(i + 1); stack[top++] = i + 1 }
+            if (y > 0 && !seen(i - w) && clear(i - w)) { mark(i - w); stack[top++] = i - w }
+            if (y < h - 1 && !seen(i + w) && clear(i + w)) { mark(i + w); stack[top++] = i + w }
         }
         val boxW = maxX - minX + 1
         val boxH = maxY - minY + 1
@@ -160,7 +163,7 @@ object OverlayWindow {
 
 /** An overlay the player imported: its folder under [OverlayStore.dir], the name shown, and its layers' images. */
 class StoredOverlay(val id: String, val name: String, val layers: List<Layer>) {
-    class Layer(val file: File, val viewport: Viewport?, val w: Int, val h: Int)
+    class Layer(val file: Path, val viewport: Viewport?, val w: Int, val h: Int)
 
     /** The layer made for a view of [aspect] (w / h): the one whose image is closest to that shape (a pack's
      * landscape and portrait versions). */
@@ -172,24 +175,27 @@ class StoredOverlay(val id: String, val name: String, val layers: List<Layer>) {
  * with its images flat beside it) and those PNGs. Imports read RetroArch .cfg files (with their images: picked
  * together, read beside the .cfg when its real path is readable, or picked when asked for), .zip packs and bare PNGs.
  */
-class OverlayStore(root: File) {
-    val dir = File(root, "overlays")
+class OverlayStore(root: Path) {
+    val dir = root / "overlays"
 
     fun list(): List<StoredOverlay> =
-        dir.listFiles().orEmpty().filter { it.isDirectory }.mapNotNull(::read).sortedBy { it.name.lowercase() }
+        dir.listFiles().filter { it.isDirectory }.mapNotNull(::read).sortedBy { it.name.lowercase() }
 
-    fun get(id: String): StoredOverlay? = File(dir, id).takeIf { it.isDirectory && safeId(id) }?.let(::read)
+    fun get(id: String): StoredOverlay? = if (!safeId(id)) null else (dir / id).takeIf { it.isDirectory }?.let(::read)
 
-    fun delete(id: String): Boolean = safeId(id) && File(dir, id).deleteRecursively()
+    fun delete(id: String): Boolean {
+        if (!safeId(id) || !(dir / id).isDirectory) return false
+        return runCatching { (dir / id).deleteRecursively(); true }.getOrDefault(false)
+    }
 
     /** Every imported overlay gone (REMOVE ALL); how many there were. */
     fun deleteAll(): Int = list().count { delete(it.id) }
 
-    private fun read(folder: File): StoredOverlay? {
-        val cfg = File(folder, CFG).takeIf { it.isFile } ?: return null
+    private fun read(folder: Path): StoredOverlay? {
+        val cfg = (folder / CFG).takeIf { it.isFile } ?: return null
         val text = runCatching { cfg.readText() }.getOrNull() ?: return null
         val layers = OverlayCfg.parse(text).mapNotNull { l ->
-            val f = File(folder, l.image).takeIf { it.isFile && it.parentFile == folder } ?: return@mapNotNull null
+            val f = (folder / l.image).takeIf { it.isFile && it.parent == folder } ?: return@mapNotNull null
             val (w, h) = PngInfo.size(f) ?: return@mapNotNull null
             StoredOverlay.Layer(f, l.viewport, w, h)
         }
@@ -240,7 +246,7 @@ class OverlayStore(root: File) {
         var needs: Result.NeedsImage? = null
         for (cfg in cfgs) {
             if (ids.size >= MAX_OVERLAYS) { skipped++; continue }
-            val layers = OverlayCfg.parse(cfg.bytes.toString(Charsets.UTF_8))
+            val layers = OverlayCfg.parse(cfg.bytes.decodeToString())
             if (layers.isEmpty()) { skipped++; continue }
             val found = layers.map { l -> l to findImage(cfg, l.image, pngs, used) }
             var ok = found.filter { it.second != null }
@@ -274,8 +280,8 @@ class OverlayStore(root: File) {
         val name = image.substringAfterLast('/')
         val hit = pngs.firstOrNull { normalize(it.path) == inZip } ?: pngs.firstOrNull { it.name.equals(name, ignoreCase = true) }
         if (hit != null) { used += hit; return hit.bytes }
-        val real = cfg.realPath?.let { File(it).parentFile?.let { d -> File(d, image) } } ?: return null
-        return runCatching { real.takeIf { it.isFile && it.length() <= MAX_IMAGE }?.readBytes() }.getOrNull()
+        val real = cfg.realPath?.toPath()?.parent?.let { it / image } ?: return null
+        return runCatching { real.takeIf { it.isFile && it.length <= MAX_IMAGE }?.readBytes() }.getOrNull()
             ?.takeIf { PngInfo.size(it) != null }
     }
 
@@ -284,58 +290,67 @@ class OverlayStore(root: File) {
         val base = baseName.lowercase().replace(Regex("[^a-z0-9.-]+"), "-").trim('-', '.').take(48).ifEmpty { "overlay" }
         var id = base
         var n = 2
-        while (File(dir, id).exists()) id = "$base-${n++}"
-        val folder = File(dir, id).apply { mkdirs() }
+        while (FileSystem.SYSTEM.exists(dir / id)) id = "$base-${n++}"
+        val folder = (dir / id).apply { mkdirs() }
         val written = layers.mapIndexed { i, (l, bytes) ->
-            File(folder, "$i.png").writeBytes(bytes)
+            (folder / "$i.png").writeBytes(bytes)
             l.copy(image = "$i.png")
         }
-        File(folder, CFG).writeText(OverlayCfg.write(displayName(baseName), written))
+        (folder / CFG).writeText(OverlayCfg.write(displayName(baseName), written))
         return id
     }
 
     /** The .zip's .cfg and PNG files by their path inside it; null when it's bigger than an overlay pack should be. */
     private fun unzip(bytes: ByteArray): List<Entry>? {
         val out = ArrayList<Entry>()
-        var total = 0L
-        runCatching {
-            ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-                var count = 0
-                while (true) {
-                    val e = zip.nextEntry ?: break
-                    if (++count > MAX_ZIP_ENTRIES) return null
-                    if (e.isDirectory) continue
-                    val path = e.name.replace('\\', '/')
-                    val lower = path.lowercase()
-                    if (!lower.endsWith(".cfg") && !lower.endsWith(".png")) continue
-                    if (path.split('/').any { it.startsWith(".") || it == "__MACOSX" }) continue
-                    val limit = if (lower.endsWith(".cfg")) MAX_CFG else MAX_IMAGE
-                    val data = readCapped(zip, limit) ?: continue
-                    total += data.size
-                    if (total > MAX_ZIP_TOTAL) return null
-                    out += Entry(path, data)
-                }
+        val temp = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "pokedaisy-overlay-${Random.nextLong().toULong()}.zip"
+        try {
+            temp.writeBytes(bytes)
+            val zip = FileSystem.SYSTEM.openZip(temp)
+            var total = 0L
+            var count = 0
+            for (entry in zip.listRecursively("/".toPath())) {
+                if (++count > MAX_ZIP_ENTRIES) return null
+                if (zip.metadataOrNull(entry)?.isRegularFile != true) continue
+                val path = entry.toString().removePrefix("/").replace('\\', '/')
+                val lower = path.lowercase()
+                if (!lower.endsWith(".cfg") && !lower.endsWith(".png")) continue
+                if (path.split('/').any { it.startsWith(".") || it == "__MACOSX" }) continue
+                val limit = if (lower.endsWith(".cfg")) MAX_CFG else MAX_IMAGE
+                val data = zip.source(entry).buffer().use { source ->
+                    val buffer = Buffer()
+                    while (true) {
+                        if (source.read(buffer, 64L * 1024) < 0) break
+                        if (buffer.size > limit) return@use null
+                    }
+                    buffer.readByteArray()
+                } ?: continue
+                total += data.size
+                if (total > MAX_ZIP_TOTAL) return null
+                out += Entry(path, data)
             }
-        }
+        } catch (_: Exception) {
+            return emptyList()
+        } finally { FileSystem.SYSTEM.delete(temp, mustExist = false) }
         return out
-    }
-
-    private fun readCapped(input: InputStream, limit: Long): ByteArray? {
-        val buf = java.io.ByteArrayOutputStream()
-        val chunk = ByteArray(64 * 1024)
-        while (true) {
-            val n = input.read(chunk)
-            if (n < 0) break
-            buf.write(chunk, 0, n)
-            if (buf.size() > limit) return null
-        }
-        return buf.toByteArray()
     }
 
     companion object {
         const val CFG = "overlay.cfg"
         /** One overlay image at most (a 4K border is ~5 MB). */
         const val MAX_IMAGE = 32L * 1024 * 1024
+        const val MAX_PICKED_FILE = 64L * 1024 * 1024
+
+        /** Read a native pick off the UI thread, with the same cap as Android's document stream. */
+        fun readPicked(file: Path): Picked? = FileSystem.SYSTEM.source(file).buffer().use { source ->
+            val buffer = Buffer()
+            while (true) {
+                if (source.read(buffer, 64L * 1024) < 0) break
+                if (buffer.size > MAX_PICKED_FILE) return@use null
+            }
+            Picked(file.name, buffer.readByteArray(), file.toString())
+        }
+
         const val MAX_CFG = 256L * 1024
         /** What a .zip may unpack to, all told (it's held in memory while it's imported). */
         const val MAX_ZIP_TOTAL = 96L * 1024 * 1024

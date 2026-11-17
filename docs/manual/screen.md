@@ -167,7 +167,7 @@ The first GBA had no light behind its screen. Light from the room went in throug
 - `DAISY`: PokeDaisy's blue with a dot grid and the flower mark in the margin.
 - `BEZEL`: a plain dark surround.
 
-On iPhone and iPad, pick `NONE`, `DAISY` or `BEZEL` from the shared `DISPLAY OPTIONS` > `OVERLAY` row while a game is running. The choice is remembered. A selected touch skin supplies its own frame instead; `EXPAND` uses the expanded picture without a border. Importing RetroArch overlays is currently available on Android.
+On iPhone and iPad, pick `NONE`, `DAISY` or `BEZEL` from the shared `DISPLAY OPTIONS` > `OVERLAY` page. The choice is remembered. A selected touch skin supplies its own frame instead; `EXPAND` uses the expanded picture without a border. You can also import your own borders there, including from the library settings.
 
 They're drawn at the game's own pixel size and the game is shown at a whole-number scale inside them, so everything stays crisp (the game is a little smaller than without a frame).
 
@@ -175,9 +175,9 @@ They're drawn at the game's own pixel size and the game is shown at a whole-numb
 
 ### Your own RetroArch overlays
 
-If you already use overlays in RetroArch, you can bring them over. On the top screen, open Settings > `OVERLAY` and tap `IMPORT FILE`. You can pick:
+If you already use overlays in RetroArch, you can bring them over. On Android's top screen, open Settings > `OVERLAY`. On iPhone and iPad, open Settings > `DISPLAY OPTIONS` > `OVERLAY`. Tap `IMPORT FILE`. You can pick:
 
-- a RetroArch overlay `.cfg` together with its PNG image,
+- a RetroArch overlay `.cfg` together with its PNG image (on iPhone and iPad, pick the `.cfg` first and its image when asked),
 - a `.zip` with overlays in it,
 - or any PNG with a see-through hole where the screen goes.
 
