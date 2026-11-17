@@ -1005,6 +1005,7 @@ class PokeDaisyActivity : Activity() {
             ::handleHotkey, { showHud(it) }, active = { ::engine.isInitialized && !isDestroyed },
             // HEAL: the party's bars filling up (HealedAnimation), not a notice.
             healed = { before -> healShow.value = com.pokedaisy.app.companion.ui.HealShow(before) },
+            registeredItems = ::registeredItems,
             extra = object : com.pokedaisy.app.companion.ui.QuickActions {
                 override fun offered(action: com.pokedaisy.app.companion.QuickAction) = when (action) {
                     com.pokedaisy.app.companion.QuickAction.FLIGHT -> flightSupport() != null
@@ -1014,7 +1015,6 @@ class PokeDaisyActivity : Activity() {
                             telemetry.snapshot.value.party.any { m -> !m.isEgg && m.moves.any { it.id == com.pokedaisy.app.companion.ui.FLASH_MOVE } })
                     com.pokedaisy.app.companion.QuickAction.REPEL -> dsRepelKnown() ||
                         fieldItemSupport()?.let { s -> s.fns.repelItems.any { s.canUse(it) } } == true
-                    com.pokedaisy.app.companion.QuickAction.BIKE, com.pokedaisy.app.companion.QuickAction.ROD -> keyItemsWork()
                     com.pokedaisy.app.companion.QuickAction.TURBO -> true
                     // A DS / 3DS game whose touch screen floats in on this layout (the TOUCH SCREEN hotkey's rule).
                     com.pokedaisy.app.companion.QuickAction.TOUCH_SCREEN -> dsFloats.value || n3dsFloats
@@ -1045,14 +1045,9 @@ class PokeDaisyActivity : Activity() {
 
     private fun runPlatformQuickAction(action: com.pokedaisy.app.companion.QuickAction) {
         if (!::engine.isInitialized) return
-        val snap = telemetry.snapshot.value
         when (action) {
             com.pokedaisy.app.companion.QuickAction.FLASH -> useFlash()
             com.pokedaisy.app.companion.QuickAction.FLIGHT -> toggleFlight()
-            com.pokedaisy.app.companion.QuickAction.BIKE ->
-                com.pokedaisy.app.companion.data.KeyItems.firstIn(snap.items, com.pokedaisy.app.companion.data.KeyItems.BIKES)?.let(::useKeyItem)
-            com.pokedaisy.app.companion.QuickAction.ROD ->
-                com.pokedaisy.app.companion.data.KeyItems.firstIn(snap.items, com.pokedaisy.app.companion.data.KeyItems.RODS)?.let(::useKeyItem)
             com.pokedaisy.app.companion.QuickAction.TURBO -> {
                 input.turboLatch = if (input.turboLatch != 0) 0 else com.pokedaisy.app.companion.data.CoreKey.A
                 showHud(com.pokedaisy.app.companion.i18n.tr("TURBO A") + ": " +
@@ -1338,75 +1333,13 @@ class PokeDaisyActivity : Activity() {
         }
     }
 
-    /** BIKE / ROD work here: a retail FireRed / Emerald-family game (ROM code the field items recognise) whose
-     * SaveBlock1 has the SELECT register where KeyItems expects it. */
-    private fun keyItemsWork(): Boolean {
-        val game = telemetry.snapshot.value.game
-        // SoulGold: its SELECT wheel (KeyItems.selectWheel), checked headless (GitHub #242).
-        if (game == com.pokedaisy.app.companion.data.GameKind.SOULGOLD) return fieldItemSupport() != null
-        if (game != com.pokedaisy.app.companion.data.GameKind.FIRERED && game != com.pokedaisy.app.companion.data.GameKind.EMERALD) return false
-        val cfg = com.pokedaisy.app.companion.data.activeNativeConfig ?: return false
-        return (cfg.moneyOff == 0x290L || cfg.moneyOff == 0x490L) && fieldItemSupport() != null
-    }
+    /** Registered-item transactions and restoration are shared with iOS. */
+    private fun registeredItems() = if (!::engine.isInitialized) null else engine.playback.bindRegisteredItems(
+        ::fieldItemSupport, input::setPress,
+    ) { runOnUiThread { showHud(com.pokedaisy.app.companion.ui.itemUseMessage(
+        com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW))) } }
 
-    /**
-     * A bike or a rod, used the way SELECT uses a registered key item (KeyItems): written into the SELECT register,
-     * SELECT pressed for the game for 2 frames ([GbaInput.setPress]: the battle controls own setScript's channel), the player's own registered item
-     * put back 20 frames later. The game does the rest: mounting, the fishing cast, or its own "can't use that here".
-     */
-    private fun useKeyItem(itemId: Int) {
-        val cfg = com.pokedaisy.app.companion.data.activeNativeConfig ?: return
-        val fns = fieldItemSupport()?.fns ?: return
-        if (!::engine.isInitialized || !engine.running) return
-        fun le16(v: Int) = byteArrayOf(v.toByte(), (v shr 8).toByte())
-        fun u16(b: ByteArray) = (b[0].toInt() and 0xFF) or ((b[1].toInt() and 0xFF) shl 8)
-        engine.requestFieldItemJob(false) { calls, busy ->
-            val ok = runCatching {
-                if (!com.pokedaisy.app.companion.data.fieldItemCodeMatches(fns, calls::read)) return@runCatching false
-                val addr = com.pokedaisy.app.companion.data.KeyItems.registerAddr(cfg, calls::read) ?: return@runCatching false
-                if (busy || calls.call(fns.fieldControlsLocked) != 0L) return@runCatching false
-                val old = u16(calls.read(addr, 2))
-                // Not a sane item id: not the register after all.
-                if (old > 0x3FF || !calls.write(addr, le16(itemId))) return@runCatching false
-                if (com.pokedaisy.app.companion.data.KeyItems.selectWheel) {
-                    // SoulGold: SELECT opens its wheel, DOWN uses the slot written above; the player's own put back after.
-                    val down = com.pokedaisy.app.companion.data.KeyItems.WHEEL_DOWN_AFTER
-                    input.setPress(CoreKey.SELECT)
-                    engine.requestFieldItemJob(false, delayFrames = 2) { _, _ -> input.setPress(0) }
-                    engine.requestFieldItemJob(false, delayFrames = down) { _, _ -> input.setPress(CoreKey.DOWN) }
-                    engine.requestFieldItemJob(false, delayFrames = down + 2) { _, _ -> input.setPress(0) }
-                    engine.requestFieldItemJob(false, delayFrames = down + 20) { c, _ -> if (u16(c.read(addr, 2)) == itemId) c.write(addr, le16(old)) }
-                    return@runCatching true
-                }
-                pressSelect(fns.fieldControlsLocked, SELECT_TRIES) {
-                    engine.requestFieldItemJob(false, delayFrames = 20) { c, _ -> if (u16(c.read(addr, 2)) == itemId) c.write(addr, le16(old)) }
-                }
-                true
-            }.getOrDefault(false)
-            if (!ok) runOnUiThread { showHud(com.pokedaisy.app.companion.ui.itemUseMessage(com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW))) }
-        }
-    }
-
-    /**
-     * SELECT for the game for 2 frames; pressed again if it was dropped (a bike rolling at full speed ignores SELECT), at most
-     * [tries] times, but only where taking it shows for sure: the riding state flips (BIKE, [EmulatorEngine.riding] - read on
-     * this game) or the field controls stay locked (ROD's cast and its messages). The lock alone isn't enough: getting on or
-     * off locks and frees them within one frame, which a check between frames misses (and a blind retry toggled the bike 20
-     * times). [done] once it took, or gave up.
-     */
-    private fun pressSelect(locked: Long, tries: Int, done: () -> Unit) {
-        val riding = engine.riding
-        val sure = engine.fieldMovesKnown
-        var took = false
-        input.setPress(CoreKey.SELECT)
-        for (f in 1..SELECT_WAIT) engine.requestFieldItemJob(false, delayFrames = f) { c, _ ->
-            if (engine.riding != riding || c.call(locked) != 0L) took = true
-        }
-        engine.requestFieldItemJob(false, delayFrames = 2) { _, _ -> input.setPress(0) }
-        engine.requestFieldItemJob(false, delayFrames = SELECT_WAIT + 1) { _, _ ->
-            if (took || !sure || tries <= 1) done() else pressSelect(locked, tries - 1, done)
-        }
-    }
+    private fun useKeyItem(itemId: Int) { if (::engine.isInitialized && engine.running) registeredItems()?.use(itemId) }
 
     /** FLY on the MAP tab (Fly.kt): two steps on the emu thread - the checks, controls locked and the fade to black,
      * then once it's black the game's own Fly map choice. */
@@ -6100,8 +6033,6 @@ class PokeDaisyActivity : Activity() {
 
         /** Tries (a frame apart) at the game's picture as a floating window opens, while another copy is on its way. */
         private const val DS_FREEZE_TRIES = 10
-        private const val SELECT_TRIES = 15
-        private const val SELECT_WAIT = 10
         /** Set by [LaunchActivity]: leaving the game returns to the frontend. */
         const val EXTRA_FROM_FRONTEND = "fromFrontend"
         private val GBA_EXT = RomArchive.ROM_EXTENSIONS + RomArchive.EXTENSIONS

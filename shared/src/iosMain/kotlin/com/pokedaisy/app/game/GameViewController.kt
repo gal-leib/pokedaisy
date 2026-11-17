@@ -49,6 +49,7 @@ class GameViewController(
     private val input = GameInput()
     val keyCapture get() = input.capture
     fun reloadBindings() = input.reloadBindings()
+    fun setPress(bits: Int) = input.setPress(bits)
     fun setHotkeys(model: com.pokedaisy.app.Hotkeys?) = input.setHotkeys(model)
     var onHotkey: (com.pokedaisy.app.Hotkeys.Event) -> Unit
         get() = input.onHotkey

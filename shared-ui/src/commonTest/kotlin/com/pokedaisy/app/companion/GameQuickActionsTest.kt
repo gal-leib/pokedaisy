@@ -37,25 +37,26 @@ class GameQuickActionsTest {
     private val actions = GameQuickActions(menu, prefs, settings, { SnapshotView(connected = true) },
         { item }, { fly }, { events += it }, { notices += it }, { live },
         object : QuickActions {
-            override fun offered(action: QuickAction) = action == QuickAction.BIKE
+            override fun offered(action: QuickAction) = action == QuickAction.TOUCH_SCREEN
             override fun run(action: QuickAction) { native += action }
         })
 
     @Test fun availabilityComesFromTheSameLiveAdaptersOnBothHosts() {
         assertTrue(actions.offered(QuickAction.PC)); assertTrue(actions.offered(QuickAction.FLY))
         assertTrue(actions.offered(QuickAction.REPEL)); assertTrue(actions.offered(QuickAction.WILD))
-        assertTrue(actions.offered(QuickAction.BIKE)); assertFalse(actions.offered(QuickAction.FLIGHT))
+        assertTrue(actions.offered(QuickAction.TOUCH_SCREEN)); assertFalse(actions.offered(QuickAction.FLIGHT))
+        assertFalse(actions.offered(QuickAction.BIKE)); assertFalse(actions.offered(QuickAction.ROD))
         assertFalse(actions.offered(QuickAction.HEAL))
         hasPc = false; hasFly = false
         assertFalse(actions.offered(QuickAction.PC)); assertFalse(actions.offered(QuickAction.FLY))
     }
 
     @Test fun menuSelectionClosesBeforeDispatchAndNativeActionsRemainWithTheirHost() {
-        menu.items = listOf(QuickAction.PC, QuickAction.BIKE)
+        menu.items = listOf(QuickAction.PC, QuickAction.TOUCH_SCREEN)
         menu.trigger(true); menu.key(MenuKey.A)
         assertFalse(menu.open); assertEquals(1, openedPc); assertTrue(notices.isEmpty())
         menu.trigger(true); menu.key(MenuKey.RIGHT); menu.key(MenuKey.A)
-        assertEquals(listOf(QuickAction.BIKE), native)
+        assertEquals(listOf(QuickAction.TOUCH_SCREEN), native)
         actions.run(QuickAction.SAVE_STATE); actions.run(QuickAction.LOAD_STATE); actions.run(QuickAction.FF)
         assertEquals(listOf(Hotkeys.Action.SAVE_STATE, Hotkeys.Action.LOAD_STATE, Hotkeys.Action.FF_TOGGLE), events.map { it.action })
         assertTrue(events.all { it.pressed })
@@ -101,5 +102,46 @@ class GameQuickActionsTest {
         val reopened = PrefsCompanionSettingsTest.Settings(prefs)
         assertEquals(setOf(QuickAction.PC, QuickAction.FF), reopened.quickMenuActions)
         assertEquals(QuickMenuStyle.GRID, reopened.quickMenuStyle); assertFalse(reopened.quickMenuLabels)
+    }
+
+    @Test fun bikeAndBestRodDispatchThroughTheSharedQueuedTransactionInsteadOfTheHost() {
+        val previous = activeGame
+        activeGame = GameKind.EMERALD
+        try {
+            var register = 262
+            var kind: GameKind? = GameKind.EMERALD
+            val calls = object : GameCalls {
+                override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int) = 0L
+                override fun read(addr: Long, len: Int) = byteArrayOf(register.toByte(), (register shr 8).toByte())
+                override fun write(addr: Long, bytes: ByteArray): Boolean {
+                    register = (bytes[0].toInt() and 255) or ((bytes[1].toInt() and 255) shl 8)
+                    return true
+                }
+            }
+            val session = com.pokedaisy.app.game.GameSession(calls, { true }) { _, e -> throw e }
+            val fields = FieldItemSupport(FieldItemFns(0, 0, 0, 0, 0, 0, 0, emptyList()), emptySet())
+            val registered = RegisteredItemUse(session, { fields },
+                { NATIVE_EMERALD.copy(staticSaveBlocks = true, saveBlock1Ptr = 0x02001000) },
+                { kind }, { false }, { false }, { false }, {}, { fail("unexpected refusal") })
+            var inventory = listOf(259, 262, 263, 264).map { ItemView(it, "ITEM", 1, null) }
+            val shared = GameQuickActions(menu, prefs, settings, { SnapshotView(connected = true, items = inventory) },
+                { null }, { null }, {}, {}, { live }, object : QuickActions {
+                    override fun offered(action: QuickAction) = false
+                    override fun run(action: QuickAction) { fail("Registered items reached the native host") }
+                }, registeredItems = { registered })
+            assertTrue(shared.offered(QuickAction.BIKE)); assertTrue(shared.offered(QuickAction.ROD))
+            shared.run(QuickAction.BIKE); assertEquals(262, register)
+            session.serviceField(true, true); assertEquals(259, register)
+            registered.cancel(); assertEquals(262, register)
+            shared.run(QuickAction.ROD); session.serviceField(true, true); assertEquals(264, register)
+            registered.cancel()
+            inventory = inventory.filter { it.itemId != 264 }
+            shared.run(QuickAction.ROD); session.serviceField(true, true); assertEquals(263, register)
+            registered.cancel()
+            inventory = emptyList()
+            shared.run(QuickAction.BIKE); session.serviceField(true, true); assertEquals(262, register)
+            kind = GameKind.RED
+            assertFalse(shared.offered(QuickAction.BIKE)); assertFalse(shared.offered(QuickAction.ROD))
+        } finally { activeGame = previous }
     }
 }

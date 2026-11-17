@@ -12,6 +12,20 @@ import kotlin.test.*
 
 /** Actual GameController snapshot objects through the native polling adapter, without physical devices. */
 class QuickMenuGameInputTest {
+    @Test fun registeredItemPressesUseTheirOwnChannelWhileManualButtonsStayQuarantined() {
+        val pad = assertNotNull(GCController.controllerWithExtendedGamepad().extendedGamepad)
+        val input = GameInput({ listOf(pad) }, { GbaControls.KeyMaps(mapOf(KeyCodes.BUTTON_A to CoreKey.A), emptyMap()) })
+        input.companionCaptured = true
+        pad.buttonA.setValue(1f); input.poll()
+        input.setPress(CoreKey.SELECT)
+        assertEquals(CoreKey.SELECT, input.keys())
+        input.poll(); assertEquals(CoreKey.SELECT, input.keys())
+        input.setPress(0); assertEquals(0, input.keys())
+        input.companionCaptured = false; input.poll(); assertEquals(0, input.keys())
+        pad.buttonA.setValue(0f); input.poll(); pad.buttonA.setValue(1f); input.poll()
+        assertEquals(CoreKey.A, input.keys())
+    }
+
     @Test fun reboundAClosesBeforeSelectingAndHeldStickMustCentreBeforePlaying() {
         val pad = assertNotNull(GCController.controllerWithExtendedGamepad().extendedGamepad)
         val input = GameInput({ listOf(pad) }, { GbaControls.KeyMaps(mapOf(KeyCodes.BUTTON_A to CoreKey.A), emptyMap()) })

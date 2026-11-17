@@ -115,12 +115,14 @@ object PokeDaisyHost {
                 panels.quickMenu, iosPreferences, currentSettings, { telemetry.snapshot.value }, { items }, { fly },
                 shortcuts::hotkey, panels::showQuickNotice,
                 active = { game === current && game?.isRunning == true && !currentRuntime.blocked },
+                registeredItems = { currentRuntime.registeredItems },
                 extra = object : com.pokedaisy.app.companion.ui.QuickActions {
                     override fun offered(action: com.pokedaisy.app.companion.QuickAction) =
                         action == com.pokedaisy.app.companion.QuickAction.COMPANION && !panels.portrait
                     override fun run(action: com.pokedaisy.app.companion.QuickAction) {
                         if (action == com.pokedaisy.app.companion.QuickAction.COMPANION) panels.toggleCompanion()
                     }
+                    override fun riding() = currentRuntime.riding
                 })
             game?.onHotkey = {
                 if (it.action == com.pokedaisy.app.Hotkeys.Action.QUICK_MENU) panels.triggerQuickMenu(it.pressed)
@@ -297,6 +299,10 @@ object PokeDaisyHost {
             if (live()) fields.get(snapshot, code.orEmpty(), revision, telemetry.knownFieldItems()) else null
         }
         val currentSession = { p.session.takeIf { live() } }
+        val registeredItems = p.bindRegisteredItems(readSupport, g::setPress) {
+            if (live()) screen?.showQuickNotice(com.pokedaisy.app.companion.ui.itemUseMessage(
+                com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW)))
+        }
         val sharedItems = com.pokedaisy.app.companion.FieldItemUse(
             support = readSupport, session = currentSession,
             inBattle = { telemetry.snapshot.value.inBattle },
@@ -317,7 +323,6 @@ object PokeDaisyHost {
                 }
             }
         }
-        g.beforeRewind = battle!!::cancel
         val currentSettings = settings!!
         val currentCheats = p.bindCheats(
             supported = romPath.substringAfterLast('.').lowercase() == "gba",
@@ -326,6 +331,7 @@ object PokeDaisyHost {
             enabled = { currentSettings.cheatsEnabled },
             submit = { text -> if (g.isRunning && PkApiCore.applyCheats(text) < 0) com.pokedaisy.app.companion.data.Logs.i("cheats didn't load") })
         val currentBattle = battle!!
+        g.beforeRewind = { registeredItems.cancel(); currentBattle.cancel() }
         val currentOptions = p.options
         g.onCoreStarted = {
             if (game === g) {
@@ -335,7 +341,7 @@ object PokeDaisyHost {
                 g.withState { resume.restore() }
             }
         }
-        g.beforeStateChange = { currentSettings.releaseRewind(); currentBattle.cancel(); touch.releaseKeys() }
+        g.beforeStateChange = { registeredItems.cancel(); currentSettings.releaseRewind(); currentBattle.cancel(); touch.releaseKeys() }
         slots = p.bindStates { StateSlotController(files, onCore = g::withState,
             write = { PkApiCore.saveState(it.toString()) }, read = { PkApiCore.loadState(it.toString()) },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
