@@ -192,8 +192,10 @@ HEAL also uses `FieldItemUse` on both platforms, with the existing `GameOptions.
 `PokemonCenter` script/gates. No second ROM scan or iOS healing implementation. iOS offers healing through Quick
 Menu and the party summary's CENTER only when discovery and the known party/PC field support agree. NICKNAME and
 FORGET A MOVE use the same shared coordination and native NPC scripts, including ownership, party identity,
-move and field-state checks. Naming hands the companion window back to the game. RELEARN still uses Android's
-TM/fade adapter. Results use the existing loaded-game queue/delivery guard.
+move and field-state checks. Naming hands the companion window back to the game. TM/HM teaching and RELEARN
+share FieldTmSupport signature selection and FieldItemUse's queued fade/screen flow. The delayed second step
+belongs to the original GameSession and retains the game's return-to-field callback and field-leave guards.
+Results use the existing loaded-game queue/delivery guard.
 
 `FLASH` shares Android's verified ROM/badge-rule cache, party-move availability, queued field move and game handoff. It uses the game's own animation and lighting, with the existing badge, cave and busy-state checks; unsafe sprite hacks remain excluded. Game Boy FLASH is unavailable.
 
