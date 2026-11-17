@@ -8,9 +8,10 @@ import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
 
 /** A picture fitted inside its viewport. Renderer adapters share this calculation without sharing game frames. */
-fun fittedGamePicture(width: Float, height: Float, aspect: Float, topAligned: Boolean = false): Rect {
+fun fittedGamePicture(width: Float, height: Float, aspect: Float, topAligned: Boolean = false, fill: Boolean = false): Rect {
     val w = width.coerceAtLeast(0f)
     val h = height.coerceAtLeast(0f)
+    if (fill) return Rect(0f, 0f, w, h)
     val gw = minOf(w, h * aspect)
     val gh = gw / aspect
     val x = (w - gw) / 2
@@ -20,9 +21,9 @@ fun fittedGamePicture(width: Float, height: Float, aspect: Float, topAligned: Bo
 
 /** Keeps one native controller at the fitted picture's bounds, including top alignment in portrait. */
 @Composable
-fun GamePicture(aspect: Float, topAligned: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun GamePicture(aspect: Float, topAligned: Boolean, modifier: Modifier = Modifier, fill: Boolean = false, content: @Composable () -> Unit) {
     Layout(content = content, modifier = modifier) { items, c ->
-        val r = fittedGamePicture(c.maxWidth.toFloat(), c.maxHeight.toFloat(), aspect, topAligned)
+        val r = fittedGamePicture(c.maxWidth.toFloat(), c.maxHeight.toFloat(), aspect, topAligned, fill)
         val picture = items.single().measure(Constraints.fixed(r.width.roundToInt(), r.height.roundToInt()))
         layout(c.maxWidth, c.maxHeight) { picture.place(r.left.roundToInt(), r.top.roundToInt()) }
     }

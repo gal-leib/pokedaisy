@@ -317,6 +317,7 @@ interface CompanionSettings : StoredCompanionSettings {
 
     /** Whether WIDE knows the running game (WideScreen.gameFor); it shows as ORIGINAL otherwise. */
     val wideSupported: Boolean get() = false
+    val pictureBadge: String? get() = null
 
     /** EXPAND's LOOK AROUND - see [com.pokedaisy.app.Prefs.lookAround]. */
     val lookAround: Boolean get() = true

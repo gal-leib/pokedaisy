@@ -26,6 +26,8 @@ On the top screen, `ASPECT` opens a preview: each choice is drawn as a little to
 
 ## EXPAND: more of the map
 
+On iPhone and iPad, use `SETTINGS` > `ASPECT` to pick `ORIGINAL`, `STRETCH` or `EXPAND`. Supported GB, GBC and GBA games use the same expanded picture and camera as Android. Pick `ZOOM` in Settings or tap its touch button to see more of the map. A controller’s right stick looks around when `LOOK AROUND` is on. Your zoom choice is kept for each game.
+
 With `EXPAND` you see more of the route around you instead of black bars. The strips beside the game aren't stretched or made up: they're rebuilt every frame from the game's own map, tiles and characters, so people walk in from the edges, water moves and the lighting matches. On a phone held upright the extra map goes above and below the game instead.
 
 A few things worth knowing:

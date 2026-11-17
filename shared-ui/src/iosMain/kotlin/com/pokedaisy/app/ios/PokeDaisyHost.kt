@@ -127,7 +127,10 @@ object PokeDaisyHost {
                 })
             game?.onHotkey = {
                 if (it.action == com.pokedaisy.app.Hotkeys.Action.QUICK_MENU) panels.triggerQuickMenu(it.pressed)
-                else if (!it.pressed || !panels.quickMenu.open) shortcuts.hotkey(it)
+                else if (!it.pressed || !panels.quickMenu.open) {
+                    if (it.action == com.pokedaisy.app.Hotkeys.Action.ZOOM && it.pressed) currentSettings.cycleZoom()
+                    else shortcuts.hotkey(it)
+                }
             }
         }
         return ComposeUIViewController(configure = { configureUiAutomation() }) {
@@ -156,7 +159,7 @@ object PokeDaisyHost {
                                 battleRead && !panels.state.side.windowOpen && !panels.quickMenu.open
                             val clear = panels.hudClear()
                             com.pokedaisy.app.companion.ui.BattleButtons(snapshot, buttons, battle,
-                                currentSettings?.showHints == true, core = panels.hudFrame(),
+                                currentSettings?.showHints == true, core = panels.coreFrame(),
                                 clearTop = clear.first, clearBottom = clear.second, avoid = panels.hudAvoid(),
                                 onWindow = { panels.captureOverlay(IosGameScreen.Overlay.BATTLE, it) })
                             quickActions?.let { actions ->
@@ -273,9 +276,10 @@ object PokeDaisyHost {
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
         }
+        var fieldTablesCrc = 0L
         playback = com.pokedaisy.app.companion.GameRuntime(
             com.pokedaisy.app.game.GameSession(PkApiCore, PkApiCore::callSafe) { where, error -> com.pokedaisy.app.companion.data.Logs.i("$where: $error") },
-            telemetry, iosPreferences, battle!!, PkApiCore, { code != null }, PkApiCore::configureField, { PkApiCore.configureField(0) }).also { p ->
+            telemetry, iosPreferences, battle!!, PkApiCore, { code != null }, { PkApiCore.configureField(fieldTablesCrc) }, { PkApiCore.configureField(0) }).also { p ->
             currentRuntime = p
             val currentSettings = settings!!
             currentSettings.playbackChanged = { p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld) }
@@ -293,7 +297,7 @@ object PokeDaisyHost {
                 p.beforeFrame()
                 p.gameBoyFields?.keepEncounters(PkApiCore, p.options.wildEncounters == 0)
             }
-            g.afterFrame = { p.tick(); gameOptions.tick(); gameOptions.markExp(PkApiCore::read, PkApiCore::write) }
+            g.afterFrame = { p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1); gameOptions.tick(); gameOptions.markExp(PkApiCore::read, PkApiCore::write) }
         }
         val p = playback!!
         val fields = com.pokedaisy.app.companion.data.FieldItemSupportCache()
@@ -365,7 +369,20 @@ object PokeDaisyHost {
         val currentOptions = p.options
         g.onCoreStarted = {
             if (game === g) {
-                p.start(romPath.toPath(), code, if (code != null) runCatching { com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()) }.getOrDefault(0L) else 0L)
+                val crc = runCatching { com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()) }.getOrDefault(0L)
+                val key = crc.toString(16).padStart(8, '0')
+                val blocked = com.pokedaisy.app.companion.data.BlockedGames.forCrc(key) != null
+                val tables = if (blocked) 0L else com.pokedaisy.app.companion.data.WideTables(
+                    { PkApiCore.wideKnows(it.toLong() and 0xFFFFFFFFL) },
+                    { PkApiCore.fieldKnows(it.toLong() and 0xFFFFFFFFL) },
+                    { own, base, row -> PkApiCore.addWideDerived(own.toLong() and 0xFFFFFFFFL, base.toLong() and 0xFFFFFFFFL, row) },
+                    log = { com.pokedaisy.app.companion.data.Logs.i(it) },
+                ).resolve(romPath.toPath(), key).toLongOrNull(16) ?: 0L
+                fieldTablesCrc = tables
+                currentSettings.cameraRomKey = key
+                g.camera.level = iosPreferences.zoomLevelFor(key)
+                g.setExpandedTables(tables)
+                p.start(romPath.toPath(), code, crc, areaMapCrc = tables)
                 currentOptions.start(romPath.toPath(), PkApiCore::configureWild)
                 currentCheats.start()
                 g.withState { resume.restore() }
@@ -385,6 +402,7 @@ object PokeDaisyHost {
             gameBoy = !romPath.lowercase().endsWith(".gba"), game = kotlinx.coroutines.Dispatchers.Main,
             current = { game === g && g.isRunning }, after = {
                 currentOptions.settingsChanged(currentSettings)
+                if (it.blocked != null && g.wideSupported) g.setExpandedTables(0)
             }, periodMillis = SAMPLE_MILLIS)
         return g
     }

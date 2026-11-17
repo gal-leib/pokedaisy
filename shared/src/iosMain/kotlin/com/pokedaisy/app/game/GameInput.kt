@@ -36,6 +36,11 @@ class GameInput internal constructor(
     }
     private val touchGate = ManualInputGate()
     private val axesGate = ManualInputGate()
+    private val lookGate = ManualInputGate()
+    var cameraX = 0f
+        private set
+    var cameraY = 0f
+        private set
 
     init {
         buttons.input.setControls(loadControls())
@@ -78,6 +83,7 @@ class GameInput internal constructor(
         touchGate.setBlocked(owner, on, touchKeys or touchTurbo)
         val hardware = hardware()
         axesGate.setBlocked(owner, on, hardware.axes)
+        lookGate.setBlocked(owner, on, hardware.lookHeld)
         buttons.quarantine(hardware.keys + touchButtonKeys)
         menuShortcut.quarantine(hardware.keys + touchButtonKeys)
     }
@@ -113,6 +119,9 @@ class GameInput internal constructor(
         val beforeTurbo = touchTurbo
         val allowed = touchGate.filter(touchKeys or touchTurbo)
         buttons.input.setTouchBits(touchKeys and allowed, touchTurbo and allowed)
+        val look = lookGate.filter(h.lookHeld)
+        cameraX = if (look != 0) h.lookX else 0f
+        cameraY = if (look != 0) h.lookY else 0f
         val axes = axesGate.filter(h.axes, h.neutral)
         buttons.input.setAxes(axes)
         if (axes != 0 || allowed != 0) buttons.letThrough()
@@ -137,7 +146,10 @@ class GameInput internal constructor(
     fun pollCapture() = buttons.poll(hardware().keys, blocked = true)
 
     private data class Hardware(val controllers: Set<Int>, val keys: Set<Int>, val axes: Int,
-        val dpad: Int, val stickX: Float, val stickY: Float, val neutral: Boolean)
+        val dpad: Int, val stickX: Float, val stickY: Float, val neutral: Boolean,
+        val lookX: Float, val lookY: Float) {
+        val lookHeld get() = if (kotlin.math.abs(lookX) >= .2f || kotlin.math.abs(lookY) >= .2f) 1 else 0
+    }
     private fun hardware(): Hardware {
         val pads = pads()
         val controllers = pads.flatMap { it.canonicalKeys() }.toSet()
@@ -146,8 +158,11 @@ class GameInput internal constructor(
             for ((native, canonical) in KEYBOARD) if (keyboard.buttonForKeyCode(native)?.pressed == true) add(canonical)
         }
         var axes = 0; var dpad = 0; var x = 0f; var y = 0f; var neutral = true
+        var lookX = 0f; var lookY = 0f
         val watchMenuAxes = quickMenuCaptured || axesGate.awaitingNeutral
         for (pad in pads) {
+            val rx = pad.rightThumbstick.xAxis.value; val ry = -pad.rightThumbstick.yAxis.value
+            if (rx * rx + ry * ry > lookX * lookX + lookY * lookY) { lookX = rx; lookY = ry }
             val sx = pad.leftThumbstick.xAxis.value; val sy = -pad.leftThumbstick.yAxis.value
             val dx = pad.dpad.xAxis.value; val dy = -pad.dpad.yAxis.value
             axes = axes or GbaInput.axisBits(sx, sy, dx, dy)
@@ -158,7 +173,7 @@ class GameInput internal constructor(
                 neutral = neutral && sx * sx + sy * sy < .25f && hat == 0
             }
         }
-        return Hardware(controllers, controllers + keyboard, axes, dpad, x, y, neutral)
+        return Hardware(controllers, controllers + keyboard, axes, dpad, x, y, neutral, lookX, lookY)
     }
 
     private companion object {

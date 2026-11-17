@@ -74,7 +74,7 @@ internal class IosTouchControls(
         DisposableEffect(Unit) { onDispose { placed = null; releaseKeys() } }
         // Changing ownership cancels existing fingers; only a new DOWN may play after a modal closes.
         key(inputEpoch) {
-            TouchControls(IosTouchPreferences.drawingStyle, portrait, input, Modifier.fillMaxSize(),
+            TouchControls(IosTouchPreferences.drawingStyle.forButtons(IosTouchPreferences.buttons - (if (game()?.expanded == true) emptySet() else setOf(TouchButton.ZOOM))), portrait, input, Modifier.fillMaxSize(),
                 gameAspect = if (gameBoy) 160f / 144 else 1.5f, gameBoy = gameBoy, ffOn = settings()?.ffActive == true, onPlaced = { placed = it })
         }
     }
@@ -110,6 +110,7 @@ internal class IosTouchControls(
         if (game()?.let { it.isRunning && !it.uiPaused && !it.companionInputCaptured } != true) return
         if (settings() == null || actions?.touch(button, down) == true) return
         when (button) {
+            TouchButton.ZOOM -> if (down) settings()?.cycleZoom()
             TouchButton.X, TouchButton.Y -> game()?.let { g ->
                 val code = if (button == TouchButton.X) com.pokedaisy.app.companion.data.KeyCodes.BUTTON_X
                     else com.pokedaisy.app.companion.data.KeyCodes.BUTTON_Y

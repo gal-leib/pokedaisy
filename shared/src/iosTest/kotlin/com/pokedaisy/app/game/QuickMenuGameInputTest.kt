@@ -12,6 +12,23 @@ import kotlin.test.*
 
 /** Actual GameController snapshot objects through the native polling adapter, without physical devices. */
 class QuickMenuGameInputTest {
+    @Test fun lookAroundMustCentreAfterOverlappingOverlayOwners() {
+        val pad = assertNotNull(GCController.controllerWithExtendedGamepad().extendedGamepad)
+        val input = GameInput({ listOf(pad) }, { GbaControls.KeyMaps(emptyMap(), emptyMap()) })
+        pad.rightThumbstick.setValueForXAxis(.8f, yAxis = -.5f); input.poll()
+        assertEquals(.8f, input.cameraX); assertEquals(.5f, input.cameraY)
+        assertEquals(0, input.keys())
+        input.companionCaptured = true; input.backgroundCaptured(true); input.poll()
+        assertEquals(0f, input.cameraX)
+        input.companionCaptured = false; input.poll(); assertEquals(0f, input.cameraX)
+        input.backgroundCaptured(false); input.poll(); assertEquals(0f, input.cameraX)
+        pad.rightThumbstick.setValueForXAxis(-.8f, yAxis = .5f); input.poll()
+        assertEquals(0f, input.cameraX, "Changing direction must not release a captured stick")
+        pad.rightThumbstick.setValueForXAxis(0f, yAxis = 0f); input.poll()
+        pad.rightThumbstick.setValueForXAxis(-.8f, yAxis = .5f); input.poll()
+        assertEquals(-.8f, input.cameraX); assertEquals(-.5f, input.cameraY)
+    }
+
     @Test fun registeredItemPressesUseTheirOwnChannelWhileManualButtonsStayQuarantined() {
         val pad = assertNotNull(GCController.controllerWithExtendedGamepad().extendedGamepad)
         val input = GameInput({ listOf(pad) }, { GbaControls.KeyMaps(mapOf(KeyCodes.BUTTON_A to CoreKey.A), emptyMap()) })
