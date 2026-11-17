@@ -288,7 +288,10 @@ object PokeDaisyHost {
                 g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField,
                     com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN)) }
             }
-            g.beforeFrame = p::beforeFrame
+            g.beforeFrame = {
+                p.beforeFrame()
+                p.gameBoyFields?.keepEncounters(PkApiCore, p.options.wildEncounters == 0)
+            }
             g.afterFrame = { p.tick(); gameOptions.tick(); gameOptions.markExp(PkApiCore::read, PkApiCore::write) }
         }
         val p = playback!!

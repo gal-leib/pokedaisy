@@ -2475,7 +2475,6 @@ class PokeDaisyActivity : Activity() {
         shinyTarget = null
         if (::engine.isInitialized) engine.setShinyTarget(null)
         syncShinyAchievements()
-        if (::engine.isInitialized) engine.gbField = null
         // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
         // GameOptions' discovery).
         if (gba && romBlocked == null) Thread({
@@ -2630,7 +2629,7 @@ class PokeDaisyActivity : Activity() {
                     }
                 }
                 // WILD ENCOUNTERS on a Game Boy game is held by the engine, frame by frame.
-                if (snap.connected && romIsGameBoy) engine.gbField = gbField()
+                if (snap.connected && romIsGameBoy) gameBoyFields()
                 // party.isNotEmpty(), not just connected: `connected` flips true as
                 // soon as the native addresses are found, which can be
                 // well before the save's party has actually loaded into RAM (e.g.

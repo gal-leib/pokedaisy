@@ -221,12 +221,6 @@ class EmulatorEngine(
         lookDirty = true
     }
 
-    /** A Game Boy game's PC / FLY / WILD ENCOUNTERS ([com.pokedaisy.app.companion.data.GbField], its code checked), or
-     * null. WILD ENCOUNTERS OFF holds the game's own encounter state every frame ([gbWildHeld]). */
-    @Volatile var gbField: com.pokedaisy.app.companion.data.GbField? = null
-    /** Whether [gbField]'s wild encounters were held last frame (null = not known yet: put back once on the field). */
-    private var gbWildHeld: Boolean? = null
-
     /** ZOOM and the look-around over WIDE: asked for the window to draw before each frame ([EmulatorView.camera]). */
     @Volatile var wideCamera: WideCamera? = null
 
@@ -847,7 +841,7 @@ class EmulatorEngine(
     }
 
     /** A Game Boy game's field, as its scene says (pk_wide_gb.c's screen match: no text box, menu or battle); a game
-     * with no scene (no EXPAND row: the European Yellows, Red / Blue) leaves it to [gbField]'s own RAM checks. */
+     * with no scene (no EXPAND row: the European Yellows, Red / Blue) leaves it to the shared Game Boy field helper's own RAM checks. */
     private val gbOnField get() = wideScene == WideCamera.SCENE_FIELD || wideScene == -1
 
     fun requestSaveState(slot: Int) { if (CoopGuards.battleActive()) return; pendingSave = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
