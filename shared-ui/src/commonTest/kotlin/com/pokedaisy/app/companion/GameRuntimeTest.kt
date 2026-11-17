@@ -77,6 +77,45 @@ class GameRuntimeTest {
         }
     }
 
+    @Test fun originalFieldWindowsHideTheHudEvenWhenTheFieldCallbackDoesNotChange() {
+        val main = 0x03001000L
+        val field = 0x08001235L
+        val reader = object : MemoryReader {
+            override fun readCoreMemory(addr: Long, size: Int) =
+                ByteArray(size) { i -> if (addr == main + 4) (field shr (8 * i)).toByte() else 0 }
+        }
+        withPlayback { runtime, session, _ ->
+            runtime.start("missing-diagnostic.gba".toPath(), "BPEE", 0)
+            FfMenuWatch.load("BPEE", field, 0)
+            FfMenuWatch.useKnownGMain(main, 0x439)
+            repeat(20) { runtime.tick(reader) }
+            assertTrue(runtime.settledOnField)
+            for (overlay in listOf(GameField.LOCKED or GameField.TEXT, GameField.LOCKED, GameField.WINDOW, GameField.BATTLE)) {
+                runtime.fieldChanged(GameField.KNOWN or GameField.AVATAR or overlay)
+                assertFalse(runtime.settledOnField, "Native field overlay $overlay must hide the HUD")
+                assertTrue(session.onField, "Presentation must not change field-job ownership")
+            }
+            runtime.fieldChanged(GameField.KNOWN or GameField.AVATAR)
+            assertTrue(runtime.settledOnField)
+            runtime.close(); runtime.fieldChanged(GameField.KNOWN or GameField.AVATAR)
+            assertFalse(runtime.settledOnField)
+        }
+    }
+
+    @Test fun unknownFieldBitsAndOtherPlatformsRetainTheirExistingFieldSignal() {
+        withPlayback { runtime, session, _ ->
+            runtime.start("missing-diagnostic.gb".toPath(), null, 0)
+            repeat(20) { session.observeField(true, com.pokedaisy.app.WideCamera.SCENE_FIELD, 0, false) }
+            runtime.fieldChanged(0)
+            assertTrue(runtime.settledOnField)
+            // Non-GBA hosts already derive their own field readiness. Do not reinterpret their native bitmaps here.
+            runtime.fieldChanged(GameField.KNOWN or GameField.LOCKED or GameField.WINDOW)
+            assertTrue(runtime.settledOnField)
+            session.close(); runtime.fieldChanged(0)
+            assertFalse(runtime.settledOnField)
+        }
+    }
+
     @Test fun expandedTextAndMenuScenesHideTheHudEvenWhileTheFieldCallbackRemainsActive() {
         val main = 0x03001000L
         val field = 0x08001235L

@@ -209,12 +209,16 @@ class GameRuntime(
         val readable = gba && !blocked && telemetry.snapshot.value.blocked == null
         session.observeScreens(readable, reader = reader)
         session.observeField(readable && FfMenuWatch.onField && !map, wideScene, battle.gameState, battle.holdPicture)
-        settledOnField = readable && session.onField
         fieldChanged(if (readable && fieldReadable) readField() else 0)
     }
 
     fun fieldChanged(bits: Int) {
+        if (closed.value) return
         field = bits
+        // START, dialogue and cutscenes retain the overworld callback. Native field reads know when the game
+        // owns its controls or text layer; presentation can step aside without changing queued field-job ownership.
+        val fieldWindow = gba && bits and (GameField.LOCKED or GameField.BATTLE or GameField.WINDOW) != 0
+        settledOnField = !blocked && telemetry.snapshot.value.blocked == null && session.onField && !fieldWindow
         if (!fieldMovesReadable && bits and GameField.AVATAR != 0) fieldMovesReadable = true
     }
     fun resetFieldMoves() { fieldMovesReadable = false }
