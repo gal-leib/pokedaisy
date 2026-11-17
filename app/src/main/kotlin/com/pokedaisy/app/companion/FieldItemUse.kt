@@ -71,5 +71,6 @@ fun <T> fieldActionBattleResult(out: T): T = when {
     out is FlyTargets && out.result == FlyResult.NOT_NOW -> out.copy(result = FlyResult.IN_BATTLE) as T
     out is FlyResult && out == FlyResult.NOT_NOW -> FlyResult.IN_BATTLE as T
     out is CenterResult && out == CenterResult.NOT_NOW -> CenterResult.IN_BATTLE as T
+    out is FlashResult && out == FlashResult.NOT_NOW -> FlashResult.IN_BATTLE as T
     else -> out
 }

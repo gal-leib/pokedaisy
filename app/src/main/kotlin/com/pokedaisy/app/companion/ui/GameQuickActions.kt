@@ -4,6 +4,7 @@ import com.pokedaisy.app.Hotkeys
 import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.FlyAction
+import com.pokedaisy.app.companion.FieldFlashAction
 import com.pokedaisy.app.companion.ItemUse
 import com.pokedaisy.app.companion.RegisteredItemUse
 import com.pokedaisy.app.companion.data.KeyItems
@@ -12,6 +13,7 @@ import com.pokedaisy.app.companion.REPEL_KINDS
 import com.pokedaisy.app.companion.data.CenterResult
 import com.pokedaisy.app.companion.data.FlyResult
 import com.pokedaisy.app.companion.data.FlyTargets
+import com.pokedaisy.app.companion.data.FlashResult
 import com.pokedaisy.app.companion.data.ItemUseResult
 import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.i18n.tr
@@ -32,6 +34,7 @@ class GameQuickActions(
     /** HEAL done: the party as it was before (the host shows the bars filling up); null = a notice says so. */
     private val healed: ((List<com.pokedaisy.app.companion.data.MonView>) -> Unit)? = null,
     private val registeredItems: () -> RegisteredItemUse? = { null },
+    private val flash: () -> FieldFlashAction? = { null },
 ) : QuickActions {
     init {
         menu.onRun = ::run
@@ -42,6 +45,7 @@ class GameQuickActions(
     override fun offered(action: QuickAction): Boolean = when (action) {
         QuickAction.PC -> items()?.canPc() == true
         QuickAction.HEAL -> items()?.center()?.heal == true
+        QuickAction.FLASH -> flash()?.available() == true
         QuickAction.FLY -> fly()?.canFly() == true
         QuickAction.BIKE, QuickAction.ROD -> registeredItems()?.supported() == true
         QuickAction.REPEL -> REPEL_KINDS.any { items()?.canUse(it.first) == true } || extra.offered(action)
@@ -64,6 +68,9 @@ class GameQuickActions(
                     if (result == CenterResult.OK && show != null) show(before)
                     else notice(if (result == CenterResult.OK) tr("Your POKéMON are fully healed.") else centerMessage(result, ""))
                 }
+            }
+            QuickAction.FLASH -> flash()?.use { result ->
+                if (active() && result != FlashResult.OK) notice(flashMessage(result))
             }
             QuickAction.FLY -> {
                 val visit = menu.visit
@@ -111,6 +118,6 @@ class GameQuickActions(
     }
     override fun riding() = extra.riding()
     override fun flying() = extra.flying()
-    override fun flashDark() = extra.flashDark()
+    override fun flashDark() = flash()?.dark()
     override fun turbo() = extra.turbo()
 }

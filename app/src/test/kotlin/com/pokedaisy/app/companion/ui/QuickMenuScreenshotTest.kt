@@ -77,10 +77,10 @@ class QuickMenuScreenshotTest {
     @Test fun dimmed() = shot(moves = 1)
 
     /** On FLASH, which nobody knows: dimmed, saying why. */
-    @Test fun flash() = shot(moves = 3)
+    @Test fun flash() = shot(moves = QuickAction.entries.indexOf(QuickAction.FLASH))
 
     /** On FLASH in a dark cave, a party Pokémon knowing it (the tile only shows then). */
-    @Test fun flashDark() = shot(moves = 3, actions = object : QuickActions by Actions() {
+    @Test fun flashDark() = shot(moves = QuickAction.entries.indexOf(QuickAction.FLASH), actions = object : QuickActions by Actions() {
         override fun flashDark() = true
     }, snapshot = FieldHudScreenshotTest.snapshot.let { s ->
         s.copy(party = s.party.mapIndexed { i, m -> if (i == 1) m.copy(moves = m.moves + com.pokedaisy.app.companion.data.MoveView("FLASH", "Normal", 20, 0, id = 148)) else m })
