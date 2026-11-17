@@ -3,6 +3,7 @@
 package com.pokedaisy.app.ios
 
 import com.pokedaisy.app.WideCamera
+import com.pokedaisy.app.game.PictureScale
 import com.pokedaisy.app.companion.GridStrength
 import com.pokedaisy.app.companion.MetalScreenEffects
 import com.pokedaisy.app.companion.MetalSmoothing
@@ -20,9 +21,12 @@ class SmoothingTest {
     private fun renderer(): GameRenderer? = GameRenderer.create()?.apply { stretch = true }.also {
         if (it == null) println("SmoothingTest: no Metal device; GPU checks not run")
     }
-    private fun program(): PictureEffects.Program {
+    private fun program(xbr: Boolean = false): List<PictureEffects.SmoothPass> {
         val dir = assertNotNull(getenv("PK_SHADER_DIR")?.toKString(), "PK_SHADER_DIR not set")
-        return MetalSmoothing.xbrz(FileSystem.SYSTEM.read("$dir/xbrz-freescale.glsl".toPath()) { readUtf8() })
+        val asset = if (xbr) "xbr-lv2.glsl" else "xbrz-freescale.glsl"
+        val source = FileSystem.SYSTEM.read("$dir/$asset".toPath()) { readUtf8() }
+        return listOf(PictureEffects.SmoothPass(if (xbr) MetalSmoothing.xbr(source) else MetalSmoothing.xbrz(source),
+            if (xbr) PictureScale.Whole else PictureScale.View))
     }
     private fun upload(r: GameRenderer, bytes: ByteArray, w: Int, h: Int, expanded: Boolean = false) {
         bytes.usePinned { assertTrue(r.uploadFrame(it.addressOf(0), w, h,
@@ -47,11 +51,25 @@ class SmoothingTest {
         println("SmoothingTest: original xBRZ draws blended diagonals with Metal and OFF restores sharp pixels")
     }
 
+    @Test fun originalXbrSmoothsDiagonalEdgesAndOffRestoresSharpPixels() = runBlocking {
+        val r = renderer() ?: return@runBlocking
+        upload(r, diagonal(6, 6), 6, 6)
+        val sharp = renderGamePixels(r, 48, 48)
+        assertTrue(sharp.indices.filter { it % 4 != 3 }.all { sharp[it] == 0.toByte() || sharp[it] == (-1).toByte() })
+        assertTrue(r.configureEffects(PictureEffects(smoothing = program(true))))
+        val smooth = renderGamePixels(r, 48, 48)
+        assertTrue(smooth.indices.filter { it % 4 != 3 }.any { smooth[it] != 0.toByte() && smooth[it] != (-1).toByte() }, "xBR must interpolate diagonal edges")
+        assertFalse(sharp.contentEquals(smooth))
+        assertTrue(r.configureEffects(PictureEffects()))
+        assertContentEquals(sharp, renderGamePixels(r, 48, 48), "OFF must drop all smoothing state")
+        println("SmoothingTest: original xBR draws blended diagonals with Metal and OFF restores sharp pixels")
+    }
+
     @Test fun smoothingCombinesWithEveryFilterColorsAndUnlit() = runBlocking {
         val r = renderer() ?: return@runBlocking
         upload(r, diagonal(6, 6), 6, 6)
-        val program = program()
-        for (filter in ScreenFilter.entries) {
+        for (xbr in listOf(false, true)) for (filter in ScreenFilter.entries) {
+            val program = program(xbr)
             assertTrue(r.configureEffects(MetalScreenEffects.picture(filter, GridStrength.MEDIUM, true, true).copy(smoothing = program)), filter.name)
             val pixels = renderGamePixels(r, 53, 47)
             assertTrue(pixels.indices.filter { it % 4 != 3 }.any { pixels[it] != 0.toByte() }, filter.name)
@@ -60,15 +78,18 @@ class SmoothingTest {
     }
 
     @Test fun resizedExpandedCapacityHasTheSameSmoothedPixelsAsAnExactTexture() = runBlocking {
-        val reused = renderer() ?: return@runBlocking
-        val settings = MetalScreenEffects.picture(ScreenFilter.CRT, GridStrength.MEDIUM, true, true).copy(smoothing = program())
-        assertTrue(reused.configureEffects(settings))
-        for (w in listOf(2, 3, 2)) {
-            val fresh = assertNotNull(renderer())
-            assertTrue(fresh.configureEffects(settings))
-            val pixels = diagonal(w, 3)
-            upload(reused, pixels, w, 3, true); upload(fresh, pixels, w, 3)
-            assertContentEquals(renderGamePixels(fresh, w * 8, 24), renderGamePixels(reused, w * 8, 24), "logical width $w")
+        for (xbr in listOf(false, true)) {
+            val reused = renderer() ?: return@runBlocking
+            val settings = MetalScreenEffects.picture(ScreenFilter.CRT, GridStrength.MEDIUM, true, true).copy(smoothing = program(xbr))
+            assertTrue(reused.configureEffects(settings))
+            for (w in listOf(2, 3, 2)) {
+                val fresh = assertNotNull(renderer())
+                assertTrue(fresh.configureEffects(settings))
+                val pixels = diagonal(w, 3)
+                upload(reused, pixels, w, 3, true); upload(fresh, pixels, w, 3)
+                assertContentEquals(renderGamePixels(fresh, w * 8, 24), renderGamePixels(reused, w * 8, 24), "logical width $w")
+            }
         }
     }
+
 }

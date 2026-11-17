@@ -788,7 +788,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             val kx = sizes.kx
             val ky = sizes.ky
             // SMOOTHING: upscales the game; FILTER then draws over its picture (`uSmoothed`).
-            val smoothed = if (gpu) 0 else runSmoothing(input, kx, ky, prescaled)
+            val smoothed = if (gpu) 0 else runSmoothing(input, prescaled)
             if (smoothed != 0) {
                 input = smoothed
                 smooth = true
@@ -857,19 +857,15 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
          * or 0 with none (off, or failed here). Each pass reads the one before at its own size (and
          * PassPrevN the one N back; one before the first is [input]), drawn as RetroArch draws a pass.
          */
-        private fun runSmoothing(input: Int, kx: Int, ky: Int, prescaled: Boolean): Int {
+        private fun runSmoothing(input: Int, prescaled: Boolean): Int {
             val programs = smoothPrograms() ?: return 0
             val passes = smoothBuiltFor ?: return 0
             var src = input
             var srcW = texW
             var srcH = texH
             for ((i, program) in programs.withIndex()) {
-                val (w, h) = when (val size = passes[i].pass.size) {
-                    is ScreenShaders.SmoothSize.Source -> srcW * size.scale to srcH * size.scale
-                    ScreenShaders.SmoothSize.Whole -> texW * kx to texH * ky
-                    ScreenShaders.SmoothSize.View ->
-                        com.pokedaisy.app.game.picturePassSizes(texW, texH, quadW, quadH, prescaled).let { it.unlitW to it.unlitH }
-                }
+                val sizes = com.pokedaisy.app.game.picturePassSizes(texW, texH, quadW, quadH, prescaled)
+                val (w, h) = com.pokedaisy.app.game.picturePassSize(passes[i].pass.size, srcW, srcH, sizes)
                 while (smoothTargets.size <= i) smoothTargets += RenderTarget()
                 val target = smoothTargets[i]
                 if (!target.ensure(w, h, half = passes[i].pass.float)) {
