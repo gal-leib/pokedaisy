@@ -146,6 +146,14 @@ object PokeDaisyHost {
                                     onOpenCompanion = if (!panels.portrait && (!panels.state.side.shown || panels.state.side.isWindow))
                                         ({ panels.toggleCompanion() }) else null)
                             }
+                            val battleRead = com.pokedaisy.app.companion.ui.rememberBattleButtonsRead(snapshot)
+                            val buttons = com.pokedaisy.app.companion.battleButtonsWanted(
+                                currentSettings?.battleButtons == true, true, panels.portrait, snapshot) &&
+                                battleRead && !panels.state.side.windowOpen && !panels.quickMenu.open
+                            val clear = panels.hudClear()
+                            com.pokedaisy.app.companion.ui.BattleButtons(snapshot, buttons, battle,
+                                currentSettings?.showHints == true, core = panels.hudFrame(),
+                                clearTop = clear.first, clearBottom = clear.second, avoid = panels.hudAvoid())
                             quickActions?.let { actions ->
                                 com.pokedaisy.app.companion.ui.QuickMenu(panels.quickMenu, snapshot, actions,
                                     currentSettings!!.quickMenuActions, iosPreferences.fieldHudStyle.look)

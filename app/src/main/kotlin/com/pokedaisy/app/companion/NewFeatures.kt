@@ -11,6 +11,8 @@ import com.pokedaisy.app.companion.i18n.tk
  * from the update. Every new feature gets one (CLAUDE.md): add its id to [ALL] and the badge to its row.
  */
 object NewFeatures {
+    /** Shared battle buttons on iPhone and iPad. */
+    const val IOS_BATTLE_BUTTONS = "ios_battle_buttons"
     /** Shared field HUD on iPhone and iPad. */
     const val IOS_FIELD_HUD = "ios_field_hud"
     /** GAME BUTTONS in the shared iPhone/iPad setup wizard. */
@@ -267,6 +269,7 @@ object NewFeatures {
     const val IOS_GAME_SCREEN = "ios_game_screen"
 
     val ALL = listOf(
+        IOS_BATTLE_BUTTONS,
         IOS_FIELD_HUD,
         IOS_SETUP_BUTTONS,
         IOS_GAME_BINDINGS,

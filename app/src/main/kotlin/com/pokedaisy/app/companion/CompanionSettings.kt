@@ -19,6 +19,8 @@ import com.pokedaisy.app.companion.i18n.tk
 interface CompanionSettings : StoredCompanionSettings {
     /** Application settings can use the shared pages without a running game or game-only actions. */
     val hasRunningGame: Boolean get() = true
+    /** Optional NEW tag when a host first gains battle buttons. */
+    val battleButtonsBadge: String? get() = null
     /** Optional NEW tag when a host first gains the field HUD. */
     val fieldHudBadge: String? get() = null
     /** Optional NEW tag when a host first gains state slots. */
@@ -325,9 +327,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val hideBattleMenu: Boolean? get() = null
     fun setHideBattleMenu(on: Boolean) {}
 
-    /** SETTINGS > BATTLE BUTTONS: one screen, FIGHT, POKéMON and RUN beside a battle - see [Prefs.battleButtons]. */
-    val battleButtons: Boolean get() = true
-    fun setBattleButtons(on: Boolean) {}
+
 
 
 
