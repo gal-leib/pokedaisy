@@ -26,8 +26,23 @@ class GameRuntime(
     private val configureField: (Long) -> Boolean = { false },
     private val disableField: () -> Unit = {},
     private val restoreOptionPatchesOnClose: Boolean = true,
+    private val applyTint: (Int, Int, Int) -> Unit = { _, _, _ -> },
 ) {
     private val closed = atomic(false)
+    private val tint = DayNight.Transition()
+    private var desiredTint = DayNight.NONE
+    val dayNightSupported get() = !closed.value && DayNight.supported(gba,
+        blocked || telemetry.snapshot.value.blocked != null, activeGame)
+
+    /** The native core starts without a tint, even when this game-run owner is reused. */
+    fun resetTint() { tint.reset(); desiredTint = DayNight.NONE }
+
+    /** Both hosts call between frames, after the shared screen observers have run. */
+    fun stepTint() {
+        if (closed.value || !gba) return
+        tint.step(if (dayNightSupported) desiredTint else DayNight.NONE,
+            onField && !map && !FfMenuWatch.battling && battle.gameState == BATTLE_INPUT_NONE, applyTint)
+    }
     private var sampler: GameSampler? = null
     val options = GameOptions(optionPatcher, { !closed.value && !blocked &&
         telemetry.snapshot.value.blocked == null && optionsAllowed() })
@@ -167,6 +182,7 @@ class GameRuntime(
     fun start(romPath: Path, code: String?, crc: Long, gba: Boolean = code != null, areaMapCrc: Long = crc) {
         if (closed.value) return
         this.gba = gba
+        resetTint()
         session.reset()
         settledOnField = false
         val romKey = crc.toString(16).padStart(8, '0')
@@ -194,6 +210,7 @@ class GameRuntime(
             return
         }
         if (!gba) return
+        desiredTint = DayNight.desired(prefs.dayNight, dayNightSupported, snapshot.mapType)
         options.observe(snapshot)
         telemetry.knownGMain()?.let { (addr, offset) -> FfMenuWatch.useKnownGMain(addr, offset) }
         if (snapshot.connected) FfMenuWatch.notePosition(snapshot.x, snapshot.y, snapshot.mapGroup, snapshot.mapNum, snapshot.inBattle)
@@ -210,6 +227,7 @@ class GameRuntime(
         session.observeScreens(readable, reader = reader)
         session.observeField(readable && FfMenuWatch.onField && !map, wideScene, battle.gameState, battle.holdPicture)
         fieldChanged(if (readable && fieldReadable) readField() else 0)
+        stepTint()
     }
 
     fun fieldChanged(bits: Int) {

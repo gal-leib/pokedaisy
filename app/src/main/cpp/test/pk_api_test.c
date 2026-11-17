@@ -18,6 +18,7 @@ static int failures;
 static void path(char* out, size_t n, const char* dir, const char* name) { snprintf(out, n, "%s/%s", dir, name); }
 
 static void closed(void) {
+    pk_api_set_tint(0, 0, 0);  // safe before init and after deinit
     uint8_t b = 0x5A;
     char code[5];
     CHECK(pk_api_platform() == PK_API_PLATFORM_NONE, "platform %d with no game", pk_api_platform());
@@ -135,6 +136,47 @@ static void gba(const char* dir) {
     closed();
 }
 
+static void tint(const char* dir) {
+    char rom[1024];
+    path(rom, sizeof rom, dir, "diagnostic.gba");
+    CHECK(pk_api_init(rom, NULL), "tint diagnostic init");
+    for (int i = 0; i < 10; i++) pk_api_run_frame(); // original diagnostic reaches its idle loop
+    struct mCore* core = pkMainCore();
+    // One synthetic tile, alternating map/text palettes. No commercial code or art.
+    core->busWrite16(core, 0x04000000, 0x0100); // mode 0, BG0
+    core->busWrite16(core, 0x04000008, 31 << 8); // map in screen block 31
+    for (int i = 0; i < 16; i++) core->busWrite16(core, 0x06000000 + i * 2, 0x1111);
+    for (int i = 0; i < 1024; i++) core->busWrite16(core, 0x0600F800 + i * 2, i % 2 ? 13 << 12 : 0);
+    core->busWrite16(core, 0x05000002, 0x7FFF);
+    core->busWrite16(core, 0x050001A2, 0x7FFF);
+    pk_api_run_frame(); pk_api_run_frame();
+    const uint8_t* px = pk_api_video();
+    uint8_t plain[3]; memcpy(plain, px + 4, 3);
+    CHECK(plain[0] > 240 && !memcmp(plain, px + 9 * 4, 3), "synthetic palettes not visible");
+    pk_api_set_tint(135, 150, 225);
+    pk_api_run_frame(); pk_api_run_frame();
+    CHECK(px[4] < px[5] && px[5] < px[6] && px[6] < plain[2], "field palette did not become blue at night");
+    CHECK(!memcmp(plain, px + 9 * 4, 3), "text-window palette was tinted");
+    CHECK(core->busRead16(core, 0x05000002) == 0x7FFF && core->busRead16(core, 0x050001A2) == 0x7FFF,
+          "tint changed emulated palette memory");
+    pk_api_set_tint(-1, 500, 256);
+    pk_api_run_frame(); pk_api_run_frame();
+    CHECK(px[4] == 0 && px[5] == plain[1] && px[6] == plain[2], "tint channel bounds not clamped");
+    pk_api_set_tint(256, 256, 256);
+    pk_api_run_frame(); pk_api_run_frame();
+    CHECK(!memcmp(plain, px + 4, 3), "OFF did not restore field colors exactly");
+    pk_api_deinit();
+    path(rom, sizeof rom, dir, "diagnostic.gb");
+    CHECK(pk_api_init(rom, NULL), "GB tint diagnostic init");
+    for (int i = 0; i < 30; i++) pk_api_run_frame();
+    uint8_t row[160 * 4]; memcpy(row, pk_api_video(), sizeof row);
+    pk_api_set_tint(0, 0, 0);
+    pk_api_run_frame(); pk_api_run_frame();
+    CHECK(!memcmp(row, pk_api_video(), sizeof row), "GBA tint changed the Game Boy picture");
+    pk_api_deinit();
+    closed();
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         fprintf(stderr, "usage: %s <dir with diagnostic.gb / .gba>\n", argv[0]);
@@ -143,6 +185,7 @@ int main(int argc, char** argv) {
     closed();
     gameBoy(argv[1]);
     gba(argv[1]);
+    tint(argv[1]);
     if (failures) fprintf(stderr, "%d failed\n", failures);
     else puts("pk_api: all passed");
     return failures != 0;

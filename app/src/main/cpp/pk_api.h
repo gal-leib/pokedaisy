@@ -80,6 +80,9 @@ bool pk_api_field_knows(uint32_t crc);
  * Game thread, between frames. Unknown games, Game Boy and no core return zero. Does not enable game patches. */
 bool pk_api_field_configure(uint32_t crc);
 int pk_api_field_state(void);
+/** GBA field/sprite palette tint, 0..256 per channel (256 = unchanged). No game-memory writes.
+ * Game thread between frames; takes the core lock. GB and no game are no-ops. */
+void pk_api_set_tint(int red, int green, int blue);
 /** Bind the verified EWRAM encounter-switch address after field_configure; zero disables it.
  * wasOff restores ownership when resuming a state saved while encounters were off. Game thread only. */
 bool pk_api_field_wild(uint32_t addr, bool wasOff);

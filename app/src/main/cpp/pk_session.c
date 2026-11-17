@@ -444,6 +444,12 @@ int pk_api_field_step(bool runIndoors, int wildKeep) {
     return state;
 }
 
+void pk_api_set_tint(int red, int green, int blue) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_tint_set(g.core, red, green, blue);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
 void pk_api_set_keys(uint32_t keys) {
     if (g.core) {
         g.core->setKeys(g.core, keys);

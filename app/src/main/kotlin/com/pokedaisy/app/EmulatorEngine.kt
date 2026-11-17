@@ -495,12 +495,6 @@ class EmulatorEngine(
     @Volatile var dsBattleMenuFloats = false
     private var touchFrames = 0
 
-    /**
-     * DAY AND NIGHT ([com.pokedaisy.app.companion.data.DayNight]): the tint the activity wants on the field now (red,
-     * green, blue, 256 = as is; [DayNight.NONE] off, indoors, or a game that isn't a GBA one). The engine eases toward it
-     * on the field's screen (text boxes and the START menu too: their palettes aren't tinted) and back out of it for
-     * battles and menu screens, a few frames either way, and hands each step to the core ([MgbaCore.pkSetTint]).
-     */
     /** FOLLOWER ([com.pokedaisy.app.companion.data.MonArt]): the party lead's sprite to walk behind the player (null =
      * none: the row off, no sprite kept). Shown on the field's own screen, not surfing; set by the activity. */
     @Volatile var follower: com.pokedaisy.app.companion.data.MonArt.Mon? = null
@@ -511,9 +505,6 @@ class EmulatorEngine(
     @Volatile private var lookRefreshPending = false
     private var lookRefreshTries = 0
 
-    @Volatile var dayNightTint: IntArray = com.pokedaisy.app.companion.data.DayNight.NONE
-    private val tintNow = floatArrayOf(256f, 256f, 256f)
-    private val tintSent = intArrayOf(256, 256, 256)
     /** The last frame's EXPAND scene ([WideCamera.SCENE_FIELD] ...), -1 without EXPAND. Emu thread. */
     private var wideScene = -1
 
@@ -627,22 +618,6 @@ class EmulatorEngine(
      * the next frame - null = no frame this tick - and told after each one. Null = no co-op battles (not retail Emerald, no link).
      */
     @Volatile var coopBattles: CoopFrameHook? = null
-
-    /** DAY AND NIGHT, once a frame (emu thread): [tintNow] a step toward [dayNightTint] on the field, toward none off it. */
-    private fun stepTint(field: Boolean) {
-        val want = if (field) dayNightTint else com.pokedaisy.app.companion.data.DayNight.NONE
-        var changed = false
-        for (c in 0..2) {
-            val d = want[c] - tintNow[c]
-            tintNow[c] = if (kotlin.math.abs(d) < TINT_STEP) want[c].toFloat() else tintNow[c] + kotlin.math.sign(d) * TINT_STEP
-            val v = tintNow[c].toInt()
-            if (v != tintSent[c]) { tintSent[c] = v; changed = true }
-        }
-        // While tinted, sent again every second too: a core started since (another game, a restart) has its own
-        // renderer, which the native side hooks when it's told.
-        if (changed || (++tintFrames % 60 == 0 && tintSent.any { it != 256 })) MgbaCore.pkSetTint(tintSent[0], tintSent[1], tintSent[2])
-    }
-    private var tintFrames = 0
 
     private fun logField(speed: Float) {
         if (!BuildConfig.DEBUG) return
@@ -822,7 +797,8 @@ class EmulatorEngine(
 
     val playback by lazy {
         com.pokedaisy.app.companion.GameRuntime(gameSession, telemetry, preferences, battle, optionPatcher, { gba || nds },
-            configureField = { fieldGame != WideScreen.OFF }, restoreOptionPatchesOnClose = false)
+            configureField = { fieldGame != WideScreen.OFF }, restoreOptionPatchesOnClose = false,
+            applyTint = MgbaCore::pkSetTint)
     }
 
     /** Runs [job] on the emu thread before the next frame; dropped if the game closes first. */
@@ -1009,8 +985,7 @@ class EmulatorEngine(
         followerSent = null
         followerShown = false
         battleMenuHideSent = -1
-        tintNow.fill(256f)
-        tintSent.fill(256)
+        playback.resetTint()
         endDsHold()
         onCoreReady?.invoke(vw, vh)
 
@@ -1363,8 +1338,464 @@ class EmulatorEngine(
                     dsSkipTimed = true
                     MgbaCore.pkNdsSetDraw(draw, drawNext)
                 } else {
+<<<<<<< HEAD
                     dsSkip.reset()
                     MgbaCore.pkNdsSetDraw(!ff || ffGroup <= 1, !ff || (if (ffGroup > 1) ffGroup <= 2 else ffFit.size <= 1))
+=======
+                    if (dsTouchWanted.value) dsTouchWanted.value = false
+                    if (dsMenuScreen.value) dsMenuScreen.value = false
+                    if (dsMenuApp.value) dsMenuApp.value = false
+                }
+                if (wideApplied == WideScreen.OFF || (wideCamera == null && !probeOnly)) wideScene = -1
+                gameSession.observeField(
+                    if (gba || nds) fieldScreen && !mapOpen && !(nds && fieldState and MgbaCore.FIELD_TEXT != 0) else wideScene == WideCamera.SCENE_FIELD,
+                    wideScene, battleInput.gameState, battleInput.holdFrame)
+                if (onField.value != gameSession.onField) onField.value = gameSession.onField
+                // SCENE SPEEDS / AUTO-RUN / RUN INDOORS / WILD ENCOUNTERS: the field as WIDE's tables read it (or a
+                // pending hack's), every frame on a game they know - a few bytes, and SETTINGS learns from it whether
+                // BIKE / SURF SPEED can work here.
+                if (fieldGame != fieldApplied || wildFlag != wildApplied) {
+                    MgbaCore.pkFieldConfigure(if (gba) fieldGame else WideScreen.OFF, wildFlag.toInt(), wildEncounters < 100)
+                    fieldApplied = fieldGame
+                    wildApplied = wildFlag
+                    playback.resetFieldMoves()
+                }
+                // The same GB hold/restore policy runs on iOS, only while frames advance.
+                if (!rewinding) playback.gameBoyFields?.keepEncounters(gameCalls, wildEncounters == 0, gbOnField)
+                // A DS game holds its own switch in its field read (pk_nds_field.cpp: the map's rates at 0).
+                val wildKeep = if (wildFlag != 0L || nds) wildEncounters else 100
+                if (nds) {
+                    MgbaCore.pkNdsKeepStartMenu(dsKeepStartMenu)
+                    MgbaCore.pkNdsCpuBoost(ndsCpuBoost)
+                }
+                fieldState = when {
+                    nds -> MgbaCore.pkFieldState(false, wildKeep)
+                    gba && fieldGame != WideScreen.OFF -> gameOptions.fieldState(MgbaCore::pkFieldState, wildKnown = wildFlag != 0L)
+                    else -> 0
+                }
+                // SHINY ODDS: a new wild foe, between the frame it's made and the battle drawing it.
+                if (gba && shinyOdds < com.pokedaisy.app.companion.data.ShinyOdds.NORMAL) shinyRoller?.let { r ->
+                    runCatching {
+                        val n = r.tick(shinyOdds, InProcessReader::readCoreMemory, MgbaCore::pkWriteBytes)
+                        if (n > 0) Log.i("pokedaisy", "shiny odds: foe made shiny (1 in $shinyOdds)")
+                    }.onFailure { Log.w("pokedaisy", "shiny odds failed", it) }
+                }
+                if (gba) gameOptions.markExp(InProcessReader::readCoreMemory, MgbaCore::pkWriteBytes)
+                playback.fieldChanged(fieldState)
+                val bike = MgbaCore.FIELD_AVATAR or MgbaCore.FIELD_BIKE
+                riding = (fieldState and bike) == bike
+                val battleState = battleInput.gameState
+                scene = PlaybackPolicy.scene(battleState, menuOpen, mapOpen, FfMenuWatch.battling, fieldState)
+                // PLAYER LOOK: the player's sprite set up again once the field's own screen runs (never over a battle's
+                // sprites); the native side checks it's still the player's.
+                // Not done (the screen mid-fade, the palette buffers not agreeing yet): again on a later field frame, for
+                // up to ~10 s of them.
+                if (lookRefreshPending && gba && fieldScreen && !mapOpen && !FfMenuWatch.battling) {
+                    if (MgbaCore.pkLookRefresh(lookPatch?.playerPal) || ++lookRefreshTries >= LOOK_REFRESH_TRIES) {
+                        if (lookRefreshTries >= LOOK_REFRESH_TRIES) Log.w("pokedaisy", "player look: the sprite's palette never settled, left as it is")
+                        lookRefreshPending = false
+                        lookRefreshTries = 0
+                    }
+                }
+                if (gba) stepRide(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
+                    battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
+                if (gba) stepFollower(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
+                    battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE && fieldState and MgbaCore.FIELD_SURF == 0)
+                if (gba) coopLock?.onFrame()
+                if (gba) coopPresence?.onFrame(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
+                    battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
+                if (gba) stepBattleMenuHide()
+                playback.stepTint()
+                logField(effectiveSpeed())
+                val speed = effectiveSpeed()
+                // FF the player still has on - SMART only holding it at 1x for a menu.
+                val ffWanted = requestedSpeed() > 1f
+                val mode = ffMusicMode
+                // The song the game is playing right now (FfMusicKey): read
+                // every frame, so a clip starts and stops exactly with it.
+                val ffMusicKey = if (gba) FfMusicKey.current(InProcessReader)
+                    else gen1Music?.let { com.pokedaisy.app.companion.data.Gen1Music.current(InProcessReader, it) }
+                if (ffMusicKey != null && ffMusicKey != songKey) {
+                    songKey = ffMusicKey
+                    songStartedAt = android.os.SystemClock.elapsedRealtime()
+                }
+                // STEADY: have each new song rendered on its own, at any
+                // speed, so its clip is usually ready before FF needs it.
+                if (mode != FfMusicMode.STEADY) requestedKey = null
+                else if (ffMusicKey != null && ffMusicKey != requestedKey) {
+                    requestedKey = ffMusicKey
+                    ffMusicCache.notePlayed(ffMusicKey)   // the songs played longest ago go first when the cache is full
+                    if (!ffMusicCache.complete(ffMusicKey)) runCatching { onFfMusicWanted?.invoke(ffMusicKey) }
+                }
+                // The clip follows the FF the player asked for, not SMART's 1x stretches: it
+                // plays straight through a menu instead of handing over to the game's music
+                // (at another spot in the song) and starting over when FF picks up again.
+                val clip = if (ffWanted && mode == FfMusicMode.STEADY && ffMusicKey != null) {
+                    ffMusicCache.fileIfCached(ffMusicKey)
+                } else null
+                if (ffClipNotice.changed(clip)) {
+                    onFfMusicChanged?.invoke(
+                        clip?.let { FfMusicPlayer.Clip(it, ffMusicCache.introIfCached(ffMusicKey!!), songStartedAt) },
+                    )
+                }
+                // STEADY with the song's clip still rendering: FF stays silent until it's in (it used to
+                // play the song SPED-UP meanwhile, then switch) - unless no clip will ever come.
+                val awaitingClip = mode == FfMusicMode.STEADY && clip == null && ffMusicKey != null &&
+                    ffMusicWillRender?.invoke(ffMusicKey) == true
+                // A DS game: no clips, the copy (above). Like a clip it follows the FF the player asked for, so it
+                // plays straight through SMART's 1x menus.
+                val dsBgm = if (nds && dsMusicOk && mode == FfMusicMode.STEADY && ffWanted) MgbaCore.pkNdsBgm() else -1
+                if (dsBgm >= 0) {
+                    // A copy is due when FF comes on and for each new song: taken once the sound driver has the song
+                    // (a few frames on) and it's settled (pkNdsBgmState: no volume fade runs, and its player isn't
+                    // paused - a song coming back after a battle is, at 0, for a few frames before it fades in: a copy
+                    // taken then stayed silent), or after DS_MUSIC_MAX_WAIT_FRAMES whatever. Settled for a few frames:
+                    // the ARM9 marks a song started a frame or so before its command reaches the ARM7, and a copy
+                    // taken in between never starts it (Black 2, leaving a Pokemon Center: silent).
+                    val bgmState = MgbaCore.pkNdsBgmState()
+                    if (bgmState != dsStateSeen) {
+                        dsStateSeen = bgmState
+                        dsStateFrames = 0
+                    } else dsStateFrames++
+                    val settled = bgmState >= 0 && dsStateFrames >= DS_MUSIC_SETTLE_FRAMES
+                    if (!dsMusicOn && dsMusicWait < 0) dsMusicWait = DS_MUSIC_SETTLE_FRAMES
+                    else if (dsMusicOn && dsBgm != dsMusicBgm) {
+                        // 0: the game fading its song out before the next (its fades run on the ARM9, stopped in the
+                        // copy).
+                        if (dsBgm == 0) MgbaCore.pkNdsMusicFade(DS_MUSIC_FADE_FRAMES) else dsMusicWait = 0
+                    } else if (dsMusicOn && dsMusicWait < 0 && settled && bgmState != dsMusicState) {
+                        // Same song, but the game paused, faded or resumed it since the copy (which can't follow): faded
+                        // out with it when it's gone silent (before the next song, usually), else copied again as it is.
+                        if ((bgmState and 0xFFFF) == 0) MgbaCore.pkNdsMusicFade(DS_MUSIC_FADE_FRAMES)
+                        else dsMusicWait = DS_MUSIC_SETTLE_FRAMES
+                        dsMusicState = bgmState
+                    }
+                    dsMusicBgm = dsBgm
+                    if (dsMusicWait >= 0 && ++dsMusicWait > DS_MUSIC_SETTLE_FRAMES &&
+                        (settled || dsMusicWait > DS_MUSIC_MAX_WAIT_FRAMES)
+                    ) {
+                        dsMusicWait = -1
+                        dsMusicState = bgmState
+                        dsMusicLeft = 0
+                        dsMusicOn = MgbaCore.pkNdsMusicStart()
+                        if (dsMusicOn) Log.i("pokedaisy", "FF music: DS copy playing song %d".format(dsBgm))
+                        else {
+                            dsMusicOk = false
+                            Log.w("pokedaisy", "FF music: the DS music copy didn't start; SPED-UP for this run")
+                        }
+                    }
+                } else {
+                    if (dsMusicOn) MgbaCore.pkNdsMusicStop()
+                    dsMusicOn = false
+                    dsMusicLeft = 0
+                    dsMusicBgm = -1
+                    dsMusicWait = -1
+                }
+                // Heard at 1x (unless a clip is playing through SMART's 1x); during FF
+                // only as SPED-UP (which STEADY falls back to only for a song or ROM it can't
+                // render). Slow-mo stays muted.
+                val spedUp = speed > 1f && clip == null && mode != FfMusicMode.OFF && !awaitingClip && !dsMusicOn
+                val wantPaused = rewinding || battleInput.holdFrame || dsHeld && !ffWanted ||
+                    !((speed == 1f && clip == null) || spedUp || dsMusicOn)
+                // Refreshes per frame when the display paces 1x; 0 = the timer and blocking audio.
+                // A screen whose ticks don't follow its refresh (VsyncCheck, GitHub #350): the timer and blocking writes,
+                // like the audio's own fallback - vsync pacing on its made-up rate flipped on and off, 25-60 fps at 1x.
+                // Not latched: vsyncsPerFrame() is 0 while the check finds them unreliable, and vsync paces again once
+                // it doesn't. The audio fallback tries vsync pacing again once its wait is over.
+                if (vsyncFallback && System.nanoTime() >= audioRetryAt) {
+                    vsyncFallback = false
+                    audioFallback = false
+                    trouble = AudioTroubleWatch()
+                    Log.i("pokedaisy", "audio: trying vsync pacing again")
+                }
+                val perFrame = if (speed == 1f && track != null && bufferFrames > 0 && !vsyncFallback) vsyncsPerFrame() else 0
+                pacedPerFrame = perFrame
+                val ffPer = ffFramesPerRefresh(speed, vsyncsPerFrame())
+                if (ffPer != ffPerTick) {
+                    ffPerTick = ffPer
+                    ffFit.reset(ffPer)
+                    ffGroup = 1   // this frame ends a group: drawn, then the next refresh's tick
+                    // Timed from the next tick: kept from FF's last run, the first group "took" all the time FF was
+                    // off (seconds, minutes), the fit dropped to a frame a refresh - 1x - and FF only came back
+                    // seconds later, longer the longer it had been off; a refresh gap mid-FF did the same.
+                    ffGroupStart = 0L
+                    if (ffPer > 0) vsyncTicks.drainPermits()
+                }
+                if ((perFrame > 0) != vsyncMode) {
+                    vsyncMode = perFrame > 0
+                    if (vsyncMode) {
+                        vsyncTicks.drainPermits()   // start on the next refresh, not a banked one
+                        vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
+                        catchUpRun = 0
+                        // framesWritten already counts every write since the track started or was flushed. It was set to
+                        // "about full" here, but a new track (every launch and resume) starts empty and FF's writes never
+                        // block: the guess ran up to twice the buffer (queued=14886 of 7688 on the Thor), held every frame
+                        // and pinned the rate control at its lowest - the music 0.5% flat - for 15 - 30 s.
+                    } else {
+                        MgbaCore.pkSetAudioRate(sampleRate.toDouble())
+                    }
+                }
+                // The timer fallback keeps the whole buffer: it's there for devices that ran dry. So does a DS game's
+                // STEADY copy, which fills it to the top on purpose (a track starts once its buffer is full).
+                if (!trackStarted && !paused && track != null) trackStarted = track.playbackHeadPosition != 0
+                val half = (!vsyncMode || !trackStarted) && !vsyncFallback && vsyncUnreliable == null && !dsMusicOn
+                if (half != trackHalf && track != null) {
+                    trackHalf = half
+                    runCatching { track.bufferSizeInFrames = if (half) bufferFrames / 2 else bufferFrames }
+                }
+                if (GameVolume.gain != trackGain && track != null) {
+                    trackGain = GameVolume.gain
+                    runCatching { track.setVolume(trackGain) }
+                }
+                gameAudioPaused = wantPaused
+                if (wantPaused != paused) {
+                    paused = wantPaused
+                    if (paused) runCatching { track?.pause(); track?.flush() }
+                    else runCatching { track?.play() }
+                    // flush() empties the buffer and puts the play head back at 0.
+                    framesWritten = 0L
+                    trackStarted = false
+                    vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
+                }
+
+                queuedAfter = null
+                val n = MgbaCore.pkReadAudio(scratch)
+                fpsAudioMade += n / 2
+                if (BuildConfig.DEBUG && fpsFrames and 63 == 0) tap.arm(audioTapDir)
+                if (BuildConfig.DEBUG && nds) for (i in 0 until n) gamePeak = maxOf(gamePeak, kotlin.math.abs(scratch[i].toInt()))
+                // In FF, the game's sounds for the companion's automated battle presses stay silent but the last.
+                if (n > 0 && speed > 1f && battleInput.muteGame) java.util.Arrays.fill(scratch, 0, n, 0.toShort())
+                if (dsMusicOn && !paused && track != null) {
+                    // The copy's audio instead of the game's: as many of its frames as keep the buffer full, so it
+                    // plays at 1x whatever the game's speed (it makes 1/60 s a frame). Full, not half: a track that
+                    // hasn't started playing yet starts only once its buffer is (its start threshold) - kept half full,
+                    // one never made a sound.
+                    val played = track.playbackHeadPosition
+                    var queued = framesWritten.toInt() - played
+                    if (queued < 0) queued = 0
+                    framesWritten = played.toLong() + queued
+                    // Seen here, so 1x's guard below doesn't take an underrun from FF (a copy starting) for one of its
+                    // own: it read it as "ran dry" and zeroed the estimate over a full buffer (Black on the Thor: 1x ran
+                    // ~2.2x after FF, every frame a catch-up, half its audio cut off).
+                    underruns = track.underrunCount
+                    // A copy frame runs only once the last one's audio is all written (what didn't fit waits in
+                    // dsMusicOut): run per game frame instead, the copy ran at the game's speed and its music skipped.
+                    var runs = 0
+                    while (queued < bufferFrames) {
+                        if (dsMusicLeft == 0) {
+                            if (runs++ >= DS_MUSIC_MAX_FRAMES) break
+                            dsMusicLeft = MgbaCore.pkNdsMusicRead(dsMusicOut).coerceAtLeast(0)
+                            dsMusicPos = 0
+                            if (dsMusicLeft == 0) break
+                        }
+                        val w = track.write(dsMusicOut, dsMusicPos, dsMusicLeft, AudioTrack.WRITE_NON_BLOCKING)
+                        if (w <= 0) break
+                        tap.frame(dsMusicOut, dsMusicLeft, w, sampleRate.toDouble(), queued, 's', dsMusicPos)
+                        if (BuildConfig.DEBUG) for (i in dsMusicPos until dsMusicPos + w) dsMusicPeak = maxOf(dsMusicPeak, kotlin.math.abs(dsMusicOut[i].toInt()))
+                        dsMusicPos += w
+                        dsMusicLeft -= w
+                        framesWritten += w / 2
+                        queued += w / 2
+                        dsMusicFrames += w / 2
+                    }
+                } else if (n > 0 && !paused && track != null) {
+                    if (vsyncMode) {
+                        // The play head wraps as an unsigned int; the difference doesn't care.
+                        val played = track.playbackHeadPosition
+                        var queued = framesWritten.toInt() - played
+                        val nowUnderruns = track.underrunCount
+                        if (queued < 0 || nowUnderruns != underruns) queued = 0   // ran dry: the guess was off
+                        if (nowUnderruns != underruns && System.nanoTime() >= vsyncSettledAt &&
+                            trouble.record(System.nanoTime())
+                        ) {
+                            // The device keeps running dry with this screen's pacing: the timer and blocking
+                            // writes for a while, as before vsync pacing (1.1.x), then vsync pacing again.
+                            vsyncFallback = true
+                            audioFallback = true
+                            audioRetryAt = System.nanoTime() + audioRetryNanos
+                            Log.w("pokedaisy", "audio: underruns keep coming under vsync pacing; timer pacing for %d s".format(audioRetryNanos / 1_000_000_000L))
+                            audioRetryNanos = (audioRetryNanos * 2).coerceAtMost(AUDIO_RETRY_MAX_NANOS)
+                        }
+                        underruns = nowUnderruns
+                        // No silence written in: it was the stutter (30-40 ms of it each time the buffer ran low). A
+                        // low buffer runs the next frame at once instead (vsyncPace below).
+                        framesWritten = played.toLong() + queued
+                        // Samples per emulated second so that a frame's worth lasts one frame of the
+                        // display's, nudged towards a half-full buffer (dynamic rate control).
+                        val fill = queued.toDouble() / bufferFrames
+                        val frameHz = 1e9 / ((audioPeriodNanos.takeIf { it > 0.0 } ?: vsyncPeriodNanos) * perFrame)
+                        val drc = 1.0 + DRC_MAX * (1.0 - 2.0 * fill).coerceIn(-1.0, 1.0)
+                        // The core's own frame rate: a DS makes 59.83 frames a second, not the GBA's 59.73 (0.17% that DRC
+                        // otherwise spent a third of its range on, GitHub #215).
+                        val rate = sampleRate * (if (nds) NDS_FPS else GBA_FPS) / frameHz * drc
+                        MgbaCore.pkSetAudioRate(rate)
+                        val w = track.write(scratch, 0, n, AudioTrack.WRITE_NON_BLOCKING)
+                        tap.frame(scratch, n, w, rate, queued, 'v')
+                        if (w > 0) fpsAudioTaken += w / 2
+                        if (w > 0) framesWritten += w / 2
+                        if (w in 0 until n) {
+                            fpsDropped += (n - w) / 2   // a full buffer cut it short
+                            // ... so it's full, whatever the estimate says: one that had gone low stays low
+                            // otherwise (the play head and the writes keep step), every frame a catch-up.
+                            framesWritten = played.toLong() + track.bufferSizeInFrames
+                        }
+                        queuedAfter = (framesWritten - played).toInt()
+                        lastQueued = queuedAfter
+                    } else if (speed == 1f) {
+                        val blockStart = System.nanoTime()
+                        val w = track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
+                        val blocked = System.nanoTime() - blockStart
+                        fpsBlocks++
+                        fpsBlockSum += blocked
+                        if (blocked > fpsBlockMax) fpsBlockMax = blocked
+                        if (w > 0) framesWritten += w / 2
+                        tap.frame(scratch, n, w, sampleRate.toDouble(), -1, 'b')
+                    } else {
+                        // The speed the game really runs at: a refresh-paced group the device can't fit runs fewer frames.
+                        val factor = if (speed.isInfinite()) measuredSpeed else if (ffPerTick > 0) ffFit.size * speed / ffPerTick else speed
+                        var m = 0
+                        for (i in 0 until n / 2) {
+                            decimL += scratch[i * 2]; decimR += scratch[i * 2 + 1]; decimN++
+                            decimPhase += 1f
+                            if (decimPhase >= factor) {
+                                decimPhase -= factor
+                                spedUpOut[m++] = (decimL / decimN).toShort()
+                                spedUpOut[m++] = (decimR / decimN).toShort()
+                                decimL = 0; decimR = 0; decimN = 0
+                            }
+                        }
+                        // Never block: FF mustn't be paced by the audio device.
+                        if (m > 0) {
+                            val w = track.write(spedUpOut, 0, m, AudioTrack.WRITE_NON_BLOCKING)
+                            if (w > 0) framesWritten += w / 2
+                        }
+                        underruns = track.underrunCount   // FF's own, not 1x's (as the DS copy's above)
+                    }
+                }
+
+                val work = System.nanoTime() - frameStart
+                workNanos += work
+                if (work > maxWork.get()) maxWork.set(work)
+                currentSpeed = speed
+                if (fpsFrames and 31 == 0) track?.let { t -> runCatching { audioUnderruns = t.underrunCount } }
+                fpsWork += work
+                if (work > fpsMaxWork) fpsMaxWork = work
+                if (++fpsFrames >= 120) {
+                    val now = System.nanoTime()
+                    val fps = fpsFrames * 1e9 / (now - fpsSince)
+                    // Pacing, for a logcat read: the screen's refresh and refreshes per frame (0 = the timer), the GL
+                    // thread's late draws since the last line, the frames' work (avg / worst ms) and audio underruns.
+                    val late = lateFramesSource?.invoke() ?: -1L
+                    // Then vsync pacing's audio guard: frames run at once (catchup) / held to a fresh refresh (hold),
+                    // audio frames a full buffer cut off (dropped), how full the buffer is, and whether it gave up.
+                    Log.i("pokedaisy", ("fps=%.1f (%s) refresh=%.2fHz paced=%s ffPerTick=%s late=%d work=%.1f/%.1fms sample=%d:%.1f/%.1fms underruns=%d " +
+                        "catchup=%d hold=%d dropped=%d queued=%d/%d audio=%d/%d/%d%s").format(
+                        fps, speedTag(speed), refreshHz, if (slowFrames) "$pacedPerFrame (slow: not waited for)" else "$pacedPerFrame", if (ffPerTick > 0 && ffFit.size != ffPerTick) "${ffFit.size}/$ffPerTick" else "$ffPerTick", if (late < 0 || fpsLate < 0) -1 else late - fpsLate,
+                        fpsWork / fpsFrames / 1e6, fpsMaxWork / 1e6,
+                        fpsSamples, if (fpsSamples > 0) fpsSampleWork / fpsSamples / 1e6 else 0.0, fpsMaxSample / 1e6, audioUnderruns,
+                        fpsCatchUps, fpsHolds, fpsDropped, lastQueued, bufferFrames,
+                        fpsAudioMade, fpsAudioTaken,
+                        (track?.playbackHeadPosition?.toLong()?.and(0xFFFFFFFFL) ?: 0L).let { p -> if (fpsPlayedAt < 0) -1 else p - fpsPlayedAt },
+                        if (vsyncUnreliable != null) " fallback (ticks don't follow the refresh)" else if (vsyncFallback) " fallback (audio)" else "") +
+                        " ticks=%.0f/s".format(vsyncCheck.lastRate) +
+                        (if (fpsBlocks > 0) " block=%.1f/%.1fms".format(fpsBlockSum / fpsBlocks / 1e6, fpsBlockMax / 1e6) else "") +
+                        (drawStatsSource?.invoke()?.let { (r, u) ->
+                            val line = " repeats=%d unshown=%d".format(r - fpsRepeats, u - fpsUnshown)
+                            fpsRepeats = r; fpsUnshown = u
+                            line
+                        } ?: "") +
+                        if (nds) " dsMusic=%s/%d written=%d peak=%d gamePeak=%d track=%d skip=%d".format(dsMusicOn, dsMusicBgm, dsMusicFrames, dsMusicPeak, gamePeak, track?.playState ?: -1, dsSkip.skip) else "")
+                    dsMusicPeak = 0
+                    gamePeak = 0
+                    dsMusicFrames = 0
+                    fpsCatchUps = 0
+                    fpsHolds = 0
+                    fpsBlocks = 0
+                    fpsBlockSum = 0L
+                    fpsBlockMax = 0L
+                    fpsDropped = 0
+                    // [slowFrames]: 3+ late draws in two windows of 1x frames (a single one can be the device's hiccup).
+                    if (!slowFrames && pacedPerFrame > 0 && speed == 1f && fpsLate >= 0 && late - fpsLate >= SLOW_LATE_FRAMES &&
+                        ++slowWindows >= SLOW_WINDOWS
+                    ) {
+                        slowFrames = true
+                        Log.i("pokedaisy", "pacing: frames keep missing the refresh; drawn a refresh later from now on")
+                    }
+                    fpsLate = late
+                    fpsWork = 0L
+                    fpsMaxWork = 0L
+                    fpsSamples = 0
+                    fpsAudioMade = 0L
+                    fpsAudioTaken = 0L
+                    fpsPlayedAt = track?.playbackHeadPosition?.toLong()?.and(0xFFFFFFFFL) ?: -1L
+                    fpsSampleWork = 0L
+                    fpsMaxSample = 0L
+                    if (speed.isInfinite()) measuredSpeed = (fps / 60.0).toFloat().coerceAtLeast(1f)
+                    fpsFrames = 0
+                    fpsSince = now
+                }
+
+                if (vsyncMode) {
+                    // Wait for the game screen's next refresh(es); if they stop coming (the view
+                    // went away) the wait times out and the timer takes over from the next frame.
+                    // The audio left in the buffer can override that (GitHub #80): low = a refresh was missed,
+                    // run the next frame now (at most two in a row: a device that never fills can't make the
+                    // game race); high = ahead, drop the banked refreshes and wait for a fresh one.
+                    val pace = queuedAfter?.let { vsyncPace(it, bufferFrames) } ?: VsyncPace.ON_TICK
+                    val wait = (vsyncPeriodNanos * perFrame * 3).toLong()
+                    if (pace == VsyncPace.CATCH_UP && catchUpRun < MAX_CATCH_UP) {
+                        catchUpRun++
+                        fpsCatchUps++
+                        vsyncTicks.tryAcquire(perFrame)   // take the refreshes it stands for, if they came
+                    } else {
+                        catchUpRun = 0
+                        if (pace == VsyncPace.HOLD) {
+                            fpsHolds++
+                            vsyncTicks.drainPermits()
+                        }
+                        runCatching { vsyncTicks.tryAcquire(perFrame, wait, java.util.concurrent.TimeUnit.NANOSECONDS) }
+                    }
+                    next = System.nanoTime()
+                    prevSpeed = speed
+                    continue
+                }
+
+                if (ffPerTick > 0) {
+                    // Fast-forward on the refresh: the group's frames run as soon as the tick comes, then the
+                    // next tick (or the timer takes over if the refreshes stop).
+                    if (--ffGroup <= 0) {
+                        // A group that outran its refresh left that refresh nothing new (GitHub #216: HeartGold at 4x
+                        // swung between ~2x and 4x, its SPED-UP music short): fewer frames a group until they fit.
+                        val groupDone = System.nanoTime()
+                        if (ffGroupStart > 0L) ffFit.groupDone(groupDone - ffGroupStart, vsyncPeriodNanos.toLong())
+                        val wait = (vsyncPeriodNanos * 3).toLong()
+                        runCatching { vsyncTicks.tryAcquire(1, wait, java.util.concurrent.TimeUnit.NANOSECONDS) }
+                        ffGroup = ffFit.size
+                        ffGroupStart = System.nanoTime()
+                    }
+                    next = System.nanoTime()
+                    prevSpeed = speed
+                    continue
+                }
+
+                if (speed.isInfinite()) {
+                    next = System.nanoTime()                 // uncapped: no wait
+                    if (fpsFrames and 63 == 0) Thread.yield()
+                    continue
+                }
+
+                val interval = (frameNanos / speed).toLong()
+                if (speed != prevSpeed) next = System.nanoTime() + interval else next += interval
+                prevSpeed = speed
+                val sleep = next - System.nanoTime()
+                if (sleep > 1_000_000L) {
+                    try {
+                        Thread.sleep(sleep / 1_000_000L)
+                    } catch (_: InterruptedException) {
+                    }
+                } else if (sleep < -interval * 4) {
+                    next = System.nanoTime()
+>>>>>>> afcfdee3 (Share day and night policy and native palette tint across hosts)
                 }
             }
             return true
@@ -2241,7 +2672,6 @@ class EmulatorEngine(
 
     internal companion object {
         /** DAY AND NIGHT's ease: per frame, of 256 (a full night's dimming in about half a second). */
-        const val TINT_STEP = 4f
 
         /** PLAYER LOOK's refresh: field frames it's tried again while the palette can't go in yet. */
         const val LOOK_REFRESH_TRIES = 600

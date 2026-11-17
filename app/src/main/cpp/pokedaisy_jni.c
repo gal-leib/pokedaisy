@@ -334,7 +334,7 @@ Java_com_pokedaisy_app_MgbaCore_pkPartnerPlace(JNIEnv* env, jobject thiz, jboole
 // DAY AND NIGHT: the map's and sprites' palettes tinted (256 = as is). Emu thread.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkSetTint(JNIEnv* env, jobject thiz, jint r, jint gr, jint b) {
-    if (g.core && pk_is_gba(g.core)) pk_tint_set(g.core, r, gr, b);
+    pk_api_set_tint(r, gr, b);
 }
 
 // HIDE BATTLE MENU: the battle's FIGHT / BAG and move menus off the frames drawn (1 = the arrow down, 2 = up, 0 = shown);
