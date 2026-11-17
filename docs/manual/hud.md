@@ -74,3 +74,8 @@ the game. `FIGHT`, the party list and `RUN` use the same battle controls as the 
 the game can read battle commands, and during double battles. Opening the companion window or `QUICK MENU` hides them.
 The action buttons move left when touch controls occupy the right margin. If no column is clear, use the regular
 game controls. You can turn battle buttons off independently of the field HUD.
+
+HUD windows and battle move/party lists take your controller and bound keyboard buttons while they are open.
+`B` or `START` backs out of the current overlay. Held gameplay buttons must be released before they can play again.
+WILD's `KEEP OPEN` keeps gameplay available. The Quick Menu shortcut still works from a modal overlay;
+editing controls or capturing a binding keeps priority over it.

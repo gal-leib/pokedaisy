@@ -23,7 +23,7 @@ class GameInput internal constructor(
     // A second view of the same bindings handles only QUICK MENU while it owns manual input.
     // Reusing PolledGameKeys preserves chord quarantine and reentrant ownership changes.
     private val menuShortcut = PolledGameKeys().also { keys ->
-        keys.onHotkey = { if (quickMenuCaptured) onHotkey(it) }
+        keys.onHotkey = { if (quickMenuCaptured || overlayMenuCaptured) onHotkey(it) }
     }
     val capture: KeyCapture get() = buttons.capture
     var onHotkey: (Hotkeys.Event) -> Unit
@@ -54,6 +54,13 @@ class GameInput internal constructor(
         set(value) {
             if (field == value) return
             if (!value) axesGate.quarantineUntilNeutral()
+            field = value
+            menuShortcut.quarantine(hardware().keys + touchButtonKeys)
+        }
+    /** HUD/battle modals allow only their Quick Menu shortcut; editor/binding/background still win. */
+    var overlayMenuCaptured = false
+        set(value) {
+            if (field == value) return
             field = value
             menuShortcut.quarantine(hardware().keys + touchButtonKeys)
         }
@@ -89,11 +96,12 @@ class GameInput internal constructor(
     fun poll() {
         val h = hardware()
         // A rebound menu key may also mean A/START. The shortcut closes the menu before that key can select a tile.
-        val menuBlocked = !quickMenuCaptured || capture.active || touchGate.blockedExcept(ManualInputGate.Owner.COMPANION)
-        if (quickMenuCaptured) menuShortcut.poll((if (keyboardCaptured) h.controllers else h.keys) + touchButtonKeys, menuBlocked)
+        val menuShortcutCaptured = quickMenuCaptured || overlayMenuCaptured
+        val menuBlocked = !menuShortcutCaptured || capture.active || touchGate.blockedExcept(ManualInputGate.Owner.COMPANION)
+        if (menuShortcutCaptured) menuShortcut.poll((if (keyboardCaptured) h.controllers else h.keys) + touchButtonKeys, menuBlocked)
         if (companionCaptured && !capture.active && !touchGate.blockedExcept(ManualInputGate.Owner.COMPANION)) {
             val aiming = quickMenuCaptured && onCompanionAim(h.stickX, h.stickY)
-            val keys = if (quickMenuCaptured && !keyboardCaptured) h.keys else h.controllers
+            val keys = if ((quickMenuCaptured || overlayMenuCaptured) && !keyboardCaptured) h.keys else h.controllers
             val directions = if (aiming) h.dpad else h.axes
             onCompanionButtons(keys.fold(directions) { bits, code -> bits or (buttons.input.buttonFor(code) ?: 0) })
         }

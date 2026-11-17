@@ -33,6 +33,17 @@ internal class IosGameScreen(
     private val repeatClock = TimeSource.Monotonic.markNow()
     private fun menuTime() = repeatClock.elapsedNow().toDouble(DurationUnit.SECONDS)
     val back = CompanionBack()
+    private val overlayBack = CompanionBack()
+    private val overlayKeys = CompanionKeys()
+    enum class Overlay { FIELD_HUD, BATTLE }
+    private val capturedOverlays = mutableSetOf<Overlay>()
+    private val overlayCaptured get() = capturedOverlays.isNotEmpty()
+    private var closed = false
+    fun captureOverlay(owner: Overlay, on: Boolean) {
+        if (closed) return
+        val changed = if (on) capturedOverlays.add(owner) else capturedOverlays.remove(owner)
+        if (changed) { captureButtons(); syncInputCapture() }
+    }
     val keys = CompanionKeys()
     private val textInputFocus = TextInputFocus { game?.keyboardInputCaptured = it }
     private var releaseFocus: () -> Unit = {}
@@ -58,8 +69,9 @@ internal class IosGameScreen(
         nextRepeat = menuTime() + .35
     }
     private fun syncInputCapture() {
-        game?.quickMenuInputCaptured = quickMenu.open
-        game?.companionInputCaptured = quickMenu.open || state.side.windowOpen || rewindUnavailable || quickNotice != null
+        game?.overlayMenuInputCaptured = !closed && overlayCaptured
+        game?.quickMenuInputCaptured = !closed && quickMenu.open
+        game?.companionInputCaptured = !closed && (quickMenu.open || state.side.windowOpen || overlayCaptured || rewindUnavailable || quickNotice != null)
         touch.releaseKeys()
     }
     fun triggerQuickMenu(pressed: Boolean) {
@@ -125,7 +137,7 @@ internal class IosGameScreen(
             GameScreen(state, gameHeight = { (it / aspect).roundToInt() },
                 game = { GamePicture(aspect, upright, Modifier.fillMaxSize(), gameContent) },
                 controls = { if (visible) touch.Controls(gameBoy, upright) },
-                gameOverlay = { CompositionLocalProvider(LocalCompanionBack provides back, LocalCompanionKeys provides keys,
+                gameOverlay = { CompositionLocalProvider(LocalCompanionBack provides overlayBack, LocalCompanionKeys provides overlayKeys,
                     LocalTextInputFocus provides textInputFocus, content = gameOverlay) },
                 companion = {
                     CompositionLocalProvider(LocalCompanionTopInset provides (frames?.portrait?.topInset(state.gripHeight) ?: 0),
@@ -196,7 +208,7 @@ internal class IosGameScreen(
     }.orEmpty()
 
     private fun controllerInput(buttons: Int) {
-        if (!state.side.windowOpen && !quickMenu.open && !rewindUnavailable && quickNotice == null) return
+        if (!state.side.windowOpen && !quickMenu.open && !overlayCaptured && !rewindUnavailable && quickNotice == null) return
         menuSuppressed = menuSuppressed and buttons
         val current = buttons and menuSuppressed.inv()
         val pressed = current and previousButtons.inv()
@@ -207,11 +219,13 @@ internal class IosGameScreen(
         val menuVisit = quickMenu.visit
         for ((bit, key) in BUTTONS) {
             if (quickMenu.visit != menuVisit) break // A selection/back cannot feed another key into its new owner.
-            if (!state.side.windowOpen && !quickMenu.open && !rewindUnavailable && quickNotice == null) break
+            if (!state.side.windowOpen && !quickMenu.open && !overlayCaptured && !rewindUnavailable && quickNotice == null) break
             when {
                 pressed and bit != 0 -> menuKey(key, false)
                 repeated and bit != 0 -> menuKey(key, true)
             }
+            // Dismissal must not send a simultaneous A/START into a newly revealed owner before recomposition.
+            if (pressed and bit != 0 && (key == MenuKey.B || key == MenuKey.START)) break
         }
     }
     private fun menuKey(key: MenuKey, repeat: Boolean) {
@@ -222,6 +236,12 @@ internal class IosGameScreen(
             return
         }
         if (quickMenu.open) { quickMenu.key(key); return }
+        if (overlayCaptured) {
+            if (key == MenuKey.B || key == MenuKey.START) {
+                if (!repeat) overlayBack.back()
+            } else overlayKeys.key(key, repeat)
+            return
+        }
         when (key) {
             MenuKey.B -> if (!repeat && !back.back()) state.hide()
             MenuKey.START -> if (!repeat) state.hide()
@@ -234,12 +254,15 @@ internal class IosGameScreen(
     }
 
     fun close() {
+        closed = true
+        capturedOverlays.clear()
         canOpenQuickMenu = { false }
         quickMenu.close()
         textInputFocus.clear()
         state.setSide(state.side.withEnabled(false))
         game?.onCompanionButtons = {}
         game?.onCompanionAim = { _, _ -> false }
+        game?.overlayMenuInputCaptured = false
         game?.quickMenuInputCaptured = false
         game?.companionInputCaptured = false
         touch.previewStage = null

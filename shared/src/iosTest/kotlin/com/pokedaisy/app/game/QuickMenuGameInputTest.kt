@@ -49,6 +49,35 @@ class QuickMenuGameInputTest {
         } finally { FileSystem.SYSTEM.deleteRecursively(dir) }
     }
 
+    @Test fun hudModalAllowsOnlyQuickMenuAndCannotReleaseEditorOwnership() {
+        val pad = assertNotNull(GCController.controllerWithExtendedGamepad().extendedGamepad)
+        val input = GameInput({ listOf(pad) }, { GbaControls.KeyMaps(mapOf(KeyCodes.BUTTON_A to CoreKey.A), emptyMap()) })
+        val dir = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "hud-menu-${Random.nextLong().toULong()}"
+        FileSystem.SYSTEM.createDirectories(dir)
+        try {
+            Hotkeys.setBindingNamed(dir, Hotkeys.Action.QUICK_MENU, listOf("BUTTON_A"))
+            Hotkeys.setBindingNamed(dir, Hotkeys.Action.FF_TOGGLE, listOf("BUTTON_B"))
+            input.setHotkeys(Hotkeys.load(dir))
+            val pressed = mutableListOf<Hotkeys.Action>()
+            input.onHotkey = { if (it.pressed) pressed += it.action }
+            input.companionCaptured = true; input.overlayMenuCaptured = true
+            pad.buttonB.setValue(1f); input.poll(); pad.buttonB.setValue(0f); input.poll()
+            assertTrue(pressed.isEmpty())
+            pad.buttonA.setValue(1f); input.poll()
+            assertEquals(listOf(Hotkeys.Action.QUICK_MENU), pressed)
+            assertEquals(0, input.keys())
+            pad.buttonA.setValue(0f); input.poll()
+            input.editorCaptured(true)
+            pad.buttonA.setValue(1f); input.poll()
+            input.overlayMenuCaptured = false; input.companionCaptured = false
+            assertEquals(0, input.keys())
+            input.editorCaptured(false); input.poll()
+            assertEquals(1, pressed.size)
+            pad.buttonA.setValue(0f); input.poll(); pad.buttonA.setValue(1f); input.poll()
+            assertEquals(listOf(Hotkeys.Action.QUICK_MENU, Hotkeys.Action.QUICK_MENU), pressed)
+        } finally { FileSystem.SYSTEM.deleteRecursively(dir) }
+    }
+
     @Test fun ringAimingUsesTheActiveControllerAndLeavesTheDpadIndependent() {
         val first = assertNotNull(GCController.controllerWithExtendedGamepad().extendedGamepad)
         val second = assertNotNull(GCController.controllerWithExtendedGamepad().extendedGamepad)

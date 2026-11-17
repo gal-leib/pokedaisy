@@ -87,6 +87,9 @@ class GameViewController(
         get() = input.onCompanionButtons
         set(value) { input.onCompanionButtons = value }
     val controllerButtons: Int get() = input.controllerKeys()
+    var overlayMenuInputCaptured: Boolean
+        get() = input.overlayMenuCaptured
+        set(value) { input.overlayMenuCaptured = value }
     var quickMenuInputCaptured: Boolean
         get() = input.quickMenuCaptured
         set(value) { input.quickMenuCaptured = value }
