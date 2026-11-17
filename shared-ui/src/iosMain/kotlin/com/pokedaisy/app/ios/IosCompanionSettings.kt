@@ -60,7 +60,7 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY", "SHADERS", "FILTER", "GRID", "GBA COLORS", "UNLIT SCREEN")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
@@ -297,14 +297,14 @@ internal class IosCompanionSettings(
     override fun cancelOverlayImport() = IosOverlays.cancel()
     override fun deleteOverlay(id: String) { IosOverlays.delete(id).invokeOnCompletion { gameScreen()?.refreshPicture() } }
     override fun deleteAllOverlays() { IosOverlays.deleteAll().invokeOnCompletion { gameScreen()?.refreshPicture() } }
-    override val gbaColors = false
-    override fun setGbaColors(on: Boolean) {}
-    override val screenFilter = ScreenFilter.NONE
-    override fun setScreenFilter(filter: ScreenFilter) {}
+    override val shadersBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCREEN_EFFECTS)
+    override fun setGbaColors(on: Boolean) { stored.setGbaColors(on); gameScreen()?.refreshPicture() }
+    override fun setUnlitScreen(on: Boolean) { stored.setUnlitScreen(on); gameScreen()?.refreshPicture() }
+    override fun setScreenFilter(filter: ScreenFilter) { stored.setScreenFilter(filter); gameScreen()?.refreshPicture() }
+    override fun setGridStrength(strength: GridStrength) { stored.setGridStrength(strength); gameScreen()?.refreshPicture() }
     override val companionShaders = false
     override fun setCompanionShaders(on: Boolean) {}
-    override val gridStrength = GridStrength.MEDIUM
-    override fun setGridStrength(strength: GridStrength) {}
+    override val smoothingAvailable = false
     override val smoothing = Smoothing.OFF
     override fun setSmoothing(mode: Smoothing) {}
 }
