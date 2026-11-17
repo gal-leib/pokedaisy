@@ -73,6 +73,9 @@ int64_t pk_api_call(uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t
  * Returns once scheduled, not when fn returns. Game thread between frames; false on GBA/no game. */
 bool pk_api_gb_call_at(uint16_t at, uint16_t fn, uint8_t a, uint8_t b, uint16_t hl);
 
+/** Table lookup needs no running core. */
+bool pk_api_field_knows(uint32_t crc);
+
 /** Field observation only: configure the current GBA ROM by its CRC32 (zero disables), then read PK_API_FIELD_*.
  * Game thread, between frames. Unknown games, Game Boy and no core return zero. Does not enable game patches. */
 bool pk_api_field_configure(uint32_t crc);
@@ -89,6 +92,31 @@ enum {
     PK_API_FIELD_BIKE = 16, PK_API_FIELD_WILD_HELD = 32, PK_API_FIELD_SURF = 64, PK_API_FIELD_AVATAR = 128,
     PK_API_FIELD_WINDOW = 262144
 };
+
+enum {
+    PK_API_WIDE_SCENE_FIELD, PK_API_WIDE_SCENE_TEXT, PK_API_WIDE_SCENE_OVERLAY,
+    PK_API_WIDE_SCENE_BATTLE_START, PK_API_WIDE_SCENE_OFF, PK_API_WIDE_SCENE_FADE, PK_API_WIDE_SCENE_MENU,
+    PK_API_WIDE_MAX_WIDTH = 800, PK_API_WIDE_MAX_HEIGHT = 800
+};
+
+/** EXPAND uses the existing renderer. Game thread between frames unless marked otherwise.
+ * CRC lookup needs no running core. Configure with a verified ROM's table CRC; zero disables it. */
+bool pk_api_wide_knows(uint32_t crc);
+bool pk_api_wide_add_derived(uint32_t crc, uint32_t baseCrc, const int32_t* row, int count);
+bool pk_api_wide_configure(uint32_t crc);
+/** Window in original game pixels. Width/height clamp to the native 800x800 limit; zero means scene observation only. */
+void pk_api_wide_set_view(int x, int y, int width, int height);
+/** Allocated RGBA buffer, valid until deinit; the drawn region is width x height (zero means use ordinary video).
+ * Read/upload on the game thread after a frame, before the next frame writes it. No per-frame allocation. */
+const void* pk_api_wide_video(void);
+int pk_api_wide_width(void);
+int pk_api_wide_height(void);
+/** Skip drawing for unshown fast-forward frames while retaining scene/RAM history. */
+void pk_api_wide_set_draw(bool draw);
+bool pk_api_wide_skipped(void);
+int pk_api_wide_fault(void);
+bool pk_api_wide_wants_close(void);
+int pk_api_wide_scene(void);
 
 /** Runs one frame: the picture into pk_api_video, its sound into pk_api_audio. */
 void pk_api_run_frame(void);

@@ -21,6 +21,7 @@ import com.pokedaisy.app.companion.data.RomOptionPatcher
 import com.pokedaisy.app.core.pkapi.pk_api_field_wild
 import com.pokedaisy.app.core.pkapi.pk_api_field_step
 import com.pokedaisy.app.core.pkapi.pk_api_field_configure
+import com.pokedaisy.app.core.pkapi.pk_api_field_knows
 import com.pokedaisy.app.core.pkapi.pk_api_field_state
 import com.pokedaisy.app.core.pkapi.pk_api_audio
 import com.pokedaisy.app.core.pkapi.pk_api_deinit
@@ -39,6 +40,18 @@ import com.pokedaisy.app.core.pkapi.pk_api_set_keys
 import com.pokedaisy.app.core.pkapi.pk_api_video
 import com.pokedaisy.app.core.pkapi.pk_api_video_height
 import com.pokedaisy.app.core.pkapi.pk_api_video_width
+import com.pokedaisy.app.core.pkapi.pk_api_wide_knows
+import com.pokedaisy.app.core.pkapi.pk_api_wide_add_derived
+import com.pokedaisy.app.core.pkapi.pk_api_wide_configure
+import com.pokedaisy.app.core.pkapi.pk_api_wide_set_view
+import com.pokedaisy.app.core.pkapi.pk_api_wide_video
+import com.pokedaisy.app.core.pkapi.pk_api_wide_width
+import com.pokedaisy.app.core.pkapi.pk_api_wide_height
+import com.pokedaisy.app.core.pkapi.pk_api_wide_set_draw
+import com.pokedaisy.app.core.pkapi.pk_api_wide_skipped
+import com.pokedaisy.app.core.pkapi.pk_api_wide_fault
+import com.pokedaisy.app.core.pkapi.pk_api_wide_wants_close
+import com.pokedaisy.app.core.pkapi.pk_api_wide_scene
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -166,11 +179,29 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls {
     }
 
     /** Read-only field observation for scene speeds; never enables patches or wild encounter changes. */
+    fun fieldKnows(crc: Long): Boolean = crc in 0L..0xFFFFFFFFL && pk_api_field_knows(crc.toUInt())
     fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
     fun fieldState(): Int = pk_api_field_state()
     fun configureWild(addr: Long, wasOff: Boolean): Boolean =
         addr in 0L..0xFFFFFFFFL && pk_api_field_wild(addr.toUInt(), wasOff)
     fun stepField(runIndoors: Boolean, wildKeep: Int): Int = pk_api_field_step(runIndoors, wildKeep)
+
+    /** EXPAND shares the existing native renderer. Configure/draw/read between frames on the game thread. */
+    fun wideKnows(crc: Long): Boolean = crc in 0L..0xFFFFFFFFL && pk_api_wide_knows(crc.toUInt())
+    fun addWideDerived(crc: Long, baseCrc: Long, row: IntArray): Boolean {
+        if (crc !in 0L..0xFFFFFFFFL || baseCrc !in 0L..0xFFFFFFFFL || row.isEmpty()) return false
+        return row.usePinned { pk_api_wide_add_derived(crc.toUInt(), baseCrc.toUInt(), it.addressOf(0), row.size) }
+    }
+    fun configureWide(crc: Long): Boolean = crc in 0L..0xFFFFFFFFL && pk_api_wide_configure(crc.toUInt())
+    fun setWideView(x: Int, y: Int, width: Int, height: Int) = pk_api_wide_set_view(x, y, width, height)
+    fun wideVideo(): COpaquePointer? = pk_api_wide_video()
+    val wideWidth: Int get() = pk_api_wide_width()
+    val wideHeight: Int get() = pk_api_wide_height()
+    fun setWideDraw(draw: Boolean) = pk_api_wide_set_draw(draw)
+    val wideSkipped: Boolean get() = pk_api_wide_skipped()
+    val wideFault: Int get() = pk_api_wide_fault()
+    val wideWantsClose: Boolean get() = pk_api_wide_wants_close()
+    val wideScene: Int get() = pk_api_wide_scene()
 
     /** The existing diff ring, with battery data excluded. Main/game thread only. */
     fun setRewind(entries: Int) = pk_api_set_rewind(entries)

@@ -51,6 +51,15 @@ _Static_assert(PK_API_FIELD_AVATAR == PK_FIELD_AVATAR, "field bit AVATAR");
 _Static_assert(PK_API_FIELD_WILD_HELD == PK_FIELD_WILD_HELD, "field bit WILD_HELD");
 _Static_assert(PK_API_FIELD_WINDOW == PK_FIELD_WINDOW, "field bit WINDOW");
 
+_Static_assert(PK_API_WIDE_SCENE_FIELD == PK_WIDE_SCENE_FIELD, "wide scene FIELD");
+_Static_assert(PK_API_WIDE_SCENE_TEXT == PK_WIDE_SCENE_TEXT, "wide scene TEXT");
+_Static_assert(PK_API_WIDE_SCENE_OVERLAY == PK_WIDE_SCENE_OVERLAY, "wide scene OVERLAY");
+_Static_assert(PK_API_WIDE_SCENE_BATTLE_START == PK_WIDE_SCENE_BATTLE_START, "wide scene BATTLE_START");
+_Static_assert(PK_API_WIDE_SCENE_OFF == PK_WIDE_SCENE_OFF, "wide scene OFF");
+_Static_assert(PK_API_WIDE_SCENE_FADE == PK_WIDE_SCENE_FADE, "wide scene FADE");
+_Static_assert(PK_API_WIDE_SCENE_MENU == PK_WIDE_SCENE_MENU, "wide scene MENU");
+_Static_assert(PK_API_WIDE_MAX_WIDTH == PK_WIDE_MAX_VIEW_W && PK_API_WIDE_MAX_HEIGHT == PK_WIDE_MAX_VIEW_H, "wide window bounds");
+
 struct pk_session pk_session;
 pthread_rwlock_t pk_coreLock = PTHREAD_RWLOCK_INITIALIZER;
 
@@ -406,6 +415,8 @@ int pk_api_cheats_apply(const char* text) {
     return count;
 }
 
+bool pk_api_field_knows(uint32_t crc) { return pk_field_knows(crc) != 0; }
+
 bool pk_api_field_configure(uint32_t crc) {
     return pk_field_configure(g.core && pk_is_gba(g.core) ? crc : 0) != 0;
 }
@@ -454,6 +465,34 @@ int pk_api_finish_save(int maxFrames) {
     if (!g.core) return 0;
     return pk_finish_save(g.core, maxFrames, pkDropAudio);
 }
+
+bool pk_api_wide_knows(uint32_t crc) { return pk_wide_knows(crc) != 0; }
+
+bool pk_api_wide_add_derived(uint32_t crc, uint32_t baseCrc, const int32_t* row, int count) {
+    return row && count > 0 && pk_wide_add_derived(crc, baseCrc, row, count);
+}
+
+bool pk_api_wide_configure(uint32_t crc) {
+    uint32_t want = g.core ? crc : 0;
+    if (want != g.wideCrc) g.wideCrc = pk_wide_configure(want) ? want : 0;
+    return g.wideCrc != 0;
+}
+
+void pk_api_wide_set_view(int x, int y, int width, int height) {
+    g.viewX = x;
+    g.viewY = y;
+    g.viewW = width < 0 ? 0 : width > PK_WIDE_MAX_VIEW_W ? PK_WIDE_MAX_VIEW_W : width;
+    g.viewH = height < 0 ? 0 : height > PK_WIDE_MAX_VIEW_H ? PK_WIDE_MAX_VIEW_H : height;
+}
+
+const void* pk_api_wide_video(void) { return g.wide; }
+int pk_api_wide_width(void) { return g.wideW; }
+int pk_api_wide_height(void) { return g.wideH; }
+void pk_api_wide_set_draw(bool draw) { g.wideSkipNext = !draw; }
+bool pk_api_wide_skipped(void) { return g.wideSkipped; }
+int pk_api_wide_fault(void) { return g.core ? pk_wide_fault() : 0; }
+bool pk_api_wide_wants_close(void) { return !g.wideW || pk_wide_wants_close(); }
+int pk_api_wide_scene(void) { return g.wideW ? pk_wide_scene() : PK_WIDE_SCENE_OFF; }
 
 // WIDE: the core's frame is the size the configured game's rebuild expects (the GBA's 240 x 160, a Game Boy's 160 x 144).
 static bool pkWideFrameFits(void) {
