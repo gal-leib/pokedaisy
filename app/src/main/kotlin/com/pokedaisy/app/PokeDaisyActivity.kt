@@ -471,10 +471,8 @@ class PokeDaisyActivity : Activity() {
         return v
     }
 
-    /** The TM screen's calls ([com.pokedaisy.app.companion.data.tmFnsFor]) and FLASH's ([com.pokedaisy.app.companion.data.flashFnsFor])
-     * for the loaded ROM, each one's code checked once per ROM, the way [tradeEvoFns] is; null where the game has none. */
+    /** The TM screen's calls, checked once per ROM; null where the game has none. */
     @Volatile private var tmCache: Pair<String, com.pokedaisy.app.companion.data.TmFns?>? = null
-    @Volatile private var flashCache: Pair<String, com.pokedaisy.app.companion.data.FlashFns?>? = null
 
     private fun retailFieldKey(): Pair<String, Boolean>? {
         if (romIsGameBoy || romIsNds) return null
@@ -497,24 +495,14 @@ class PokeDaisyActivity : Activity() {
         return found.also { tmCache = key to it }
     }
 
-    private fun flashFns(): com.pokedaisy.app.companion.data.FlashFns? {
-        val (key, hack) = retailFieldKey() ?: return null
-        // Rocket Edition / Ash Gray: their own player sprites never finish the field move's pose, so FLASH's cut-in waits
-        // forever with the controls locked (headless); their party menu's FLASH row is blank too.
-        val hackText = com.pokedaisy.app.companion.data.runningFireRedHack
-        if (hackText === com.pokedaisy.app.companion.data.fireRedHackRocketEdition || hackText === com.pokedaisy.app.companion.data.fireRedHackAshGray) return null
-        val flashes = com.pokedaisy.app.companion.data.flashCandidatesFor(telemetry.snapshot.value.game, romCode, romRev, hack)
-        if (flashes.isEmpty()) return null
-        flashCache?.let { (k, v) -> if (k == key) return v }
-        if (!::engine.isInitialized || !engine.running) return null
-        val read = { addr: Long, len: Int -> com.pokedaisy.app.companion.data.InProcessReader.readCoreMemory(addr, len) }
-        val found = runCatching {
-            flashes.firstOrNull { com.pokedaisy.app.companion.data.flashCodeMatches(it, read) }
-                ?.let { com.pokedaisy.app.companion.data.flashBadgeRule(it, read) }
-        }.getOrElse { return null }
-        Log.i("pokedaisy", "FLASH: ${when { found == null -> "code not found or badge rule unknown"; found.badgeFn != 0L -> "code found, the hack's badge rule"
-            found.badgeFlag < 0 -> "code found, no badge"; else -> "code found" }}")
-        return found.also { flashCache = key to it }
+    private val fieldFlash by lazy {
+        val verified = com.pokedaisy.app.companion.FieldFlashSupport(
+            com.pokedaisy.app.companion.data.InProcessReader::readCoreMemory)
+        com.pokedaisy.app.companion.FieldFlashAction(sharedItemUse,
+            { if (romIsGameBoy || romIsNds || fieldItemSupport()?.fns?.party == null) null
+              else verified.get(telemetry.snapshot.value, romCode, romRev) },
+            { telemetry.snapshot.value }, com.pokedaisy.app.companion.data.InProcessReader::readCoreMemory,
+            ::closeCompanionWindow)
     }
 
     /** USE opens the game's TM screen for [itemId] here: the TM calls and the bag's (CheckBagHasItem, the party). */
@@ -795,14 +783,10 @@ class PokeDaisyActivity : Activity() {
         com.pokedaisy.app.companion.ui.GameQuickActions(
             quickMenu, Prefs(this), companionSettings, { telemetry.snapshot.value }, { itemUse }, { flyAction },
             ::handleHotkey, { showHud(it) }, active = { ::engine.isInitialized && !isDestroyed },
-            registeredItems = ::registeredItems,
+            registeredItems = ::registeredItems, flash = { fieldFlash },
             extra = object : com.pokedaisy.app.companion.ui.QuickActions {
                 override fun offered(action: com.pokedaisy.app.companion.QuickAction) = when (action) {
                     com.pokedaisy.app.companion.QuickAction.FLIGHT -> flightSupport() != null
-                    // Only while a party Pokémon knows it (the snapshot's moves), or anyone with NO HMS NEEDED: the tile isn't there otherwise.
-                    com.pokedaisy.app.companion.QuickAction.FLASH -> flashFns() != null && fieldItemSupport()?.fns?.party != null &&
-                        (com.pokedaisy.app.companion.data.HmFree.active ||
-                            telemetry.snapshot.value.party.any { m -> !m.isEgg && m.moves.any { it.id == com.pokedaisy.app.companion.ui.FLASH_MOVE } })
                     com.pokedaisy.app.companion.QuickAction.REPEL -> dsRepelKnown() ||
                         fieldItemSupport()?.let { s -> s.fns.repelItems.any { s.canUse(it) } } == true
                     // A DS / 3DS game whose touch screen floats in on this layout (the TOUCH SCREEN hotkey's rule).
@@ -818,13 +802,6 @@ class PokeDaisyActivity : Activity() {
 
                 override fun flying() = ::engine.isInitialized && engine.flightState != MgbaCore.FLIGHT_IDLE
 
-                override fun flashDark(): Boolean? {
-                    val flash = flashFns() ?: return null
-                    val progress = telemetry.snapshot.value.progress
-                    return com.pokedaisy.app.companion.data.flashDark(flash, { a, n -> com.pokedaisy.app.companion.data.InProcessReader.readCoreMemory(a, n) }) { f ->
-                        progress?.flag(f)
-                    }
-                }
 
         })
     }
@@ -834,7 +811,6 @@ class PokeDaisyActivity : Activity() {
     private fun runPlatformQuickAction(action: com.pokedaisy.app.companion.QuickAction) {
         if (!::engine.isInitialized) return
         when (action) {
-            com.pokedaisy.app.companion.QuickAction.FLASH -> useFlash()
             com.pokedaisy.app.companion.QuickAction.FLIGHT -> toggleFlight()
             com.pokedaisy.app.companion.QuickAction.TOUCH_SCREEN -> toggleDsTouch()
             com.pokedaisy.app.companion.QuickAction.COMPANION -> if (::sidePanel.isInitialized) sidePanel.openPanel()
@@ -1091,28 +1067,6 @@ class PokeDaisyActivity : Activity() {
                     }
                 }
             }, "pokedaisy-scenic-fly").start()
-        }
-    }
-
-    /** FLASH (Flash.kt): the party menu's checks and the field move on the emu thread; the game does the rest (the cut-in, the
-     * light). Anything that kept it from starting says why on the HUD. */
-    private fun useFlash() {
-        val flash = flashFns()
-        val fns = fieldItemSupport()?.fns
-        if (flash == null || fns == null || !::engine.isInitialized || !engine.running) {
-            return showHud(com.pokedaisy.app.companion.ui.flashMessage(com.pokedaisy.app.companion.data.FlashResult.FAILED))
-        }
-        val inBattle = telemetry.snapshot.value.inBattle
-        engine.requestFieldItemJob(inBattle) { calls, busy ->
-            val r = com.pokedaisy.app.companion.data.useFlash(fns, flash, busy, calls).let {
-                if (inBattle && it == com.pokedaisy.app.companion.data.FlashResult.NOT_NOW) com.pokedaisy.app.companion.data.FlashResult.IN_BATTLE else it
-            }
-            Log.i("pokedaisy", "flash: $r")
-            runOnUiThread {
-                // The field move is the game's to show: a companion window over it goes.
-                if (r == com.pokedaisy.app.companion.data.FlashResult.OK) closeCompanionWindow()
-                else showHud(com.pokedaisy.app.companion.ui.flashMessage(r))
-            }
         }
     }
 

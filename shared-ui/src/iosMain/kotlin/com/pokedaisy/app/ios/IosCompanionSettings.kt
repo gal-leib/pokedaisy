@@ -209,7 +209,7 @@ internal class IosCompanionSettings(
     override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS + com.pokedaisy.app.Hotkeys.Action.QUICK_MENU
     override val quickMenuSupportedActions get() = setOf(
         com.pokedaisy.app.companion.QuickAction.PC, com.pokedaisy.app.companion.QuickAction.FLY,
-        com.pokedaisy.app.companion.QuickAction.HEAL,
+        com.pokedaisy.app.companion.QuickAction.HEAL, com.pokedaisy.app.companion.QuickAction.FLASH,
         com.pokedaisy.app.companion.QuickAction.REPEL, com.pokedaisy.app.companion.QuickAction.WILD,
         com.pokedaisy.app.companion.QuickAction.BIKE, com.pokedaisy.app.companion.QuickAction.ROD,
         com.pokedaisy.app.companion.QuickAction.SAVE_STATE, com.pokedaisy.app.companion.QuickAction.LOAD_STATE,
@@ -217,6 +217,7 @@ internal class IosCompanionSettings(
     override val quickMenuBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.REGISTERED_ITEMS)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GB_ENCOUNTERS)
+        ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FLASH)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_HEAL)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_QUICK_MENU)
     override val hotkeysBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_HOTKEYS)

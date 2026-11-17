@@ -75,6 +75,7 @@ object PokeDaisyHost {
     private var screen: IosGameScreen? = null
     private var playback: com.pokedaisy.app.companion.GameRuntime? = null
     private var items by mutableStateOf<com.pokedaisy.app.companion.ItemUse?>(null)
+    private var flash: com.pokedaisy.app.companion.FieldFlashAction? = null
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
 
     /** Sets the shared screens' hosts (fonts, pictures, settings, the manual). Safe to call more than once. */
@@ -115,7 +116,7 @@ object PokeDaisyHost {
                 panels.quickMenu, iosPreferences, currentSettings, { telemetry.snapshot.value }, { items }, { fly },
                 shortcuts::hotkey, panels::showQuickNotice,
                 active = { game === current && game?.isRunning == true && !currentRuntime.blocked },
-                registeredItems = { currentRuntime.registeredItems },
+                registeredItems = { currentRuntime.registeredItems }, flash = { flash },
                 extra = object : com.pokedaisy.app.companion.ui.QuickActions {
                     override fun offered(action: com.pokedaisy.app.companion.QuickAction) =
                         action == com.pokedaisy.app.companion.QuickAction.COMPANION && !panels.portrait
@@ -317,6 +318,12 @@ object PokeDaisyHost {
             centerMetadata = { if (live()) p.options.discovery.center else null },
             deliver = { result -> result(); if (live()) sample() },
         )
+        val flashSupport = com.pokedaisy.app.companion.FieldFlashSupport(PkApiCore::read)
+        flash = com.pokedaisy.app.companion.FieldFlashAction(sharedItems,
+            { if (readSupport()?.fns?.party == null) null else flashSupport.get(telemetry.snapshot.value, code, revision) },
+            { telemetry.snapshot.value }, PkApiCore::read) {
+            if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
+        }
         val classicFly = com.pokedaisy.app.companion.ClassicFlyAction(sharedItems, readSupport, currentSession) {
             if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
         }
@@ -410,6 +417,7 @@ object PokeDaisyHost {
         playback?.quiesce()
         items = null
         fly = null
+        flash = null
         playback?.close()
         playback = null
         battle = null

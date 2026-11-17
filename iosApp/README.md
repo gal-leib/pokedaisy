@@ -185,6 +185,8 @@ HEAL also uses `FieldItemUse` on both platforms, with the existing `GameOptions.
 Menu and the party summary's CENTER only when discovery and the known party/PC field support agree; the other
 CENTER services remain with Android's adapters. Results use the existing loaded-game queue/delivery guard.
 
+`FLASH` shares Android's verified ROM/badge-rule cache, party-move availability, queued field move and game handoff. It uses the game's own animation and lighting, with the existing badge, cave and busy-state checks; unsafe sprite hacks remain excluded. Game Boy FLASH is unavailable.
+
 ## Field HUD
 
 Landscape GBA games reuse the shared `FieldHud` over the native picture. `GameRuntime` publishes the settled
