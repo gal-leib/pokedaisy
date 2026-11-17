@@ -79,6 +79,13 @@ class BattleButtonsScreenshotTest {
 
     @Test fun gen5Original() = paparazzi.snapshot { BattleScene(expand = false, style = BattleStyle.GEN5) }
 
+    @Test fun matchingPartyMembers() = paparazzi.snapshot {
+        val active = lead.copy(personality = 101)
+        val bench = active.copy(personality = 102, nickname = "SECOND")
+        BattleScene(window = BattleButtonsWindow.PARTY,
+            snap = battle.copy(party = listOf(active, bench), battlePlayer = listOf(active)))
+    }
+
     @Test fun dark() {
         com.pokedaisy.app.companion.ui.theme.DarkMode.override = true
         paparazzi.snapshot { BattleScene(window = BattleButtonsWindow.MOVES) }
