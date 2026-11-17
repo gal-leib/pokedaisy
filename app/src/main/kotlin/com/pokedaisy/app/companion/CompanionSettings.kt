@@ -86,6 +86,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val instantTextSupported: Boolean get() = false
 
     val tradeEvolutionsSupported: Boolean get() = false
+    val tradeEvolutionsBadge: String? get() = NewFeatures.badge(NewFeatures.TRADE_EVOLUTIONS)
 
     /** DS RESOLUTION ([com.pokedaisy.app.Prefs.dsResolution]): the scale, null when the game isn't a DS one (no row);
      * [dsGpuAvailable] false = this device can't run the GPU renderer (no OpenGL ES 3.2), so the DS's own it is. */

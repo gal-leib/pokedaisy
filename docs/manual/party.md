@@ -52,6 +52,8 @@ Some Pokémon only evolve when traded, some of them while holding an item. If yo
 
 The game decides, by its own rules: a Pokémon holding the item that stops evolution doesn't get the button, and one that needs a held item uses it up, as in a real trade. It works on the field, with no menu, text or battle open. **Save in the game** to keep it.
 
+The same trade-evolution setting and native game scene work on Android, iPhone and iPad. Target previews keep held items in place; the game consumes an evolution item only when the confirmed evolution needs it.
+
 > [!NOTE]
 > `TRADE EVOS` works in the English FireRed (the later release), LeafGreen and Emerald. In other games it shows `N/A`. To trade for real between two of your games, see [Link play](link-play.md).
 

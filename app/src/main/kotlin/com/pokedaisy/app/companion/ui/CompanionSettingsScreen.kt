@@ -732,7 +732,7 @@ private fun homeRows(
         // A Pokémon that evolves by trading evolves from its summary, through the game's own evolution (TradeEvolution.kt).
         SettingRow(
             tk("TRADE EVOS"), if (s.tradeEvolutionsSupported) onOff(s.tradeEvolutions) else tk("N/A"),
-            enabled = s.tradeEvolutionsSupported, labelBadge = NewFeatures.badge(NewFeatures.TRADE_EVOLUTIONS),
+            enabled = s.tradeEvolutionsSupported, labelBadge = s.tradeEvolutionsBadge,
             subtitle = "Evolve without a trade",
         ) {
             if (s.tradeEvolutionsSupported) { s.setTradeEvolutions(!s.tradeEvolutions); changed() }

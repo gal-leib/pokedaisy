@@ -267,7 +267,7 @@ fun MonDetailScreen(
                 val size = SummaryButtonSize
                 if (stats) TextNavButton(if (showStats) tr("MOVES") else tr("STATS"), StatsPurple, StatsPurpleDark, size) { showStats = !showStats }
                 if (learns) TextNavButton(if (showLearn) tr("MOVES") else tr("LEARN"), SuggestGold, SuggestGoldDark, size) { showLearn = !showLearn; learnPick = 0 }
-                if (evolve) TextNavButton(tr("EVOLVE"), EvolveBlue, EvolveBlueDark, size) { evolveResult = null; evolveAsk = true }
+                if (evolve) TextNavButton(tr("EVOLVE"), EvolveBlue, EvolveBlueDark, size, badge = itemUse?.evolveBadge) { evolveResult = null; evolveAsk = true }
                 if (reorders != null) TextNavButton(tr("SWITCH"), RunBlue, RunBlueDark, size, badge = partyBadge) { switching = true }
                 if (centers) TextNavButton(tr("CENTER"), CenterPink, CenterPinkDark, size) { centerMenu = true }
                 if (onDeposit != null) TextNavButton(tr("DEPOSIT"), PcGreen, PcGreenDark, size, badge = partyBadge, onClick = onDeposit)
