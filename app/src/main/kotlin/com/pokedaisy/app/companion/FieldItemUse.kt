@@ -3,11 +3,12 @@ package com.pokedaisy.app.companion
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.game.GameSession
 
-/** Android's item adapter shared with iOS. The hosts supply game lifetime and result delivery only. */
+/** Shared item actions over the loaded game's queue, discovered field/center metadata and UI delivery. */
 class FieldItemUse(
     private val support: () -> FieldItemSupport?,
     private val session: () -> GameSession?,
     private val inBattle: () -> Boolean,
+    private val centerMetadata: () -> PokemonCenter.Found? = { null },
     private val deliver: (() -> Unit) -> Unit,
 ) : ItemUse {
     private val failed = ItemUseOutcome(ItemUseResult.FAILED)
@@ -20,6 +21,18 @@ class FieldItemUse(
     override fun picksMove(itemId: Int) = support()?.picksMove(itemId) == true
     override fun canTake() = support()?.canTake == true
     override fun canPc() = support()?.canPc == true
+    override fun center(): CenterSupport? {
+        if (centerMetadata() == null) return null
+        val fields = support()?.fns ?: return null
+        if (fields.pc == null || fields.party == null) return null
+        // Other services retain their own adapters until their screen/move-list flows are shared too.
+        return CenterSupport(heal = true, nickname = false, forget = false, relearn = false)
+    }
+
+    override fun centerHeal(done: (CenterResult) -> Unit) {
+        val center = centerMetadata() ?: return done(CenterResult.FAILED)
+        onGame(CenterResult.FAILED, done) { fields, calls, busy -> centerHeal(fields.fns, center, busy, calls) }
+    }
 
     /** Extra game actions (Android's TM / box operations) use the same queued-work and result policy. */
     fun <T> onGame(failed: T, done: (T) -> Unit, work: (FieldItemSupport, GameCalls, Boolean) -> T) {
@@ -57,5 +70,6 @@ fun <T> fieldActionBattleResult(out: T): T = when {
     out is PartyTargets && out.result == ItemUseResult.NOT_NOW -> out.copy(result = ItemUseResult.IN_BATTLE) as T
     out is FlyTargets && out.result == FlyResult.NOT_NOW -> out.copy(result = FlyResult.IN_BATTLE) as T
     out is FlyResult && out == FlyResult.NOT_NOW -> FlyResult.IN_BATTLE as T
+    out is CenterResult && out == CenterResult.NOT_NOW -> CenterResult.IN_BATTLE as T
     else -> out
 }

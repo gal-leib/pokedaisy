@@ -164,7 +164,7 @@ keys. Only the game's free field can invert B; menus, dialogue, battles, bikes, 
 auto-run are preserved. Ruby/Sapphire indoor rules remain unavailable. The native field step owns the write lock;
 field observation does not change encounter ownership or its RNG. Unknown tables and Game Boy stay N/A.
 
-## Field HUD
+## Shared field actions
 
 Game Boy PC and classic FLY reuse `GameBoyFieldActions` on Android and iOS. The loaded runtime verifies the
 existing `GbField` ROM signatures once per helper, queues work through `GameSession`, waits for the game's
@@ -179,6 +179,13 @@ BIKE and ROD in Quick Menu use the same `RegisteredItemUse` as Android. It owns 
 bounded retry and SoulGold wheel timing, and restores on completion or before state/rewind/close operations. The
 iOS adapter only forwards its separate synthetic press channel to the existing shared `GbaInput`. Availability
 retains Android's recognized GBA layouts and field-code checks; GB/GBC games do not gain unsupported entries.
+
+HEAL also uses `FieldItemUse` on both platforms, with the existing `GameOptions.discovery.center` metadata and
+`PokemonCenter` script/gates. No second ROM scan or iOS healing implementation. iOS offers healing through Quick
+Menu and the party summary's CENTER only when discovery and the known party/PC field support agree; the other
+CENTER services remain with Android's adapters. Results use the existing loaded-game queue/delivery guard.
+
+## Field HUD
 
 Landscape GBA games reuse the shared `FieldHud` over the native picture. `GameRuntime` publishes the settled
 `GameSession` field signal; Android and iOS use the same visibility rule and persisted HUD settings. Shared

@@ -314,6 +314,7 @@ object PokeDaisyHost {
         val sharedItems = com.pokedaisy.app.companion.FieldItemUse(
             support = readSupport, session = currentSession,
             inBattle = { telemetry.snapshot.value.inBattle },
+            centerMetadata = { if (live()) p.options.discovery.center else null },
             deliver = { result -> result(); if (live()) sample() },
         )
         val classicFly = com.pokedaisy.app.companion.ClassicFlyAction(sharedItems, readSupport, currentSession) {

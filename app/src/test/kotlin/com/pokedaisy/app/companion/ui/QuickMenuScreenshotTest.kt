@@ -70,6 +70,7 @@ class QuickMenuScreenshotTest {
 
     /** Just opened: the first tile (PC) highlighted. */
     @Test fun open() = shot()
+    @Test fun heal() = shot(moves = QuickAction.entries.indexOf(QuickAction.HEAL))
 
     /** On FLY, which nobody knows: dimmed, saying why. */
     @Test fun dimmed() = shot(moves = 1)

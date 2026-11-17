@@ -15,6 +15,8 @@ class GameQuickActionsTest {
     private var live = true
     private var hasPc = true
     private var hasFly = true
+    private var hasHeal = false
+    private var healing: ((CenterResult) -> Unit)? = null
     private val used = mutableListOf<Int>()
     private var openedPc = 0
     private var itemResult: ((ItemUseOutcome) -> Unit)? = null
@@ -23,6 +25,8 @@ class GameQuickActionsTest {
         override fun canUse(itemId: Int) = itemId == 86
         override fun use(itemId: Int, done: (ItemUseOutcome) -> Unit) { used += itemId; itemResult = done }
         override fun openPc(done: (ItemUseOutcome) -> Unit) { openedPc++; done(ItemUseOutcome(ItemUseResult.USED)) }
+        override fun center() = if (hasHeal) CenterSupport(true, false, false, false) else null
+        override fun centerHeal(done: (CenterResult) -> Unit) { healing = done }
     }
     private val destinations = mutableListOf<(FlyTargets) -> Unit>()
     private val flights = mutableListOf<Int>()
@@ -102,6 +106,16 @@ class GameQuickActionsTest {
         val reopened = PrefsCompanionSettingsTest.Settings(prefs)
         assertEquals(setOf(QuickAction.PC, QuickAction.FF), reopened.quickMenuActions)
         assertEquals(QuickMenuStyle.GRID, reopened.quickMenuStyle); assertFalse(reopened.quickMenuLabels)
+    }
+
+    @Test fun healUsesTheVerifiedItemAdapterAndCannotShowALateNoticeAfterTheGameCloses() {
+        assertFalse(actions.offered(QuickAction.HEAL))
+        hasHeal = true; assertTrue(actions.offered(QuickAction.HEAL))
+        actions.run(QuickAction.HEAL); assertTrue(notices.isEmpty())
+        assertNotNull(healing)(CenterResult.OK); assertEquals(1, notices.size)
+        actions.run(QuickAction.HEAL); live = false
+        assertNotNull(healing)(CenterResult.FAILED); assertEquals(1, notices.size)
+        hasHeal = false; assertFalse(actions.offered(QuickAction.HEAL))
     }
 
     @Test fun bikeAndBestRodDispatchThroughTheSharedQueuedTransactionInsteadOfTheHost() {

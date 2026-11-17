@@ -64,6 +64,10 @@ The services you'd normally walk to a town for are on every Pokémon's summary: 
 - `FORGET A MOVE`: pick one of its moves and confirm, and it's gone, as the move deleter does it, field moves included.
 - `NICKNAME`: the game's own naming screen for this Pokémon.
 
+On iPhone and iPad, `HEAL THE PARTY` and the Quick Menu's `HEAL` use the same verified GBA healing script as
+Android. The game restores HP, PP and status and plays its own jingle. The other `CENTER` services are not yet
+available on iOS. Games without recognized healing and field scripts do not offer the action.
+
 The games' own rules stay: an egg gets none of these, a Pokémon keeps at least one move, and only the trainer who caught a Pokémon can rename it, so one from a trade can't be renamed. The last Pokémon in your party that can cross water can't forget that move, unless [`NO HMS NEEDED`](controls.md#no-hms-needed) is on. Everything works out on the field, with no menu, text or battle open. **Save in the game** to keep the changes.
 
 > [!NOTE]

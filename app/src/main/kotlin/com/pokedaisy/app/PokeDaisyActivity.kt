@@ -179,8 +179,6 @@ class PokeDaisyActivity : Activity() {
     private var tmSites: List<com.pokedaisy.app.companion.data.ReusableTms.Site> = emptyList()
     /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = the row shows N/A). */
     private var textPatch: com.pokedaisy.app.companion.data.InstantText.Patch? = null
-    /** The POKéMON CENTER's specials in this ROM ([com.pokedaisy.app.companion.data.PokemonCenter]; null = none). */
-    @Volatile private var centerFound: com.pokedaisy.app.companion.data.PokemonCenter.Found? = null
     private fun currentGameOptions() = if (::engine.isInitialized) engine.gameOptions else null
     private val hmPatch get() = currentGameOptions()?.discovery?.hm
     private val expShareFound get() = currentGameOptions()?.discovery?.exp
@@ -449,6 +447,8 @@ class PokeDaisyActivity : Activity() {
         return fieldSupport.get(snapshot, romCode, romRev, telemetry.knownFieldItems())
     }
 
+    private fun centerFound() = if (::engine.isInitialized && engine.running) engine.gameOptions.discovery.center else null
+
     /** TRADE EVOLUTIONS' calls for the loaded ROM ([com.pokedaisy.app.companion.data.tradeEvoFor]), its code checked once
      * per ROM; null where the game has none (a hack, another language, a Game Boy or DS game). */
     @Volatile private var tradeEvoCache: Pair<String, com.pokedaisy.app.companion.data.TradeEvoFns?>? = null
@@ -543,6 +543,7 @@ class PokeDaisyActivity : Activity() {
         support = ::fieldItemSupport,
         session = { if (::engine.isInitialized && engine.running) engine.gameSession else null },
         inBattle = { telemetry.snapshot.value.inBattle },
+        centerMetadata = ::centerFound,
         deliver = { result -> runOnUiThread(result) },
     )
 
@@ -666,7 +667,7 @@ class PokeDaisyActivity : Activity() {
         }
 
         override fun center(): com.pokedaisy.app.companion.CenterSupport? {
-            val c = centerFound ?: return null
+            val c = centerFound() ?: return null
             val fns = fieldItemSupport()?.fns?.takeIf { it.pc != null && it.party != null } ?: return null
             return com.pokedaisy.app.companion.CenterSupport(
                 heal = true, nickname = c.nickname != null, forget = c.forget != null,
@@ -679,7 +680,7 @@ class PokeDaisyActivity : Activity() {
             work: (com.pokedaisy.app.companion.data.FieldItemFns, com.pokedaisy.app.companion.data.PokemonCenter.Found,
                    com.pokedaisy.app.companion.data.GameCalls, Boolean) -> com.pokedaisy.app.companion.data.CenterResult,
         ) {
-            val c = centerFound ?: return done(com.pokedaisy.app.companion.data.CenterResult.FAILED)
+            val c = centerFound() ?: return done(com.pokedaisy.app.companion.data.CenterResult.FAILED)
             val inBattle = telemetry.snapshot.value.inBattle
             onGame(com.pokedaisy.app.companion.data.CenterResult.FAILED, { r ->
                 // A screen of the game's (naming, the Move Tutor's) is the game's to show: the window over it goes.
@@ -689,7 +690,7 @@ class PokeDaisyActivity : Activity() {
         }
 
         override fun centerHeal(done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) =
-            onCenter(done) { fns, c, calls, busy -> com.pokedaisy.app.companion.data.centerHeal(fns, c, busy, calls) }
+            sharedItemUse.centerHeal(done)
 
         override fun centerNickname(slot: Int, personality: Long, done: (com.pokedaisy.app.companion.data.CenterResult) -> Unit) =
             onCenter(done, screen = true) { fns, c, calls, busy -> com.pokedaisy.app.companion.data.centerNickname(fns, c, slot, personality, busy, calls) }
@@ -2207,7 +2208,6 @@ class PokeDaisyActivity : Activity() {
         textPatch = null
         if (::engine.isInitialized) engine.setInstantText(null, false)
         syncHmFree(false)
-        centerFound = null
         syncExpShare()
         syncLevelCap()
         shinyTarget = null
@@ -2382,7 +2382,6 @@ class PokeDaisyActivity : Activity() {
             }, ready = { found ->
                 if (romData == r && engine === current) {
                     tmSites = found.sites; textPatch = found.text
-                    centerFound = found.center
                     syncHmFree(); syncExpShare(); syncLevelCap()
                     current.setReusableTms(tmSites, Prefs(this).reusableTms)
                     current.setInstantText(textPatch, Prefs(this).instantText)

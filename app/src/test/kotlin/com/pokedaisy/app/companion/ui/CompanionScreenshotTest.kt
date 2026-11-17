@@ -406,6 +406,14 @@ open class CompanionScreenshotTest {
     }
 
     @Test fun partyDetailTake() = snapshot { AppTheme { MonDetailScreen(takeParty, 0, {}, {}, itemUse = takeUse) } }
+    @Test fun partyHealOnly() = snapshot { AppTheme {
+        MonDetailScreen(takeParty, 0, {}, {}, initialCenterMenu = true,
+            itemUse = object : com.pokedaisy.app.companion.ItemUse {
+                override fun canUse(itemId: Int) = false
+                override fun use(itemId: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {}
+                override fun center() = com.pokedaisy.app.companion.CenterSupport(true, false, false, false)
+            })
+    } }
 
     /** ...and pops up what it did, like the bag's USE / GIVE. */
     @Test fun partyDetailTaken() = snapshot {
