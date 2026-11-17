@@ -195,6 +195,21 @@ class PkApiCoreTest {
         assertTrue(calls.write(0xC100, byteArrayOf(0x12, 0x34)))
         assertContentEquals(byteArrayOf(0x12, 0x34), calls.read(0xC100, 2))
         assertContentEquals("PD-TEST-GB".encodeToByteArray(), calls.rom(0x134, 10))
+        // The diagnostic waits on LY in its main loop. Hook that actual CPU address, run a tiny RAM
+        // routine, and return to the loop: the same GB call bridge the Gen 1 PC uses, without a retail ROM.
+        val program = assertNotNull(calls.rom(0x150, 96))
+        val wait = byteArrayOf(0xF0.toByte(), 0x44, 0xFE.toByte(), 0x90.toByte())
+        val loop = (0..program.size - wait.size).first { at ->
+            program.copyOfRange(at, at + wait.size).contentEquals(wait)
+        } + 0x150
+        val routine = byteArrayOf(0xEA.toByte(), 0x23, 0xC1.toByte(), // ld [c123],a
+            0x78, 0xEA.toByte(), 0x24, 0xC1.toByte(), // ld a,b; ld [c124],a
+            0x7C, 0xEA.toByte(), 0x25, 0xC1.toByte(), // ld a,h; ld [c125],a
+            0x7D, 0xEA.toByte(), 0x26, 0xC1.toByte(), 0xC9.toByte()) // ld a,l; ld [c126],a; ret
+        assertTrue(calls.write(0xC100, routine))
+        assertTrue(calls.gbCallAt(loop, 0xC100, 0x5A, 0x6B, 0x1234))
+        PkApiCore.runFrame()
+        assertContentEquals(byteArrayOf(0x5A, 0x6B, 0x12, 0x34), calls.read(0xC123, 4))
         PkApiCore.stop()
         assertEquals(-1L, calls.call(0x03004001))
     }
