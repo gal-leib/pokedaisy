@@ -60,11 +60,11 @@ val STATUS_BAR_PLACES = listOf(tk("OFF"), tk("GAME"), tk("COMPANION"))
 
 fun statusBarLabel(on: Boolean, onCompanion: Boolean) = STATUS_BAR_PLACES[if (!on) 0 else if (onCompanion) 2 else 1]
 
-internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), CHEATS(tk("CHEATS")), CHEAT_ADD(tk("ADD CODE")), TWEAKS(tk("TWEAKS")), COOP_PARTNERS(tk("PARTNERS")), HELP(tk("HELP")) }
+internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), OVERLAYS(tk("OVERLAY")), CHEATS(tk("CHEATS")), CHEAT_ADD(tk("ADD CODE")), TWEAKS(tk("TWEAKS")), COOP_PARTNERS(tk("PARTNERS")), HELP(tk("HELP")) }
 
 /** Where BACK from a page goes: SHADERS opens from DISPLAY OPTIONS, the rest from HOME. */
 internal val Page.parent: Page get() = when (this) {
-    Page.SHADERS -> Page.DISPLAY
+    Page.SHADERS, Page.OVERLAYS -> Page.DISPLAY
     Page.CHEAT_ADD -> Page.CHEATS
     else -> Page.HOME
 }
@@ -122,9 +122,21 @@ fun CompanionSettingsScreen(
     val capturedKeys = capture?.keys
     DisposableEffect(page, capture) { onDispose { capture?.cancel() } }
     var confirm by remember { mutableStateOf<Confirm?>(null) }
+    var removingOverlays by remember(page) { mutableStateOf(false) }
+    var overlayNotice by remember { mutableStateOf<Pair<String, String>?>(null) }
     var cheatNotice by remember { mutableStateOf<Pair<String, String>?>(null) }
     var removingCheats by remember(page) { mutableStateOf(false) }
     var selector by remember { mutableStateOf<Selector?>(null) }
+    fun importOverlay() {
+        settings?.importOverlay?.invoke { completed ->
+            overlayNotice = completed.notice
+            completed.needsImage?.let { need ->
+                confirm = Confirm(tk("PICK THE IMAGE"), com.pokedaisy.app.companion.OverlayImport.imagePrompt(need), tk("PICK")) { importOverlay() }
+                    .also { it.onCancel = { settings.cancelOverlayImport() }; it.onDismiss = { settings.cancelOverlayImport() } }
+            }
+            tick++
+        }
+    }
     // TOUCH CONTROLS > SKINS: the imported skins (read on the way in) and their pick-list.
     val touchSkinUi = remember { TouchSkinUi() }
     val touchSkins = remember(settings, page, settings?.touchRevision) { if (page == Page.TOUCH) settings?.touchSkins.orEmpty() else emptyList() }
@@ -168,7 +180,8 @@ fun CompanionSettingsScreen(
             }
             // EDIT LAYOUT saves over the game, outside this page: its revision redraws TOUCH CONTROLS.
             val touchRevision = settings?.touchRevision ?: 0
-            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision, removingCheats) {
+            val overlayRevision = settings?.overlayRevision ?: 0
+            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision, overlayRevision, removingCheats, removingOverlays) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
@@ -273,6 +286,19 @@ fun CompanionSettingsScreen(
                         buttons = settings.touchButtons, xyBadge = settings.touchXyBadge,
                     ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.OVERLAYS -> overlayChoiceRows(settings.overlayChoices, settings.overlay, removingOverlays,
+                        pick = { settings.setOverlay(it); tick++ }, remove = { id, label ->
+                            confirm = Confirm(tk("REMOVE OVERLAY?"), label, tk("REMOVE")) { settings.deleteOverlay(id); tick++ }
+                        }) + buildList {
+                            settings.importOverlay?.let { add(SettingRow(tk("IMPORT FILE"), null) { removingOverlays = false; importOverlay() }) }
+                            if (settings.overlayChoices.any { it.first.startsWith("user:") }) {
+                                add(SettingRow(if (removingOverlays) tk("DONE") else tk("REMOVE"), null) { removingOverlays = !removingOverlays })
+                                if (removingOverlays) add(SettingRow(tk("REMOVE ALL"), null) {
+                                    confirm = Confirm(tk("REMOVE ALL OVERLAYS?"), tr("Every imported overlay ({0}) is deleted from this device. The built-in ones stay.", settings.overlayChoices.count { it.first.startsWith("user:") }), tk("REMOVE ALL")) { settings.deleteAllOverlays(); removingOverlays = false; tick++ }
+                                })
+                            }
+                            add(SettingRow(tk("CANCEL"), null) { page = Page.DISPLAY })
+                        }
                     Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it })
                         .let { rows -> settings.shownRows?.let { onlyRows(rows, it) } ?: rows } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.CHEATS -> cheatRows(settings, changed = { tick++ }, removing = removingCheats,
@@ -439,6 +465,9 @@ fun CompanionSettingsScreen(
                 badge = sel.badge, note = sel.note,
             )
         }
+        overlayNotice?.let { (title, message) ->
+            OptionConfirm(title, message, tk("OK"), m, onConfirm = { overlayNotice = null }, onDismiss = { overlayNotice = null }, cancelLabel = null)
+        }
         cheatNotice?.let { (title, message) ->
             OptionConfirm(title, message, tk("OK"), m, onConfirm = { cheatNotice = null },
                 onDismiss = { cheatNotice = null }, cancelLabel = null)
@@ -446,7 +475,7 @@ fun CompanionSettingsScreen(
         confirm?.let { c ->
             OptionConfirm(
                 c.title, c.message, c.confirmLabel, m,
-                onConfirm = { confirm = null; c.action() }, onDismiss = { confirm = null },
+                onConfirm = { confirm = null; c.action() }, onDismiss = { confirm = null; c.onDismiss() },
                 onCancel = { confirm = null; c.onCancel() },
                 cancelLabel = c.cancelLabel ?: tk("CANCEL"),
             )
@@ -507,6 +536,7 @@ private class Confirm(val title: String, val message: String, val confirmLabel: 
     /** YES / NO style confirms name their buttons; [onCancel] runs on NO only (BACK just closes it). */
     var cancelLabel: String? = null
     var onCancel: () -> Unit = {}
+    var onDismiss: () -> Unit = {}
 }
 
 /** The groups (by title) a blocked game ([CompanionSettings.gameBlocked]) leaves out whole: none of them works there. */
@@ -1155,8 +1185,8 @@ private fun displayRows(s: CompanionSettings, changed: () -> Unit, navigate: (Pa
         // A frame around the game: NONE, the built-in ones, the player's imports (added on the top screen). Live.
         s.overlayChoices.takeIf { it.isNotEmpty() }?.let { choices ->
             val current = choices.firstOrNull { it.first == s.overlay }?.second ?: choices.first().second
-            SettingRow(tk("OVERLAY"), current, subtitle = "A frame around the game", labelBadge = s.overlayBadge) {
-                select(Selector(tk("OVERLAY"), choices.map { it.second }, current) { l ->
+            SettingRow(tk("OVERLAY"), current, subtitle = "A frame around the game", labelBadge = s.overlayBadge, opensPage = s.importOverlay != null) {
+                if (s.importOverlay != null) navigate(Page.OVERLAYS) else select(Selector(tk("OVERLAY"), choices.map { it.second }, current) { l ->
                     choices.firstOrNull { it.second == l }?.let { s.setOverlay(it.first) }
                 })
             }

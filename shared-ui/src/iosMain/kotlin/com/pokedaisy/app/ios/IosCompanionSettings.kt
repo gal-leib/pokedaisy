@@ -61,7 +61,7 @@ internal class IosCompanionSettings(
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
         "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY")
-        .let { if (game == null) it - "GAME SPEED" - "FF" - "DISPLAY OPTIONS" else it }
+        .let { if (game == null) it - "GAME SPEED" - "FF" else it }
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
     override val cheats get() = cheatHost()?.list.orEmpty()
@@ -126,16 +126,20 @@ internal class IosCompanionSettings(
     override val touchButtons get() = IosTouchPreferences.buttons
     override val touchSkins get() = IosTouchSkins.store.list()
     override val touchSkinsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TOUCH_SKINS)
+    private fun pauseForFileImport() {
+        actions?.cancelTouch()
+        game?.let { it.uiPaused = true; it.pause() }
+    }
+    private fun resumeAfterFileImport() {
+        game?.takeIf { it.isRunning }?.let {
+            it.uiPaused = false
+            if (platform.UIKit.UIApplication.sharedApplication.applicationState == platform.UIKit.UIApplicationState.UIApplicationStateActive) it.resume()
+        }
+    }
     override val importTouchSkin: (((Pair<String, String>) -> Unit) -> Unit) get() = { done ->
         presentFrom()?.let { from ->
-            IosTouchSkins.pick(from, before = {
-                actions?.cancelTouch()
-                game?.let { it.uiPaused = true; it.pause() }
-            }, done = { notice ->
-                game?.takeIf { it.isRunning }?.let {
-                    it.uiPaused = false
-                    if (platform.UIKit.UIApplication.sharedApplication.applicationState == platform.UIKit.UIApplicationState.UIApplicationStateActive) it.resume()
-                }
+            IosTouchSkins.pick(from, before = ::pauseForFileImport, done = { notice ->
+                resumeAfterFileImport()
                 notice?.let(done)
             })
         }
@@ -271,14 +275,28 @@ internal class IosCompanionSettings(
     override fun setLookAround(on: Boolean) { iosPreferences.lookAround = on; gameScreen()?.refreshPicture() }
     override val expandZoomOnText get() = iosPreferences.expandZoomOnText
     override fun setExpandZoomOnText(on: Boolean) { iosPreferences.expandZoomOnText = on; gameScreen()?.refreshPicture() }
-    override val overlayChoices get() = if (game != null) com.pokedaisy.app.companion.ui.builtInOverlayChoices() else emptyList()
+    override val overlayChoices get() = IosOverlays.choices.map { (choice, label) -> choice.key to label }
     override val overlay get() = iosPreferences.overlay
-    override val overlayBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCREEN_BORDERS)
+    override val overlayRevision get() = IosOverlays.revision
+    override val overlayBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_OVERLAY_IMPORTS)
+        ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCREEN_BORDERS)
     override fun setOverlay(key: String) {
-        if (key.isNotEmpty() && com.pokedaisy.app.overlay.BuiltInFrames.style(key) == null) return
+        if (key.isNotEmpty() && com.pokedaisy.app.overlay.OverlayChoice.of(key) == com.pokedaisy.app.overlay.OverlayChoice.None) return
         iosPreferences.overlay = key
         gameScreen()?.refreshPicture()
     }
+    override val importOverlay: (((com.pokedaisy.app.companion.OverlayImport.Completed) -> Unit) -> Unit) get() = { done ->
+        presentFrom()?.let { from ->
+            IosOverlays.pick(from, before = ::pauseForFileImport, done = { completed ->
+                resumeAfterFileImport()
+                gameScreen()?.refreshPicture()
+                completed?.let(done)
+            })
+        }
+    }
+    override fun cancelOverlayImport() = IosOverlays.cancel()
+    override fun deleteOverlay(id: String) { IosOverlays.delete(id).invokeOnCompletion { gameScreen()?.refreshPicture() } }
+    override fun deleteAllOverlays() { IosOverlays.deleteAll().invokeOnCompletion { gameScreen()?.refreshPicture() } }
     override val gbaColors = false
     override fun setGbaColors(on: Boolean) {}
     override val screenFilter = ScreenFilter.NONE
