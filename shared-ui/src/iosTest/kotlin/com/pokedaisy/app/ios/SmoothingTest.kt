@@ -3,7 +3,8 @@
 package com.pokedaisy.app.ios
 
 import com.pokedaisy.app.WideCamera
-import com.pokedaisy.app.game.PictureScale
+import com.pokedaisy.app.ScreenShaders
+import com.pokedaisy.app.companion.Smoothing
 import com.pokedaisy.app.companion.GridStrength
 import com.pokedaisy.app.companion.MetalScreenEffects
 import com.pokedaisy.app.companion.MetalSmoothing
@@ -21,13 +22,7 @@ class SmoothingTest {
     private fun renderer(): GameRenderer? = GameRenderer.create()?.apply { stretch = true }.also {
         if (it == null) println("SmoothingTest: no Metal device; GPU checks not run")
     }
-    private fun program(xbr: Boolean = false): List<PictureEffects.SmoothPass> {
-        val dir = assertNotNull(getenv("PK_SHADER_DIR")?.toKString(), "PK_SHADER_DIR not set")
-        val asset = if (xbr) "xbr-lv2.glsl" else "xbrz-freescale.glsl"
-        val source = FileSystem.SYSTEM.read("$dir/$asset".toPath()) { readUtf8() }
-        return listOf(PictureEffects.SmoothPass(if (xbr) MetalSmoothing.xbr(source) else MetalSmoothing.xbrz(source),
-            if (xbr) PictureScale.Whole else PictureScale.View))
-    }
+    private fun program(xbr: Boolean = false) = smoothingPrograms(if (xbr) Smoothing.XBR else Smoothing.XBRZ)
     private fun upload(r: GameRenderer, bytes: ByteArray, w: Int, h: Int, expanded: Boolean = false) {
         bytes.usePinned { assertTrue(r.uploadFrame(it.addressOf(0), w, h,
             if (expanded) WideCamera.Window(0, 0, w, h, 0f, 0f, 8f) else null)) }
@@ -92,4 +87,13 @@ class SmoothingTest {
         }
     }
 
+}
+
+/** Tests read the same preset and shader assets as both hosts, without copied shader algorithms. */
+internal fun smoothingPrograms(mode: Smoothing): List<PictureEffects.SmoothPass> {
+    val dir = assertNotNull(getenv("PK_SHADER_DIR")?.toKString(), "PK_SHADER_DIR not set")
+    return ScreenShaders.smoothingPasses(mode).orEmpty().mapIndexed { index, pass ->
+        val source = FileSystem.SYSTEM.read("$dir/${pass.asset}".toPath()) { readUtf8() }
+        PictureEffects.SmoothPass(MetalSmoothing.program(mode, source, index), pass.size, pass.float, MetalSmoothing.history(source))
+    }
 }
