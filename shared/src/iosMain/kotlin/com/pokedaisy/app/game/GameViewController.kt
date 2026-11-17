@@ -54,6 +54,32 @@ class GameViewController(
     var onHotkey: (com.pokedaisy.app.Hotkeys.Event) -> Unit
         get() = input.onHotkey
         set(value) { input.onHotkey = value }
+    /** Shared camera policy; this adapter only supplies native drawable/input/frame signals. */
+    val camera = com.pokedaisy.app.WideCamera()
+    private var wideTables = 0L
+    val wideSupported: Boolean get() = wideTables != 0L
+    var onPictureChanged: () -> Unit = {}
+    var expanded = false
+        set(value) {
+            if (field == value) return
+            field = value
+            camera.reset()
+            if (running) PkApiCore.configureWide(if (value) wideTables else 0)
+        }
+    var stretch = false
+        set(value) { field = value; renderer?.stretch = value }
+    private var pictureWindow: com.pokedaisy.app.WideCamera.Window? = null
+
+    /** Only the shared ROM verifier's table CRC may enable EXPAND. Main/game thread after core start. */
+    fun setExpandedTables(crc: Long) {
+        wideTables = crc.takeIf(PkApiCore::wideKnows) ?: 0
+        camera.frameW = PkApiCore.videoWidth
+        camera.frameH = PkApiCore.videoHeight
+        camera.reset()
+        PkApiCore.configureWide(if (expanded) wideTables else 0)
+        onPictureChanged()
+    }
+
     private val pacer = FramePacer()
     private val observers = mutableListOf<NSObjectProtocol>()
     private var running = false
@@ -121,6 +147,7 @@ class GameViewController(
         val next = on && rewindEnabled
         if (next == rewinding) return
         rewinding = next
+        camera.reset()
         beforeRewind()
         if (!running) return
         audio.stop()
@@ -226,6 +253,7 @@ class GameViewController(
             if (PkApiCore.finishSave(600) >= 600) false else operation()
         } finally {
             stateChanging = false
+            camera.reset()
             pacer.reset()
             audioSpeed = -1.0
             if (active && running) audio.start()
@@ -243,6 +271,7 @@ class GameViewController(
             PkApiCore.finishSave(FINISH_SAVE_FRAMES)
             PkApiCore.stop()
         }
+        onPictureChanged = {}
         onHotkey = {}
         beforeRewind = {}
         beforeFrame = {}
@@ -255,6 +284,14 @@ class GameViewController(
         // GameController queries. A controller action can close/restart the game or open the editor here.
         input.poll()
         if (!running || !active || uiPaused) return
+        view.drawableSize.useContents {
+            val w = width.toInt(); val h = height.toInt()
+            if (camera.viewW != w || camera.viewH != h) {
+                camera.viewW = w; camera.viewH = h; camera.reset()
+                pictureWindow = null
+                renderer?.upload()
+            }
+        }
         val rate = effectiveSpeed()
         val now = CACurrentMediaTime()
         if (rate != audioSpeed) {
@@ -274,8 +311,27 @@ class GameViewController(
             if (!running || !active || uiPaused) break
             val keys = if (rewinding) 0 else frameKeys(held)
             if (!running || !active || uiPaused) break
+            val window = if (expanded && wideSupported) runCatching {
+                camera.stickX = input.cameraX; camera.stickY = input.cameraY
+                camera.walking = held and 0xF0 != 0
+                camera.frame(PkApiCore.wideScene)
+            }.getOrElse {
+                // Keep this run on the ordinary picture; a settings refresh must not re-enable a failing camera.
+                wideTables = 0
+                expanded = false
+                onPictureChanged()
+                null
+            } else null
+            if (window != null) PkApiCore.setWideView(window.x, window.y, window.w, window.h)
+            else PkApiCore.setWideView(0, 0, 0, 0)
+            // Capped FF draws its final frame; uncapped FF always draws one even if its time budget expires early.
+            PkApiCore.setWideDraw(frame == frames - 1 || rate == 0.0 && frame == 0)
             PkApiCore.setKeys(keys)
             PkApiCore.runFrame()
+            if (!PkApiCore.wideSkipped) pictureWindow = window.takeIf { PkApiCore.wideWidth > 0 }
+            if (wideTables != 0L && PkApiCore.wideFault != 0) {
+                wideTables = 0; expanded = false; pictureWindow = null; onPictureChanged()
+            }
             afterFrame()
             audio.volume = if (rewinding || muted || rate == 0.0 || quietPress()) 0f else volume
             audio.push()
@@ -284,7 +340,7 @@ class GameViewController(
             if (effectiveSpeed() != rate) break
         }
         if (!running || !active || uiPaused) return
-        if (ran && (rewinding || !holdPicture())) renderer?.upload()
+        if (ran && (rewinding || !holdPicture())) renderer?.upload(if (expanded) pictureWindow else null)
         draw(view)
     }
 

@@ -21,7 +21,7 @@ import com.pokedaisy.app.game.GameViewController
 
 /**
  * The companion's SETTINGS on the iPad: shared battle and appearance options, playback and sound, kept in the
- * app's defaults. Only supported rows are shown ([shownRows]); shaders and EXPAND wait for later ports.
+ * app's defaults. Only supported rows are shown ([shownRows]); screen filters wait for their native renderer adapter.
  */
 internal class IosCompanionSettings(
     private val romPath: String?,
@@ -58,7 +58,7 @@ internal class IosCompanionSettings(
     override val hasRunningGame get() = game != null
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
@@ -206,7 +206,7 @@ internal class IosCompanionSettings(
     override fun clearGbaControlBinding(btn: GbaControls.Btn) {
         bindings.clearGameButton(btn)
     }
-    override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS + com.pokedaisy.app.Hotkeys.Action.QUICK_MENU
+    override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS + listOf(com.pokedaisy.app.Hotkeys.Action.QUICK_MENU, com.pokedaisy.app.Hotkeys.Action.ZOOM)
     override val quickMenuSupportedActions get() = setOf(
         com.pokedaisy.app.companion.QuickAction.PC, com.pokedaisy.app.companion.QuickAction.FLY,
         com.pokedaisy.app.companion.QuickAction.HEAL, com.pokedaisy.app.companion.QuickAction.FLASH,
@@ -231,8 +231,25 @@ internal class IosCompanionSettings(
     override fun setClickSound(on: Boolean) {}
     override val statusBar = false
     override fun setStatusBar(on: Boolean) {}
-    override val gameAspect = GameAspect.ORIGINAL
-    override fun setGameAspect(aspect: GameAspect) {}
+    override val gameAspect get() = stored.gameAspect
+    override fun setGameAspect(aspect: GameAspect) { stored.setGameAspect(aspect); gameScreen()?.refreshPicture() }
+    override val wideSupported get() = game?.wideSupported == true && playback()?.blocked != true
+    override val pictureBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_EXPAND)
+    var cameraRomKey = ""
+    override val zoomSteps get() = game?.camera?.let { camera -> camera.levels().indices.map(camera::factor) }.orEmpty()
+    override val zoomLevel get() = game?.camera?.level ?: 0
+    override fun setZoomLevel(level: Int) {
+        val camera = game?.camera ?: return
+        if (game?.expanded == true) {
+            camera.level = level.coerceIn(0, (camera.levels().size - 1).coerceAtLeast(0))
+            if (cameraRomKey.isNotEmpty()) iosPreferences.setZoomLevelFor(cameraRomKey, camera.level)
+        }
+    }
+    fun cycleZoom() { if (game?.expanded == true) setZoomLevel((zoomLevel + 1) % zoomSteps.size.coerceAtLeast(1)) }
+    override val lookAround get() = iosPreferences.lookAround
+    override fun setLookAround(on: Boolean) { iosPreferences.lookAround = on; gameScreen()?.refreshPicture() }
+    override val expandZoomOnText get() = iosPreferences.expandZoomOnText
+    override fun setExpandZoomOnText(on: Boolean) { iosPreferences.expandZoomOnText = on; gameScreen()?.refreshPicture() }
     override val gbaColors = false
     override fun setGbaColors(on: Boolean) {}
     override val screenFilter = ScreenFilter.NONE

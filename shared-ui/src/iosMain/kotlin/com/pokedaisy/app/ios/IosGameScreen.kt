@@ -52,6 +52,17 @@ internal class IosGameScreen(
     private var nextRepeat = 0.0
     private var portraitGripHeight = 0
     private var density = 1f
+    private var pictureAspect by mutableStateOf(prefs.gameAspect)
+    private var expandedSupported by mutableStateOf(game?.wideSupported == true)
+    val expanded get() = pictureAspect == com.pokedaisy.app.companion.GameAspect.WIDE && expandedSupported
+    private val stretched get() = pictureAspect == com.pokedaisy.app.companion.GameAspect.STRETCH
+    fun refreshPicture() {
+        pictureAspect = prefs.gameAspect
+        expandedSupported = game?.wideSupported == true
+        game?.expanded = expanded
+        game?.stretch = stretched
+        game?.camera?.let { it.lookAround = prefs.lookAround; it.zoomOnText = prefs.expandZoomOnText }
+    }
     private val aspect = if (gameBoy) 160f / 144 else 1.5f
     private var frames by mutableStateOf<GameScreenFrames?>(null)
     private var rewindUnavailable by mutableStateOf(false)
@@ -107,6 +118,8 @@ internal class IosGameScreen(
         set(on) { prefs.companionWindow = on; state.setSide(state.side.copy(window = on)) }
 
     init {
+        game?.onPictureChanged = ::refreshPicture
+        refreshPicture()
         game?.onCompanionButtons = ::controllerInput
         game?.onCompanionAim = quickMenu::aim
         touch.quickMenu = quickMenu
@@ -132,10 +145,10 @@ internal class IosGameScreen(
                 TouchGeometry.naturalHeight(IosTouchPreferences.style, constraints.maxWidth.toFloat(), density, gameBoy) else 0
             SideEffect {
                 state.setSide(state.side.withEnabled(!upright))
-                state.setPortrait(state.portrait.copy(enabled = upright, underGame = IosTouchPreferences.underGame, padStrip = strip))
+                state.setPortrait(state.portrait.copy(enabled = upright, underGame = IosTouchPreferences.underGame, padStrip = strip, expand = expanded))
             }
             GameScreen(state, gameHeight = { (it / aspect).roundToInt() },
-                game = { GamePicture(aspect, upright, Modifier.fillMaxSize(), gameContent) },
+                game = { GamePicture(aspect, upright, Modifier.fillMaxSize(), fill = expanded || stretched, content = gameContent) },
                 controls = { if (visible) touch.Controls(gameBoy, upright) },
                 gameOverlay = { CompositionLocalProvider(LocalCompanionBack provides overlayBack, LocalCompanionKeys provides overlayKeys,
                     LocalTextInputFocus provides textInputFocus, content = gameOverlay) },
@@ -184,7 +197,7 @@ internal class IosGameScreen(
 
     private fun stage(f: GameScreenFrames, visible: Boolean, w: Int = state.width, h: Int = state.height,
                       upright: Boolean = state.portrait.enabled): TouchStage {
-        val picture = fittedGamePicture(f.game.width, f.game.height, aspect, upright).translate(f.game.left, f.game.top)
+        val picture = fittedGamePicture(f.game.width, f.game.height, aspect, upright, fill = expanded || stretched).translate(f.game.left, f.game.top)
         val area = if (visible) f.controls else Rect(0f, h.toFloat(), w.toFloat(), h.toFloat())
         val companion = f.companion.takeIf { f.companionShown && (upright || !state.side.isWindow) }
         return TouchStage(w.toFloat(), h.toFloat(), density, upright, picture, area, companion, aspect, gameBoy)
@@ -192,6 +205,10 @@ internal class IosGameScreen(
 
     fun hudFrame(): Rect? = frames?.let { f ->
         stage(f, IosTouchPreferences.visible).game.translate(-f.game.left, -f.game.top)
+    }
+
+    fun coreFrame(): Rect? = frames?.let { f ->
+        fittedGamePicture(f.game.width, f.game.height, aspect, state.portrait.enabled && !expanded, fill = stretched)
     }
 
     fun hudClear(): Pair<Int, Int> {

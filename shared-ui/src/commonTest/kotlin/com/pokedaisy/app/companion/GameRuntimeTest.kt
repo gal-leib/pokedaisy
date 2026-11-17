@@ -77,6 +77,33 @@ class GameRuntimeTest {
         }
     }
 
+    @Test fun expandedTextAndMenuScenesHideTheHudEvenWhileTheFieldCallbackRemainsActive() {
+        val main = 0x03001000L
+        val field = 0x08001235L
+        val reader = object : MemoryReader {
+            override fun readCoreMemory(addr: Long, size: Int) =
+                ByteArray(size) { i -> if (addr == main + 4) (field shr (8 * i)).toByte() else 0 }
+        }
+        withPlayback { runtime, _, _ ->
+            runtime.start("missing-diagnostic.gba".toPath(), "BPEE", 0)
+            FfMenuWatch.load("BPEE", field, 0)
+            FfMenuWatch.useKnownGMain(main, 0x439)
+            repeat(20) { runtime.tick(reader, com.pokedaisy.app.WideCamera.SCENE_FIELD) }
+            assertTrue(runtime.settledOnField)
+            runtime.tick(reader, com.pokedaisy.app.WideCamera.SCENE_FADE)
+            assertTrue(runtime.settledOnField)
+            runtime.tick(reader, com.pokedaisy.app.WideCamera.SCENE_TEXT)
+            assertFalse(runtime.settledOnField)
+            runtime.tick(reader, com.pokedaisy.app.WideCamera.SCENE_FADE)
+            assertFalse(runtime.settledOnField)
+            repeat(19) { runtime.tick(reader, com.pokedaisy.app.WideCamera.SCENE_FIELD); assertFalse(runtime.settledOnField) }
+            runtime.tick(reader, com.pokedaisy.app.WideCamera.SCENE_FIELD)
+            assertTrue(runtime.settledOnField)
+            runtime.tick(reader, com.pokedaisy.app.WideCamera.SCENE_MENU)
+            assertFalse(runtime.settledOnField)
+        }
+    }
+
     @Test fun liveConfigurationDrivesScenesAndSmartMenusWithoutLosingTheRequestedSpeed() = withPlayback { p, session, _ ->
         p.baseSpeed = 1.5f; p.bikeSpeed = 3f
         p.fieldChanged(GameField.AVATAR or GameField.BIKE)

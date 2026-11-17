@@ -136,7 +136,15 @@ so closing a window cannot release its capture; touch ownership changes cancel o
 the shared companion keys and focus actions. Keyboard letters remain text input, rather than controller shortcuts.
 
 The live screen and in-game editor/rotated preview use measured common frames, including saved sizes and hidden state.
-Game Boy games keep 10:9; GBA games keep 3:2. DS, shaders, skins and fold/device-window features remain Android-only.
+ORIGINAL keeps Game Boy games at 10:9 and GBA games at 3:2; STRETCH fills the measured picture slot.
+EXPAND uses the same `WideTables`, native C renderer and `WideCamera` as Android. The Metal adapter reuses one
+800x800 texture as the logical window changes, uploads only drawn frames and keeps the original picture as fallback.
+Portrait expansion uses the shared `PortraitLayout`; HUD bounds cover the expanded picture, while battle buttons
+use the original frame's bounds. State changes, rewind edges and drawable resizing reset the shared camera.
+
+The shared ASPECT, ZOOM, AUTO ZOOM IN and LOOK AROUND settings are available on iOS. Zoom is kept per ROM; the touch
+ZOOM button and hotkey cycle its steps, and the right stick looks around. Captured right-stick movement stays
+suppressed until centred after overlays close. DS, filters, skins and fold/device-window features remain Android-only.
 
 For XCUITest, launch with `POKEDAISY_UI_TEST=1` in the app's environment to synchronize Compose accessibility
 semantics without enabling VoiceOver. Normal launches keep Compose's service-driven accessibility synchronization.

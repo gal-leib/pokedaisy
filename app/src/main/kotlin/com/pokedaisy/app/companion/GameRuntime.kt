@@ -205,10 +205,10 @@ class GameRuntime(
         session.serviceField(gba, gbOnField = true)
     }
 
-    fun tick(reader: MemoryReader = InProcessReader) {
+    fun tick(reader: MemoryReader = InProcessReader, wideScene: Int = -1) {
         val readable = gba && !blocked && telemetry.snapshot.value.blocked == null
         session.observeScreens(readable, reader = reader)
-        session.observeField(readable && FfMenuWatch.onField && !map, -1, battle.gameState, battle.holdPicture)
+        session.observeField(readable && FfMenuWatch.onField && !map, wideScene, battle.gameState, battle.holdPicture)
         settledOnField = readable && session.onField
         fieldChanged(if (readable && fieldReadable) readField() else 0)
     }

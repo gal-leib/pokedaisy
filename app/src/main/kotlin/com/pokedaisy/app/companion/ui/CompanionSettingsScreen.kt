@@ -826,7 +826,7 @@ private fun homeRows(
         // A blocked game has no EXPAND: ORIGINAL or STRETCH, a saved EXPAND reading as ORIGINAL (what it plays as).
         run {
             val aspect = if (s.gameBlocked && s.gameAspect == GameAspect.WIDE) GameAspect.ORIGINAL else s.gameAspect
-            SettingRow(tk("ASPECT"), aspectLabel(aspect), if (s.gameBlocked) null else wideBadge(s, aspect), subtitle = "Original shape, stretched, or more of the map") {
+            SettingRow(tk("ASPECT"), aspectLabel(aspect), if (s.gameBlocked) null else wideBadge(s, aspect), subtitle = "Original shape, stretched, or more of the map", labelBadge = s.pictureBadge) {
                 val aspects = GameAspect.entries.filter { !s.gameBlocked || it != GameAspect.WIDE }
                 select(
                     Selector(
@@ -842,16 +842,16 @@ private fun homeRows(
             val now = labels.getOrElse(s.zoomLevel) { labels[0] }
             SettingRow(
                 tk("ZOOM"), now, subtitle = "How much of the map you see",
-                labelBadge = NewFeatures.badge(NewFeatures.ZOOM_SETTING),
+                labelBadge = s.pictureBadge ?: NewFeatures.badge(NewFeatures.ZOOM_SETTING),
             ) { select(Selector(tk("ZOOM"), labels, now) { l -> s.setZoomLevel(labels.indexOf(l)); changed() }) }
         },
         // EXPAND only: whether a conversation, sign, menu or picture over the field pulls the zoom in (battles always do).
-        SettingRow(tk("AUTO ZOOM IN"), onOff(s.expandZoomOnText)) { s.setExpandZoomOnText(!s.expandZoomOnText); changed() }
+        SettingRow(tk("AUTO ZOOM IN"), onOff(s.expandZoomOnText), labelBadge = s.pictureBadge) { s.setExpandZoomOnText(!s.expandZoomOnText); changed() }
             .takeIf { s.gameAspect == GameAspect.WIDE },
         // EXPAND only: the right stick moves the view.
         SettingRow(
             tk("LOOK AROUND"), onOff(s.lookAround), subtitle = "The right stick moves the view",
-            labelBadge = NewFeatures.badge(NewFeatures.LOOK_AROUND),
+            labelBadge = s.pictureBadge ?: NewFeatures.badge(NewFeatures.LOOK_AROUND),
         ) { s.setLookAround(!s.lookAround); changed() }
             .takeIf { s.gameAspect == GameAspect.WIDE },
         // A DS game: which emulator runs it (melonDS, or DSperate for weak devices); taken at the game's next start.
