@@ -13,7 +13,8 @@ data class PictureEffects(
     val gridY: Float = 0f,
 ) {
     data class Program(val name: String, val fragment: String)
-    data class SmoothPass(val program: Program, val size: PictureScale)
+    data class SmoothPass(val program: Program, val size: PictureScale,
+        val halfFloat: Boolean = false, val history: Int? = null)
 }
 
 /** Android GL and Metal choose the same whole-pixel filter size and reflective-screen pass size. */

@@ -304,7 +304,8 @@ internal class IosCompanionSettings(
     override fun setGridStrength(strength: GridStrength) { stored.setGridStrength(strength); gameScreen()?.refreshPicture() }
     override val companionShadersBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_COMPANION_EFFECTS)
     override fun setCompanionShaders(on: Boolean) { stored.setCompanionShaders(on); gameScreen()?.refreshPicture() }
-    override val smoothingBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_XBR_SMOOTHING)
+    override val smoothingBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCALEFX_SMOOTHING)
+        ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_XBR_SMOOTHING)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SMOOTHING)
     override val smoothingModes get() = IosSmoothing.modes
     override val smoothingAvailable get() = smoothingModes.size > 1

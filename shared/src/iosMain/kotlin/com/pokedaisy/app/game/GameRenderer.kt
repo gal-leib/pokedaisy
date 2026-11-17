@@ -6,6 +6,7 @@ import com.pokedaisy.app.WideCamera
 import com.pokedaisy.app.core.PkApiCore
 import kotlinx.cinterop.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,7 +30,7 @@ class GameRenderer private constructor(
     var stretch = false
     private var frameW = 0
     private var frameH = 0
-    private val uniforms = FloatArray(20)
+    private val uniforms = FloatArray(24)
     val frameWidth: Int get() = frameW
     val frameHeight: Int get() = frameH
 
@@ -48,13 +49,15 @@ class GameRenderer private constructor(
     /** Call on the draw thread. Compilation runs off it, and cancellation never publishes an old request. */
     suspend fun configureEffects(settings: PictureEffects): Boolean {
         val next = withContext(Dispatchers.Default) {
+            val compilationContext = coroutineContext
             compiling.withLock {
                 fun program(p: PictureEffects.Program?, format: MTLPixelFormat): MTLRenderPipelineStateProtocol? = p?.let {
+                    compilationContext.ensureActive()
                     programs[it to format] ?: makePipeline(device, HEADER + "\n" + it.fragment, format)?.also { built -> programs[it to format] = built }
                 }
                 Effects(settings, program(settings.colors, MTLPixelFormatRGBA8Unorm), program(settings.unlit, MTLPixelFormatRGBA8Unorm),
                     program(settings.filter, if (settings.prescale) MTLPixelFormatRGBA8Unorm else outputFormat),
-                    settings.smoothing.map { program(it.program, MTLPixelFormatRGBA8Unorm) })
+                    settings.smoothing.map { program(it.program, if (it.halfFloat) MTLPixelFormatRGBA16Float else MTLPixelFormatRGBA8Unorm) })
             }
         }
         effects = next
@@ -64,12 +67,14 @@ class GameRenderer private constructor(
 
     private inner class Target {
         var texture: MTLTextureProtocol? = null
-        fun ensure(w: Int, h: Int): MTLTextureProtocol? {
-            texture?.takeIf { it.width.toInt() >= w && it.height.toInt() >= h }?.let { return it }
+        fun ensure(w: Int, h: Int, halfFloat: Boolean = false): MTLTextureProtocol? {
+            val format = if (halfFloat) MTLPixelFormatRGBA16Float else MTLPixelFormatRGBA8Unorm
+            val previous = texture?.takeIf { it.pixelFormat == format }
+            previous?.takeIf { it.width.toInt() >= w && it.height.toInt() >= h }?.let { return it }
             // Grow in bounded steps, so a smooth camera transition doesn't allocate a texture every frame.
             fun capacity(n: Int) = ((n + 255) / 256) * 256
-            val desc = MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(MTLPixelFormatRGBA8Unorm,
-                capacity(maxOf(w, texture?.width?.toInt() ?: 0)).toULong(), capacity(maxOf(h, texture?.height?.toInt() ?: 0)).toULong(), false)
+            val desc = MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(format,
+                capacity(maxOf(w, previous?.width?.toInt() ?: 0)).toULong(), capacity(maxOf(h, previous?.height?.toInt() ?: 0)).toULong(), false)
             desc.usage = MTLTextureUsageRenderTarget or MTLTextureUsageShaderRead
             desc.storageMode = MTLStorageModePrivate
             return device.newTextureWithDescriptor(desc)?.also { texture = it }
@@ -128,11 +133,17 @@ class GameRenderer private constructor(
         var smooth = false
         if (e.smoothing.isNotEmpty() && e.smoothing.all { it != null }) {
             var result: Surface? = input
+            val previous = mutableListOf<Surface>()
             for ((i, program) in e.smoothing.withIndex()) {
                 val source = result ?: break
                 while (smoothingTargets.size <= i) smoothingTargets += Target()
-                val (w, h) = picturePassSize(e.settings.smoothing[i].size, source.w, source.h, sizes)
-                result = pass(buffer, requireNotNull(program), source, smoothingTargets[i], w, h, false, false)
+                val spec = e.settings.smoothing[i]
+                val history = spec.history?.let { back -> if (i - back == -1) input else previous.getOrNull(i - back) }
+                if (spec.history != null && history == null) { result = null; break }
+                val (w, h) = picturePassSize(spec.size, source.w, source.h, sizes)
+                result = pass(buffer, requireNotNull(program), source, smoothingTargets[i], w, h, false, false,
+                    halfFloat = spec.halfFloat, history = history ?: source)
+                result?.let { previous += it }
             }
             // A partial chain may contain metrics rather than colors: never publish it after a failed pass.
             result?.let { input=it; smooth=true }
@@ -148,15 +159,16 @@ class GameRenderer private constructor(
     }
 
     private fun pass(buffer: MTLCommandBufferProtocol, program: MTLRenderPipelineStateProtocol, input: Surface,
-                     target: Target, w: Int, h: Int, smooth: Boolean, smoothed: Boolean): Surface? {
-        val out=target.ensure(w,h) ?: return null
+                     target: Target, w: Int, h: Int, smooth: Boolean, smoothed: Boolean,
+                     halfFloat: Boolean = false, history: Surface? = null): Surface? {
+        val out=target.ensure(w,h,halfFloat) ?: return null
         val desc=MTLRenderPassDescriptor.renderPassDescriptor()
         val color=desc.colorAttachments.objectAtIndexedSubscript(0u)
         color.texture=out;color.loadAction=MTLLoadActionDontCare;color.storeAction=MTLStoreActionStore
         val encoder=buffer.renderCommandEncoderWithDescriptor(desc) ?: return null
         encoder.setViewport(cValue<MTLViewport> { width=w.toDouble();height=h.toDouble();znear=0.0;zfar=1.0 })
         bind(encoder,program,input,doubleArrayOf(-1.0,1.0,1.0,-1.0),w.toDouble()/frameW,h.toDouble()/frameH,
-            if(smooth) sampler else nearestSampler,smoothed)
+            if(smooth) sampler else nearestSampler,smoothed,history)
         encoder.endEncoding()
         return Surface(out,w,h)
     }
@@ -172,16 +184,19 @@ class GameRenderer private constructor(
     }
 
     private fun bind(encoder: MTLRenderCommandEncoderProtocol, program: MTLRenderPipelineStateProtocol, input: Surface,
-                     ndc: DoubleArray, scaleX: Double, scaleY: Double, sampling: MTLSamplerStateProtocol, smoothed: Boolean) {
+                     ndc: DoubleArray, scaleX: Double, scaleY: Double, sampling: MTLSamplerStateProtocol, smoothed: Boolean,
+                     history: Surface? = null) {
         for(i in 0..3) uniforms[i]=ndc[i].toFloat()
         uniforms[4]=frameW.toFloat();uniforms[5]=frameH.toFloat();uniforms[6]=scaleX.toFloat();uniforms[7]=scaleY.toFloat()
         uniforms[8]=input.texture.width.toFloat();uniforms[9]=input.texture.height.toFloat()
         uniforms[10]=input.w.toFloat();uniforms[11]=input.h.toFloat()
         uniforms[12]=effects.settings.gridX;uniforms[13]=effects.settings.gridY;uniforms[14]=if(smoothed)1f else 0f;uniforms[15]=0f
         uniforms[16]=(scaleX*frameW).toFloat();uniforms[17]=(scaleY*frameH).toFloat();uniforms[18]=0f;uniforms[19]=0f
+        uniforms[20]=history?.w?.toFloat() ?: 0f;uniforms[21]=history?.h?.toFloat() ?: 0f;uniforms[22]=0f;uniforms[23]=0f
         encoder.setRenderPipelineState(program)
         uniforms.usePinned { val p=it.addressOf(0);val n=(uniforms.size*4).toULong();encoder.setVertexBytes(p,n,0u);encoder.setFragmentBytes(p,n,0u) }
         encoder.setFragmentTexture(input.texture,0u);encoder.setFragmentSamplerState(sampling,0u)
+        history?.let { encoder.setFragmentTexture(it.texture,1u) }
         encoder.drawPrimitives(MTLPrimitiveTypeTriangleStrip,0u,4u)
     }
 
@@ -192,7 +207,7 @@ class GameRenderer private constructor(
         private const val HEADER="""
 #include <metal_stdlib>
 using namespace metal;
-struct Quad { float4 rect; float4 size; float4 textureSize; float4 grid; float4 output; };
+struct Quad { float4 rect; float4 size; float4 textureSize; float4 grid; float4 output; float4 history; };
 struct V { float4 pos [[position]]; float2 uv; };
 vertex V game_vertex(uint vid [[vertex_id]], constant Quad& q [[buffer(0)]]) {
     float2 c = float2(vid & 1, vid >> 1);
