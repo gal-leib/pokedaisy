@@ -172,3 +172,9 @@ control placements reserve room around custom touch layouts. HUD windows reuse t
 actions and close when Quick Menu opens. Portrait continues to use the companion. Battle buttons reuse the same shared renderer and `GameBattleInput` in supported single battles. The readiness
 latch is shared with Android, resets between battles, and the controls' shared edge-clearance keeps the lists
 clear of touch rows. Both overlay settings retain the existing installed preference format.
+
+HUD modal panels and battle lists feed the existing manual-input gate, separately from the retained companion's
+navigation handlers. Common overlay-presence notifications release ownership on removal/disposal. B/START backs out
+within the game overlay; simultaneous keys cannot select into a newly revealed owner. WILD KEEP OPEN leaves manual
+play available. The existing menu-only hotkey poller also serves captured overlays, while editor, binding capture,
+text focus and background ownership retain priority. Closing the host retires callbacks before native input cleanup.

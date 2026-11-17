@@ -123,7 +123,7 @@ fun BattleButtons(
     LaunchedEffect(shown, state) {
         if (!shown || state != BATTLE_INPUT_ACTION_SELECT && !(window == BattleButtonsWindow.MOVES && state == BATTLE_INPUT_MOVE_SELECT)) window = null
     }
-    LaunchedEffect(window) { onWindow(window != null) }
+    OverlayPresence(window != null, onWindow)
     if (!shown && slide == 1f && movesIn == 0f && partyIn == 0f) return
     val busy = rememberBattleInputBusy(battleInput)
     val m = rememberGbaTextMetrics(1f)
