@@ -347,7 +347,12 @@ object PokeDaisyHost {
                 if (gbFields.available) gbFields.fly(mapsec, targets, done) else classicFly.fly(mapsec, targets, done)
             }
         }
-        items = object : com.pokedaisy.app.companion.ItemUse by sharedItems {
+        val partyActions = com.pokedaisy.app.companion.FieldPartyActions(
+            sharedItems, currentSession, { telemetry.snapshot.value }, telemetry::knownPartyReorderConfig,
+            { p.fieldState }, { result -> result(); if (live()) sample() },
+        )
+        items = object : com.pokedaisy.app.companion.ItemUse by partyActions {
+            override val partyBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PARTY_STORAGE)
             override val relearnBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_MOVE_SCREENS)
             override fun useBadge(itemId: Int) = relearnBadge.takeIf { sharedItems.canTeach(itemId) }
             override val centerBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PARTY_SERVICES)

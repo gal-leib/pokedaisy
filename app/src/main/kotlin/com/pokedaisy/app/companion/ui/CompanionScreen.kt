@@ -652,6 +652,7 @@ fun CompanionScreen(
                                 onIndexChange = { i -> boxesUi.open = i; boxesUi.looked = pcBoxes.boxes[boxIndex].mons.indexOf(inBox.getOrNull(i)) },
                                 onBack = { boxesUi.open = null },
                                 dexTables = dex?.tables,
+                                partyBadge = itemUse?.partyBadge,
                                 // WITHDRAW into the party; with six there, SWAP's pick instead.
                                 onWithdraw = if (itemUse?.canSwapBox() == true) {
                                     {

@@ -215,3 +215,5 @@ overlay's own fields alone. Non-modal presence and WILD KEEP OPEN do not steal f
 game overlay; simultaneous keys cannot select into a newly revealed owner. WILD KEEP OPEN leaves manual
 play available. The existing menu-only hotkey poller also serves captured overlays, while editor, binding capture,
 text focus and background ownership retain priority. Closing the host retires callbacks before native input cleanup.
+
+Party reordering and PC transfers share `FieldPartyActions` with Android. Reordering verifies the current count and selected personalities before exchanging whole records, refuses field locks and drops retired-game results. SWAP/DEPOSIT/WITHDRAW reuse the existing BoxSwap functions and their exact vanilla-storage support checks.
