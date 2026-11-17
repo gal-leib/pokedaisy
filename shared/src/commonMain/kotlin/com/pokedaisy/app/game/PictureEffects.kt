@@ -5,7 +5,7 @@ import kotlin.math.roundToInt
 /** Renderer programs supplied by the shared presentation layer; no frame transport through Compose. */
 data class PictureEffects(
     val colors: Program? = null,
-    val smoothing: Program? = null,
+    val smoothing: List<SmoothPass> = emptyList(),
     val unlit: Program? = null,
     val filter: Program? = null,
     val prescale: Boolean = false,
@@ -13,6 +13,7 @@ data class PictureEffects(
     val gridY: Float = 0f,
 ) {
     data class Program(val name: String, val fragment: String)
+    data class SmoothPass(val program: Program, val size: PictureScale)
 }
 
 /** Android GL and Metal choose the same whole-pixel filter size and reflective-screen pass size. */
@@ -24,4 +25,20 @@ fun picturePassSizes(frameW: Int, frameH: Int, drawW: Float, drawH: Float, presc
     return PicturePassSizes(kx, ky, frameW * kx, frameH * ky,
         if (prescale) frameW * kx else maxOf(1, drawW.roundToInt()),
         if (prescale) frameH * ky else maxOf(1, drawH.roundToInt()))
+}
+
+/** The existing RetroArch preset sizes, shared by Android GL and Metal. */
+sealed class PictureScale {
+    /** Relative to the preceding pass (ScaleFX's 1x metrics and final 3x). */
+    data class Source(val scale: Int) : PictureScale()
+    /** The largest whole multiple of the original frame inside the picture. */
+    data object Whole : PictureScale()
+    /** Exact picture size, or Whole when the selected filter needs an even pixel grid. */
+    data object View : PictureScale()
+}
+
+fun picturePassSize(scale: PictureScale, sourceW: Int, sourceH: Int, sizes: PicturePassSizes): Pair<Int, Int> = when (scale) {
+    is PictureScale.Source -> sourceW * scale.scale to sourceH * scale.scale
+    PictureScale.Whole -> sizes.integerW to sizes.integerH
+    PictureScale.View -> sizes.unlitW to sizes.unlitH
 }

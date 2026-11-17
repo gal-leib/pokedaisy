@@ -3,6 +3,7 @@ package com.pokedaisy.app
 import com.pokedaisy.app.companion.GridStrength
 import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.Smoothing
+import com.pokedaisy.app.game.PictureScale
 
 /**
  * Fragment shaders for [EmulatorView]'s passes. Each reads `uTex` at `vUv`; `uTexSize` is
@@ -291,19 +292,7 @@ object ScreenShaders {
      * glsl-shaders, unmodified - third_party/licenses/libretro-shaders.txt), the size it draws at, and
      * whether its output needs a half-float framebuffer (ScaleFX keeps metrics between passes).
      */
-    class SmoothPass(val asset: String, val size: SmoothSize, val float: Boolean = false)
-
-    /** How big a smoothing pass's output is. */
-    sealed class SmoothSize {
-        /** [scale] times its input (ScaleFX's fixed 3x). */
-        data class Source(val scale: Int) : SmoothSize()
-        /** The largest whole multiple of the game's size that fits its place on screen, then smoothly
-         * scaled onto it - what xBR looked best at (straight at 6.75x its text came out lumpy). */
-        object Whole : SmoothSize()
-        /** The game's size on screen: drawn 1:1 (xBRZ freescale renders any size). With a hard-edged
-         * FILTER (LCD, SCANLINES) it's [Whole] instead, so their grid lines stay even. */
-        object View : SmoothSize()
-    }
+    class SmoothPass(val asset: String, val size: PictureScale, val float: Boolean = false)
 
     /**
      * SMOOTHING's passes, as their libretro presets have them (xbrz-freescale.glslp, xbr-lv2.glslp,
@@ -312,14 +301,14 @@ object ScreenShaders {
      */
     fun smoothingPasses(mode: Smoothing): List<SmoothPass>? = when (mode) {
         Smoothing.OFF -> null
-        Smoothing.XBRZ -> listOf(SmoothPass("xbrz-freescale.glsl", SmoothSize.View))
-        Smoothing.XBR -> listOf(SmoothPass("xbr-lv2.glsl", SmoothSize.Whole))
+        Smoothing.XBRZ -> listOf(SmoothPass("xbrz-freescale.glsl", PictureScale.View))
+        Smoothing.XBR -> listOf(SmoothPass("xbr-lv2.glsl", PictureScale.Whole))
         Smoothing.SCALEFX -> listOf(
-            SmoothPass("scalefx-pass0.glsl", SmoothSize.Source(1), float = true),
-            SmoothPass("scalefx-pass1.glsl", SmoothSize.Source(1), float = true),
-            SmoothPass("scalefx-pass2.glsl", SmoothSize.Source(1)),
-            SmoothPass("scalefx-pass3.glsl", SmoothSize.Source(1)),
-            SmoothPass("scalefx-pass4.glsl", SmoothSize.Source(3)),
+            SmoothPass("scalefx-pass0.glsl", PictureScale.Source(1), float = true),
+            SmoothPass("scalefx-pass1.glsl", PictureScale.Source(1), float = true),
+            SmoothPass("scalefx-pass2.glsl", PictureScale.Source(1)),
+            SmoothPass("scalefx-pass3.glsl", PictureScale.Source(1)),
+            SmoothPass("scalefx-pass4.glsl", PictureScale.Source(3)),
         )
     }
 

@@ -36,7 +36,7 @@ class GameRenderer private constructor(
     private data class Surface(val texture: MTLTextureProtocol, val w: Int, val h: Int)
     private data class Effects(val settings: PictureEffects = PictureEffects(),
         val colors: MTLRenderPipelineStateProtocol? = null, val unlit: MTLRenderPipelineStateProtocol? = null,
-        val filter: MTLRenderPipelineStateProtocol? = null, val smoothing: MTLRenderPipelineStateProtocol? = null)
+        val filter: MTLRenderPipelineStateProtocol? = null, val smoothing: List<MTLRenderPipelineStateProtocol?> = emptyList())
     private var effects = Effects()
     private val compiling = Mutex()
     private val programs = mutableMapOf<Pair<PictureEffects.Program, MTLPixelFormat>, MTLRenderPipelineStateProtocol>()
@@ -54,12 +54,12 @@ class GameRenderer private constructor(
                 }
                 Effects(settings, program(settings.colors, MTLPixelFormatRGBA8Unorm), program(settings.unlit, MTLPixelFormatRGBA8Unorm),
                     program(settings.filter, if (settings.prescale) MTLPixelFormatRGBA8Unorm else outputFormat),
-                    program(settings.smoothing, MTLPixelFormatRGBA8Unorm))
+                    settings.smoothing.map { program(it.program, MTLPixelFormatRGBA8Unorm) })
             }
         }
         effects = next
         return (settings.colors == null || next.colors != null) && (settings.unlit == null || next.unlit != null) &&
-            (settings.filter == null || next.filter != null) && (settings.smoothing == null || next.smoothing != null)
+            (settings.filter == null || next.filter != null) && next.smoothing.all { it != null }
     }
 
     private inner class Target {
@@ -76,7 +76,7 @@ class GameRenderer private constructor(
         }
     }
     private val colorsTarget = Target()
-    private val smoothingTarget = Target()
+    private val smoothingTargets = mutableListOf<Target>()
     private val unlitTarget = Target()
     private val filterTarget = Target()
 
@@ -126,7 +126,17 @@ class GameRenderer private constructor(
         val sizes = picturePassSizes(frameW,frameH,(r[2]-r[0]).toFloat(),(r[3]-r[1]).toFloat(),e.filter!=null && e.settings.prescale)
         e.colors?.let { pass(buffer,it,input,colorsTarget,frameW,frameH,false,false)?.let { out -> input=out } }
         var smooth = false
-        e.smoothing?.let { pass(buffer,it,input,smoothingTarget,sizes.unlitW,sizes.unlitH,false,false)?.let { out -> input=out;smooth=true } }
+        if (e.smoothing.isNotEmpty() && e.smoothing.all { it != null }) {
+            var result: Surface? = input
+            for ((i, program) in e.smoothing.withIndex()) {
+                val source = result ?: break
+                while (smoothingTargets.size <= i) smoothingTargets += Target()
+                val (w, h) = picturePassSize(e.settings.smoothing[i].size, source.w, source.h, sizes)
+                result = pass(buffer, requireNotNull(program), source, smoothingTargets[i], w, h, false, false)
+            }
+            // A partial chain may contain metrics rather than colors: never publish it after a failed pass.
+            result?.let { input=it; smooth=true }
+        }
         e.unlit?.let { pass(buffer,it,input,unlitTarget,sizes.unlitW,sizes.unlitH,true,smooth)?.let { out -> input=out;smooth=true } }
         if (e.filter != null && e.settings.prescale) {
             pass(buffer,e.filter,input,filterTarget,sizes.integerW,sizes.integerH,smooth,smooth)?.let { out -> input=out;smooth=true }

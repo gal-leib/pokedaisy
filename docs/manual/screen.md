@@ -119,7 +119,7 @@ The clock follows your device's 12 or 24 hour setting. Money shows for the games
 
 ## Shaders
 
-On iPhone and iPad, `DISPLAY OPTIONS` > `SHADERS` offers `FILTER`, `GRID`, `GBA COLORS` and `UNLIT SCREEN` for the game picture. Choices are remembered and combine with `ORIGINAL`, `STRETCH`, `EXPAND` and game borders. `ON COMPANION` also applies your filter and GBA colors to the companion, HUD and panel controls. Touch controls and touch-skin artwork keep their own look. `SMOOTHING` offers `OFF` and `xBRZ`; the other smoothing modes are available on Android.
+On iPhone and iPad, `DISPLAY OPTIONS` > `SHADERS` offers `FILTER`, `GRID`, `GBA COLORS` and `UNLIT SCREEN` for the game picture. Choices are remembered and combine with `ORIGINAL`, `STRETCH`, `EXPAND` and game borders. `ON COMPANION` also applies your filter and GBA colors to the companion, HUD and panel controls. Touch controls and touch-skin artwork keep their own look. `SMOOTHING` offers `OFF`, `xBRZ` and `xBR`; `SCALEFX` is available on Android.
 
 `SHADERS` opens a page of effects for how the game is drawn. They stack: you can have smoothing, the GBA's colours, the unlit screen and a filter all at once.
 
@@ -148,7 +148,7 @@ On iPhone and iPad, `DISPLAY OPTIONS` > `SHADERS` offers `FILTER`, `GRID`, `GBA 
 - `xBR`: rounder and softer.
 - `SCALEFX`: the most even outlines.
 
-On iPhone and iPad, tap to switch between `OFF` and `xBRZ`. `xBR` and `SCALEFX` are currently available on Android only. Smoothing combines with your filter, GBA colors and unlit screen setting.
+On iPhone and iPad, tap to switch between `OFF`, `xBRZ` and `xBR`. `SCALEFX` is currently available on Android only. Smoothing combines with your filter, GBA colors and unlit screen setting.
 
 Smoothing only applies to the game, never to the companion. On devices whose graphics chip can't run it, the row shows `N/A`.
 
