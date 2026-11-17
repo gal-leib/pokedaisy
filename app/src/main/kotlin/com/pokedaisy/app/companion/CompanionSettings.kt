@@ -386,6 +386,9 @@ interface CompanionSettings : StoredCompanionSettings {
 
     /** Whether this device can run SMOOTHING (OpenGL ES 3); without it the row is greyed out. */
     val smoothingAvailable: Boolean get() = true
+    /** Only implemented modes are offered by a renderer. Android retains every existing mode. */
+    val smoothingModes: List<Smoothing> get() = Smoothing.entries
+    val smoothingBadge: String? get() = null
 
     /** Whether there's a second screen - SINGLE SCREEN only shows then. */
     val hasSecondScreen: Boolean get() = false

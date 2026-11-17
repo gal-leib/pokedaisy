@@ -868,8 +868,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
                     is ScreenShaders.SmoothSize.Source -> srcW * size.scale to srcH * size.scale
                     ScreenShaders.SmoothSize.Whole -> texW * kx to texH * ky
                     ScreenShaders.SmoothSize.View ->
-                        if (prescaled) texW * kx to texH * ky
-                        else maxOf(1, quadW.roundToInt()) to maxOf(1, quadH.roundToInt())
+                        com.pokedaisy.app.game.picturePassSizes(texW, texH, quadW, quadH, prescaled).let { it.unlitW to it.unlitH }
                 }
                 while (smoothTargets.size <= i) smoothTargets += RenderTarget()
                 val target = smoothTargets[i]

@@ -5,6 +5,7 @@ import kotlin.math.roundToInt
 /** Renderer programs supplied by the shared presentation layer; no frame transport through Compose. */
 data class PictureEffects(
     val colors: Program? = null,
+    val smoothing: Program? = null,
     val unlit: Program? = null,
     val filter: Program? = null,
     val prescale: Boolean = false,
