@@ -1289,8 +1289,12 @@ private fun shaderRows(s: CompanionSettings, changed: () -> Unit): List<SettingR
             if (s.screenFilter.hasGrid) { s.setGridStrength(s.gridStrength.next()); changed() }
         },
         // OFF / xBRZ / xBR / SCALEFX, cycling too: smooths the game's edges before FILTER (the game only).
-        SettingRow(tk("SMOOTHING"), if (s.smoothingAvailable) s.smoothing.label else tk("N/A"), enabled = s.smoothingAvailable) {
-            if (s.smoothingAvailable) { s.setSmoothing(s.smoothing.next()); changed() }
+        SettingRow(tk("SMOOTHING"), if (s.smoothingAvailable) s.smoothing.label else tk("N/A"), enabled = s.smoothingAvailable, labelBadge = s.smoothingBadge) {
+            if (s.smoothingAvailable) {
+                val modes = s.smoothingModes
+                if (modes.isNotEmpty()) s.setSmoothing(modes[(modes.indexOf(s.smoothing) + 1) % modes.size])
+                changed()
+            }
         },
         // The colours as the GBA's own LCD showed them; stacks with any filter.
         SettingRow(tk("GBA COLORS"), if (s.gbaColors) tk("ON") else tk("OFF")) { s.setGbaColors(!s.gbaColors); changed() },

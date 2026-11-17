@@ -29,14 +29,14 @@ class GameRenderer private constructor(
     var stretch = false
     private var frameW = 0
     private var frameH = 0
-    private val uniforms = FloatArray(16)
+    private val uniforms = FloatArray(20)
     val frameWidth: Int get() = frameW
     val frameHeight: Int get() = frameH
 
     private data class Surface(val texture: MTLTextureProtocol, val w: Int, val h: Int)
     private data class Effects(val settings: PictureEffects = PictureEffects(),
         val colors: MTLRenderPipelineStateProtocol? = null, val unlit: MTLRenderPipelineStateProtocol? = null,
-        val filter: MTLRenderPipelineStateProtocol? = null)
+        val filter: MTLRenderPipelineStateProtocol? = null, val smoothing: MTLRenderPipelineStateProtocol? = null)
     private var effects = Effects()
     private val compiling = Mutex()
     private val programs = mutableMapOf<Pair<PictureEffects.Program, MTLPixelFormat>, MTLRenderPipelineStateProtocol>()
@@ -53,12 +53,13 @@ class GameRenderer private constructor(
                     programs[it to format] ?: makePipeline(device, HEADER + "\n" + it.fragment, format)?.also { built -> programs[it to format] = built }
                 }
                 Effects(settings, program(settings.colors, MTLPixelFormatRGBA8Unorm), program(settings.unlit, MTLPixelFormatRGBA8Unorm),
-                    program(settings.filter, if (settings.prescale) MTLPixelFormatRGBA8Unorm else outputFormat))
+                    program(settings.filter, if (settings.prescale) MTLPixelFormatRGBA8Unorm else outputFormat),
+                    program(settings.smoothing, MTLPixelFormatRGBA8Unorm))
             }
         }
         effects = next
         return (settings.colors == null || next.colors != null) && (settings.unlit == null || next.unlit != null) &&
-            (settings.filter == null || next.filter != null)
+            (settings.filter == null || next.filter != null) && (settings.smoothing == null || next.smoothing != null)
     }
 
     private inner class Target {
@@ -75,6 +76,7 @@ class GameRenderer private constructor(
         }
     }
     private val colorsTarget = Target()
+    private val smoothingTarget = Target()
     private val unlitTarget = Target()
     private val filterTarget = Target()
 
@@ -124,7 +126,8 @@ class GameRenderer private constructor(
         val sizes = picturePassSizes(frameW,frameH,(r[2]-r[0]).toFloat(),(r[3]-r[1]).toFloat(),e.filter!=null && e.settings.prescale)
         e.colors?.let { pass(buffer,it,input,colorsTarget,frameW,frameH,false,false)?.let { out -> input=out } }
         var smooth = false
-        e.unlit?.let { pass(buffer,it,input,unlitTarget,sizes.unlitW,sizes.unlitH,true,false)?.let { out -> input=out;smooth=true } }
+        e.smoothing?.let { pass(buffer,it,input,smoothingTarget,sizes.unlitW,sizes.unlitH,false,false)?.let { out -> input=out;smooth=true } }
+        e.unlit?.let { pass(buffer,it,input,unlitTarget,sizes.unlitW,sizes.unlitH,true,smooth)?.let { out -> input=out;smooth=true } }
         if (e.filter != null && e.settings.prescale) {
             pass(buffer,e.filter,input,filterTarget,sizes.integerW,sizes.integerH,smooth,smooth)?.let { out -> input=out;smooth=true }
         }
@@ -165,6 +168,7 @@ class GameRenderer private constructor(
         uniforms[8]=input.texture.width.toFloat();uniforms[9]=input.texture.height.toFloat()
         uniforms[10]=input.w.toFloat();uniforms[11]=input.h.toFloat()
         uniforms[12]=effects.settings.gridX;uniforms[13]=effects.settings.gridY;uniforms[14]=if(smoothed)1f else 0f;uniforms[15]=0f
+        uniforms[16]=(scaleX*frameW).toFloat();uniforms[17]=(scaleY*frameH).toFloat();uniforms[18]=0f;uniforms[19]=0f
         encoder.setRenderPipelineState(program)
         uniforms.usePinned { val p=it.addressOf(0);val n=(uniforms.size*4).toULong();encoder.setVertexBytes(p,n,0u);encoder.setFragmentBytes(p,n,0u) }
         encoder.setFragmentTexture(input.texture,0u);encoder.setFragmentSamplerState(sampling,0u)
@@ -178,7 +182,7 @@ class GameRenderer private constructor(
         private const val HEADER="""
 #include <metal_stdlib>
 using namespace metal;
-struct Quad { float4 rect; float4 size; float4 textureSize; float4 grid; };
+struct Quad { float4 rect; float4 size; float4 textureSize; float4 grid; float4 output; };
 struct V { float4 pos [[position]]; float2 uv; };
 vertex V game_vertex(uint vid [[vertex_id]], constant Quad& q [[buffer(0)]]) {
     float2 c = float2(vid & 1, vid >> 1);

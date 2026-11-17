@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 // The companion's screens (app/.../companion/ui, the companion's settings and state next to them, the co-op
 // screens' model, the manual reader, cheats, the controls' bindings) as a Kotlin Multiplatform module, compiled
@@ -68,4 +69,12 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+// Native shader tests use the exact bundled GLSL assets, without copying their algorithms into fixtures.
+tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+    val shaders = rootDir.resolve("app/src/main/assets/shaders").path
+    inputs.dir(rootDir.resolve("app/src/main/assets/shaders"))
+    environment("PK_SHADER_DIR", shaders)
+    environment("SIMCTL_CHILD_PK_SHADER_DIR", shaders)
 }
