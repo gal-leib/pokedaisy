@@ -95,6 +95,7 @@ tasks.withType<KotlinCompile>().configureEach {
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/PlayerLookCore.kt"))
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/RideCore.kt"))
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/PictureEffects.kt"))
+    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/RaClient.kt"))
     if (gameExport) {
         dependsOn(stubCore)
         source(appSrc.matching { exclude("MgbaCore.kt") })
