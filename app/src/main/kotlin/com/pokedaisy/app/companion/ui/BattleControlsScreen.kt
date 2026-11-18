@@ -529,7 +529,7 @@ internal fun MoveGrid(
     compact: Boolean = false,
 ) {
     CompanionBackHandler(enabled = battleInput != null && !busy) { onCancel?.invoke() ?: battleInput?.back() }
-    if (gen1Buttons) return Gen1MoveList(moves, battleInput, busy, showHints, modifier, onCancel)
+    if (gen1Buttons) return Gen1MoveList(moves, battleInput, busy, showHints, modifier, onCancel, compact)
     // Opened by us ([onCancel]), the game is still on its action menu: its cursor is an action's, not a move's.
     val cursor = rememberBattleCursor(battleInput).takeIf { !busy && onCancel == null } ?: -1
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -883,13 +883,14 @@ private fun Gen1MoveList(
     busy: Boolean,
     showHints: Boolean,
     modifier: Modifier,
-    onCancel: (() -> Unit)? = null,
+    onCancel: (() -> Unit)?,
+    compact: Boolean,
 ) {
     val m = rememberGbaTextMetrics()
-    val small = rememberGbaTextMetrics(1f)
+    val small = rememberGbaTextMetrics(if (compact) 0.75f else 1f)
     // A short screen (the RG DS): tighter boxes and smaller pills, or the type line was cut off.
     val short = LocalShortCompanion.current
-    val pill = if (short) 12.sp else 16.sp
+    val pill = if (short || compact) 12.sp else 16.sp
     Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (row in 0..1) {
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -908,17 +909,23 @@ private fun Gen1MoveList(
                             verticalArrangement = Arrangement.SpaceEvenly,
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            GbaText(mv?.name ?: "-", buttonContent, Color.Transparent, m, bold = true)
+                            val name = mv?.name ?: "-"
+                            if (compact) FittedGbaText(name, buttonContent, Color.Transparent, m, bold = true)
+                            else GbaText(name, buttonContent, Color.Transparent, m, bold = true)
                             if (mv != null) {
+                                val pp = tr("PP {0}", mv.pp)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     TypeBadge(mv.type, fontSize = pill)
                                     if (showHints && mv.power > 0) mv.vs.firstOrNull()?.let { v ->   // status moves ignore the chart
                                         Spacer(Modifier.width(m.u * 4))
                                         MultiplierChip(v.label, v.pct, fontSize = pill)
                                     }
-                                    Spacer(Modifier.width(m.u * 8))
-                                    GbaText(tr("PP {0}", mv.pp), buttonContent, Color.Transparent, small)
+                                    if (!compact) {
+                                        Spacer(Modifier.width(m.u * 8))
+                                        GbaText(pp, buttonContent, Color.Transparent, small)
+                                    }
                                 }
+                                if (compact) GbaText(pp, buttonContent, Color.Transparent, small)
                             }
                         }
                     }

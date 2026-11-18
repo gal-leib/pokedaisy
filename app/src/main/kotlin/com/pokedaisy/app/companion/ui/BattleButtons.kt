@@ -189,8 +189,19 @@ fun BattleButtons(
         }
         val close = { window = null }
         // A list down the right side, over the dimmed game (no window behind it), as big as the room allows.
-        if (movesIn > 0f) BattleList(movesIn, window == BattleButtonsWindow.MOVES, top, close, MOVE_LIST_W, 4 * MOVE_ROW + 3 * MOVE_GAP + MOVE_ROW * 0.7f) { u2 ->
-            BattleMoveList(moves, battleInput, busy, showHints, u2 * MOVE_LIST_W, u2 * MOVE_ROW, u2 * MOVE_GAP, u2 * EDGE, onCancel = close, gen5 = gen5)
+        if (movesIn > 0f) {
+            val grid = gen1Buttons
+            val height = if (grid) MOVE_GRID_H.toFloat() else 4 * MOVE_ROW + 4 * MOVE_GAP + MOVE_ROW * 0.7f
+            val edge = if (grid) 0 else EDGE
+            BattleList(movesIn, window == BattleButtonsWindow.MOVES, top, close, MOVE_LIST_W, height, edge) { u2 ->
+                if (grid) {
+                    MoveGrid(moves, battleInput, busy, showHints,
+                        Modifier.width(u2 * MOVE_LIST_W).height(u2 * MOVE_GRID_H), onCancel = close, compact = true)
+                } else {
+                    BattleMoveList(moves, battleInput, busy, showHints, u2 * MOVE_LIST_W, u2 * MOVE_ROW, u2 * MOVE_GAP,
+                        u2 * EDGE, onCancel = close, gen5 = gen5)
+                }
+            }
         }
         if (partyIn > 0f) {
             val n = snapshot.party.size.coerceAtLeast(1)
@@ -214,6 +225,8 @@ private const val MOVE_LIST_W = 196
 // at 34 the second line (type, power, verdict) was cut off.
 private const val MOVE_ROW = 38
 private const val MOVE_GAP = 3
+// The Game Boy grid has a full-width CANCEL button and borders at both edges.
+private const val MOVE_GRID_H = 5 * MOVE_ROW + 4 * MOVE_GAP
 private const val PARTY_LIST_W = 192
 private const val PARTY_ROW = 34
 private const val PARTY_GAP = 3
@@ -268,11 +281,14 @@ private val ButtonShadow = Color(0xFF383838)
  * FIGHT's / POKéMON's list, top right from the buttons' top edge down, over the dimmed game; a tap outside closes it, as
  * BACK does. Drawn at the largest whole GBA pixel at which [listW] x [listH] (GBA pixels) fits under [top] and in 55% of
  * the screen's width (its own [Density], as the HUD's SIZE does), so it uses the room and its pixels stay square;
- * [content] gets that pixel. It runs [EDGE] pixels off the right edge. [shown] 0..1: how far it has slid in from the right
+ * [content] gets that pixel. List rows can extend [edge] pixels past the right edge. [shown] 0..1: how far it has slid in from the right
  * (the dim fades with it); [open]: it's the one open (taps and BACK reach it only then, not while it slides out).
  */
 @Composable
-private fun BattleList(shown: Float, open: Boolean, top: Dp, onClose: () -> Unit, listW: Int, listH: Float, content: @Composable (u: Dp) -> Unit) {
+private fun BattleList(
+    shown: Float, open: Boolean, top: Dp, onClose: () -> Unit, listW: Int, listH: Float,
+    edge: Int = EDGE, content: @Composable (u: Dp) -> Unit,
+) {
     val base = LocalDensity.current
     if (open) CompanionBackHandler(onBack = onClose)
     BoxWithConstraints(
@@ -293,7 +309,7 @@ private fun BattleList(shown: Float, open: Boolean, top: Dp, onClose: () -> Unit
             val u = rememberGbaTextMetrics(1f).u
             Box(
                 Modifier.align(Alignment.TopEnd).padding(top = with(scaled) { topPx.toDp() })
-                    .offset(x = u * EDGE).graphicsLayer { translationX = (1f - shown) * size.width }.then(keep),
+                    .offset(x = u * edge).graphicsLayer { translationX = (1f - shown) * size.width }.then(keep),
             ) { content(u) }
         }
     }
