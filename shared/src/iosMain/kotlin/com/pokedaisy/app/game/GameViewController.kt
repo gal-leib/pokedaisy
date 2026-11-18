@@ -164,12 +164,21 @@ class GameViewController(
             if (field == value) return
             holdRewind(false)
             field = value
-            if (running) PkApiCore.setRewind(RewindPolicy.capacity(value))
+            if (running) updateRewindCapacity()
         }
+    private var rewindFramesEnabled = false
     private var rewinding = false
     /** Cancel queued battle commands on either transport edge. No state operation or touch release here. */
     var beforeRewind: () -> Unit = {}
     var rewindAllowed: () -> Boolean = { true }
+
+    private fun updateRewindCapacity() {
+        val enabled = rewindEnabled && rewindAllowed()
+        if (enabled == rewindFramesEnabled) return
+        if (!enabled) holdRewind(false)
+        PkApiCore.setRewind(RewindPolicy.capacity(enabled))
+        rewindFramesEnabled = enabled
+    }
 
     fun holdRewind(on: Boolean) {
         val next = on && rewindEnabled && rewindAllowed()
@@ -240,7 +249,7 @@ class GameViewController(
             return
         }
         running = true
-        PkApiCore.setRewind(RewindPolicy.capacity(rewindEnabled))
+        updateRewindCapacity()
         onCoreStarted()
         active = true
         audio.start()
@@ -315,6 +324,7 @@ class GameViewController(
         beforeRewind = {}
         beforeFrame = {}
         frameGate = null
+        rewindFramesEnabled = false
         onForeground = {}
         rewindAllowed = { true }
         afterFrame = {}
@@ -353,13 +363,16 @@ class GameViewController(
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
             val workStarted = if (performance != null) CACurrentMediaTime() else 0.0
             if (!running || !active || uiPaused) break
-            if (rewinding && !rewindAllowed()) holdRewind(false)
             val gate = frameGate
             val held = if (gate == null) {
+                if (rewindFramesEnabled != rewindEnabled) updateRewindCapacity()
                 if (!rewinding) beforeFrame()
                 input.keys()
             } else {
-                val allowed = gate(input.keys()) ?: break
+                val allowed = gate(input.keys())
+                // Do not retain frames from a linked battle or a story-locked save in the rewind ring.
+                updateRewindCapacity()
+                if (allowed == null) break
                 if (!rewinding) beforeFrame()
                 allowed
             }

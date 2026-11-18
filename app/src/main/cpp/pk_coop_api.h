@@ -8,6 +8,7 @@
 /** Co-op's retail check and battle bridge for the player's GBA core. Call mutations between frames. */
 bool pk_api_coop_enable(void);
 bool pk_api_coop_link_enable(void);
+/* Removes the linked-battle bridge and clears co-op detection. */
 void pk_api_coop_disable(void);
 /** The most recent refusal, as NUL-terminated ASCII. Empty when the check has not reported a refusal. */
 void pk_api_coop_refusal(bool link, char* out, size_t capacity);

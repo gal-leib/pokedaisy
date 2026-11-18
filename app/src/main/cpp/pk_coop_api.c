@@ -32,7 +32,10 @@ bool pk_api_coop_link_enable(void) {
 
 void pk_api_coop_disable(void) {
     pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core) pk_coop_uninstall(g.core);
+    if (g.core && pk_is_gba(g.core)) {
+        pk_coop_link_uninstall(g.core);
+        pk_coop_uninstall(g.core);
+    }
     pthread_rwlock_unlock(&pk_coreLock);
 }
 
