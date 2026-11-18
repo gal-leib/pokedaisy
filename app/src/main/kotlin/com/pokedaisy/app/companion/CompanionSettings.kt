@@ -172,6 +172,7 @@ interface CompanionSettings : StoredCompanionSettings {
     fun setRideVehicle(v: com.pokedaisy.app.companion.data.RideVehicle) {}
     /** RIVAL LOOK: the rival of the other gender ([rivalLookSupported]: Emerald, Ruby, Sapphire) dressed up with the player. */
     val rivalLookSupported: Boolean get() = false
+    val rivalLookBadge: String? get() = null
     /** FOLLOWER: the party's lead walks behind the player ([followerSupported]: a GBA game it's drawn in; [followerReady]:
      * Pokémon sprites kept, from Heart and Soul). */
     val followerSupported: Boolean get() = false

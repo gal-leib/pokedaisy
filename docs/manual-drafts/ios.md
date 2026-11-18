@@ -37,6 +37,8 @@ kept for this ROM when you reopen the game. Game Boy cheats are not supported by
 
 In a supported GBA game on iPhone or iPad, choose a hero under `SETTINGS` > `MAKEOVER` > `PLAYER LOOK`. Import a compatible GBA game to supply its hero's graphics. Your choice is saved for the current game, and `OFF` restores its original look.
 
+In Ruby, Sapphire and Emerald, `RIVAL LOOK` starts on. Pick a `PLAYER LOOK` to dress your rival as the other hero of that game when their graphics are available. Turn it off to keep your rival's original look.
+
 On iPhone and iPad, open `SETTINGS` > `MAKEOVER` > `FOLLOWER` while playing a supported GBA game. The first Pokémon in your party that isn't an Egg follows you on foot and waits while you surf. To supply its sprite, import a compatible game with its own followers, such as Emerald Seaglass, into your library. The row can show `N/A` while PokeDaisy scans your games.
 
 ## From controls.md

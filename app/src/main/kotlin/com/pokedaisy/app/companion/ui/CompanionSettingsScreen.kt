@@ -606,10 +606,9 @@ private fun homeRows(
         },
         // The rival of the other gender (Emerald, Ruby, Sapphire) wears the same game's other hero.
         if (looks && s.rivalLookSupported) {
-            val on = s.rivalLook && s.playerLook != null
             SettingRow(
                 tk("RIVAL LOOK"), if (s.playerLook == null) tk("N/A") else onOff(s.rivalLook), enabled = s.playerLook != null,
-                labelBadge = NewFeatures.badge(NewFeatures.RIVAL_LOOK),
+                labelBadge = s.rivalLookBadge ?: NewFeatures.badge(NewFeatures.RIVAL_LOOK),
                 subtitle = if (s.playerLook == null) "Pick a PLAYER LOOK first" else null,
             ) { if (s.playerLook != null) { s.setRivalLook(!s.rivalLook); changed() } }
         } else null,

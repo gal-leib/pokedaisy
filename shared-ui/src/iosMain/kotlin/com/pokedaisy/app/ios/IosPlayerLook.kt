@@ -33,6 +33,7 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
     private var female by mutableStateOf<Boolean?>(null)
     private var pick by mutableStateOf<LookChar?>(null)
     val supported get() = catalog != null
+    val rivalSupported get() = catalog?.engine?.let(PlayerLook::hasRival) == true
     val choices get() = catalog?.availableHeroes(female).orEmpty().map { it.name }
     val selected get() = pick?.name
     val own get() = catalog?.let { current -> female?.let { LookChar.of(current.engine, it).name } }
@@ -73,11 +74,14 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
         apply()
     }
 
-    private fun apply() {
+    fun apply() {
         val current = catalog ?: return
         val currentKey = key ?: return
         pick = LookChar.byName(prefs.playerLookFor(currentKey))?.takeIf { it.name in choices }
-        val patch = female?.let { gender -> current.heroes[Triple(gender, pick, false)] }
+        val rival = rivalSupported && prefs.rivalLook
+        val patch = female?.let { gender ->
+            current.heroes[Triple(gender, pick, rival)] ?: current.heroes[Triple(gender, pick, false)]
+        }
         PlayerLook.worn.value = pick.takeIf { patch?.blocks?.isNotEmpty() == true }
         renderer.select(patch)
     }

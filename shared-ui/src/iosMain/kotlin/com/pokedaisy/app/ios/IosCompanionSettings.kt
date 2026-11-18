@@ -47,6 +47,13 @@ internal class IosCompanionSettings(
     override val playerLooks get() = looks?.choices.orEmpty()
     override val playerLook get() = looks?.selected
     override val playerLookOwn get() = looks?.own
+    override val rivalLookSupported get() = looks?.rivalSupported == true
+    override val rivalLookBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_RIVAL_LOOK)
+    override fun setRivalLook(on: Boolean) {
+        if (!rivalLookSupported) return
+        stored.setRivalLook(on)
+        looks?.apply()
+    }
     override val rideVehicleSupported get() = false
     override fun setPlayerLook(look: String?) { looks?.select(look) }
 
@@ -91,7 +98,7 @@ internal class IosCompanionSettings(
     override val dayNightBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_DAY_NIGHT)
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY", "SHADERS", "FILTER", "GRID", "GBA COLORS", "UNLIT SCREEN", "ON COMPANION", "SMOOTHING", "DAY AND NIGHT", "SHINY ODDS", "FLY STYLE", "FLIGHT AREA", "FLY ON", "FOLLOWER", "PLAYER LOOK")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY", "SHADERS", "FILTER", "GRID", "GBA COLORS", "UNLIT SCREEN", "ON COMPANION", "SMOOTHING", "DAY AND NIGHT", "SHINY ODDS", "FLY STYLE", "FLIGHT AREA", "FLY ON", "FOLLOWER", "PLAYER LOOK", "RIVAL LOOK")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
