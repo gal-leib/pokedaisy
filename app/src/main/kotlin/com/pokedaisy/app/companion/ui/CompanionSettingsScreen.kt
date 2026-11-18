@@ -775,13 +775,14 @@ private fun homeRows(
         // A new wild foe made shiny at these odds before its battle draws it (ShinyOdds.kt; the versions it knows by hash).
         SettingRow(
             tk("SHINY ODDS"), if (s.shinyOddsSupported) shinyOddsLabel(s.shinyOdds) else tk("N/A"),
-            enabled = s.shinyOddsSupported, labelBadge = NewFeatures.badge(NewFeatures.SHINY_ODDS),
+            enabled = s.shinyOddsSupported, labelBadge = s.shinyOddsBadge,
         ) {
             if (s.shinyOddsSupported) {
                 val odds = s.shinyOddsChoices
                 val labels = odds.map(::shinyOddsLabel)
                 select(
-                    Selector(tk("SHINY ODDS"), labels, shinyOddsLabel(s.shinyOdds), note = SHINY_ODDS_NOTE) { l ->
+                    Selector(tk("SHINY ODDS"), labels, shinyOddsLabel(s.shinyOdds),
+                        note = if (s.shinyOddsPausesAchievements) SHINY_ODDS_NOTE else SHINY_ODDS_CHECKER_NOTE) { l ->
                         s.setShinyOdds(odds[labels.indexOf(l)])
                     },
                 )
@@ -1288,6 +1289,7 @@ private fun shinyOddsLabel(odds: Int): String =
 
 /** SHINY ODDS' pick-list disclaimer: what a save checker may say, and the achievements' pause. */
 private const val SHINY_ODDS_NOTE = "Save checkers may flag these shinies. Achievements pause."
+private const val SHINY_ODDS_CHECKER_NOTE = "Save checkers may flag these shinies."
 
 /** EXP SHARE's pick-list: what the two ways do. */
 private const val EXP_SHARE_NOTE = "SPLIT shares a win's EXP across the party. FULL EXP gives each one all of it. Achievements pause."

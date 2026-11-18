@@ -44,6 +44,17 @@ class GameRuntime(
             onField && !map && !FfMenuWatch.battling && battle.gameState == BATTLE_INPUT_NONE, applyTint)
     }
     private var sampler: GameSampler? = null
+    private val shinyOwner = atomic<GameShinyOdds?>(null)
+    val shiny get() = shinyOwner.value
+
+    fun bindShiny(core: GameCalls, debug: Boolean, changed: () -> Unit = {}): GameShinyOdds {
+        shinyOwner.value?.let { return it }
+        val owner = GameShinyOdds(prefs, core, debug,
+            { !closed.value && gba && !blocked && telemetry.snapshot.value.blocked == null }, changed)
+        if (!shinyOwner.compareAndSet(null, owner)) { owner.close(); return shinyOwner.value!! }
+        if (closed.value) owner.close()
+        return owner
+    }
     val options = GameOptions(optionPatcher, { !closed.value && !blocked &&
         telemetry.snapshot.value.blocked == null && optionsAllowed() })
 
@@ -182,6 +193,7 @@ class GameRuntime(
     fun start(romPath: Path, code: String?, crc: Long, gba: Boolean = code != null, areaMapCrc: Long = crc) {
         if (closed.value) return
         this.gba = gba
+        shiny?.observe(null)
         resetTint()
         session.reset()
         settledOnField = false
@@ -207,9 +219,11 @@ class GameRuntime(
             disableField()
             fieldReadable = false
             fieldMovesReadable = false
+            shiny?.observe(null)
             return
         }
         if (!gba) return
+        if (snapshot.connected) shiny?.observe(telemetry.knownShinyTarget())
         desiredTint = DayNight.desired(prefs.dayNight, dayNightSupported, snapshot.mapType)
         options.observe(snapshot)
         telemetry.knownGMain()?.let { (addr, offset) -> FfMenuWatch.useKnownGMain(addr, offset) }
@@ -227,6 +241,7 @@ class GameRuntime(
         session.observeScreens(readable, reader = reader)
         session.observeField(readable && FfMenuWatch.onField && !map, wideScene, battle.gameState, battle.holdPicture)
         fieldChanged(if (readable && fieldReadable) readField() else 0)
+        shiny?.tick()
         stepTint()
     }
 
@@ -269,6 +284,7 @@ class GameRuntime(
         battle.changed = {}
         release { actions?.close() }
         release { cheats?.close() }
+        release { shiny?.close() }
         release { stateSlots.value?.close() }
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }

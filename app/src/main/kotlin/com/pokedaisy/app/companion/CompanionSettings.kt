@@ -125,6 +125,8 @@ interface CompanionSettings : StoredCompanionSettings {
     fun setShinyOdds(odds: Int) {}
     val shinyOddsChoices: List<Int> get() = com.pokedaisy.app.companion.data.ShinyOdds.CHOICES
     val shinyOddsSupported: Boolean get() = false
+    val shinyOddsBadge: String? get() = NewFeatures.badge(NewFeatures.SHINY_ODDS)
+    val shinyOddsPausesAchievements: Boolean get() = true
 
     /** PLAYER LOOK ([com.pokedaisy.app.companion.data.PlayerLook]): [playerLookSupported] = a FireRed / LeafGreen /
      * Emerald game; [playerLooks] = the heroes it can wear now (another game's, kept from the player's own ROMs);

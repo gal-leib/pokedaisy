@@ -288,6 +288,8 @@ were off still restores the current map's normal rates if your choice is now `ON
 
 ## SHINY ODDS
 
+This setting is also available on iPhone and iPad, using the same supported games and wild-foe checks as Android.
+
 `SHINY ODDS` sets how often a wild Pokémon is shiny. It's in the companion's `GAMEPLAY` group and opens a list:
 
 - **`NORMAL`** (the default) leaves the game's own odds, 1 in 8192 in the original games.
@@ -297,7 +299,7 @@ It counts for every wild Pokémon you meet, in grass, caves, water and from a ro
 
 A shiny one you catch stays shiny when you set the odds back to `NORMAL`, and the Pokémon you caught before are never touched. A shiny made this way keeps its nature, gender, ability, IVs and moves. The one thing that gives it away is a link between its hidden values that the game's own shinies have and save checkers look for, so a checker may flag it if you move it on to a newer game.
 
-While the odds are raised, [achievements](achievements.md) are paused, since some sets reward catching a shiny.
+On Android, while the odds are raised, [achievements](achievements.md) are paused, since some sets reward catching a shiny.
 
 It works in the original FireRed, LeafGreen, Ruby, Sapphire and Emerald, in every language and revision, and in these hacks: Unbound (French too), Radical Red, Gaia, Odyssey, Amethyst, Sword and Shield Ultimate Plus, GS Chronicles, Emerald Kaizo, Emerald Legacy, Recharged Emerald (Rebalanced too), Glazed, Ultra Violet, Orange Islands, FireRed Rocket Edition, Ash Gray, Recharged Yellow, Lazarus, Emerald Seaglass, Too Many Types 2, Emerald Imperium, Super Mariomon, SoulGold, Team Rocket Edition, Elite Redux and R.O.W.E. Many hacks have better odds of their own (1 in 4096 in Unbound, Glazed, the newer Amethyst and most of the hacks rebuilt from newer source code, about 1 in 1800 in Emerald Imperium, 1 in 256 in SoulGold, about 1 in 257 in Odyssey): there `NORMAL` keeps theirs, and a choice that isn't better changes nothing. Everywhere else, the Game Boy and DS games included, it shows `N/A`.
 

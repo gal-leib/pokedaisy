@@ -187,19 +187,8 @@ class EmulatorEngine(
     fun setHmFree(patch: com.pokedaisy.app.companion.data.HmFree.Patch?, on: Boolean) =
         gameOptions.setHmFree(patch, on)
 
-    /** SHINY ODDS ([com.pokedaisy.app.companion.data.ShinyOdds]): the game's foe party watched every frame, a new wild foe
-     * made shiny at 1 in [shinyOdds] ([com.pokedaisy.app.companion.data.ShinyOdds.NORMAL] = the game's own odds, nothing
-     * done); null = a game it doesn't know. */
-    @Volatile private var shinyRoller: com.pokedaisy.app.companion.data.ShinyOdds.Roller? = null
-    @Volatile var shinyOdds = com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
-
-    @Volatile private var shinyTarget: com.pokedaisy.app.companion.data.ShinyOdds.Target? = null
-
-    fun setShinyTarget(target: com.pokedaisy.app.companion.data.ShinyOdds.Target?) {
-        if (target == shinyTarget) return
-        shinyTarget = target
-        shinyRoller = target?.let { com.pokedaisy.app.companion.data.ShinyOdds.Roller(it) }
-    }
+    @Volatile var onShinyChanged: () -> Unit = {}
+    val shiny by lazy { playback.bindShiny(gameCalls, BuildConfig.DEBUG) { onShinyChanged() } }
 
     /** PLAYER LOOK ([com.pokedaisy.app.companion.data.PlayerLook]): the patch to wear - its blocks into the ROM, then its
      * palettes swapped where the game has them loaded - on the next frame boundary ([setPlayerLook]); its palettes again
@@ -1424,12 +1413,7 @@ class EmulatorEngine(
                     else -> 0
                 }
                 // SHINY ODDS: a new wild foe, between the frame it's made and the battle drawing it.
-                if (gba && shinyOdds < com.pokedaisy.app.companion.data.ShinyOdds.NORMAL) shinyRoller?.let { r ->
-                    runCatching {
-                        val n = r.tick(shinyOdds, InProcessReader::readCoreMemory, MgbaCore::pkWriteBytes)
-                        if (n > 0) Log.i("pokedaisy", "shiny odds: foe made shiny (1 in $shinyOdds)")
-                    }.onFailure { Log.w("pokedaisy", "shiny odds failed", it) }
-                }
+                shiny.tick()
                 if (gba) gameOptions.markExp(InProcessReader::readCoreMemory, MgbaCore::pkWriteBytes)
                 playback.fieldChanged(fieldState)
                 val bike = MgbaCore.FIELD_AVATAR or MgbaCore.FIELD_BIKE
