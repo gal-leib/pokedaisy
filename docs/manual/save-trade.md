@@ -12,6 +12,8 @@ Everything the editor offers is something the game itself could have: a nature, 
 
 ## Save editor
 
+On iPhone and iPad, `SAVE EDITOR` works with supported GBA saves from FireRed, LeafGreen, Emerald, Ruby and Sapphire. Open it from `TOOLS` or the game's menu. Saving keeps a copy of the previous battery save under `PokeDaisy/saves/pokedaisy-backups` and makes the game start from the edited save on its next launch.
+
 Tap `TOOLS` in the library, then `SAVE EDITOR`, and pick a game. Or open a game's menu in the library (long-press it) and pick `SAVE EDITOR` there. The editor has three pages: `POKéMON`, `BAG` and `TRAINER`. Nothing is written until you tap `SAVE`, and `UNDO ALL` drops every change.
 
 With a controller or a keyboard, the D-pad moves an orange cursor (the first press puts it on the Pokémon you picked, or on the open page's button), A presses what it's on and B goes back.

@@ -96,9 +96,9 @@ class StateFiles(val directory: Path, private val extraSidecars: List<String> = 
         fun romKey(rom: Path): String = hash(rom)
 
         /** A distinct battery backup before opening a game or explicitly rewinding it. Failure aborts the load. */
-        fun backupBattery(save: Path, keep: Int = 10) {
+        fun backupBattery(save: Path, keep: Int = 10): Path? {
             require(keep > 0)
-            if (!present(save)) return
+            if (!present(save)) return null
             val dir = save.parent!! / "pokedaisy-backups"
             dir.mkdirs()
             val prefix = "${save.name}."
@@ -108,6 +108,7 @@ class StateFiles(val directory: Path, private val extraSidecars: List<String> = 
             batteryBackups(save)
                 .sortedWith(compareByDescending<Path> { it.lastModified }.thenByDescending { it == target })
                 .drop(keep).forEach { it.delete() }
+            return target
         }
 
         fun batteryBackups(save: Path): List<Path> {

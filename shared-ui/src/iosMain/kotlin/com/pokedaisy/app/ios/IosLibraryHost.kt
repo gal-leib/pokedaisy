@@ -62,6 +62,9 @@ internal class IosLibraryHost(
     private var choosingAdd by mutableStateOf(false)
     private var choosingSaveGame by mutableStateOf(false)
     private var restorePath by mutableStateOf<String?>(null)
+
+    private var choosingEditSave by mutableStateOf(false)
+    private var editingSave by mutableStateOf<String?>(null)
     private var infoPath by mutableStateOf<String?>(null)
     private var renaming by mutableStateOf<String?>(null)
     private var notice by mutableStateOf<Pair<String, String>?>(failed?.let { tr("ERROR") to it.substringAfterLast('/') })
@@ -129,10 +132,15 @@ internal class IosLibraryHost(
                     val density = androidx.compose.ui.platform.LocalDensity.current.density
                     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                         SideEffect { screen = DpSize(maxWidth, maxHeight); scale = density }
+                        val edit = editingSave
                         val flow = setup
-                        if (flow == null) Library() else Setup(flow)
-                        Dialogs()
-                        touch.EditorOverlay()
+                        if (edit != null) {
+                            IosSaveEditor(edit, label(edit), onClose = { editingSave = null }, onSaved = ::refreshGames)
+                        } else {
+                            if (flow == null) Library() else Setup(flow)
+                            Dialogs()
+                            touch.EditorOverlay()
+                        }
                     }
                 }
             } }
@@ -179,8 +187,10 @@ internal class IosLibraryHost(
         val shown = projection.games(view)
         val tools = listOf(
             LibraryTool("PATCH", "PATCH A ROM", "Turn a .bps patch into a game", NewFeatures.badge(NewFeatures.ROM_PATCH), ::pickPatch),
-            LibraryTool("save_editor", "LOAD SAVE", "The game starts from this save next time, not from where you left off.", null,
+            LibraryTool("load_save", "LOAD SAVE", "The game starts from this save next time, not from where you left off.", null,
                 open = { if (paths.isEmpty()) library.selectSection(LibrarySection.GAMES) else choosingSaveGame = true }),
+            LibraryTool("EDIT", "SAVE EDITOR", "Change a game's Pokémon, bag and Pokédex",
+                NewFeatures.badge(NewFeatures.IOS_SAVE_EDITOR), open = { choosingEditSave = true }),
         )
         val state = LibraryPresentation(shown, library.grid, library.section, views, view,
             projection.counts, games.isNotEmpty(), library.query,
@@ -202,14 +212,17 @@ internal class IosLibraryHost(
             var menu by remember(game.id) { mutableStateOf(false) }
             val openMenu = libraryLongPress { menu = true }
             val cover: @Composable (Modifier) -> Unit = { LibraryCover(null, category(game.id), m, it) }
-            val items = listOf(
+            val items = listOfNotNull(
                 LibraryMenuItem(if (game.favorite) "UNFAVORITE" else "FAVORITE",
                     if (game.favorite) LibraryIcons.StarBorder else Icons.Filled.Star,
                     pixel = if (game.favorite) PixelIcons.starOutline else PixelIcons.star) { prefs.toggleFavorite(key(game.id)) },
                 LibraryMenuItem("INFO", Icons.Filled.Info, opens = true) { infoPath = game.id },
                 LibraryMenuItem("RENAME", Icons.Filled.Edit, opens = true) { renaming = game.id },
                 LibraryMenuItem("LOAD SAVE", LibraryIcons.FileOpen, opens = true) { pickSave(game.id) },
-                LibraryMenuItem("RESTORE BACKUP", LibraryIcons.History, opens = true) { restorePath = game.id })
+                LibraryMenuItem("RESTORE BACKUP", LibraryIcons.History, opens = true) { restorePath = game.id },
+                if (category(game.id) == RomCategory.GBA)
+                    LibraryMenuItem("SAVE EDITOR", LibraryIcons.Inventory2, opens = true) { editingSave = game.id }
+                else null)
             val onPlay = {
                 playGame(game.id)
             }
@@ -327,6 +340,11 @@ internal class IosLibraryHost(
                     onDismiss = { restorePath = null },
                 )
             }
+        }
+        if (choosingEditSave) {
+            IosSaveEditorPicker(paths, ::label,
+                onPick = { choosingEditSave = false; editingSave = it },
+                onClose = { choosingEditSave = false })
         }
         LaunchedEffect(saveImports.importing) {
             val picked = saveImports.importing ?: return@LaunchedEffect

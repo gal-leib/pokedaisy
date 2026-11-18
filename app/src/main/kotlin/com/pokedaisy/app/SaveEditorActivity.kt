@@ -677,19 +677,7 @@ class SaveEditorActivity : ComponentActivity() {
         when (val p = page) {
             is Page.Ready -> {
                 val s = p.state
-                // BACK closes what's open first: a pick-list or amount, a confirm, then a pending MOVE, then asks before dropping edits.
-                BackHandler {
-                    when {
-                        s.editing != null -> s.editing = null
-                        s.missing != null -> s.missing = null
-                        s.confirmSave -> s.confirmSave = false
-                        s.confirmDiscard -> s.confirmDiscard = false
-                        s.detail != null -> s.detail = null
-                        s.moving != null -> s.moving = null
-                        s.changed -> s.confirmDiscard = true
-                        else -> if (!backToCollection()) finish()
-                    }
-                }
+                BackHandler { if (!saving) s.back { if (!backToCollection()) finish() } }
                 PcBoxesScreen(
                     s, gameName, m, onBack = { if (!backToCollection()) finish() }, onSave = { save(p) }, saving = saving,
                     icons = icons[rom.absolutePath], onTrade = { pickPartner() },
