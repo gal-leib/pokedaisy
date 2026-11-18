@@ -95,6 +95,8 @@ object PokeDaisyHost {
 
     fun receiveCoopInvite(link: String) = IosCoopHost.receiveInvite(link)
 
+    fun installCoopNetwork(tcp: IosCoopTcpNative, discovery: IosCoopDiscovery) = IosCoopHost.install(tcp, discovery)
+
     /** Sets the shared screens' hosts (fonts, pictures, settings, the manual). Safe to call more than once. */
     fun start() {
         if (started) return

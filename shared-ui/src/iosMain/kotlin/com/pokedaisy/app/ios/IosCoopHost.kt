@@ -6,6 +6,7 @@ import com.pokedaisy.app.CoopPairingHost
 import com.pokedaisy.app.companion.coop.CoopEndpointOptions
 import com.pokedaisy.app.companion.coop.CoopEndpointSession
 import com.pokedaisy.app.companion.coop.CoopIdentity
+import com.pokedaisy.app.companion.coop.NoCoopLan
 import com.pokedaisy.app.companion.coop.CoopInvite
 import com.pokedaisy.app.companion.coop.CoopPair
 import com.pokedaisy.app.companion.coop.CoopRelay
@@ -16,6 +17,7 @@ import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CoopSaveChoice
 import com.pokedaisy.app.game.RomPicker
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okio.FileSystem
@@ -37,15 +39,29 @@ internal object IosCoopHost {
         .URLsForDirectory(NSApplicationSupportDirectory, NSUserDomainMask)
         .filterIsInstance<NSURL>().firstNotNullOf { it.path }.toPath() / "coop"
 
+    private data class NativeNetwork(val tcp: IosCoopTcpNative, val discovery: IosCoopDiscovery)
+    @Volatile private var native: NativeNetwork? = null
+    private val manual = IosCoopIp { native?.tcp }
+
+    fun install(tcp: IosCoopTcpNative, discovery: IosCoopDiscovery) { native = NativeNetwork(tcp, discovery) }
+
+    val relayOnly: Boolean get() = native == null || iosPreferences.coopRelayOnly
     private val connector by lazy { IosCoopRelayConnector() }
+
     val session by lazy {
         CoopEndpointSession(
-            createTransport = { RelayCoopTransport(connector, IosCoopCrypto, ::IosCoopNetwork) },
+            createTransport = {
+                val host = native
+                RelayCoopTransport(
+                    connector, IosCoopCrypto, { IosCoopNetwork(host?.tcp) },
+                    lan = host?.discovery?.let(::IosCoopLan) ?: NoCoopLan,
+                )
+            },
             directory = ::directory,
             version = { NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "" },
             secretKey = { CoopIdentity.secretKey(directory(), IosCoopCrypto) },
             relayConnector = { connector },
-            options = { CoopEndpointOptions(CoopRelay.effective(iosPreferences.coopRelayUrl, defaultRelay), relayOnly = true) },
+            options = { CoopEndpointOptions(CoopRelay.effective(iosPreferences.coopRelayUrl, defaultRelay), relayOnly = relayOnly) },
         )
     }
 
@@ -57,7 +73,7 @@ internal object IosCoopHost {
 
     fun pairingHost(games: () -> List<String>, title: (String) -> String, presentFrom: () -> UIViewController?) =
         object : CoopPairingHost {
-            override val relayOnly = true
+            override val relayOnly get() = IosCoopHost.relayOnly
             override val defaultRelay get() = IosCoopHost.defaultRelay
             override var relayOverride: String?
                 get() = iosPreferences.coopRelayUrl
@@ -86,9 +102,8 @@ internal object IosCoopHost {
                 from.presentViewController(share, animated = true, completion = null)
             }
 
-            override fun startAddressHost(link: () -> String?, address: (String?) -> Unit) = address(null)
-            override fun stopAddressHost() {}
-            override fun fetchInvite(address: String, result: (Result<String>) -> Unit) =
-                result(Result.failure(IllegalArgumentException()))
+            override fun startAddressHost(link: () -> String?, address: (String?) -> Unit) = manual.start(link, address)
+            override fun stopAddressHost() = manual.stop()
+            override fun fetchInvite(address: String, result: (Result<String>) -> Unit) = manual.fetch(address, result)
         }
 }

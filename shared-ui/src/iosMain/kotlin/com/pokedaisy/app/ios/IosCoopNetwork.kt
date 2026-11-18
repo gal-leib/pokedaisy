@@ -7,6 +7,7 @@ import com.pokedaisy.app.companion.coop.CoopPipe
 import com.pokedaisy.app.companion.coop.CoopRelayPipe
 import com.pokedaisy.app.companion.coop.CoopRelaySocket
 import com.pokedaisy.app.companion.coop.CoopTcpSocket
+import com.pokedaisy.app.companion.coop.CoopTcpListener
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
@@ -23,7 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Schedules relay routing away from the iOS UI and emulator threads. */
-internal class IosCoopNetwork : CoopNetwork {
+internal class IosCoopNetwork(private val tcp: IosCoopTcpNative?) : CoopNetwork {
     private val relayWorkers = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var ticker: Job? = null
 
@@ -37,11 +38,23 @@ internal class IosCoopNetwork : CoopNetwork {
     }
 
     override fun relayPipe(): CoopRelayPipe = RelayPipe(relayWorkers)
-    override fun listen(onAccept: (CoopTcpSocket) -> Unit) = null
-    override fun ticketAddresses(port: Int): List<CoopAddress> = emptyList()
+    override fun listen(onAccept: (CoopTcpSocket) -> Unit): CoopTcpListener? {
+        val native = tcp?.listen(0) { onAccept(IosCoopTcpSocket(it, relayWorkers)) } ?: return null
+        return object : CoopTcpListener {
+            override val port get() = native.port
+            override fun start() {}
+            override fun close() = native.close()
+        }
+    }
+
+    override fun ticketAddresses(port: Int): List<CoopAddress> =
+        tcp?.addresses()?.mapNotNull { it.toEndpoint(port)?.address }.orEmpty()
 
     override fun connect(address: CoopEndpoint, timeoutMs: Long, connected: (CoopTcpSocket?) -> Unit) {
-        connected(null)
+        val host = tcp ?: return connected(null)
+        host.connect(address.hostName(), address.address.port, timeoutMs.toInt()) { socket ->
+            connected(socket?.let { IosCoopTcpSocket(it, relayWorkers) })
+        }
     }
 
     override fun close() {

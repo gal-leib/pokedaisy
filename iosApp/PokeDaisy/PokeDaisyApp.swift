@@ -8,6 +8,7 @@ extension CoopCryptoKit: IosCoopPrimitives {}
 struct PokeDaisyApp: App {
     init() {
         PokeDaisyHost.shared.installCoopCrypto(primitives: CoopCryptoKit())
+        PokeDaisyHost.shared.installCoopNetwork(tcp: CoopTcp(), discovery: CoopBonjour())
         PokeDaisyHost.shared.start()
     }
 

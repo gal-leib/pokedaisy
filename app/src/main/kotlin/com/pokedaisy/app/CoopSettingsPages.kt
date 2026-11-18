@@ -133,12 +133,12 @@ class CoopSettingsPages(
             endpoint.refreshRooms()
         }
         val opened = ++generation
-        if (!host.relayOnly) host.startAddressHost(::currentLink) { address ->
+        if (!host.relayOnly) host.startAddressHost({ linkFor(p) }) { address ->
             ui.launch { if (opened == generation) wifi = address }
         }
     }
 
-    private fun currentLink(): String? =
+    private fun linkFor(pairing: CoopPairing?): String? =
         (pairing?.step?.value as? CoopPairing.Step.Inviting)?.ticket?.let { runCatching { CoopInvite.link(it) }.getOrNull() }
 
     /** A typed or listed room code, looked up on the relay's lobby, then joined like an invite link. */
@@ -171,8 +171,8 @@ class CoopSettingsPages(
         }
     }
 
-    private fun copyLink() = currentLink()?.let(host::copyLink)
-    private fun shareLink() = currentLink()?.let(host::shareLink)
+    private fun copyLink() = linkFor(pairing)?.let(host::copyLink)
+    private fun shareLink() = linkFor(pairing)?.let(host::shareLink)
 
     /** PAIR: [onDone] leaves it for the hub (DONE once paired). */
     @Composable

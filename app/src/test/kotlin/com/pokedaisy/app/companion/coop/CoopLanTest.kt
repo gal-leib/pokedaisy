@@ -45,32 +45,32 @@ class CoopLanTest {
     private fun bytes(m: Map<String, String>) = m.mapValues { it.value.toByteArray(Charsets.UTF_8) }
 
     @Test fun longLabelIsCutAtACharacterWithin200Bytes() {
-        val u = NsdCoopLan.txtFor(a, "é".repeat(150) + "😀".repeat(5))["u"]!!
+        val u = CoopLanRecord.encode(a, "é".repeat(150) + "😀".repeat(5))["u"]!!
         assertTrue(u.toByteArray(Charsets.UTF_8).size <= 200)
-        assertEquals("é".repeat(100), NsdCoopLan.txtFor(a, "é".repeat(150))["u"])
+        assertEquals("é".repeat(100), CoopLanRecord.encode(a, "é".repeat(150))["u"])
         assertEquals(u, String(u.toByteArray(Charsets.UTF_8), Charsets.UTF_8))
-        assertEquals("a".repeat(199), NsdCoopLan.txtFor(a, "a".repeat(199) + "😀")["u"])
+        assertEquals("a".repeat(199), CoopLanRecord.encode(a, "a".repeat(199) + "😀")["u"])
     }
 
     @Test fun txtRoundTrip() {
-        val txt = NsdCoopLan.txtFor(a, "hello")
-        val parsed = NsdCoopLan.parseTxt(bytes(txt))
+        val txt = CoopLanRecord.encode(a, "hello")
+        val parsed = CoopLanRecord.decode(bytes(txt))
         assertEquals(a, parsed?.first)
         assertEquals("hello", parsed?.second)
-        assertEquals("", NsdCoopLan.parseTxt(bytes(NsdCoopLan.txtFor(a, null)))?.second)
+        assertEquals("", CoopLanRecord.decode(bytes(CoopLanRecord.encode(a, null)))?.second)
         val u200 = "é".repeat(100)
-        assertEquals(u200, NsdCoopLan.parseTxt(bytes(NsdCoopLan.txtFor(a, u200)))?.second)
+        assertEquals(u200, CoopLanRecord.decode(bytes(CoopLanRecord.encode(a, u200)))?.second)
     }
 
     @Test fun badTxtIsNotFound() {
         val k = a.hex.toByteArray()
-        assertNull(NsdCoopLan.parseTxt(emptyMap()))
-        assertNull(NsdCoopLan.parseTxt(mapOf("k" to "zz".toByteArray())))
-        assertNull(NsdCoopLan.parseTxt(mapOf("k" to a.hex.uppercase().toByteArray())))
-        assertNull(NsdCoopLan.parseTxt(mapOf("k" to k + 'a'.code.toByte())))
-        assertNull(NsdCoopLan.parseTxt(mapOf("k" to k, "u" to ByteArray(201) { 'x'.code.toByte() })))
-        assertNotNull(NsdCoopLan.parseTxt(mapOf("k" to k, "u" to ByteArray(200) { 'x'.code.toByte() })))
-        assertNull(NsdCoopLan.parseTxt(mapOf("k" to k, "u" to byteArrayOf(0xC3.toByte()))))
+        assertNull(CoopLanRecord.decode(emptyMap()))
+        assertNull(CoopLanRecord.decode(mapOf("k" to "zz".toByteArray())))
+        assertNull(CoopLanRecord.decode(mapOf("k" to a.hex.uppercase().toByteArray())))
+        assertNull(CoopLanRecord.decode(mapOf("k" to k + 'a'.code.toByte())))
+        assertNull(CoopLanRecord.decode(mapOf("k" to k, "u" to ByteArray(201) { 'x'.code.toByte() })))
+        assertNotNull(CoopLanRecord.decode(mapOf("k" to k, "u" to ByteArray(200) { 'x'.code.toByte() })))
+        assertNull(CoopLanRecord.decode(mapOf("k" to k, "u" to byteArrayOf(0xC3.toByte()))))
     }
 
     @Test fun noLanDoesNothing() {

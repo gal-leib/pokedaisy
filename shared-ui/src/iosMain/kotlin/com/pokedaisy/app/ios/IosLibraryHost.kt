@@ -347,6 +347,11 @@ internal class IosLibraryHost(
                             opensPage = true) { coopPage = CoopPage.PARTNERS },
                         SettingRow(tk("RELAY"), CoopRelay.rowValue(iosPreferences.coopRelayUrl, IosCoopHost.defaultRelay),
                             opensPage = true) { coopPage = CoopPage.RELAY },
+                        SettingRow(tk("RELAY ONLY"), tk(if (IosCoopHost.relayOnly) "ON" else "OFF")) {
+                            iosPreferences.coopRelayOnly = !iosPreferences.coopRelayOnly
+                            IosCoopHost.session.restart()
+                            coopRevision++
+                        },
                     )
                     OptionListWindow(m, Modifier.fillMaxWidth()) {
                         GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() })
