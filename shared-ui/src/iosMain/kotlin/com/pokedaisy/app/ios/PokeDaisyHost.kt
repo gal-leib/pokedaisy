@@ -91,6 +91,8 @@ object PokeDaisyHost {
     private var flash: com.pokedaisy.app.companion.FieldFlashAction? = null
     private var fly by mutableStateOf<com.pokedaisy.app.companion.FlyAction?>(null)
 
+    fun installCoopCrypto(primitives: IosCoopPrimitives) = IosCoopCrypto.install(primitives)
+
     /** Sets the shared screens' hosts (fonts, pictures, settings, the manual). Safe to call more than once. */
     fun start() {
         if (started) return
