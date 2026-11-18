@@ -7,6 +7,7 @@ import com.pokedaisy.app.companion.data.SnapshotCache
 import com.pokedaisy.app.companion.data.delete
 import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.game.GameSession
 import android.graphics.Bitmap
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -1164,7 +1165,7 @@ class EmulatorEngine(
                 if (!paused) { paused = true; runCatching { track?.pause(); track?.flush() }; framesWritten = 0L }
                 coopBattles?.beforeFrame(input.mask)   // CO-OP BATTLES: its timers and link waits tick while no frame runs
                 coopLock?.onFrame()
-                servicePending(runFieldJobs = false)
+                servicePending(GameSession.FrameWork.HELD)
                 if (sleeping) synchronized(sleepLock) {
                     while (sleeping && running && pendingSuspend == null) sleepLock.wait(SLEEP_POLL_MS)
                     sleeping = false
@@ -1248,7 +1249,7 @@ class EmulatorEngine(
                     wasHeld = true
                     gameAudioPaused = true
                     if (!paused) { paused = true; runCatching { track?.pause(); track?.flush() }; framesWritten = 0L }
-                    servicePending(runFieldJobs = false)
+                    servicePending(GameSession.FrameWork.HELD)
                     if (sleeping) synchronized(sleepLock) {
                         while (sleeping && running && pendingSuspend == null) sleepLock.wait(SLEEP_POLL_MS)
                         sleeping = false
@@ -1326,7 +1327,7 @@ class EmulatorEngine(
 
         /** Jobs, sleep, EXPAND's fault check and the companion's samples. */
         fun afterCore() {
-            servicePending()
+            servicePending(if (rewinding) GameSession.FrameWork.REWINDING else GameSession.FrameWork.ADVANCING)
             if (sleeping) {
                 runCatching { track?.pause(); track?.flush() }
                 val sleptAt = android.os.SystemClock.elapsedRealtime()
@@ -1906,14 +1907,15 @@ class EmulatorEngine(
             MgbaCore.pkRomPatch(expectAt, expect, at, value)
     }
 
-    private fun servicePending(runFieldJobs: Boolean = true) {
-        gameSession.servicePosted()
-        if (cheatsDirty) applyCheats()
-        // Never during a co-op battle: both reach pkRomUnpatch / pkRomUnblock, which uninstall co-op (they stay dirty until it ends).
-        if (gameOptions.dirty && !CoopGuards.battleActive()) { gameOptions.tick(); coopLock?.requestReinstall() }
-        if (gba && !CoopGuards.battleActive() && playerLook.service()) coopLock?.requestReinstall()
-        // Co-op holds still service posted work and patches, but field delays must not advance.
-        if (runFieldJobs) gameSession.serviceField(gba, gbOnField)
+    private fun servicePending(work: GameSession.FrameWork) {
+        gameSession.servicePending(work, gba, { gbOnField }) {
+            if (cheatsDirty) applyCheats()
+            // Never during a co-op battle: both reach pkRomUnpatch / pkRomUnblock, which uninstall co-op.
+            if (!CoopGuards.battleActive()) {
+                if (gameOptions.dirty) { gameOptions.tick(); coopLock?.requestReinstall() }
+                if (gba && playerLook.service()) coopLock?.requestReinstall()
+            }
+        }
         pendingSuspend?.let { target ->
             pendingSuspend = null
             finishSave()

@@ -292,10 +292,9 @@ class GameRuntime(
         if (snapshot.connected) FfMenuWatch.notePosition(snapshot.x, snapshot.y, snapshot.mapGroup, snapshot.mapNum, snapshot.inBattle)
     }
 
-    fun beforeFrame() {
-        session.servicePosted()
+    fun beforeFrame(applyPatches: () -> Unit = {}) {
         // As Android with an unknown GB scene: each GB helper validates its own field RAM.
-        session.serviceField(gba, gbOnField = true)
+        session.servicePending(GameSession.FrameWork.ADVANCING, gba, { true }, applyPatches)
     }
 
     fun tick(reader: MemoryReader = InProcessReader, wideScene: Int = -1) {

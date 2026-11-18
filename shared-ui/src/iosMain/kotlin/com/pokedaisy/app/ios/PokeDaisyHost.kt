@@ -406,9 +406,14 @@ object PokeDaisyHost {
                 }
             }
             g.beforeFrame = {
-                p.beforeFrame()
-                if (!currentCoop.battleActive) {
-                    if (currentLook.renderer.service()) currentCoop.storyLock?.requestReinstall()
+                p.beforeFrame {
+                    if (!currentCoop.battleActive) {
+                        if (gameOptions.dirty) {
+                            gameOptions.tick()
+                            currentCoop.storyLock?.requestReinstall()
+                        }
+                        if (currentLook.renderer.service()) currentCoop.storyLock?.requestReinstall()
+                    }
                 }
                 g.camera.flying = p.flight?.state?.let { it != 0 } == true
                 g.camera.flightZoom = p.flight?.scenicAirborne == true
@@ -425,10 +430,6 @@ object PokeDaisyHost {
                 if (g.playingForward) currentCoop.afterFrame(field)
                 if (field) currentLook.renderer.fieldFrame()
                 currentLook.ride.step(p.riding && !p.session.mapOpen && !gameOwnsScreen, currentLook.renderer.ride)
-                if (!currentCoop.battleActive && gameOptions.dirty) {
-                    gameOptions.tick()
-                    currentCoop.storyLock?.requestReinstall()
-                }
                 gameOptions.markExp(PkApiCore::read, PkApiCore::write)
             }
         }

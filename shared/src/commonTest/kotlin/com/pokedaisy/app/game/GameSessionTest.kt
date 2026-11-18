@@ -21,18 +21,27 @@ class GameSessionTest {
             events += "field"
             s.requestField(false) { _, _ -> events += "next field" }
         }
-        s.servicePosted(); events += "patches"; s.serviceField(true, true)
+        s.servicePending(GameSession.FrameWork.ADVANCING, true, { true }) { events += "patches" }
         assertEquals(listOf("sample", "patches", "field"), events)
-        s.servicePosted(); s.serviceField(true, true)
+        s.servicePending(GameSession.FrameWork.ADVANCING, true, { true })
         assertEquals(listOf("sample", "patches", "field", "next sample", "next field"), events)
     }
 
     @Test fun delaysDoNotAdvanceDuringAHoldAndUnsafeCallsWaitAtMost120Frames() {
         val s = session()
         s.requestField(false, 2) { _, _ -> events += "delayed" }
-        repeat(20) { s.servicePosted() } // held core: host skips field service
+        s.post { events += "posted" }
+        repeat(20) {
+            s.servicePending(GameSession.FrameWork.REWINDING, true, { error("read scene while rewinding") }) {
+                error("applied patches while rewinding")
+            }
+        }
         assertTrue(events.isEmpty())
-        repeat(2) { s.serviceField(true, true) }
+        s.servicePending(GameSession.FrameWork.HELD, true, { error("read scene while held") }) { events += "patches" }
+        repeat(19) { s.servicePending(GameSession.FrameWork.HELD, true, { true }) }
+        assertEquals(listOf("posted", "patches"), events)
+        events.clear()
+        repeat(2) { s.servicePending(GameSession.FrameWork.ADVANCING, true, { true }) }
         assertTrue(events.isEmpty())
         safe = false
         repeat(120) { s.serviceField(true, true) }
