@@ -475,12 +475,16 @@ object PokeDaisyHost {
         val classicFly = com.pokedaisy.app.companion.ClassicFlyAction(sharedItems, readSupport, currentSession) {
             if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
         }
-        fly = object : com.pokedaisy.app.companion.FlyAction by classicFly {
+        val sharedFly = com.pokedaisy.app.companion.GameFlyAction(
+            gameBoy = { gbFields }, classic = classicFly, gbaAvailable = { readSupport()?.canFly == true },
+            flight = { p.flight },
+            flyUsed = { if (game === g) FeatureTips.used(TipId.FLY) },
+        )
+        fly = object : com.pokedaisy.app.companion.FlyAction by sharedFly {
             override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
                 if (gbFields.available) com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS
                 else if (canFreeFlight()) com.pokedaisy.app.companion.NewFeatures.IOS_FLIGHT
                 else com.pokedaisy.app.companion.NewFeatures.IOS_CLASSIC_FLY)
-            override fun canFly() = gbFields.available || readSupport()?.canFly == true
             override fun canFreeFlight() = p.flight?.support() != null
             override fun flying() = p.flight?.state?.let { it != 0 } == true
             override fun toggleFlight(done: (com.pokedaisy.app.companion.data.FlyResult?) -> Unit) {
@@ -488,20 +492,6 @@ object PokeDaisyHost {
                     if (notOnFoot) screen?.showQuickNotice(tr("You can only take off from land."))
                     else done(result?.takeUnless { it == com.pokedaisy.app.companion.data.FlyResult.OK })
                 }
-            }
-            override fun targets(done: (com.pokedaisy.app.companion.data.FlyTargets) -> Unit) {
-                if (gbFields.available) gbFields.targets(done) else classicFly.targets(done)
-            }
-            override fun fly(mapsec: Int, targets: com.pokedaisy.app.companion.data.FlyTargets,
-                             done: (com.pokedaisy.app.companion.data.FlyResult) -> Unit) {
-                val completed = { result: com.pokedaisy.app.companion.data.FlyResult ->
-                    if (game === g && result == com.pokedaisy.app.companion.data.FlyResult.OK) FeatureTips.used(TipId.FLY)
-                    done(result)
-                }
-                if (gbFields.available) return gbFields.fly(mapsec, targets, completed)
-                val flight = p.flight
-                if (flight == null) classicFly.fly(mapsec, targets, completed)
-                else flight.flyTo(mapsec, targets, classicFly, completed)
             }
         }
         val partyActions = com.pokedaisy.app.companion.FieldPartyActions(
@@ -596,7 +586,8 @@ object PokeDaisyHost {
                             com.pokedaisy.app.companion.data.KeyItems.BIKES) },
                         useItem = { p.registeredItems?.use(it) },
                         keeper = com.pokedaisy.app.companion.data.FlightArea.Keeper(appFilesDir(), key),
-                        deliver = { it() }, tookOff = {
+                        deliver = { it() }, tookOff = { scenic ->
+                            if (!scenic && game === g) FeatureTips.used(TipId.FLY)
                             if (currentSettings.flightArea != com.pokedaisy.app.companion.FlightAreaMode.SEEN) {
                                 flewAnywhere = true
                                 ra.setFlightAnywhere(true)

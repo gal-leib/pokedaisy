@@ -66,9 +66,12 @@ class FieldItemUse(
         game.requestField(battling) { calls, busy ->
             val out = runCatching { work(fields, calls, busy) }.getOrElse { Logs.w("item use failed", it); failed }
             Logs.i("item use: $out")
-            deliver { if (session() === game) done(if (battling) fieldActionBattleResult(out) else out) }
+            deliverIfCurrent(game) { done(if (battling) fieldActionBattleResult(out) else out) }
         }
     }
+
+    internal fun deliverIfCurrent(game: GameSession, result: () -> Unit) =
+        deliver { if (session() === game) result() }
 
     override fun use(itemId: Int, done: (ItemUseOutcome) -> Unit) {
         if (!canTeach(itemId)) { onGame(failed, done) { s, calls, busy -> useFieldItem(s.fns, itemId, busy, calls) }; return }

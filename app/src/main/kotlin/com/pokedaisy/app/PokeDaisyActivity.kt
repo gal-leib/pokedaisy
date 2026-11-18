@@ -728,8 +728,11 @@ class PokeDaisyActivity : Activity() {
                 deliver = { runOnUiThread(it) },
                 tookOff = { scenic ->
                     if (Prefs(this).flightArea != com.pokedaisy.app.companion.FlightAreaMode.SEEN) RetroAchievements.setFlightAnywhere(true)
-                    com.pokedaisy.app.companion.FeatureTips.used(TipId.FLY)
-                    if (!scenic) { closeCompanionWindow(); hudCloseTick.intValue++ }
+                    if (!scenic) {
+                        com.pokedaisy.app.companion.FeatureTips.used(TipId.FLY)
+                        closeCompanionWindow()
+                        hudCloseTick.intValue++
+                    }
                 }, turned = { showHud(com.pokedaisy.app.companion.i18n.tr("You haven't been there yet.")) },
                 askStyle = { com.pokedaisy.app.companion.ui.FlyStyleAsk.showing = true },
             )
@@ -757,10 +760,16 @@ class PokeDaisyActivity : Activity() {
 
     private fun useKeyItem(itemId: Int) { if (::engine.isInitialized && engine.running) registeredItems()?.use(itemId) }
 
-    /** FLY on the MAP tab (Fly.kt): two steps on the emu thread - the checks, controls locked and the fade to black,
-     * then once it's black the game's own Fly map choice. */
-    private val flyAction = object : com.pokedaisy.app.companion.FlyAction {
-        override fun canFly() = dsFly() || gen5Fly() || fieldItemSupport()?.canFly == true || gbField() != null
+    private val sharedFly = com.pokedaisy.app.companion.GameFlyAction(
+        gameBoy = ::gameBoyFields, classic = sharedClassicFly,
+        gbaAvailable = { ::engine.isInitialized && engine.running && fieldItemSupport()?.canFly == true },
+        flight = ::gameFlight,
+        beforeGbaFly = { closeCompanionWindow(); hudCloseTick.intValue++ },
+        flyUsed = { com.pokedaisy.app.companion.FeatureTips.used(TipId.FLY) },
+    )
+
+    private val flyAction = object : com.pokedaisy.app.companion.FlyAction by sharedFly {
+        override fun canFly() = dsFly() || gen5Fly() || sharedFly.canFly()
 
         override fun canFreeFlight() = flightSupport() != null
 
@@ -861,13 +870,17 @@ class PokeDaisyActivity : Activity() {
                 if (!::engine.isInitialized || !engine.running) return done(com.pokedaisy.app.companion.data.FlyTargets(com.pokedaisy.app.companion.data.FlyResult.FAILED))
                 return dsTargets(done)
             }
-            val gb = gameBoyFields()
-            if (gb?.available == true) return gb.targets(done)
-            sharedClassicFly.targets(done)
+            sharedFly.targets(done)
         }
 
         override fun fly(mapsec: Int, targets: com.pokedaisy.app.companion.data.FlyTargets, done: (com.pokedaisy.app.companion.data.FlyResult) -> Unit) {
-            com.pokedaisy.app.companion.FeatureTips.used(TipId.FLY)
+            val current = if (::engine.isInitialized) engine else null
+            fun completed(result: com.pokedaisy.app.companion.data.FlyResult) {
+                if (result == com.pokedaisy.app.companion.data.FlyResult.OK && current != null && engine === current && current.running) {
+                    com.pokedaisy.app.companion.FeatureTips.used(TipId.FLY)
+                }
+                done(result)
+            }
             if (gen5Fly()) {
                 // [mapsec] is a town's place here (gen5OpenFlySpots); the flyer must still be in its slot.
                 val cfg = gen5Config()
@@ -886,7 +899,7 @@ class PokeDaisyActivity : Activity() {
                         com.pokedaisy.app.companion.data.ItemUseResult.FAILED
                     } else com.pokedaisy.app.companion.data.ItemUseResult.USED
                 }) { o ->
-                    done(when (o.result) {
+                    completed(when (o.result) {
                         com.pokedaisy.app.companion.data.ItemUseResult.USED -> com.pokedaisy.app.companion.data.FlyResult.OK
                         com.pokedaisy.app.companion.data.ItemUseResult.IN_BATTLE -> com.pokedaisy.app.companion.data.FlyResult.IN_BATTLE
                         com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW -> com.pokedaisy.app.companion.data.FlyResult.NOT_NOW
@@ -905,7 +918,7 @@ class PokeDaisyActivity : Activity() {
                 }
                 closeCompanionWindow()
                 dsAction(MgbaCore.NDS_ACTION_FLY, intArrayOf(flyer.first, spot.mapHeader, spot.x, spot.z)) { o ->
-                    done(when (o.result) {
+                    completed(when (o.result) {
                         com.pokedaisy.app.companion.data.ItemUseResult.USED -> com.pokedaisy.app.companion.data.FlyResult.OK
                         com.pokedaisy.app.companion.data.ItemUseResult.IN_BATTLE -> com.pokedaisy.app.companion.data.FlyResult.IN_BATTLE
                         com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW -> com.pokedaisy.app.companion.data.FlyResult.NOT_NOW
@@ -914,18 +927,7 @@ class PokeDaisyActivity : Activity() {
                 }
                 return
             }
-            val gb = gameBoyFields()
-            if (gb?.available == true) return gb.fly(mapsec, targets, done)
-            val support = fieldItemSupport()
-            if (support == null || !support.canFly || !::engine.isInitialized || !engine.running) {
-                done(com.pokedaisy.app.companion.data.FlyResult.FAILED)
-                return
-            }
-            // The flight is the game's to show: the window over it goes, and the HUD's panel it was picked from (its map).
-            closeCompanionWindow()
-            hudCloseTick.intValue++
-            gameFlight()?.flyTo(mapsec, targets, sharedClassicFly, done)
-                ?: done(com.pokedaisy.app.companion.data.FlyResult.FAILED)
+            sharedFly.fly(mapsec, targets, done)
         }
 
 
