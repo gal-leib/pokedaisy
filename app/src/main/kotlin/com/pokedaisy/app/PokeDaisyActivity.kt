@@ -2363,7 +2363,11 @@ class PokeDaisyActivity : Activity() {
         override val coopOn get() = FeatureFlags.coop(this@PokeDaisyActivity)
         override val emu = object : CoopEmu {
             override fun post(job: () -> Unit) { if (::engine.isInitialized) engine.postToEmu(job) }
-            override val running get() = ::engine.isInitialized && engine.running
+            override fun runBetweenFrames(waitMs: Long, job: () -> Unit): Boolean {
+                if (::engine.isInitialized && engine.running) return awaitCoopFrame(waitMs, ::post, job)
+                job()
+                return true
+            }
         }
         override val overlay get() = coopOverlay
         override fun core(): com.pokedaisy.app.companion.data.coop.CoopCore =
