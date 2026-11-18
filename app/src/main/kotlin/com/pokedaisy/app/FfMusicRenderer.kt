@@ -54,6 +54,7 @@ class FfMusicRenderer(
     private val host: MusicRenderHost,
     private val click: RenderedGameSound? = null,
     private val fanfare: RenderedGameSound? = null,
+    private val prefetch: Boolean = true,
 ) : SongRenderer {
     // String keys (played now: first), Int song ids (prefetch: last) or CLICK (first of all).
     private val queue = SongRenderQueue()
@@ -149,7 +150,7 @@ class FfMusicRenderer(
     private fun locateSongs(): Pair<M4aSongs, List<Int>>? {
         val romBytes = rom.readBytes()
         val songs = M4aSongs.locate(romBytes) ?: return null
-        return songs to if (cache.prefetched) emptyList() else prefetchList(romBytes, songs)
+        return songs to if (!prefetch || cache.prefetched) emptyList() else prefetchList(romBytes, songs)
     }
 
     /** The songs to render once in the background: see the class comment. */

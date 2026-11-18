@@ -1079,7 +1079,7 @@ private fun homeRows(
         ) { s.setBattleFocus(!s.battleFocus); changed() },
         SettingRow(tk("TAB BAR"), tr("{0} TABS", barTabs), labelBadge = NewFeatures.badge(NewFeatures.MORE_TAB) ?: NewFeatures.badge(NewFeatures.BOXES_TAB), opensPage = true, subtitle = "Which tabs sit next to the gear") { navigate(Page.TABS) },
         // The game's menu click on every companion button.
-        SettingRow(tk("CLICK SOUND"), onOff(s.clickSound)) { s.setClickSound(!s.clickSound); changed() },
+        SettingRow(tk("CLICK SOUND"), onOff(s.clickSound), labelBadge = s.clickSoundBadge) { s.setClickSound(!s.clickSound); changed() },
         // RetroAchievements' challenge badges and leaderboard values in the corner (GitHub discussion #620).
         SettingRow(
             tk("CHALLENGE ICONS"), onOff(s.raIcons), subtitle = "RetroAchievements' icons in the corner",

@@ -75,7 +75,7 @@ class FlacWriterTest {
         // FfMusicCache.prepare's path: a clip written as WAV before FLAC, read back and written again.
         val pcm = chipMusic(30000)
         val wav = tmp.newFile("old.wav")
-        writeWav(wav, pcm, pcm.size, 48000)
+        writeWav(wav.toOkioPath(), pcm, pcm.size, 48000)
         val (rate, read) = readWav(wav.toOkioPath())!!
         assertEquals(48000, rate)
         assertArrayEquals(pcm, read)

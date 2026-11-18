@@ -404,6 +404,7 @@ interface CompanionSettings : StoredCompanionSettings {
     /** A tip's TRY IT. */
     fun tryTip(tip: TipId) {}
     val tipsBadge: String? get() = null
+    val clickSoundBadge: String? get() = null
 
     /** SCREEN > OVERLAY's choices, as (key, label) - see [com.pokedaisy.app.Prefs.overlay]; empty = no row (no game).
      * Imported in the top screen's Settings (a file picker); picked here, live. */

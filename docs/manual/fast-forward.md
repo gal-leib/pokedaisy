@@ -100,6 +100,8 @@ The recordings take at most 1.5 GB of your device's storage for all your games t
 
 ## Game volume and mute: SOUND
 
+`CLICK SOUND` plays a short menu sound when a companion button is pressed on Android, iPhone or iPad. It uses a recording made from a supported GBA cartridge on your device and follows the game volume and mute settings.
+
 The `SOUND` group, right under `FF / SPEED` in the companion's `SETTINGS` (and in the top screen's Settings), sets how loud the game is, so you can keep it down while listening to something else.
 
 - **`GAME VOLUME`** is a slider from `100%` (the default) down to `0%`: drag it, tap along it, or press left and right on the D-pad while the row is picked. `100%` is the game as loud as your device's own volume plays it; anything lower is quieter than that, and the device's volume buttons still work on top. It covers everything the game sounds like: its music and sounds, `FF MUSIC`'s songs and the click of the companion's buttons.

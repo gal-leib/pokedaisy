@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -163,7 +164,7 @@ object PokeDaisyHost {
                 { telemetry.snapshot.value }, { items }, { fly }, it) }
         } else null
         return ComposeUIViewController(configure = { configureUiAutomation() }) {
-            AppTheme {
+            AppTheme { CompositionLocalProvider(com.pokedaisy.app.companion.ui.LocalClickSound provides ::playGameClick) {
                 tips?.Clock()
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
                     panels.Content(
@@ -230,7 +231,7 @@ object PokeDaisyHost {
                         })
                     touch.EditorOverlay()
                 }
-            }
+            } }
         }
     }
 
@@ -239,7 +240,7 @@ object PokeDaisyHost {
         val snapshot by telemetry.snapshot.collectAsState()
         Box(Modifier.fillMaxSize()) {
             CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle, gamePick = telemetry.gamePick,
-                back = panels.back, keys = panels.keys, statusBar = statusBar, itemUse = items, fly = fly)
+                back = panels.back, keys = panels.keys, clickSound = ::playGameClick, statusBar = statusBar, itemUse = items, fly = fly)
             stateError?.let { message ->
                 OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
                     onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)
@@ -381,7 +382,7 @@ object PokeDaisyHost {
             g.afterFrame = {
                 p.flight?.afterFrame()
                 p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1)
-                steadyMusic?.frame(currentSettings.ffMusicMode, p.requestedSpeedNow() > 1f)
+                steadyMusic?.frame(currentSettings.ffMusicMode, p.requestedSpeedNow() > 1f, currentSettings.clickSound)
                 // Native flags identify a clear field even while the callback watcher is learning it.
                 val gameOwnsScreen = p.fieldState and (GameField.LOCKED or GameField.BATTLE or GameField.WINDOW) != 0
                 val field = !p.session.mapOpen && !gameOwnsScreen &&
@@ -521,7 +522,8 @@ object PokeDaisyHost {
                 g.setExpandedTables(tables)
                 p.start(romPath.toPath(), code, crc, areaMapCrc = tables)
                 if (!blocked) {
-                    steadyMusic = IosSteadyMusic(g, romPath.toPath(), key, code != null).also {
+                    val click = IosGameClickSound(g, key).also { gameClick = it }
+                    steadyMusic = IosSteadyMusic(g, romPath.toPath(), key, code != null, click).also {
                         g.onMusicPause = it::pause
                     }
                 }
@@ -628,6 +630,11 @@ object PokeDaisyHost {
 
     private var playerLook: IosPlayerLook? = null
     private var steadyMusic: IosSteadyMusic? = null
+    private var gameClick: IosGameClickSound? = null
+
+    private fun playGameClick() {
+        if (settings?.clickSound == true) gameClick?.play()
+    }
 
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
@@ -636,6 +643,8 @@ object PokeDaisyHost {
         stateError = null
         steadyMusic?.close()
         steadyMusic = null
+        gameClick?.close()
+        gameClick = null
         playerLook?.close()
         playerLook = null
         playback?.quiesce()
