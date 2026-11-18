@@ -24,6 +24,7 @@ private val androidRa = RaSession(
 /** Android's cartridge, savestate and library adapters for the shared RetroAchievements session. */
 object RetroAchievements : CompanionAchievements by androidRa {
     private const val RC_OK = 0
+    internal val account get() = androidRa
     val user get() = androidRa.user
     val signingIn get() = androidRa.signingIn
     val available get() = androidRa.available

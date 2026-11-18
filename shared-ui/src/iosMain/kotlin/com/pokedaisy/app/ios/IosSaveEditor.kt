@@ -17,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.SaveEditFiles
-import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.Gen3SaveFile
 import com.pokedaisy.app.companion.data.save.MissingDex
@@ -137,7 +136,7 @@ internal fun IosSaveEditor(
             scope.launch {
                 val result = withContext(NonCancellable + Dispatchers.Default) {
                     runCatching {
-                        val states = StateFiles(RomPicker.statesDir.toPath() / edit.source.stateKey)
+                        val states = iosStateFiles(edit.source.stateKey)
                         commitIosSaveEdit(edit.source.path, states, edit.source.source.bytes, bytes)
                     }.getOrElse { SaveEditFiles.Result.Failed(tr("Can't write the save")) }
                 }

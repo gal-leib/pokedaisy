@@ -123,10 +123,15 @@ internal class IosCompanionSettings(
     override val shinyAlertSupported get() = playback()?.shiny?.supported == true
     override val shinyAlertBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SHINY_ALERT)
     override fun setShinyAlert(on: Boolean) { playback()?.shinyAlert?.set(on) }
+    override val raIcons get() = iosPreferences.raIcons
+    override fun setRaIcons(on: Boolean) {
+        iosPreferences.raIcons = on
+        com.pokedaisy.app.companion.ui.AchievementIcons.shown = on
+    }
+
     override val shinyOdds get() = playback()?.shiny?.odds ?: com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
     override val shinyOddsChoices get() = playback()?.shiny?.choices ?: com.pokedaisy.app.companion.data.ShinyOdds.CHOICES
     override val shinyOddsSupported get() = playback()?.shiny?.supported == true
-    override val shinyOddsPausesAchievements = false
     override val shinyOddsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SHINY_ODDS)
     override fun setShinyOdds(odds: Int) { playback()?.shiny?.setOdds(odds) }
     override val dayNightSupported get() = playback()?.dayNightSupported == true

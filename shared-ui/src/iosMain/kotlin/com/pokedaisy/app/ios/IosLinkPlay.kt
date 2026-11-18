@@ -208,7 +208,7 @@ private class IosLinkSaves private constructor(
 
     fun finish() {
         originals.filter { stamp(it.save) != it.crc }.forEach {
-            val state = StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(it.rom.toPath()))
+            val state = iosStateFiles(it.rom.toPath())
             StateResume.startFresh(state)
         }
     }

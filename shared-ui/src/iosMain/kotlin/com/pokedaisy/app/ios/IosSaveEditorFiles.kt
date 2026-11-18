@@ -93,7 +93,7 @@ private fun recoverIosSaveTradesLocked(): Boolean = tradeJournal().recover(
         side.edit.path.parent == saveDir && side.edit.path.name.endsWith(".sav") &&
             key.length == 64 && key.all { it in '0'..'9' || it in 'a'..'f' }
     },
-    finishCommitted = { side -> StateResume.startFresh(StateFiles(RomPicker.statesDir.toPath() / side.stateKey)) },
+    finishCommitted = { side -> StateResume.startFresh(iosStateFiles(side.stateKey)) },
 )
 
 private fun writeSynced(path: Path, data: ByteArray) {
