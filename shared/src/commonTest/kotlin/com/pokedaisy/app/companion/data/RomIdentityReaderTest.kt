@@ -26,6 +26,19 @@ class RomIdentityReaderTest {
         assertNull(reader(gba.copyOf(0xB0)).header())
     }
 
+    @Test fun gameBoyTitleOmitsColorFlagsAndStopsAtPadding() {
+        val gb = ByteArray(0x160)
+        "FULL LENGTH GAME".encodeToByteArray().copyInto(gb, 0x134)
+        gb[0x14C] = 4
+        assertEquals("FULL LENGTH GAME", reader(gb).gameBoyTitle())
+        assertEquals(4, reader(gb).gameBoyRevision())
+        gb[0x143] = 0x80.toByte()
+        assertEquals("FULL LENGTH GAM", reader(gb).gameBoyTitle())
+        gb[0x13A] = 0
+        assertEquals("FULL L", reader(gb).gameBoyTitle())
+        assertNull(reader(ByteArray(0x160)).gameBoyTitle())
+    }
+
     @Test fun wholeFileHashesStreamBeyondOneBufferAndRawPathReadsMatch() {
         val bytes = ByteArray(200_000) { (it * 37).toByte() }
         val r = reader(bytes)

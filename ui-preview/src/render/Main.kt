@@ -2903,14 +2903,14 @@ fun main(args: Array<String>) {
         Shot("library-info", tw, th, td, activity {
             LibraryActivity().apply {
                 val ctx = android.content.Context()
-                gameInfo = com.pokedaisy.app.GameInfo.read(ctx, Prefs(ctx), File(ctx.filesDir, "roms/firered-hack.gba"), hashes = true)
+                gameInfo = com.pokedaisy.app.AndroidGameInfo.read(ctx, Prefs(ctx), File(ctx.filesDir, "roms/firered-hack.gba"), hashes = true)
             }
         }),
         // A ROM the app doesn't know: INFO's PICK A GAME, tapped (every config of its base game, AUTO, NONE OF THESE).
         Shot("library-info-pick", tw, th, td, activity {
             LibraryActivity().apply {
                 val ctx = android.content.Context()
-                val info = com.pokedaisy.app.GameInfo.read(ctx, Prefs(ctx), File(ctx.filesDir, "roms/firered-hack.gba"), hashes = true)
+                val info = com.pokedaisy.app.AndroidGameInfo.read(ctx, Prefs(ctx), File(ctx.filesDir, "roms/firered-hack.gba"), hashes = true)
                 gameInfo = com.pokedaisy.app.GameInfo(
                     info.title, info.sections, supportUrl = "https://example.invalid",
                     gamePick = com.pokedaisy.app.GameInfo.GamePick("0123456789abcdef0123456789abcdef01234567", "BPEE", "SOULGOLD_V1_2"),

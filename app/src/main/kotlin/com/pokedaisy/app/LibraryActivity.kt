@@ -804,7 +804,7 @@ class LibraryActivity : ComponentActivity() {
                 val name = romLabel(p.target)
                 val current = remember(p) { SavesLocation.saveFor(this@LibraryActivity, prefs, p.target) }
                 val size = p.bytes.size.toLong()
-                val what = "${p.fileName} (${GameInfo.sizeLabel(size)}${GameSaves.kind(size)?.let { " · $it" } ?: ""})"
+                val what = "${p.fileName} (${AndroidGameInfo.sizeLabel(size)}${GameSaves.kind(size)?.let { " · $it" } ?: ""})"
                 OptionConfirm(
                     title = tr("LOAD SAVE?"),
                     message = (if (current.isFile) {
@@ -1279,9 +1279,9 @@ class LibraryActivity : ComponentActivity() {
 
     /** INFO: the quick facts at once, then again with the hashes (a whole-ROM read). */
     private fun showInfo(rom: File) {
-        gameInfo = GameInfo.read(this, prefs, rom, hashes = false)
+        gameInfo = AndroidGameInfo.read(this, prefs, rom, hashes = false)
         Thread({
-            val full = GameInfo.read(this, prefs, rom, hashes = true)
+            val full = AndroidGameInfo.read(this, prefs, rom, hashes = true)
             runOnUiThread { if (gameInfo?.title == full.title) gameInfo = full }
         }, "pokedaisy-game-info").apply { isDaemon = true; start() }
     }

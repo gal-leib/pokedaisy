@@ -105,9 +105,15 @@ class StateFiles(val directory: Path, private val extraSidecars: List<String> = 
             val target = dir / "$prefix${hash(save)}.sav"
             val tmp = sidecar(target, ".tmp")
             try { save.copyTo(tmp); tmp.moveTo(target) } finally { runCatching { tmp.delete() } }
-            dir.listFiles().filter { it.name.startsWith(prefix) && it.name.endsWith(".sav") }
+            batteryBackups(save)
                 .sortedWith(compareByDescending<Path> { it.lastModified }.thenByDescending { it == target })
                 .drop(keep).forEach { it.delete() }
+        }
+
+        fun batteryBackups(save: Path): List<Path> {
+            val dir = save.parent?.resolve("pokedaisy-backups") ?: return emptyList()
+            val prefix = "${save.name}."
+            return dir.listFiles().filter { it.isFile && it.name.startsWith(prefix) && it.name.endsWith(".sav") }
         }
 
         private fun hash(file: Path): String = HashingSource.sha256(FileSystem.SYSTEM.source(file)).use { hash ->

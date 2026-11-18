@@ -12,6 +12,8 @@ import androidx.compose.ui.window.ComposeUIViewController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.pokedaisy.app.companion.SaveImportFlow
+import com.pokedaisy.app.GameInfo
+import com.pokedaisy.app.GameInfoDialog
 import com.pokedaisy.app.GameSaves
 import com.pokedaisy.app.RomPatchFiles
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +59,7 @@ internal class IosLibraryHost(
     private enum class AddChoice(val label: String) { ROM("ADD A ROM FILE"), PATCH("PATCH A ROM") }
     private var choosingAdd by mutableStateOf(false)
     private var choosingSaveGame by mutableStateOf(false)
+    private var infoPath by mutableStateOf<String?>(null)
     private var renaming by mutableStateOf<String?>(null)
     private var notice by mutableStateOf<Pair<String, String>?>(failed?.let { tr("ERROR") to it.substringAfterLast('/') })
     private val saveImports = SaveImportFlow<String>(GameSaves.MAX_BYTES)
@@ -200,6 +203,7 @@ internal class IosLibraryHost(
                 LibraryMenuItem(if (game.favorite) "UNFAVORITE" else "FAVORITE",
                     if (game.favorite) LibraryIcons.StarBorder else Icons.Filled.Star,
                     pixel = if (game.favorite) PixelIcons.starOutline else PixelIcons.star) { prefs.toggleFavorite(key(game.id)) },
+                LibraryMenuItem("INFO", Icons.Filled.Info, opens = true) { infoPath = game.id },
                 LibraryMenuItem("RENAME", Icons.Filled.Edit, opens = true) { renaming = game.id },
                 LibraryMenuItem("LOAD SAVE", LibraryIcons.FileOpen, opens = true) { pickSave(game.id) })
             val onPlay = {
@@ -259,6 +263,23 @@ internal class IosLibraryHost(
             },
             onDismiss = { choosingAdd = false },
             badge = { if (it == AddChoice.PATCH) NewFeatures.badge(NewFeatures.ROM_PATCH) else null })
+        infoPath?.let { game ->
+            var info by remember(game) { mutableStateOf<GameInfo?>(null) }
+            val title = label(game)
+            LaunchedEffect(game) {
+                val recent = prefs.played.entries.sortedByDescending { it.value }.indexOfFirst { it.key == key(game) } + 1
+                info = withContext(Dispatchers.Default) { readIosGameInfo(game, title, recent) }
+            }
+            val current = info
+            if (current == null) {
+                OptionConfirm(tr("INFO"), "…", tr("CLOSE"), m,
+                    onConfirm = { infoPath = null }, onDismiss = { infoPath = null }, cancelLabel = null)
+            } else {
+                GameInfoDialog(current, m, small, { infoPath = null }, onOpenUrl = { url ->
+                    NSURL.URLWithString(url)?.let { UIApplication.sharedApplication.openURL(it) }
+                })
+            }
+        }
         renaming?.let { game ->
             LibraryRenameDialog(label(game), m, small, onDismiss = { renaming = null }) { name ->
                 prefs.rename(key(game), name, iosRomTitle(game))
