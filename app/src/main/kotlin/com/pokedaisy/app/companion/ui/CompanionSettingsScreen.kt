@@ -1029,7 +1029,8 @@ private fun homeRows(
             }
         },
         // The game's frames per second and the app's CPU share, in the game's corner.
-        SettingRow(tk("FPS / CPU"), onOff(s.showPerformance), subtitle = "Speed and CPU use in the game's corner") { s.setShowPerformance(!s.showPerformance); changed() },
+        SettingRow(tk("FPS / CPU"), onOff(s.showPerformance), labelBadge = s.performanceBadge,
+            subtitle = "Speed and CPU use in the game's corner") { s.setShowPerformance(!s.showPerformance); changed() },
         groupTitle(tk("COMPANION")),
         // Move effectiveness and the foe's weak-to/resists during battle.
         // Off: the battle buttons alone - no INFO, SUGGESTIONS or move ratings. The rows about them go with it.

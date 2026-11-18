@@ -128,6 +128,9 @@ interface StoredCompanionSettings {
     /** Shows the status bar over the companion's tabs. */
     val statusBarOnCompanion: Boolean get() = false
     fun setStatusBarOnCompanion(on: Boolean) {}
+    /** Shows the FPS / CPU readout over the game. */
+    val showPerformance: Boolean get() = false
+    fun setShowPerformance(on: Boolean) {}
     /** SOUND > GAME VOLUME, in percent of the device's volume (100 = the device's) - see [Prefs.gameVolume]. */
     val gameVolume: Int get() = 100
     fun setGameVolume(percent: Int) {}

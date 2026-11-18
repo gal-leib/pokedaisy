@@ -356,9 +356,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val quickMenuBadge: String? get() = null
 
 
-    /** FPS / CPU over the game's corner - see [Prefs.showPerformance]. */
-    val showPerformance: Boolean get() = false
-    fun setShowPerformance(on: Boolean) {}
+    val performanceBadge: String? get() = null
 
     /** RetroAchievements popups - see [Prefs.raPopups]. The top screen's Settings > RetroAchievements has the same
      * switches; off also mutes the unlock fanfare. */

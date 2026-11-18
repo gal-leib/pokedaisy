@@ -177,6 +177,16 @@ object PokeDaisyHost {
                                     onOpenCompanion = if (!panels.portrait && (!panels.state.side.shown || panels.state.side.isWindow))
                                         ({ panels.toggleCompanion() }) else null)
                             }
+                            if (current is GameViewController && currentSettings?.showPerformance == true) {
+                                Box(Modifier.fillMaxSize()) {
+                                    val picture = panels.hudFrame()
+                                    val inset = with(LocalDensity.current) { Modifier.padding(
+                                        start = (picture?.left ?: 0f).coerceAtLeast(0f).toDp(),
+                                        top = (picture?.top ?: 0f).coerceAtLeast(0f).toDp(),
+                                    ) }
+                                    IosPerformanceOverlay(current, telemetry, inset)
+                                }
+                            }
                             val battleRead = com.pokedaisy.app.companion.ui.rememberBattleButtonsRead(snapshot)
                             val buttons = com.pokedaisy.app.companion.battleButtonsWanted(
                                 currentSettings?.battleButtons == true, true, panels.portrait, snapshot) &&

@@ -29,6 +29,12 @@ import kotlinx.coroutines.*
  * Objective-C class can't have a companion with fields. */
 private const val FINISH_SAVE_FRAMES = 300
 
+/** Reports main-thread frame work and new pictures submitted to Metal while diagnostics are visible. */
+interface GamePerformanceObserver {
+    fun frame(workNanos: Long)
+    fun refresh(submittedPicture: Boolean)
+}
+
 /**
  * A running game for the iPad app: the game drawn with Metal ([GameRenderer]), heard ([GameAudio]) and played with
  * controllers, a keyboard or [touchKeys] ([GameInput]). The app shell embeds its view wherever the game goes (full
@@ -179,6 +185,8 @@ class GameViewController(
     var afterFrame: () -> Unit = {}
     var holdPicture: () -> Boolean = { false }
     var quietPress: () -> Boolean = { false }
+    var performanceObserver: GamePerformanceObserver? = null
+    val performanceSpeed: Float get() = effectiveSpeed().let { if (it == 0.0) Float.POSITIVE_INFINITY else it.toFloat() }
     private var audioSpeed = -1.0
 
     /** Releases scripted input before a state changes the running game. */
@@ -294,6 +302,7 @@ class GameViewController(
         beforeRewind = {}
         beforeFrame = {}
         afterFrame = {}
+        performanceObserver = null
     }
 
     private fun refresh(view: MTKView) {
@@ -319,10 +328,12 @@ class GameViewController(
             audioSpeed = rate
         }
         val frames = if (rate == 0.0) 64 else pacer.framesAt(now, rate)
+        val performance = performanceObserver
         var ran = false
         for (frame in 0 until frames) {
             // Unlimited FF still leaves time for the companion and touch events on the main thread.
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
+            val workStarted = if (performance != null) CACurrentMediaTime() else 0.0
             if (!rewinding) beforeFrame()
             if (!running || !active || uiPaused) break
             val held = input.keys()
@@ -353,31 +364,35 @@ class GameViewController(
             afterFrame()
             audio.volume = if (shouldMuteAudio(rate) || quietPress()) 0f else volume
             audio.push()
+            performance?.frame(((CACurrentMediaTime() - workStarted) * 1e9).toLong())
             ran = true
             // A menu may open on the first uncapped frame. Do not spend the remaining fast batch inside it.
             if (effectiveSpeed() != rate) break
         }
         if (!running || !active || uiPaused) return
-        if (ran && (rewinding || !holdPicture())) renderer?.upload(if (expanded) pictureWindow else null)
-        draw(view)
+        val newPicture = ran && (rewinding || !holdPicture()) &&
+            renderer?.upload(if (expanded) pictureWindow else null) == true
+        val submitted = draw(view)
+        performance?.refresh(newPicture && submitted)
     }
 
     private fun effectiveSpeed(): Double = if (rewinding) 1.0 else
         frameSpeed().takeIf { it.isFinite() && it in 0.0..64.0 } ?: 1.0
 
-    private fun draw(view: MTKView) {
-        val renderer = renderer ?: return
-        val pass = view.currentRenderPassDescriptor ?: return
-        val drawable = view.currentDrawable ?: return
-        val buffer = queue?.commandBuffer() ?: return
+    private fun draw(view: MTKView): Boolean {
+        val renderer = renderer ?: return false
+        val pass = view.currentRenderPassDescriptor ?: return false
+        val drawable = view.currentDrawable ?: return false
+        val buffer = queue?.commandBuffer() ?: return false
         view.drawableSize.useContents {
             renderer.prepare(buffer, width, height)
             onGamePixel?.invoke(renderer.gamePixelHeight(width, height))
         }
-        val encoder = buffer.renderCommandEncoderWithDescriptor(pass) ?: return
+        val encoder = buffer.renderCommandEncoderWithDescriptor(pass) ?: return false
         view.drawableSize.useContents { renderer.encode(encoder, width, height) }
         encoder.endEncoding()
         buffer.presentDrawable(drawable)
         buffer.commit()
+        return true
     }
 }

@@ -133,7 +133,7 @@ internal class IosCompanionSettings(
     override val dayNightBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_DAY_NIGHT)
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "LAST BALL", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "BOSS RETRY", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "STATUS BAR", "OVERLAY", "SHADERS", "FILTER", "GRID", "GBA COLORS", "UNLIT SCREEN", "ON COMPANION", "SMOOTHING", "DAY AND NIGHT", "SHINY ODDS", "SHINY ALERT", "LOW HP BEEP", "FIELD POISON", "NUZLOCKE", "FLY STYLE", "FLIGHT AREA", "FLY ON", "FOLLOWER", "PLAYER LOOK", "RIVAL LOOK", "TEXT LOOK", "RIDE ON", "AUTO REFILL")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "LAST BALL", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "BOSS RETRY", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "FPS / CPU", "STATUS BAR", "OVERLAY", "SHADERS", "FILTER", "GRID", "GBA COLORS", "UNLIT SCREEN", "ON COMPANION", "SMOOTHING", "DAY AND NIGHT", "SHINY ODDS", "SHINY ALERT", "LOW HP BEEP", "FIELD POISON", "NUZLOCKE", "FLY STYLE", "FLIGHT AREA", "FLY ON", "FOLLOWER", "PLAYER LOOK", "RIVAL LOOK", "TEXT LOOK", "RIDE ON", "AUTO REFILL")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
         .let { if (romCode == null) it - "BOSS RETRY" else it }
@@ -338,6 +338,7 @@ internal class IosCompanionSettings(
     override val clickSound = false
     override fun setClickSound(on: Boolean) {}
     override val statusBarBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_STATUS_BAR)
+    override val performanceBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PERFORMANCE)
     override val gameAspect get() = stored.gameAspect
     override fun setGameAspect(aspect: GameAspect) { stored.setGameAspect(aspect); gameScreen()?.refreshPicture() }
     override val wideSupported get() = game?.wideSupported == true && playback()?.blocked != true

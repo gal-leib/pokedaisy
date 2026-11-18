@@ -248,6 +248,8 @@ The dates follow your device's calendar. If two holidays overlap (`LUNAR NEW YEA
 
 Tap the readout to open a longer panel with frame times, late frames, the screen's refresh and pacing, audio underruns, battery temperature, thermal state and memory. It's useful when a game feels choppy; see [Troubleshooting](troubleshooting.md#the-game-feels-choppy-or-the-device-runs-hot).
 
+On iPhone and iPad, the panel shows measured game and display rates, CPU use, frame times and thermal state. A dash marks an unavailable reading. Scroll the panel to see more rows on a short screen.
+
 ## Game look
 
 `COMPANION LOOK`, right under `THEME`, picks how the companion and the HUD look in a game. On `GAME` (the default), they take on the style of the game you're playing, from the colors of its own menus:

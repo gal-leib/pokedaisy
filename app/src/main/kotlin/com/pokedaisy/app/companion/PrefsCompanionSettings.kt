@@ -57,6 +57,9 @@ class PrefsCompanionSettings(
     override fun setStatusBar(on: Boolean) { prefs.statusBar = on; statusBarRevision++ }
     override val statusBarOnCompanion get() = statusBarRevision.let { prefs.statusBarOnCompanion }
     override fun setStatusBarOnCompanion(on: Boolean) { prefs.statusBarOnCompanion = on; statusBarRevision++ }
+    private var performanceRevision by mutableIntStateOf(0)
+    override val showPerformance get() = performanceRevision.let { prefs.showPerformance }
+    override fun setShowPerformance(on: Boolean) { prefs.showPerformance = on; performanceRevision++ }
     override val gbaColors get() = prefs.gbaColors
     override fun setGbaColors(on: Boolean) { prefs.gbaColors = on }
     override val companionShaders get() = prefs.companionShaders

@@ -71,6 +71,7 @@ import com.pokedaisy.app.companion.data.RomRegionMap
 import com.pokedaisy.app.companion.data.displayName
 import com.pokedaisy.app.companion.ui.CompanionScreen
 import com.pokedaisy.app.companion.ui.RunningGameStatusBar
+import com.pokedaisy.app.companion.ui.PerformanceCounters
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -1344,9 +1345,8 @@ class PokeDaisyActivity : Activity() {
             stored.setQuickMenuActions(actions)
             quickShown.value = actions
         }
-        override val showPerformance get() = Prefs(this@PokeDaisyActivity).showPerformance
         override fun setShowPerformance(on: Boolean) {
-            Prefs(this@PokeDaisyActivity).showPerformance = on
+            stored.setShowPerformance(on)
             runOnUiThread { syncGameScreen() }
         }
         // RetroAchievements reads Prefs at each event, so these apply to the running game at once.
@@ -3876,35 +3876,25 @@ class PokeDaisyActivity : Activity() {
             val cpu = CpuUsage()
             val power = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
             val cores = Runtime.getRuntime().availableProcessors()
-            // Cumulative counters, read every half second: each reading is the difference.
-            var at = System.nanoTime()
-            var frames = 0L; var work = 0L; var shown = 0L; var late = 0L
-            var samples = 0L; var checks = 0L
-            fun take() {
-                at = System.nanoTime()
-                if (::engine.isInitialized) { frames = engine.framesRun; work = engine.workNanos; engine.takeMaxWorkNanos() }
-                shown = view.framesShown; late = view.lateFrames
-                samples = telemetry.samplesTaken; checks = telemetry.battleChecksTaken
-            }
-            take()
+            fun take(e: EmulatorEngine?) = PerformanceCounters(System.nanoTime(), e?.framesRun ?: 0, view.framesShown,
+                e?.workNanos ?: 0, telemetry.samplesTaken, telemetry.battleChecksTaken)
+            val initial = if (::engine.isInitialized) engine else null
+            var previous = take(initial)
+            var late = view.lateFrames
+            initial?.takeMaxWorkNanos()
             withContext(Dispatchers.IO) { cpu.sample() }
             while (true) {
                 delay(500)
                 if (!::engine.isInitialized) continue
                 val e = engine
-                val secs = (System.nanoTime() - at) / 1e9
-                val df = (e.framesRun - frames).coerceAtLeast(0)
-                val dw = (e.workNanos - work).coerceAtLeast(0)
-                val maxWork = e.takeMaxWorkNanos()
+                val current = take(e)
+                val currentLate = view.lateFrames
+                val seconds = ((current.atNanos - previous.atNanos) / 1e9).coerceAtLeast(0.001)
+                val frameReading = current.since(previous, e.takeMaxWorkNanos())
                 val cpuPct = withContext(Dispatchers.IO) { cpu.sample() }
                 val rt = Runtime.getRuntime()
-                value = com.pokedaisy.app.companion.ui.PerfReading(
-                    fps = (df / secs).toFloat(),
-                    shownFps = ((view.framesShown - shown).coerceAtLeast(0) / secs).toFloat(),
-                    latePerSecond = ((view.lateFrames - late).coerceAtLeast(0) / secs).toFloat(),
-                    frameMs = if (df > 0) (dw / df / 1e6).toFloat() else 0f,
-                    frameMaxMs = (maxWork / 1e6).toFloat(),
-                    emulationLoad = (dw / 1e9 / secs * 100).toInt().coerceIn(0, 100),
+                value = frameReading.copy(
+                    latePerSecond = ((currentLate - late).coerceAtLeast(0) / seconds).toFloat(),
                     cpu = cpuPct, cores = cores,
                     refreshHz = e.refreshHz, refreshesPerFrame = e.refreshesPerFrame, timerFallback = e.timerFallback,
                     speed = e.currentSpeed,
@@ -3912,12 +3902,9 @@ class PokeDaisyActivity : Activity() {
                     batteryTempC = batteryTempC,
                     thermal = if (android.os.Build.VERSION.SDK_INT >= 29) power.currentThermalStatus else -1,
                     memoryMb = ((rt.totalMemory() - rt.freeMemory() + android.os.Debug.getNativeHeapAllocatedSize()) shr 20).toInt(),
-                    snapshotsPerSecond = ((telemetry.samplesTaken - samples).coerceAtLeast(0) / secs).toFloat(),
-                    battleChecksPerSecond = ((telemetry.battleChecksTaken - checks).coerceAtLeast(0) / secs).toFloat(),
                 )
-                frames = e.framesRun; work = e.workNanos; shown = view.framesShown; late = view.lateFrames
-                samples = telemetry.samplesTaken; checks = telemetry.battleChecksTaken
-                at = System.nanoTime()
+                previous = current
+                late = currentLate
             }
         }
         // The view fills the stage, and Compose hands its root that whole size as the least it may take: a Box
