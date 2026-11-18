@@ -865,241 +865,120 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopLinkInstall(JNIEnv* env, jobject thiz) {
     return pk_api_coop_link_enable() ? JNI_TRUE : JNI_FALSE;
 }
 
+static bool read_coop_name(JNIEnv* env, jbyteArray input, uint8_t out[PK_API_COOP_NAME_SIZE]) {
+    if (!input || (*env)->GetArrayLength(env, input) < PK_API_COOP_NAME_SIZE) return false;
+    (*env)->GetByteArrayRegion(env, input, 0, PK_API_COOP_NAME_SIZE, (jbyte*) out);
+    return true;
+}
+
+static jbyteArray coop_byte_array(JNIEnv* env, const uint8_t* bytes, int length) {
+    if (length <= 0) return NULL;
+    jbyteArray out = (*env)->NewByteArray(env, length);
+    if (out) (*env)->SetByteArrayRegion(env, out, 0, length, (const jbyte*) bytes);
+    return out;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkBegin(JNIEnv* env, jobject thiz, jboolean master, jint kind, jint trainerA,
                                                 jint trainerB, jbyteArray jName, jint gender, jint otId) {
-    if (!jName || (*env)->GetArrayLength(env, jName) < 8 || kind < PK_COOP_LINK_WILD || kind > PK_COOP_LINK_STORY) {
-        return JNI_FALSE;
-    }
-    struct pk_coop_link_setup s;
-    memset(&s, 0, sizeof(s));
-    s.master = master ? 1 : 0;
-    s.kind = (uint8_t) kind;
-    s.trainerA = (uint16_t) trainerA;
-    s.trainerB = (uint16_t) trainerB;
-    (*env)->GetByteArrayRegion(env, jName, 0, 8, (jbyte*) s.partnerName);
-    s.partnerGender = gender ? 1 : 0;
-    s.partnerOtId = (uint32_t) otId;
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_begin(g.core, &s) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    uint8_t name[PK_API_COOP_NAME_SIZE];
+    return read_coop_name(env, jName, name) &&
+           pk_api_coop_link_begin(master, kind, trainerA, trainerB, name, sizeof(name), gender, (uint32_t) otId);
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkTake(JNIEnv* env, jobject thiz) {
-    uint8_t buf[PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX];
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int n = g.core && pk_is_gba(g.core) ? pk_coop_link_take(g.core, buf, (int) sizeof(buf)) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    if (n <= 0) {
-        return NULL;
-    }
-    jbyteArray out = (*env)->NewByteArray(env, n);
-    if (out) {
-        (*env)->SetByteArrayRegion(env, out, 0, n, (const jbyte*) buf);
-    }
-    return out;
+    uint8_t bytes[PK_API_COOP_LINK_PACKET_SIZE];
+    int length = pk_api_coop_link_take(bytes, sizeof(bytes));
+    return coop_byte_array(env, bytes, length);
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkGive(JNIEnv* env, jobject thiz, jbyteArray jBlock) {
-    if (!jBlock) {
-        return JNI_FALSE;
-    }
-    jsize n = (*env)->GetArrayLength(env, jBlock);
-    if (n < PK_COOP_LINK_WIRE_HEADER || n > PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX) {
-        return JNI_FALSE;
-    }
-    uint8_t buf[PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX];
-    (*env)->GetByteArrayRegion(env, jBlock, 0, n, (jbyte*) buf);
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_give(g.core, buf, (int) n) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    if (!jBlock) return JNI_FALSE;
+    jsize length = (*env)->GetArrayLength(env, jBlock);
+    if (length > PK_API_COOP_LINK_PACKET_SIZE) return JNI_FALSE;
+    uint8_t bytes[PK_API_COOP_LINK_PACKET_SIZE];
+    (*env)->GetByteArrayRegion(env, jBlock, 0, length, (jbyte*) bytes);
+    return pk_api_coop_link_give(bytes, (size_t) length);
 }
 
-// The blocks the bridge last refused as malformed / could not classify (pk_coop_link_bad_blocks), for the log; null = none.
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkBadBlocks(JNIEnv* env, jobject thiz) {
-    uint8_t buf[4 * (6 + PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX)];
-    int n = 0;
-    pthread_rwlock_rdlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) n = pk_coop_link_bad_blocks(buf, (int) sizeof(buf));
-    pthread_rwlock_unlock(&pk_coreLock);
-    if (n <= 0) return NULL;
-    jbyteArray out = (*env)->NewByteArray(env, n);
-    if (out) (*env)->SetByteArrayRegion(env, out, 0, n, (const jbyte*) buf);
-    return out;
+    uint8_t bytes[PK_API_COOP_LINK_DEBUG_SIZE];
+    int length = pk_api_coop_link_bad_blocks(bytes, sizeof(bytes));
+    return coop_byte_array(env, bytes, length);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkState(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) pk_coop_link_tick(g.core);   // task 5: the end's steps ride the app's per-frame state pump
-    int s = g.core && pk_is_gba(g.core) ? pk_coop_link_state(g.core) : PK_COOP_LINK_IDLE;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return s;
+    return pk_api_coop_link_state();
 }
 
-// Ends this game's side of the link battle now (pk_coop_link_leave, task 7): blackout = the game's whiteout, else back to the field.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkLeave(JNIEnv* env, jobject thiz, jboolean blackout) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) {
-        pk_coop_link_leave(g.core, blackout ? 1 : 0);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
+    pk_api_coop_link_leave(blackout);
 }
 
-// The finished battle's result (PK_COOP_LINK_RESULT_SIZE bytes, pk_coop_link_result), null until the end's steps are through.
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkResult(JNIEnv* env, jobject thiz) {
-    uint8_t r[PK_COOP_LINK_RESULT_SIZE];
-    int n = 0;
-    pthread_rwlock_rdlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) {
-        n = pk_coop_link_result(g.core, r, sizeof(r));
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
-    if (n != PK_COOP_LINK_RESULT_SIZE) {
-        return NULL;
-    }
-    jbyteArray out = (*env)->NewByteArray(env, n);
-    if (out) {
-        (*env)->SetByteArrayRegion(env, out, 0, n, (const jbyte*) r);
-    }
-    return out;
+    uint8_t bytes[PK_API_COOP_LINK_RESULT_SIZE];
+    int length = pk_api_coop_link_result(bytes, sizeof(bytes));
+    return length == sizeof(bytes) ? coop_byte_array(env, bytes, length) : NULL;
 }
 
-// --- plan 6 task 8b: how a joined battle starts and ends from the app (pk_coop_link_start.c, pk_coop_link_story.c, pk_coop_link_end.c) ---
-
-// The partner's identity for host_go / story_go (the OTHER player's name, gender and trainer ID), or the host's for partner_go.
-static int pk_link_other(JNIEnv* env, jbyteArray jName, jint gender, jint otId, struct pk_coop_link_setup* s) {
-    memset(s, 0, sizeof(*s));
-    if (!jName || (*env)->GetArrayLength(env, jName) < 8) {
-        return 0;
-    }
-    (*env)->GetByteArrayRegion(env, jName, 0, 8, (jbyte*) s->partnerName);
-    s->partnerName[7] = 0xFF;   // the name came over the network: it always ends
-    s->partnerGender = gender ? 1 : 0;
-    s->partnerOtId = (uint32_t) otId;
-    return 1;
-}
-
-// 1 while the host's game is held where a joined battle is offered (wild, two trainers, one trainer with 2+ Pokemon).
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkHostHold(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    int r = g.core && pk_is_gba(g.core) ? pk_coop_link_host_hold(g.core) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_link_host_hold();
 }
 
-// The held battle becomes the link battle (the partner said yes): 1 entered, 0 refused (the held battle exactly as it was).
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkHostGo(JNIEnv* env, jobject thiz, jbyteArray jName, jint gender, jint otId) {
-    struct pk_coop_link_setup s;
-    if (!pk_link_other(env, jName, gender, otId, &s)) {
-        return JNI_FALSE;
-    }
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_host_go(g.core, &s) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    uint8_t name[PK_API_COOP_NAME_SIZE];
+    return read_coop_name(env, jName, name) &&
+           pk_api_coop_link_host_go(name, sizeof(name), gender, (uint32_t) otId);
 }
 
-// The partner's start from its free field: 1 started, -1 the field is not free yet (ask again), 0 refused.
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkPartnerGo(JNIEnv* env, jobject thiz, jint kind, jint trainerA, jint trainerB,
                                                     jbyteArray jName, jint gender, jint otId) {
-    struct pk_coop_link_setup s;
-    if (kind < PK_COOP_LINK_WILD || kind > PK_COOP_LINK_SINGLE || trainerA < 0 || trainerA > 0xFFFF || trainerB < 0
-        || trainerB > 0xFFFF || !pk_link_other(env, jName, gender, otId, &s)) {
-        return 0;
-    }
-    s.master = 0;
-    s.kind = (uint8_t) kind;
-    s.trainerA = (uint16_t) trainerA;
-    s.trainerB = (uint16_t) trainerB;
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int r = g.core && pk_is_gba(g.core) ? pk_coop_link_partner_go(g.core, &s) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r;
+    uint8_t name[PK_API_COOP_NAME_SIZE];
+    if (!read_coop_name(env, jName, name)) return 0;
+    return pk_api_coop_link_partner_go(kind, trainerA, trainerB, name, sizeof(name), gender, (uint32_t) otId);
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopStoryArm(JNIEnv* env, jobject thiz, jint trainerId) {
-    if (trainerId <= 0 || trainerId > 0xFFFF) {
-        return JNI_FALSE;
-    }
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_arm(g.core, pk_coop_game_call, (uint16_t) trainerId) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_story_arm(trainerId);
 }
 
-// PK_COOP_STORY_*: pk_coop_story_state takes a mismatched hook out itself, so it writes.
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopStoryState(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int s = g.core && pk_is_gba(g.core) ? pk_coop_story_state(g.core) : PK_COOP_STORY_IDLE;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return s;
+    return pk_api_coop_story_state();
 }
 
-// Both teams are picked: the link battle begins ([master] = the host; the other player's identity as for host_go). 1 entered, 0 not yet / refused.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopStoryGo(JNIEnv* env, jobject thiz, jboolean master, jbyteArray jName, jint gender, jint otId) {
-    struct pk_coop_link_setup s;
-    if (!pk_link_other(env, jName, gender, otId, &s)) {
-        return JNI_FALSE;
-    }
-    s.master = master ? 1 : 0;
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_go(g.core, &s) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    uint8_t name[PK_API_COOP_NAME_SIZE];
+    return read_coop_name(env, jName, name) &&
+           pk_api_coop_story_go(master, name, sizeof(name), gender, (uint32_t) otId);
 }
 
-// The pick screen was backed out of, or the join fell through: the game's own solo battle starts. 1 = started.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopStoryCancel(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_cancel(g.core) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_story_cancel();
 }
 
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopStoryDisarm(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) {
-        pk_coop_story_disarm(g.core);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
+    pk_api_coop_story_disarm();
 }
 
-// What the battle caught: [0] who threw the ball (1 the host, 2 the partner), then the Pokemon's 100 bytes; null when nothing was caught.
-// Read before pk_coop_link_reset / leave (they zero it).
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkCaught(JNIEnv* env, jobject thiz) {
-    uint8_t buf[101];
-    int who = 0;
-    pthread_rwlock_rdlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) {
-        who = pk_coop_link_caught(g.core, buf + 1);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
-    if (who != 1 && who != 2) {
-        return NULL;
-    }
-    buf[0] = (uint8_t) who;
-    jbyteArray out = (*env)->NewByteArray(env, 101);
-    if (out) {
-        (*env)->SetByteArrayRegion(env, out, 0, 101, (const jbyte*) buf);
-    }
-    return out;
+    uint8_t bytes[PK_API_COOP_LINK_CATCH_SIZE];
+    int length = pk_api_coop_link_caught(bytes, sizeof(bytes));
+    return coop_byte_array(env, bytes, length);
 }
 
 // A story script held by its trainerbattle is let go (pk_coop_release_script): 1 released, 0 nothing held, -1 not yet (ask again).
@@ -1111,12 +990,7 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopReleaseScript(JNIEnv* env, jobject thiz) {
 // The battle is over and its result read: the bridge goes (hooks out, area zeroed) and the result is dropped.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkReset(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) {
-        pk_coop_link_result_clear(g.core);
-        pk_coop_link_reset(g.core);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
+    pk_api_coop_link_reset();
 }
 
 // Emu thread: 1 while the game stands free on the field (pk_coop_on_free_field).

@@ -297,6 +297,13 @@ static void coopControl(const char* dir) {
     CHECK(pk_api_coop_write_party_mon(0, NULL, sizeof mon) == 0, "coop update accepted a null Pokémon");
     CHECK(pk_api_coop_give_mon(mon, sizeof mon) == -1, "coop catch ran without a core");
     CHECK(pk_api_coop_save_game() == -1, "coop save ran without a core");
+
+    uint8_t data[PK_API_COOP_LINK_PACKET_SIZE] = { 0 };
+    CHECK(pk_api_coop_link_take(data, sizeof data - 1) == 0, "link take ignored small buffer");
+    CHECK(pk_api_coop_link_result(data, sizeof data) == 0, "link reported a result without a core");
+    CHECK(!pk_api_coop_link_host_go(data, PK_API_COOP_NAME_SIZE - 1, 0, 1), "link accepted a short trainer name");
+    CHECK(!pk_api_coop_link_give(data, sizeof data + 1), "link accepted an oversized block");
+    CHECK(!pk_api_coop_story_arm(-1), "link armed an invalid trainer");
     pk_api_coop_join_trainers(trainers);
     CHECK(trainers[0] == 0 && trainers[1] == 0, "co-op returned trainers without a game");
 

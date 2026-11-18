@@ -1,6 +1,7 @@
 #include "pk_coop_api.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "pk_call.h"
 #include "pk_coop.h"
@@ -145,3 +146,143 @@ int pk_api_coop_release_script(void) {
 }
 
 #undef COOP_AFTER_CALL
+
+_Static_assert(PK_API_COOP_LINK_PACKET_SIZE == PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX, "co-op wire size");
+_Static_assert(PK_API_COOP_LINK_RESULT_SIZE == PK_COOP_LINK_RESULT_SIZE, "co-op result size");
+_Static_assert(PK_API_COOP_LINK_DEBUG_SIZE == 4 * (6 + PK_API_COOP_LINK_PACKET_SIZE), "co-op debug size");
+
+#define COOP_LINK_CALL(lock, fallback, expr)                     \
+    pthread_rwlock_##lock(&pk_coreLock);                         \
+    int result = g.core && pk_is_gba(g.core) ? (expr) : fallback; \
+    pthread_rwlock_unlock(&pk_coreLock);                        \
+    return result;
+
+static bool coop_other(struct pk_coop_link_setup* setup, const uint8_t* name, size_t length, int gender,
+                       uint32_t ot_id, bool terminate) {
+    if (!name || length < PK_API_COOP_NAME_SIZE) return false;
+    memset(setup, 0, sizeof(*setup));
+    memcpy(setup->partnerName, name, PK_API_COOP_NAME_SIZE);
+    if (terminate) setup->partnerName[7] = 0xFF;
+    setup->partnerGender = gender != 0;
+    setup->partnerOtId = ot_id;
+    return true;
+}
+
+bool pk_api_coop_link_begin(bool master, int kind, int trainer_a, int trainer_b,
+                           const uint8_t* name, size_t length, int gender, uint32_t ot_id) {
+    struct pk_coop_link_setup setup;
+    if (kind < PK_COOP_LINK_WILD || kind > PK_COOP_LINK_STORY ||
+        !coop_other(&setup, name, length, gender, ot_id, false)) return false;
+    setup.master = master;
+    setup.kind = (uint8_t) kind;
+    setup.trainerA = (uint16_t) trainer_a;
+    setup.trainerB = (uint16_t) trainer_b;
+    COOP_LINK_CALL(wrlock, 0, pk_coop_link_begin(g.core, &setup))
+}
+
+int pk_api_coop_link_take(uint8_t* out, size_t capacity) {
+    if (!out || capacity < PK_API_COOP_LINK_PACKET_SIZE) return 0;
+    COOP_LINK_CALL(wrlock, 0, pk_coop_link_take(g.core, out, PK_API_COOP_LINK_PACKET_SIZE))
+}
+
+bool pk_api_coop_link_give(const uint8_t* block, size_t length) {
+    if (!block || length < PK_COOP_LINK_WIRE_HEADER || length > PK_API_COOP_LINK_PACKET_SIZE) return false;
+    COOP_LINK_CALL(wrlock, 0, pk_coop_link_give(g.core, block, (int) length))
+}
+
+int pk_api_coop_link_bad_blocks(uint8_t* out, size_t capacity) {
+    if (!out || capacity < PK_API_COOP_LINK_DEBUG_SIZE) return 0;
+    COOP_LINK_CALL(rdlock, 0, pk_coop_link_bad_blocks(out, PK_API_COOP_LINK_DEBUG_SIZE))
+}
+
+int pk_api_coop_link_state(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int state = PK_COOP_LINK_IDLE;
+    if (g.core && pk_is_gba(g.core)) {
+        pk_coop_link_tick(g.core);
+        state = pk_coop_link_state(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+    return state;
+}
+
+void pk_api_coop_link_leave(bool blackout) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_coop_link_leave(g.core, blackout);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+int pk_api_coop_link_result(uint8_t* out, size_t capacity) {
+    if (!out || capacity < PK_API_COOP_LINK_RESULT_SIZE) return 0;
+    COOP_LINK_CALL(rdlock, 0, pk_coop_link_result(g.core, out, PK_API_COOP_LINK_RESULT_SIZE))
+}
+
+bool pk_api_coop_link_host_hold(void) {
+    COOP_LINK_CALL(rdlock, 0, pk_coop_link_host_hold(g.core))
+}
+
+bool pk_api_coop_link_host_go(const uint8_t* name, size_t length, int gender, uint32_t ot_id) {
+    struct pk_coop_link_setup setup;
+    if (!coop_other(&setup, name, length, gender, ot_id, true)) return false;
+    COOP_LINK_CALL(wrlock, 0, pk_coop_link_host_go(g.core, &setup))
+}
+
+int pk_api_coop_link_partner_go(int kind, int trainer_a, int trainer_b,
+                               const uint8_t* name, size_t length, int gender, uint32_t ot_id) {
+    struct pk_coop_link_setup setup;
+    if (kind < PK_COOP_LINK_WILD || kind > PK_COOP_LINK_SINGLE || trainer_a < 0 || trainer_a > UINT16_MAX ||
+        trainer_b < 0 || trainer_b > UINT16_MAX ||
+        !coop_other(&setup, name, length, gender, ot_id, true)) return 0;
+    setup.kind = (uint8_t) kind;
+    setup.trainerA = (uint16_t) trainer_a;
+    setup.trainerB = (uint16_t) trainer_b;
+    COOP_LINK_CALL(wrlock, 0, pk_coop_link_partner_go(g.core, &setup))
+}
+
+bool pk_api_coop_story_arm(int trainer_id) {
+    if (trainer_id <= 0 || trainer_id > UINT16_MAX) return false;
+    COOP_LINK_CALL(wrlock, 0, pk_coop_story_arm(g.core, pk_coop_game_call, (uint16_t) trainer_id))
+}
+
+int pk_api_coop_story_state(void) {
+    // Reading the story state can remove a stale hook.
+    COOP_LINK_CALL(wrlock, PK_COOP_STORY_IDLE, pk_coop_story_state(g.core))
+}
+
+bool pk_api_coop_story_go(bool master, const uint8_t* name, size_t length, int gender, uint32_t ot_id) {
+    struct pk_coop_link_setup setup;
+    if (!coop_other(&setup, name, length, gender, ot_id, true)) return false;
+    setup.master = master;
+    COOP_LINK_CALL(wrlock, 0, pk_coop_story_go(g.core, &setup))
+}
+
+bool pk_api_coop_story_cancel(void) {
+    COOP_LINK_CALL(wrlock, 0, pk_coop_story_cancel(g.core))
+}
+
+void pk_api_coop_story_disarm(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_coop_story_disarm(g.core);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+int pk_api_coop_link_caught(uint8_t* out, size_t capacity) {
+    if (!out || capacity < PK_API_COOP_LINK_CATCH_SIZE) return 0;
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int owner = g.core && pk_is_gba(g.core) ? pk_coop_link_caught(g.core, out + 1) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    if (owner != 1 && owner != 2) return 0;
+    out[0] = (uint8_t) owner;
+    return PK_API_COOP_LINK_CATCH_SIZE;
+}
+
+void pk_api_coop_link_reset(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) {
+        pk_coop_link_result_clear(g.core);
+        pk_coop_link_reset(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+#undef COOP_LINK_CALL

@@ -32,4 +32,32 @@ int pk_api_coop_evolve(int slot);
 int pk_api_coop_save_game(void);
 int pk_api_coop_release_script(void);
 
+enum {
+    PK_API_COOP_NAME_SIZE = 8,
+    PK_API_COOP_LINK_PACKET_SIZE = 260,
+    PK_API_COOP_LINK_DEBUG_SIZE = 1064,
+    PK_API_COOP_LINK_RESULT_SIZE = 16,
+    PK_API_COOP_LINK_CATCH_SIZE = 101,
+};
+
+bool pk_api_coop_link_begin(bool master, int kind, int trainer_a, int trainer_b,
+                           const uint8_t* name, size_t name_length, int gender, uint32_t ot_id);
+int pk_api_coop_link_take(uint8_t* out, size_t capacity);
+bool pk_api_coop_link_give(const uint8_t* block, size_t length);
+int pk_api_coop_link_bad_blocks(uint8_t* out, size_t capacity);
+int pk_api_coop_link_state(void);
+void pk_api_coop_link_leave(bool blackout);
+int pk_api_coop_link_result(uint8_t* out, size_t capacity);
+bool pk_api_coop_link_host_hold(void);
+bool pk_api_coop_link_host_go(const uint8_t* name, size_t name_length, int gender, uint32_t ot_id);
+int pk_api_coop_link_partner_go(int kind, int trainer_a, int trainer_b,
+                              const uint8_t* name, size_t name_length, int gender, uint32_t ot_id);
+bool pk_api_coop_story_arm(int trainer_id);
+int pk_api_coop_story_state(void);
+bool pk_api_coop_story_go(bool master, const uint8_t* name, size_t name_length, int gender, uint32_t ot_id);
+bool pk_api_coop_story_cancel(void);
+void pk_api_coop_story_disarm(void);
+int pk_api_coop_link_caught(uint8_t* out, size_t capacity);
+void pk_api_coop_link_reset(void);
+
 #endif
