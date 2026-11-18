@@ -3,6 +3,7 @@ package com.pokedaisy.app
 import android.util.Log
 import java.io.File
 import java.io.RandomAccessFile
+import okio.Path.Companion.toOkioPath
 
 /**
  * On-device cache of FF background-music clips (see FfMusicPlayer,
@@ -84,7 +85,7 @@ class FfMusicCache(filesDir: File, private val romCrc: String, gameBoy: Boolean 
      * FfMusicPlayer loops as is (FfMusicRenderer cuts it at the song's own
      * loop, see M4aLoopSplice), then brings the cache under its budget. */
     fun writeClip(key: String, pcm: ShortArray, from: Int, len: Int, sampleRate: Int) {
-        FlacWriter.write(file(key), pcm, len, sampleRate, from)
+        FlacWriter.write(file(key).toOkioPath(), pcm, len, sampleRate, from)
         wavFile(key).delete()
         trim(keep = key)
     }
@@ -93,7 +94,7 @@ class FfMusicCache(filesDir: File, private val romCrc: String, gameBoy: Boolean 
      * it runs straight into the clip (the clip starts where it ends). A song with
      * none gets an empty file, which says so. */
     fun writeIntro(key: String, pcm: ShortArray, len: Int, sampleRate: Int) {
-        if (len > 0) FlacWriter.write(introFile(key), pcm, len, sampleRate, 0) else introFile(key).writeBytes(ByteArray(0))
+        if (len > 0) FlacWriter.write(introFile(key).toOkioPath(), pcm, len, sampleRate, 0) else introFile(key).writeBytes(ByteArray(0))
         wavIntroFile(key).delete()
     }
 
@@ -126,7 +127,7 @@ class FfMusicCache(filesDir: File, private val romCrc: String, gameBoy: Boolean 
                 val pcm = readWav(wav)
                 if (pcm == null) wav.delete()
                 else {
-                    if (pcm.second.isEmpty()) flac.writeBytes(ByteArray(0)) else FlacWriter.write(flac, pcm.second, pcm.second.size, pcm.first)
+                    if (pcm.second.isEmpty()) flac.writeBytes(ByteArray(0)) else FlacWriter.write(flac.toOkioPath(), pcm.second, pcm.second.size, pcm.first)
                     flac.setLastModified(wav.lastModified())   // keeps its place among the never-played (best effort)
                     wav.delete()
                     converted++
