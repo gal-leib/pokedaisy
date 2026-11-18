@@ -32,6 +32,32 @@ class PkApiCoreTest {
     fun close() = PkApiCore.stop()
 
     @Test
+    fun followerAssetsCannotEnableAnUnknownGameOrLeakAcrossCoreTeardown() {
+        val frames = ByteArray(3072) { 0x11 }
+        val palette = ByteArray(32) { 0xFF.toByte() }
+        fun setAndClear() {
+            PkApiCore.setFollower(frames, palette)
+            PkApiCore.showFollower(true)
+            PkApiCore.setFollower(frames.copyOf(3071), palette)
+            PkApiCore.setFollower(frames, palette.copyOf(31))
+            PkApiCore.setFollower(frames, null)
+            PkApiCore.setFollower(null, palette)
+            PkApiCore.setFollower(null, null)
+            PkApiCore.showFollower(false)
+        }
+        setAndClear()
+        for (cart in listOf("diagnostic.gb", "diagnostic.gba")) {
+            assertTrue(PkApiCore.start("$dir/$cart", null))
+            repeat(30) { PkApiCore.runFrame() }
+            val before = assertNotNull(PkApiCore.stateThumbnail())
+            PkApiCore.setFollower(frames, palette); PkApiCore.showFollower(true)
+            repeat(10) { PkApiCore.runFrame() }
+            assertContentEquals(before, PkApiCore.stateThumbnail())
+            setAndClear(); PkApiCore.stop(); setAndClear()
+        }
+    }
+
+    @Test
     fun flightTransportWithoutVerifiedConfigurationIsInertOnBothPlatforms() {
         fun idle() {
             PkApiCore.configureFlight(intArrayOf(1, 2, 3))

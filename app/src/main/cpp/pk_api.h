@@ -83,6 +83,13 @@ int pk_api_field_state(void);
 /** GBA field/sprite palette tint, 0..256 per channel (256 = unchanged). No game-memory writes.
  * Game thread between frames; takes the core lock. GB and no game are no-ops. */
 void pk_api_set_tint(int red, int green, int blue);
+
+/** Visual follower transport, game thread between frames. Six 32x32 4bpp frames and one RGB555 palette
+ * are copied by the existing renderer; null or incorrect lengths clear the graphics. Showing is GBA-only.
+ * The existing field renderer owns drawing and temporary sprite state; no ROM-file edits. */
+enum { PK_API_FOLLOWER_FRAME_BYTES = 3072, PK_API_FOLLOWER_PALETTE_BYTES = 32 };
+void pk_api_follower_set(const uint8_t* frames, int frameBytes, const uint8_t* palette, int paletteBytes);
+void pk_api_follower_show(bool on);
 /** Bind the verified EWRAM encounter-switch address after field_configure; zero disables it.
  * wasOff restores ownership when resuming a state saved while encounters were off. Game thread only. */
 bool pk_api_field_wild(uint32_t addr, bool wasOff);

@@ -260,13 +260,15 @@ Java_com_pokedaisy_app_MgbaCore_pkLookRefresh(JNIEnv* env, jobject thiz, jbyteAr
 // FOLLOWER: its frames + palette (null = none), and whether it's shown this frame. Emu thread.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkFollowerSet(JNIEnv* env, jobject thiz, jbyteArray frames, jbyteArray pal) {
-    if (!frames || !pal || (*env)->GetArrayLength(env, frames) != 3072 || (*env)->GetArrayLength(env, pal) != 32) {
-        pk_follower_set(NULL, NULL);
+    if (!frames || !pal || (*env)->GetArrayLength(env, frames) != PK_API_FOLLOWER_FRAME_BYTES ||
+        (*env)->GetArrayLength(env, pal) != PK_API_FOLLOWER_PALETTE_BYTES) {
+        pk_api_follower_set(NULL, 0, NULL, 0);
         return;
     }
     jbyte* f = (*env)->GetByteArrayElements(env, frames, NULL);
     jbyte* p = (*env)->GetByteArrayElements(env, pal, NULL);
-    pk_follower_set((const uint8_t*) f, (const uint8_t*) p);
+    pk_api_follower_set((const uint8_t*) f, PK_API_FOLLOWER_FRAME_BYTES,
+                       (const uint8_t*) p, PK_API_FOLLOWER_PALETTE_BYTES);
     (*env)->ReleaseByteArrayElements(env, frames, f, JNI_ABORT);
     (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
 }
@@ -293,7 +295,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRideShow(JNIEnv* env, jobject thiz, jboolean o
 
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkFollowerShow(JNIEnv* env, jobject thiz, jboolean on) {
-    if (g.core && pk_is_gba(g.core)) pk_follower_show(g.core, on);
+    pk_api_follower_show(on);
 }
 
 // Co-op presence: the player's map, fine position, facing, mode and step count this frame (pk_partner_self's
