@@ -20,7 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
-import com.pokedaisy.app.companion.data.save.Gen3SaveData
+import com.pokedaisy.app.companion.data.save.Gen3SaveReader
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.Gen3SaveFile
 import com.pokedaisy.app.companion.data.save.RomMonIcons
@@ -544,15 +544,10 @@ class SaveEditorActivity : ComponentActivity() {
         val format = SaveFileEdits.formatFor(rom)
             ?: return tr("The save editor reads FireRed, LeafGreen, Emerald, Ruby, Sapphire, Diamond, Pearl, HeartGold, SoulSilver and Platinum saves (and builds that keep their save layout). This game's isn't one yet.")
         val save = SavesLocation.saveFor(this, prefs, rom)
-        if (!save.isFile) return tr("No save yet - save once in the game first.")
-        val bytes = runCatching { save.readBytes() }.getOrNull() ?: return tr("Can't read the save {0}", save.path)
-        return when (val parsed = Gen3SaveFile.parse(bytes, format)) {
-            is Gen3SaveFile.Parsed.Failed -> parsed.reason
-            is Gen3SaveFile.Parsed.Ok -> {
-                val why = Gen3SaveData(parsed.save).mismatch()
-                if (why != null) tr("This save doesn't look like a {0} save ({1}), so it's left alone.", format.label, why)
-                else Opened(rom, GameTitles.label(this, prefs, rom), RomIdentity.gameCode(rom).orEmpty(), bytes, parsed.save)
-            }
+        return when (val result = Gen3SaveReader.open(save.toOkioPath(), format)) {
+            is Gen3SaveReader.Result.Failed -> result.message
+            is Gen3SaveReader.Result.Ready ->
+                Opened(rom, GameTitles.label(this, prefs, rom), RomIdentity.gameCode(rom).orEmpty(), result.bytes, result.save)
         }
     }
 

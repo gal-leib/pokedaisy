@@ -1,7 +1,7 @@
 package com.pokedaisy.app
 
 import android.content.Context
-import com.pokedaisy.app.companion.data.save.Gen3SaveFormat
+import com.pokedaisy.app.companion.data.save.Gen3SaveReader
 import com.pokedaisy.app.companion.i18n.tr
 import java.io.File
 import java.io.FileOutputStream
@@ -32,16 +32,7 @@ object SaveFileEdits {
     }
 
     /** The save format the editor reads [rom]'s save in, or null if it has none (hacks too big to be in-place edits, GB, Japanese). */
-    fun formatFor(rom: File): Gen3SaveFormat? {
-        if (RomIdentity.isGameBoy(rom)) return null
-        if (RomArchive.romSize(rom) > 0x1000000L) return null
-        val code = RomIdentity.gameCode(rom)
-        // Emerald Legacy keeps retail's header but not its SaveBlock1 (a 120-slot ITEMS pocket moves everything after
-        // it): the bag and flags would be edited at retail's offsets. Only a full 16 MB Emerald can be it.
-        if (code == "BPEE" && RomArchive.romSize(rom) == 0x1000000L &&
-            RomIdentity.sha1(rom) == com.pokedaisy.app.companion.data.TelemetrySampler.EMERALD_LEGACY_V1_1_4_SHA1) return null
-        return Gen3SaveFormat.forGameCode(code)
-    }
+    fun formatFor(rom: File) = Gen3SaveReader.formatFor(RomIdentity.reader(rom)) { RomArchive.romSize(rom) }
 
     /** A DS cart whose save the editor reads ([com.pokedaisy.app.companion.data.save.Gen4SaveFile]) with tables from the
      * cart: HeartGold / SoulSilver in any language (IPK / IPG), Platinum USA rev 1 (CPUE, Renegade Platinum too), English

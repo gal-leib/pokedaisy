@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.data
 
+import com.pokedaisy.app.companion.data.save.Gen3SaveFormat
+import com.pokedaisy.app.companion.data.save.Gen3SaveReader
 import kotlin.random.Random
 import kotlin.test.*
 import okio.*
@@ -37,6 +39,15 @@ class RomIdentityReaderTest {
         gb[0x13A] = 0
         assertEquals("FULL L", reader(gb).gameBoyTitle())
         assertNull(reader(ByteArray(0x160)).gameBoyTitle())
+    }
+
+    @Test fun gbaSaveEligibilityDoesNotAcceptGameBoyOrExpandedRomLayouts() {
+        val header = ByteArray(0x160)
+        "BPEE".encodeToByteArray().copyInto(header, 0xAC)
+        assertEquals(Gen3SaveFormat.EMERALD, Gen3SaveReader.formatFor(reader(header)) { 0x800000L })
+        assertNull(Gen3SaveReader.formatFor(reader(header)) { 0x2000000L })
+        byteArrayOf(0xCE.toByte(), 0xED.toByte(), 0x66, 0x66).copyInto(header, 0x104)
+        assertNull(Gen3SaveReader.formatFor(reader(header)) { error("Game Boy has no Gen 3 layout") })
     }
 
     @Test fun wholeFileHashesStreamBeyondOneBufferAndRawPathReadsMatch() {
