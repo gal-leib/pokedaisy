@@ -4,6 +4,7 @@ import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.i18n.tr
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlin.random.Random
 import okio.Buffer
 import okio.BufferedSource
 import okio.FileSystem
@@ -69,7 +70,8 @@ class SaveTradeJournal(
     }.getOrDefault(false)
 
     private fun replace(target: Path, bytes: ByteArray, from: ByteArray? = null) {
-        val staging = target.parent!! / "${target.name}.trade.tmp"
+        val nonce = Random.nextLong().toULong().toString(16)
+        val staging = target.parent!! / "${target.name}.trade-$nonce.tmp"
         try {
             sync(staging, bytes)
             check(matches(staging, bytes))
