@@ -88,6 +88,7 @@ object ExportCore {
     }
 }
 tasks.withType<KotlinCompile>().configureEach {
+    source(rootDir.resolve("../shared-ui/src/commonMain/kotlin/com/pokedaisy/app/companion/SharedSetting.kt"))
     // FieldItemUse reaches the shared frame-work queue; compile that same source here too.
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/GameSession.kt"))
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/FlightCore.kt"))

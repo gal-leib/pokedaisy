@@ -306,9 +306,8 @@ interface CompanionSettings : StoredCompanionSettings {
      * SETTINGS shows the emulator's rows only. */
     val gameBlocked: Boolean get() = false
 
-    /** A host that runs only part of the app (the iPad app, so far): SETTINGS' HOME, DISPLAY OPTIONS and SHADERS show only these rows (English
-     * labels), each group's title kept over the ones left. Null = every row. */
-    val shownRows: Set<String>? get() = null
+    /** A host that runs only part of the app (the iPad app, so far): SETTINGS' HOME, DISPLAY OPTIONS and SHADERS show only these shared settings, each group's title kept over the ones left. Null = every row. */
+    val shownRows: Set<SharedSetting>? get() = null
 
     /** Opens a web link ([url]) in the browser - a blocked game's button ([com.pokedaisy.app.companion.data.BlockedAction]). */
     fun openUrl(url: String) {}

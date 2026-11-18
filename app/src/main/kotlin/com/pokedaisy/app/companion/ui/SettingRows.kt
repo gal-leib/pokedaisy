@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.companion.SharedSetting
+
 import com.pokedaisy.app.companion.i18n.stripAccents
 import androidx.compose.foundation.layout.Column
 import kotlinx.coroutines.launch
@@ -61,6 +63,7 @@ class SettingRow(
     val slider: SettingSlider? = null,
     /** More (or less) of the line for the label than the page's default: a long label beside a short value. */
     val labelWeight: Float? = null,
+    val setting: SharedSetting? = null,
     val onClick: () -> Unit,
 )
 
@@ -620,7 +623,7 @@ fun settingsLookRows(changed: () -> Unit): List<SettingRow> {
 /** APP > TIPS, on both screens ([com.pokedaisy.app.companion.FeatureTips]): now and then a card about a feature the
  *  player hasn't found yet. */
 fun tipsRow(on: Boolean, badge: String? = null, set: (Boolean) -> Unit): SettingRow = SettingRow(
-    tk("TIPS"), if (on) tk("ON") else tk("OFF"), subtitle = "Now and then, a feature you haven't tried yet",
+    tk("TIPS"), if (on) tk("ON") else tk("OFF"), setting = SharedSetting.TIPS, subtitle = "Now and then, a feature you haven't tried yet",
     labelBadge = badge ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.TIPS),
 ) { set(!on) }
 

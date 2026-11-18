@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.companion.SharedSetting
+
 import androidx.compose.foundation.background
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
@@ -1329,7 +1331,7 @@ open class CompanionScreenshotTest {
             override val wildEncountersSupported = true
             override val wildEncounters = rate
             override val fieldOptionsBadge = com.pokedaisy.app.companion.NewFeatures.NEW_TAG
-            override val shownRows = setOf("WILD ENCOUNTERS")
+            override val shownRows = setOf(SharedSetting.WILD_ENCOUNTERS)
         })
     @Test fun redDexEntry() = yellow("red", "DEX", dexEntry = 151, cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     // Pokémon Brown 6.1.2: its own save (the brown fixtures), its own Super Game Boy colours.
@@ -2205,7 +2207,7 @@ open class CompanionScreenshotTest {
         val settings = object : com.pokedaisy.app.companion.CompanionSettings by SampleCompanion.Settings() {
             override val resumeGamesEditable = true
             override val resumeBadge = com.pokedaisy.app.companion.NewFeatures.NEW_TAG
-            override val shownRows = setOf("RESUME GAMES", "LANGUAGE", "HELP")
+            override val shownRows = setOf(SharedSetting.RESUME_GAMES, SharedSetting.LANGUAGE, SharedSetting.HELP)
         }
         CompanionScreen(SampleCompanion.snapshot, SampleCompanion.Slots, settings,
             initialTab = "SETTINGS", initialSettingsRow = "RESUME GAMES")
