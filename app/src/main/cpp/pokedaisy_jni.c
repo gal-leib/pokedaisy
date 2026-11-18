@@ -1105,14 +1105,7 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopLinkCaught(JNIEnv* env, jobject thiz) {
 // A story script held by its trainerbattle is let go (pk_coop_release_script): 1 released, 0 nothing held, -1 not yet (ask again).
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopReleaseScript(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int r = -1;
-    if (g.core && pk_is_gba(g.core)) {
-        pk_coop_after_set_call(pk_coop_game_call);
-        r = pk_coop_release_script(g.core);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r;
+    return pk_api_coop_release_script();
 }
 
 // The battle is over and its result read: the bridge goes (hooks out, area zeroed) and the result is dropped.
@@ -1154,81 +1147,57 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopPartnerFree(JNIEnv* env, jobject thiz) {
     return pk_api_coop_partner_free() ? JNI_TRUE : JNI_FALSE;
 }
 
-// coop-field (plan 4 Task 7)
-// coop-after (plan 4 Task 8): the battle's results written through the game's own functions (pk_coop_after.c); each takes
-// the core lock shared (they call the game like pkCall does) and answers 1 / 0 / -1 as pk_coop_after.h says.
-static void pk_coop_cap(long steps) {   // the step cap of pk_call: the game's save takes ~16M steps (0 = the default again)
-    pk_call_set_cap(steps);
-}
-
-#define COOP_AFTER_GUARD(expr)                                                  \
-    pthread_rwlock_rdlock(&pk_coreLock);                                        \
-    int r = -1;                                                                 \
-    if (g.core && pk_is_gba(g.core)) {                                          \
-        pk_coop_after_set_call(pk_coop_game_call);                                   \
-        pk_coop_after_set_cap(pk_coop_cap);                                     \
-        r = (expr);                                                             \
-    }                                                                           \
-    pthread_rwlock_unlock(&pk_coreLock);                                        \
-    return r;
-
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopGiveMon(JNIEnv* env, jobject thiz, jbyteArray jMon) {
-    if (!jMon || (*env)->GetArrayLength(env, jMon) != 100) {
-        return 2;
-    }
-    uint8_t mon[100];
-    (*env)->GetByteArrayRegion(env, jMon, 0, 100, (jbyte*) mon);
-    COOP_AFTER_GUARD(pk_coop_give_mon(g.core, mon))
+    if (!jMon || (*env)->GetArrayLength(env, jMon) != PK_API_COOP_MON_SIZE) return 2;
+    uint8_t mon[PK_API_COOP_MON_SIZE];
+    (*env)->GetByteArrayRegion(env, jMon, 0, sizeof(mon), (jbyte*) mon);
+    return pk_api_coop_give_mon(mon, sizeof(mon));
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopRemoveItem(JNIEnv* env, jobject thiz, jint item, jint count) {
-    COOP_AFTER_GUARD(pk_coop_remove_item(g.core, item, count))
+    return pk_api_coop_remove_item(item, count);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopSetTrainerFlag(JNIEnv* env, jobject thiz, jint id) {
-    COOP_AFTER_GUARD(pk_coop_set_trainer_flag(g.core, id))
+    return pk_api_coop_set_trainer_flag(id);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopPrize(JNIEnv* env, jobject thiz, jint id, jboolean single) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    int r = !g.core || !pk_is_gba(g.core) ? -1 : single ? pk_coop_prize_single(g.core, id) : pk_coop_prize(g.core, id);
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r;
+    return pk_api_coop_prize(id, single != JNI_FALSE);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopAddMoney(JNIEnv* env, jobject thiz, jint amount) {
-    COOP_AFTER_GUARD(pk_coop_add_money(g.core, amount))
+    return pk_api_coop_add_money(amount);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopWritePartyMon(JNIEnv* env, jobject thiz, jint slot, jbyteArray jMon) {
-    if (!jMon || (*env)->GetArrayLength(env, jMon) != 100) {
-        return 0;
-    }
-    uint8_t mon[100];
-    (*env)->GetByteArrayRegion(env, jMon, 0, 100, (jbyte*) mon);
-    COOP_AFTER_GUARD(pk_coop_write_party_mon(g.core, slot, mon))
+    if (!jMon || (*env)->GetArrayLength(env, jMon) != PK_API_COOP_MON_SIZE) return 0;
+    uint8_t mon[PK_API_COOP_MON_SIZE];
+    (*env)->GetByteArrayRegion(env, jMon, 0, sizeof(mon), (jbyte*) mon);
+    return pk_api_coop_write_party_mon(slot, mon, sizeof(mon));
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopWhiteOut(JNIEnv* env, jobject thiz) {
-    COOP_AFTER_GUARD(pk_coop_white_out(g.core))
+    return pk_api_coop_white_out();
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopEvolve(JNIEnv* env, jobject thiz, jint slot) {
-    COOP_AFTER_GUARD(pk_coop_evolve(g.core, slot))
+    return pk_api_coop_evolve(slot);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopSaveGame(JNIEnv* env, jobject thiz) {
-    COOP_AFTER_GUARD(pk_coop_save_game(g.core))
+    return pk_api_coop_save_game();
 }
+
 // Emu thread: the 32-byte palettes in `from` (back to back) swapped for `to` wherever the
 // game has one loaded (pk_cheats_repalette). Returns how many.
 JNIEXPORT jint JNICALL

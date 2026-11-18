@@ -292,12 +292,20 @@ static void coopControl(const char* dir) {
     char reason[80];
     int trainers[] = {-1, -1};
     CHECK(!pk_api_coop_enable() && !pk_api_coop_link_enable(), "co-op opened without a game");
+    uint8_t mon[PK_API_COOP_MON_SIZE] = { 0 };
+    CHECK(pk_api_coop_give_mon(mon, sizeof mon - 1) == 2, "coop catch accepted a short Pokémon");
+    CHECK(pk_api_coop_write_party_mon(0, NULL, sizeof mon) == 0, "coop update accepted a null Pokémon");
+    CHECK(pk_api_coop_give_mon(mon, sizeof mon) == -1, "coop catch ran without a core");
+    CHECK(pk_api_coop_save_game() == -1, "coop save ran without a core");
     pk_api_coop_join_trainers(trainers);
     CHECK(trainers[0] == 0 && trainers[1] == 0, "co-op returned trainers without a game");
 
     path(rom, sizeof rom, dir, "diagnostic.gb");
     CHECK(pk_api_init(rom, NULL), "co-op Game Boy fixture");
     CHECK(!pk_api_coop_enable() && !pk_api_coop_link_enable(), "co-op accepted Game Boy");
+    CHECK(pk_api_coop_add_money(300) == -1 && pk_api_coop_set_trainer_flag(19) == -1 &&
+          pk_api_coop_write_party_mon(0, mon, sizeof mon) == -1 && pk_api_coop_release_script() == -1,
+          "coop rewards ran on Game Boy");
     CHECK(!pk_api_coop_battle_starting() && !pk_api_coop_partner_free() && !pk_api_coop_on_free_field(),
           "co-op state present for Game Boy");
     pk_api_coop_disable();
