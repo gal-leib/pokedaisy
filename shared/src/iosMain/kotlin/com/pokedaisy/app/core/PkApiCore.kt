@@ -2,6 +2,8 @@
 
 package com.pokedaisy.app.core
 
+import com.pokedaisy.app.game.FlightCore
+
 import com.pokedaisy.app.companion.data.GameCalls
 import com.pokedaisy.app.companion.data.InProcessReader
 import com.pokedaisy.app.companion.data.EmulatorCore
@@ -83,7 +85,7 @@ import kotlinx.cinterop.value
  *
  * Threads, as pk_api.h says: one thread (the game's) starts, runs and stops it; the reads may come from any thread.
  */
-object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls {
+object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore {
     /** Existing field actions use this same interface on Android. Game thread between frames only. */
     fun callSafe(): Boolean = pk_api_call_safe()
     override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int): Long =
@@ -192,20 +194,20 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls {
     fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
     fun fieldState(): Int = pk_api_field_state()
     fun setTint(red: Int, green: Int, blue: Int) = pk_api_set_tint(red, green, blue)
-    fun configureFlight(words: IntArray?) {
+    override fun configureFlight(words: IntArray?) {
         if (words == null || words.isEmpty()) pk_api_flight_configure(null, 0)
         else words.usePinned { pk_api_flight_configure(it.addressOf(0).reinterpret(), words.size) }
     }
-    fun flightTakeOff(): Int = pk_api_flight_take_off()
-    fun flightLand() = pk_api_flight_land()
-    fun setFlightRoute(directions: ByteArray): Int = if (directions.isEmpty()) pk_api_flight_route(null, 0)
+    override fun flightTakeOff(): Int = pk_api_flight_take_off()
+    override fun flightLand() = pk_api_flight_land()
+    override fun setFlightRoute(directions: ByteArray): Int = if (directions.isEmpty()) pk_api_flight_route(null, 0)
         else directions.usePinned { pk_api_flight_route(it.addressOf(0).reinterpret(), directions.size) }
-    fun setFlightArea(bits: ByteArray?) {
+    override fun setFlightArea(bits: ByteArray?) {
         if (bits == null || bits.isEmpty()) pk_api_flight_area(null, 0)
         else bits.usePinned { pk_api_flight_area(it.addressOf(0).reinterpret(), bits.size) }
     }
-    val flightAreaTurned get() = pk_api_flight_area_turned()
-    val flightState get() = pk_api_flight_state()
+    override val flightAreaTurned get() = pk_api_flight_area_turned()
+    override val flightState get() = pk_api_flight_state()
     val flightRouteDone get() = pk_api_flight_route_done()
     fun configureWild(addr: Long, wasOff: Boolean): Boolean =
         addr in 0L..0xFFFFFFFFL && pk_api_field_wild(addr.toUInt(), wasOff)

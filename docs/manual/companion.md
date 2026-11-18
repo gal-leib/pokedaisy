@@ -199,3 +199,5 @@ On a device with two screens there's also `CLOSE COMPANION`. It hands the compan
 
 > [!TIP]
 > Not sure what a row does? `HELP`, the last row of SETTINGS, opens this manual right on the bottom screen.
+
+On iPhone and iPad, `FLY STYLE`, `FLIGHT AREA` and `FLY ON` use the same supported GBA games and flight behavior as Android. Choose `TAKE OFF` on the map or quick menu to fly yourself, then `LAND` or `B` to land. With `SCENIC`, a destination connected by a route you may cross is flown over the map; other destinations use `CLASSIC` where the game supports it. `EXPAND` zooms out during the scenic journey. Your seen-map limit stays on unless you choose `ANYWHERE`.

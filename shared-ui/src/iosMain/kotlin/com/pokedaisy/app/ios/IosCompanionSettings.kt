@@ -42,6 +42,16 @@ internal class IosCompanionSettings(
             languageRomCode = { romCode }, allowDisableResume = onDisableResume),
 ) : CompanionSettings, com.pokedaisy.app.companion.StoredCompanionSettings by stored {
     private fun options() = playback()?.options
+    private fun flight() = playback()?.flight
+    override val flyStyleSupported get() = flight()?.support() != null
+    override val flightBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FLIGHT)
+    override val flyStyle get() = flight()?.style ?: iosPreferences.flyStyle
+    override fun setFlyStyle(style: com.pokedaisy.app.companion.FlyStyle) { flight()?.setStyle(style) }
+    override val flightArea get() = flight()?.areaMode ?: iosPreferences.flightArea
+    override fun setFlightArea(mode: com.pokedaisy.app.companion.FlightAreaMode) { flight()?.setArea(mode) }
+    override val flightVehicle get() = flight()?.vehicle ?: com.pokedaisy.app.companion.data.FlightVehicle.BIRD
+    override fun setFlightVehicle(vehicle: com.pokedaisy.app.companion.data.FlightVehicle) { flight()?.setVehicle(vehicle) }
+    override fun answerFlyStyle(style: com.pokedaisy.app.companion.FlyStyle?) { flight()?.answerStyle(style) }
     private fun cheatHost() = playback()?.cheats
     private val d = NSUserDefaults.standardUserDefaults
     private val libraryInput = if (game == null) com.pokedaisy.app.game.GameInput() else null
@@ -68,7 +78,7 @@ internal class IosCompanionSettings(
     override val dayNightBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_DAY_NIGHT)
     override val gamePickBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_PICKER)
     override val shownRows: Set<String> get() = setOf("BATTLE HINTS", "FOE IVS", "TAB BAR", "DARK MODE", "THEME", "LANGUAGE", "HELP",
-        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY", "SHADERS", "FILTER", "GRID", "GBA COLORS", "UNLIT SCREEN", "ON COMPANION", "SMOOTHING", "DAY AND NIGHT", "SHINY ODDS")
+        "FF", "FF SPEED", "GAME SPEED", "GAME VOLUME", "MUTE GAME", "ONE-TAP MOVES", "BATTLE INFO", "BATTLE STYLE", "BATTLE VIEW", "BATTLE FOCUS", "RESUME GAMES", "TOUCH CONTROLS", "COMPANION VIEW", "SPEED OPTIONS", "INSTANT TEXT", "REUSABLE TMS", "AUTO-RUN", "RUN INDOORS", "WILD ENCOUNTERS", "GAME BUTTONS", "HOTKEYS", "QUICK MENU", "HUD", "BATTLE BUTTONS", "REWIND", "CHEATS", "ASPECT", "ZOOM", "AUTO ZOOM IN", "LOOK AROUND", "TRADE EVOS", "NO HMS NEEDED", "EXP SHARE", "LEVEL CAP", "DISPLAY OPTIONS", "OVERLAY", "SHADERS", "FILTER", "GRID", "GBA COLORS", "UNLIT SCREEN", "ON COMPANION", "SMOOTHING", "DAY AND NIGHT", "SHINY ODDS", "FLY STYLE", "FLIGHT AREA", "FLY ON")
         .let { if (game == null) it - "GAME SPEED" - "FF" else it }
         .let { if (cheatHost()?.supported != true) it - "CHEATS" else it }
 
@@ -239,9 +249,9 @@ internal class IosCompanionSettings(
     override fun clearGbaControlBinding(btn: GbaControls.Btn) {
         bindings.clearGameButton(btn)
     }
-    override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS + listOf(com.pokedaisy.app.Hotkeys.Action.QUICK_MENU, com.pokedaisy.app.Hotkeys.Action.ZOOM)
+    override val hotkeyActions get() = com.pokedaisy.app.companion.GameActions.BASIC_ACTIONS + listOf(com.pokedaisy.app.Hotkeys.Action.QUICK_MENU, com.pokedaisy.app.Hotkeys.Action.ZOOM, com.pokedaisy.app.Hotkeys.Action.FREE_FLIGHT)
     override val quickMenuSupportedActions get() = setOf(
-        com.pokedaisy.app.companion.QuickAction.PC, com.pokedaisy.app.companion.QuickAction.FLY,
+        com.pokedaisy.app.companion.QuickAction.PC, com.pokedaisy.app.companion.QuickAction.FLY, com.pokedaisy.app.companion.QuickAction.FLIGHT,
         com.pokedaisy.app.companion.QuickAction.HEAL, com.pokedaisy.app.companion.QuickAction.FLASH,
         com.pokedaisy.app.companion.QuickAction.REPEL, com.pokedaisy.app.companion.QuickAction.WILD,
         com.pokedaisy.app.companion.QuickAction.BIKE, com.pokedaisy.app.companion.QuickAction.ROD,
