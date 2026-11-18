@@ -194,20 +194,17 @@ class EmulatorEngine(
     @Volatile var onShinyChanged: () -> Unit = {}
     val shiny by lazy { playback.bindShiny(gameCalls, BuildConfig.DEBUG) { onShinyChanged() } }
 
-    /** PLAYER LOOK ([com.pokedaisy.app.companion.data.PlayerLook]): the patch to wear - its blocks into the ROM, then its
-     * palettes swapped where the game has them loaded - on the next frame boundary ([setPlayerLook]); its palettes again
-     * after every state load (a state made in another look). Null = nothing to do. */
-    @Volatile private var lookPatch: com.pokedaisy.app.companion.data.PlayerLook.Patch? = null
-    @Volatile private var lookDirty = false
+    private val playerLook = com.pokedaisy.app.companion.GamePlayerLook(
+        object : com.pokedaisy.app.game.PlayerLookCore {
+            override fun replaceLookBlocks(addresses: IntArray, lengths: IntArray, crcs: IntArray, data: ByteArray) =
+                if (addresses.isEmpty()) { MgbaCore.pkRomUnblock(); 0 }
+                else MgbaCore.pkRomBlocks(addresses, lengths, crcs, data)
+            override fun repaletteLook(from: ByteArray, to: ByteArray) = MgbaCore.pkRepalette(from, to)
+            override fun refreshLook(palette: ByteArray?) = MgbaCore.pkLookRefresh(palette)
+        },
+    )
 
-    fun setPlayerLook(patch: com.pokedaisy.app.companion.data.PlayerLook.Patch?) {
-        // The same look again (the party read changing, as it does as a battle starts) is nothing to do: putting it in
-        // again set the player's sprite up again after the battle, mid-fade.
-        val now = lookPatch
-        if (patch === now || (patch == null && now == null) || (patch != null && patch.sameAs(now))) return
-        lookPatch = patch
-        lookDirty = true
-    }
+    fun setPlayerLook(patch: com.pokedaisy.app.companion.data.PlayerLook.Patch?) = playerLook.select(patch)
 
     /** ZOOM and the look-around over WIDE: asked for the window to draw before each frame ([EmulatorView.camera]). */
     @Volatile var wideCamera: WideCamera? = null
@@ -483,10 +480,6 @@ class EmulatorEngine(
     @Volatile var dsBattleMenuFloats = false
     private var touchFrames = 0
 
-    /** PLAYER LOOK changed (or a state loaded): the player's sprite is set up again on the field ([MgbaCore.pkLookRefresh]). */
-    @Volatile private var lookRefreshPending = false
-    private var lookRefreshTries = 0
-
     /** The last frame's EXPAND scene ([WideCamera.SCENE_FIELD] ...), -1 without EXPAND. Emu thread. */
     private var wideScene = -1
 
@@ -508,7 +501,6 @@ class EmulatorEngine(
      * script / battle checks can be read off `adb logcat -s pokedaisy` after a test on a device.
      */
     /** RIDE ON's vehicle as the look patch now in brings it (emu thread; null = none), sent to the core when it changed. */
-    private var rideApplied: com.pokedaisy.app.companion.data.RideOn.Sprite? = null
     private var rideSent: com.pokedaisy.app.companion.data.RideOn.Sprite? = null
     private var rideShown = false
     private var rideFrames = 0
@@ -516,7 +508,7 @@ class EmulatorEngine(
     /** RIDE ON, once a frame (emu thread): the vehicle's sprite to the core when it changed, and shown or not (the core
      * draws it only while the player is on a bike, behind them). */
     private fun stepRide(field: Boolean) {
-        val r = rideApplied
+        val r = playerLook.ride
         if (r !== rideSent) {
             MgbaCore.pkRideSet(r?.frames, r?.pal, r?.width ?: 32)
             rideSent = r
@@ -1006,7 +998,7 @@ class EmulatorEngine(
         applyCheats()
         gameOptions.coreStarted()
         gameOptions.tick()
-        applyLook()
+        if (gba) playerLook.service(force = true)
 
         val sampleRate = MgbaCore.pkSampleRate()
         // Out of audio resources (or a device mid-reroute) mustn't take the process down:
@@ -1507,17 +1499,7 @@ class EmulatorEngine(
             riding = (fieldState and bike) == bike
             val battleState = battleInput.gameState
             scene = PlaybackPolicy.scene(battleState, menuOpen, mapOpen, FfMenuWatch.battling, fieldState)
-            // PLAYER LOOK: the player's sprite set up again once the field's own screen runs (never over a battle's
-            // sprites); the native side checks it's still the player's.
-            // Not done (the screen mid-fade, the palette buffers not agreeing yet): again on a later field frame, for
-            // up to ~10 s of them.
-            if (lookRefreshPending && gba && fieldScreen && !mapOpen && !FfMenuWatch.battling) {
-                if (MgbaCore.pkLookRefresh(lookPatch?.playerPal) || ++lookRefreshTries >= LOOK_REFRESH_TRIES) {
-                    if (lookRefreshTries >= LOOK_REFRESH_TRIES) Log.w("pokedaisy", "player look: the sprite's palette never settled, left as it is")
-                    lookRefreshPending = false
-                    lookRefreshTries = 0
-                }
-            }
+            if (gba && fieldScreen && !mapOpen && !FfMenuWatch.battling) playerLook.fieldFrame()
             if (gba) stepRide(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
                 battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
             if (gba) playback.stepFollower()
@@ -1968,51 +1950,12 @@ class EmulatorEngine(
             MgbaCore.pkRomPatch(expectAt, expect, at, value)
     }
 
-    /** PLAYER LOOK onto the ROM (emu thread): the last look's blocks out, this one's in (all or none), then the palettes. */
-    private fun applyLook() {
-        lookDirty = false
-        MgbaCore.pkRomUnblock()
-        rideApplied = null
-        val patch = lookPatch
-        // The player's sprite still holds the last look's record (a Pokémon's 32x32 shape, a frame table in the tail):
-        // set up from the ROM as it is now, whatever comes next.
-        if (gba && patch == null) { lookRefreshPending = true; lookRefreshTries = 0 }
-        if (!gba || patch == null) return
-        if (patch.blocks.isNotEmpty()) {
-            val data = java.io.ByteArrayOutputStream()
-            patch.blocks.forEach { data.write(it.data) }
-            val n = MgbaCore.pkRomBlocks(
-                IntArray(patch.blocks.size) { 0x08000000 + patch.blocks[it].off },
-                IntArray(patch.blocks.size) { patch.blocks[it].data.size },
-                IntArray(patch.blocks.size) { patch.blocks[it].crc },
-                data.toByteArray(),
-            )
-            Log.i("pokedaisy", "player look: ${if (n < 0) "the ROM didn't match, left as it is" else "$n block(s) in"}")
-            if (n < 0) return
-            rideApplied = patch.ride   // only with the rider's frames in: else a vehicle under the game's own bike
-        }
-        settleLook()
-    }
-
-    /** The worn look's palettes over any other hero's the game has loaded (emu thread). */
-    private fun settleLook() {
-        if (gba) { lookRefreshPending = true; lookRefreshTries = 0 }
-        val patch = lookPatch ?: return
-        if (!gba) return
-        var n = 0
-        for (p in patch.palettes) {
-            val from = java.io.ByteArrayOutputStream().also { o -> p.from.forEach { o.write(it) } }.toByteArray()
-            n += MgbaCore.pkRepalette(from, p.to)
-        }
-        if (n > 0) Log.i("pokedaisy", "player look: $n palette(s) swapped")
-    }
-
     private fun servicePending(runFieldJobs: Boolean = true) {
         gameSession.servicePosted()
         if (cheatsDirty) applyCheats()
         // Never during a co-op battle: both reach pkRomUnpatch / pkRomUnblock, which uninstall co-op (they stay dirty until it ends).
         if (gameOptions.dirty && !CoopGuards.battleActive()) { gameOptions.tick(); coopLock?.requestReinstall() }
-        if (lookDirty && !CoopGuards.battleActive()) { applyLook(); coopLock?.requestReinstall() }
+        if (gba && !CoopGuards.battleActive() && playerLook.service()) coopLock?.requestReinstall()
         // Co-op holds still service posted work and patches, but field delays must not advance.
         if (runFieldJobs) gameSession.serviceField(gba, gbOnField)
         pendingSuspend?.let { target ->
@@ -2110,7 +2053,7 @@ class EmulatorEngine(
         val ok = MgbaCore.pkLoadState(source.absolutePath)
         if (ok) RetroAchievements.afterLoadState(source)
         // A state made in another PLAYER LOOK holds that look's palettes.
-        if (ok) settleLook()
+        if (ok && gba) playerLook.settle()
         return ok
     }
 
@@ -2184,9 +2127,6 @@ class EmulatorEngine(
 
     internal companion object {
         /** DAY AND NIGHT's ease: per frame, of 256 (a full night's dimming in about half a second). */
-
-        /** PLAYER LOOK's refresh: field frames it's tried again while the palette can't go in yet. */
-        const val LOOK_REFRESH_TRIES = 600
 
         /** The last loop started on the native core, by any engine (there's one core, `g` in pokedaisy_jni.c). */
         @Volatile private var coreLoop: Thread? = null
