@@ -19,6 +19,8 @@ import com.pokedaisy.app.companion.ui.theme.themeById
 import platform.Foundation.NSUserDefaults
 import com.pokedaisy.app.game.GameViewController
 
+private val IOS_FF_MUSIC_MODES = listOf(FfMusicMode.SPED_UP, FfMusicMode.OFF)
+
 /**
  * The companion's SETTINGS on the iPad: shared battle and appearance options, playback and sound, kept in the
  * app's defaults. Only supported rows are shown ([shownRows]); screen filters wait for their native renderer adapter.
@@ -284,6 +286,8 @@ internal class IosCompanionSettings(
         game.speed = if (requested.isInfinite()) 0.0 else requested.toDouble()
         game.volume = gameVolume / 100f
         game.muted = gameMuted
+        val music = ffMusicMode
+        game.muteAudioAtSpeed = { speed -> com.pokedaisy.app.companion.PlaybackPolicy.muteFastAudio(speed.toFloat(), music) }
         playbackChanged()
     }
 
@@ -294,10 +298,10 @@ internal class IosCompanionSettings(
         d.setFloat(v, "game_speed:$romPath"); applyPlayback()
     }
 
-    // Not on the iPad yet: never shown (shownRows), so fixed values.
-    override val ffMusicMode = FfMusicMode.SPED_UP
-    override fun setFfMusicMode(mode: FfMusicMode) {}
-    override val ffMusicModes = listOf(FfMusicMode.SPED_UP)
+    override val ffMusicModes get() = IOS_FF_MUSIC_MODES
+    override val ffMusicMode get() = stored.ffMusicMode.takeIf { it in ffMusicModes } ?: FfMusicMode.SPED_UP
+    override fun setFfMusicMode(mode: FfMusicMode) { if (mode in ffMusicModes) stored.setFfMusicMode(mode) }
+    override val ffMusicBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_FF_AUDIO)
     override val speedOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCENE_SPEEDS)
     override val fieldReadable get() = playback()?.fieldReadable == true
     override val fieldMovesReadable get() = playback()?.fieldMovesReadable == true

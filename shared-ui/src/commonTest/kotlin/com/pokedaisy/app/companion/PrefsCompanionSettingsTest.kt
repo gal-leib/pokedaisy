@@ -81,6 +81,20 @@ class PrefsCompanionSettingsTest {
         assertEquals(false, store.data["status_bar"])
     }
 
+    @Test fun iosFastAudioKeepsItsDefaultAndHonorsExplicitChoices() {
+        val store = Store()
+        val defaults = Prefs.Defaults(ffMusicMode = FfMusicMode.SPED_UP)
+        val settings = Settings(Prefs(store, defaults))
+        assertEquals(FfMusicMode.STEADY, Prefs(Store()).ffMusicMode)
+        assertEquals(FfMusicMode.SPED_UP, settings.ffMusicMode)
+        settings.setFfMusicMode(FfMusicMode.OFF)
+        val reopened = Settings(Prefs(store, defaults))
+        assertEquals("OFF", store.data["ff_music_mode"])
+        assertEquals(FfMusicMode.OFF, reopened.ffMusicMode)
+        val legacy = Store().apply { data["ff_music_enabled"] = false }
+        assertEquals(FfMusicMode.OFF, Prefs(legacy).ffMusicMode)
+    }
+
     @Test fun bothInstalledBattleStyleFormatsKeepTheirRepresentation() {
         val androidStore = Store().apply { data["battle_style"] = BattleStyle.GEN4.id }
         val iosStore = Store().apply { data["battle_style"] = BattleStyle.GEN4.name }

@@ -89,6 +89,8 @@ Sped-up game music turns into chipmunk noise. `FF MUSIC` picks what you hear whi
 - **`SPED-UP`** plays the game's own sound at the game's speed.
 - **`OFF`** is silence while fast-forwarding.
 
+On iPhone and iPad, choose `SPED-UP` (the default) or `OFF`. When `SMART` returns the game to normal speed for a menu, you hear the game's audio again.
+
 `STEADY` works by preparing a clean recording of each song from your ROM, in the background. The first time you play a game, it goes through the game's songs once; a song that isn't ready yet is silent during fast-forward. Once a song is done, it's kept, so this only happens the first time you hear it.
 
 The recordings take at most 1.5 GB of your device's storage for all your games together, and less when the device is short on space. When they reach that, the songs you haven't heard for the longest time make room. A song that was removed is recorded again the next time the game plays it, so it can be silent once more for a moment.

@@ -1583,7 +1583,7 @@ class EmulatorEngine(
             // Heard at 1x (unless a clip is playing through SMART's 1x); during FF
             // only as SPED-UP (which STEADY falls back to only for a song or ROM it can't
             // render). Slow-mo stays muted.
-            val spedUp = speed > 1f && clip == null && mode != FfMusicMode.OFF && !awaitingClip && !dsMusicOn
+            val spedUp = speed > 1f && clip == null && !PlaybackPolicy.muteFastAudio(speed, mode) && !awaitingClip && !dsMusicOn
             wantPaused = rewinding || battleInput.holdFrame || dsHeldFast && !ffWanted ||
                 !((speed == 1f && clip == null) || spedUp || dsMusicOn)
         }

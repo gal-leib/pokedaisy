@@ -28,7 +28,7 @@ sharing are not connected on iOS.
 SETTINGS has FF (a persistent toggle), FF SPEED (including INFINITE), GAME SPEED (kept per game), GAME VOLUME and MUTE GAME.
 SMART mode and per-scene speeds use Android's shared playback policy and existing memory watchers. Sound is pitched
 and sped up; INFINITE is silent and yields between bounded batches so the main thread handles touch and the companion.
-Steady music remains later parity work.
+`FF MUSIC` lets you choose `SPED-UP` (the default) or `OFF`. `SMART` restores game audio when it slows a menu to normal speed.
 
 REWIND is off by default. The existing native diff ring keeps the same 600 snapshots as Android, sampled every two
 frames. REWIND HOLD and the shared touch extra have independent hold owners. Rewind ignores FF pacing, flushes/mutes

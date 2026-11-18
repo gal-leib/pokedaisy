@@ -39,6 +39,7 @@ interface CompanionSettings : StoredCompanionSettings {
      * 0 = SAME (GAME SPEED's) - see [com.pokedaisy.app.Prefs.battleSpeed]. */
     val speedOptionsBadge: String? get() = null
     val ffMusicModes: List<FfMusicMode> get() = FfMusicMode.entries
+    val ffMusicBadge: String? get() = null
     val fieldMovesReadable: Boolean get() = false
 
     /** Whether the running game's field can be read for TEXT SPEED and AUTO-RUN (WIDE's tables know it). */

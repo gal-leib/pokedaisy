@@ -1229,7 +1229,8 @@ private fun speedRows(s: CompanionSettings, changed: () -> Unit, select: (Select
             select(Selector(tk("FF MODE"), modes.map { it.label }, s.ffMode.label) { l -> s.setFfMode(modes.first { it.label == l }); changed() })
         },
         // STEADY / SPED-UP / OFF (FfMusicMode's order).
-        SettingRow(tk("FF MUSIC"), s.ffMusicMode.label, enabled = s.ffMusicModes.size > 1, subtitle = "What you hear while fast-forwarding") {
+        SettingRow(tk("FF MUSIC"), s.ffMusicMode.label, enabled = s.ffMusicModes.size > 1,
+            labelBadge = s.ffMusicBadge, subtitle = "What you hear while fast-forwarding") {
             val modes = s.ffMusicModes
             select(Selector(tk("FF MUSIC"), modes.map { it.label }, s.ffMusicMode.label) { l -> s.setFfMusicMode(modes.first { it.label == l }); changed() })
         },

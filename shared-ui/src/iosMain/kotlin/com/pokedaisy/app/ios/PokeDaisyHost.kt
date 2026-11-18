@@ -316,7 +316,7 @@ object PokeDaisyHost {
                 s.rewindChanged()
             }
         battle = com.pokedaisy.app.companion.GameBattleInput(telemetry, code, revision,
-            changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 },
+            changed = { sample() }, silent = { g.audioSilent },
             caller = { fn, a0, a1, a2, a3 ->
                 if (PkApiCore.callSafe()) PkApiCore.call(fn, a0, a1, a2, a3) else com.pokedaisy.app.BattleInputController.CALL_NOT_NOW
             }, ballWriter = PkApiCore::write).also { b ->
