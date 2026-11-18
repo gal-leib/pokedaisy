@@ -37,13 +37,14 @@ internal object IosCoopCrypto : CoopCrypto {
     override fun open(key: ByteArray, nonce: ByteArray, associated: ByteArray, sealed: ByteArray) =
         primitives?.open(key.nativeData(), nonce.nativeData(), associated.nativeData(), sealed.nativeData())?.copyBytes()
 
-    private fun ByteArray.nativeData(): NSData =
-        if (isEmpty()) NSData()
-        else usePinned { NSData.create(bytes = it.addressOf(0), length = size.toULong()) }
+}
 
-    private fun NSData.copyBytes(): ByteArray? = when {
-        length == 0uL -> ByteArray(0)
-        length > Int.MAX_VALUE.toULong() -> null
-        else -> bytes?.reinterpret<ByteVar>()?.readBytes(length.toInt())
-    }
+internal fun ByteArray.nativeData(): NSData =
+    if (isEmpty()) NSData()
+    else usePinned { NSData.create(bytes = it.addressOf(0), length = size.toULong()) }
+
+internal fun NSData.copyBytes(): ByteArray? = when {
+    length == 0uL -> ByteArray(0)
+    length > Int.MAX_VALUE.toULong() -> null
+    else -> bytes?.reinterpret<ByteVar>()?.readBytes(length.toInt())
 }
