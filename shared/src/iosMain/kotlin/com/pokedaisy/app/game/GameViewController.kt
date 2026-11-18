@@ -2,6 +2,7 @@
 
 package com.pokedaisy.app.game
 
+import com.pokedaisy.app.SteadyMusicClip
 import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.companion.data.RewindPolicy
 import kotlinx.cinterop.CValue
@@ -149,10 +150,14 @@ class GameViewController(
     var speed: Double = 1.0
     var volume: Float = 1f
     var muted: Boolean = false
+    var steadyClip: SteadyMusicClip? = null
+    var steadyAwaiting = false
+    var onMusicPause: (Boolean) -> Unit = {}
     var muteAudioAtSpeed: (Double) -> Boolean = { false }
     val audioSilent: Boolean get() = shouldMuteAudio(effectiveSpeed())
 
-    private fun shouldMuteAudio(rate: Double) = rewinding || muted || volume == 0f || rate == 0.0 || muteAudioAtSpeed(rate)
+    private fun shouldMuteAudio(rate: Double) = rewinding || muted || volume == 0f || rate == 0.0 ||
+        muteAudioAtSpeed(rate) || audio.hasSteadyMusic || steadyAwaiting && rate > 1.0
     /** The same diff-ring capacity as Android; configuring it releases any current hold. */
     var rewindEnabled: Boolean = false
         set(value) {
@@ -251,6 +256,7 @@ class GameViewController(
         input.capture.cancel()
         input.backgroundCaptured(true)
         active = false
+        onMusicPause(true)
         audio.stop()
         return beforeSuspend()
     }
@@ -259,6 +265,7 @@ class GameViewController(
     fun resume() {
         if (!running || uiPaused) return
         input.backgroundCaptured(false)
+        onMusicPause(false)
         active = true
         pacer.reset()
         audio.start()
@@ -303,6 +310,8 @@ class GameViewController(
         beforeRewind = {}
         beforeFrame = {}
         afterFrame = {}
+        onMusicPause = {}
+        steadyClip = null
         performanceObserver = null
     }
 
@@ -363,7 +372,9 @@ class GameViewController(
                 wideTables = 0; expanded = false; pictureWindow = null; onPictureChanged()
             }
             afterFrame()
-            audio.volume = if (shouldMuteAudio(rate) || quietPress()) 0f else volume
+            audio.volume = if (muted) 0f else volume
+            audio.steadyClip(steadyClip.takeUnless { rewinding })
+            audio.liveMuted = shouldMuteAudio(rate) || quietPress()
             audio.push()
             performance?.frame(((CACurrentMediaTime() - workStarted) * 1e9).toLong())
             ran = true

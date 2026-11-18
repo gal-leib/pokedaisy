@@ -24,7 +24,7 @@ class Gen1MusicRenderer(
     private val requested = SeenSongs()
     @Volatile private var stopped = false
 
-    fun start() = host.start("pokedaisy-gbmusic-render", onFailure = {
+    override fun start() = host.start("pokedaisy-gbmusic-render", onFailure = {
         host.log("GB FF music renderer failed", it)
         failed = true
     }) { run() }

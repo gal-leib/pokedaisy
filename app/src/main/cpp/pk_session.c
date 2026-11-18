@@ -72,15 +72,20 @@ pthread_rwlock_t pk_coreLock = PTHREAD_RWLOCK_INITIALIZER;
 static void pk_mgba_log(struct mLogger* logger, int category, enum mLogLevel level, const char* format, va_list args) {
     (void) logger;
     if (!(level & (mLOG_FATAL | mLOG_ERROR))) return;
-    static struct timespec windowStart;
+    static pthread_mutex_t logLock = PTHREAD_MUTEX_INITIALIZER;
+    static time_t windowSecond;
     static int inWindow;
+    if (pthread_mutex_trylock(&logLock) != 0) return;
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    if (now.tv_sec != windowStart.tv_sec) {
-        windowStart = now;
+    if (now.tv_sec != windowSecond) {
+        windowSecond = now.tv_sec;
         inWindow = 0;
     }
-    if (++inWindow > 5) return;
+    bool allowed = inWindow < 5;
+    if (allowed) ++inWindow;
+    pthread_mutex_unlock(&logLock);
+    if (!allowed) return;
     char line[256];
     vsnprintf(line, sizeof(line), format, args);
     PK_LOG_MGBA(mLogCategoryName(category), line);

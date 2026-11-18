@@ -381,6 +381,7 @@ object PokeDaisyHost {
             g.afterFrame = {
                 p.flight?.afterFrame()
                 p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1)
+                steadyMusic?.frame(currentSettings.ffMusicMode, p.requestedSpeedNow() > 1f)
                 // Native flags identify a clear field even while the callback watcher is learning it.
                 val gameOwnsScreen = p.fieldState and (GameField.LOCKED or GameField.BATTLE or GameField.WINDOW) != 0
                 val field = !p.session.mapOpen && !gameOwnsScreen &&
@@ -519,6 +520,11 @@ object PokeDaisyHost {
                 g.camera.level = iosPreferences.zoomLevelFor(key)
                 g.setExpandedTables(tables)
                 p.start(romPath.toPath(), code, crc, areaMapCrc = tables)
+                if (!blocked) {
+                    steadyMusic = IosSteadyMusic(g, romPath.toPath(), key, code != null).also {
+                        g.onMusicPause = it::pause
+                    }
+                }
                 currentLook.ride.reset()
                 if (code != null && !blocked) {
                     currentLook.load(romPath.toPath(), code, key) { games().map { it.toPath() } }
@@ -621,12 +627,15 @@ object PokeDaisyHost {
     }
 
     private var playerLook: IosPlayerLook? = null
+    private var steadyMusic: IosSteadyMusic? = null
 
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
         FeatureTips.available = { false }
         FeatureTips.scheduler?.let { tips -> tips.current?.let(tips::timedOut); tips.save() }
         stateError = null
+        steadyMusic?.close()
+        steadyMusic = null
         playerLook?.close()
         playerLook = null
         playback?.quiesce()

@@ -41,6 +41,7 @@ val sharedCoreSources by extra(
         "com/pokedaisy/app/FfMusicRenderer.kt",
         "com/pokedaisy/app/Gen1MusicRenderer.kt",
         "com/pokedaisy/app/MusicRenderHost.kt",
+        "com/pokedaisy/app/SteadyMusic.kt",
         "com/pokedaisy/app/M4aLoop.kt",
         "com/pokedaisy/app/Gen1Loop.kt",
         "com/pokedaisy/app/ScriptInput.kt",

@@ -1065,12 +1065,7 @@ class EmulatorEngine(
         var lastSample = 0L
         var lastBattleInputSample = 0L
         val ffClipNotice = SteadyClipNotice()
-        var requestedKey: String? = null
-        // The song playing and when it started (elapsedRealtime), so a clip picks up
-        // where the song is: from the top for a song that just started, further on
-        // when FF comes on mid-song. A key blinking off for a moment isn't a new song.
-        var songKey: String? = null
-        var songStartedAt = 0L
+        val steady = SteadyMusic(ffMusicCache, android.os.SystemClock::elapsedRealtime)
         // SPED-UP: the core's audio averaged down to real time (a box
         // filter, so it's the game's own sound pitched and tempo'd up).
         val spedUpOut = ShortArray(scratch.size)
@@ -1341,7 +1336,7 @@ class EmulatorEngine(
                 // STEADY's clip: the activity released its player as the screen went off, so it's told again (the
                 // lid closed and opened on the Thor left FF silent). The song held meanwhile: its start moves on.
                 ffClipNotice.forget()
-                songStartedAt += android.os.SystemClock.elapsedRealtime() - sleptAt
+                steady.holdFor(android.os.SystemClock.elapsedRealtime() - sleptAt)
                 if (!paused) runCatching { track?.play() }
                 // As after the audio pausing below: flush() put the play head back at 0. And the frames due while
                 // it slept are not owed.
@@ -1496,33 +1491,17 @@ class EmulatorEngine(
             // every frame, so a clip starts and stops exactly with it.
             val ffMusicKey = if (gba) FfMusicKey.current(InProcessReader)
                 else gen1Music?.let { com.pokedaisy.app.companion.data.Gen1Music.current(InProcessReader, it) }
-            if (ffMusicKey != null && ffMusicKey != songKey) {
-                songKey = ffMusicKey
-                songStartedAt = android.os.SystemClock.elapsedRealtime()
-            }
-            // STEADY: have each new song rendered on its own, at any
-            // speed, so its clip is usually ready before FF needs it.
-            if (mode != FfMusicMode.STEADY) requestedKey = null
-            else if (ffMusicKey != null && ffMusicKey != requestedKey) {
-                requestedKey = ffMusicKey
-                ffMusicCache.notePlayed(ffMusicKey)   // the songs played longest ago go first when the cache is full
-                if (!ffMusicCache.complete(ffMusicKey)) runCatching { onFfMusicWanted?.invoke(ffMusicKey) }
-            }
-            // The clip follows the FF the player asked for, not SMART's 1x stretches: it
-            // plays straight through a menu instead of handing over to the game's music
-            // (at another spot in the song) and starting over when FF picks up again.
-            val clip = if (ffWanted && mode == FfMusicMode.STEADY && ffMusicKey != null) {
-                ffMusicCache.fileIfCached(ffMusicKey)?.toFile()
-            } else null
+            steady.observe(ffMusicKey, mode == FfMusicMode.STEADY, ffWanted,
+                request = { key -> runCatching { onFfMusicWanted?.invoke(key) } },
+                willRender = { key -> ffMusicWillRender?.invoke(key) == true })
+            val desired = steady.clip
+            val clip = desired?.loop?.toFile()
             if (ffClipNotice.changed(clip)) {
-                onFfMusicChanged?.invoke(
-                    clip?.let { FfMusicPlayer.Clip(it, ffMusicCache.introIfCached(ffMusicKey!!)?.toFile(), songStartedAt) },
-                )
+                onFfMusicChanged?.invoke(desired?.let {
+                    FfMusicPlayer.Clip(it.loop.toFile(), it.intro?.toFile(), it.songStartedAt)
+                })
             }
-            // STEADY with the song's clip still rendering: FF stays silent until it's in (it used to
-            // play the song SPED-UP meanwhile, then switch) - unless no clip will ever come.
-            val awaitingClip = mode == FfMusicMode.STEADY && clip == null && ffMusicKey != null &&
-                ffMusicWillRender?.invoke(ffMusicKey) == true
+            val awaitingClip = steady.awaitingClip
             // A DS game: no clips, the copy (above). Like a clip it follows the FF the player asked for, so it
             // plays straight through SMART's 1x menus.
             val dsBgm = if (nds && dsMusicOk && mode == FfMusicMode.STEADY && ffWanted) MgbaCore.pkNdsBgm() else -1

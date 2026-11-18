@@ -15,6 +15,7 @@ import okio.SYSTEM
 
 /** What the activity drives: FfMusicRenderer (GBA) or Gen1MusicRenderer (Game Boy). */
 interface SongRenderer {
+    fun start()
     /** Render [key]'s song soon, unless it's cached or already asked for. */
     fun request(key: String)
     fun stop()
@@ -65,7 +66,7 @@ class FfMusicRenderer(
     @Volatile var supported = true
         private set
 
-    fun start() = host.start("pokedaisy-ffmusic-render", onFailure = {
+    override fun start() = host.start("pokedaisy-ffmusic-render", onFailure = {
         host.log("FF music renderer failed", it)
         supported = false
     }) { run() }

@@ -93,17 +93,15 @@ class FfMusicPlayer {
                     buildTrack(loop.rate).also { track = it }
                 }
                 applyVolume()
-                val atFrames = ((SystemClock.elapsedRealtime() - clip.songStartedAt).coerceAtLeast(0L) * loop.rate / 1000L)
-                val introFrames = intro?.frames ?: 0L
+                val position = SteadyMusicPosition.at(
+                    SystemClock.elapsedRealtime() - clip.songStartedAt, loop.rate, intro?.frames ?: 0L, loop.frames,
+                )
                 track.play()
-                if (intro != null && atFrames < introFrames) {
-                    // Still in the intro: play the rest of it, then straight into the loop.
-                    if (!intro.play(atFrames)) return
+                if (intro != null && position.insideIntro) {
+                    if (!intro.play(position.frame)) return
                     loop.repeat(0L)
                 } else if (loop.frames > 0) {
-                    // Without an intro the clip's own timeline starts at the song's start (near enough): just past
-                    // the intro, at the same place in the loop.
-                    loop.repeat((atFrames - introFrames) % loop.frames)
+                    loop.repeat(position.frame)
                 }
             } catch (e: Exception) {
                 if (running) Log.w("pokedaisy", "ffmusic: playback of ${clip.loop.name} stopped", e)
