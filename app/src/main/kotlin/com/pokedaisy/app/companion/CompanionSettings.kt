@@ -158,6 +158,8 @@ interface CompanionSettings : StoredCompanionSettings {
      * Emerald game; [playerLooks] = the heroes it can wear now (another game's, kept from the player's own ROMs);
      * [playerLook] = the one worn, by name (null = the game's own). */
     val playerLookSupported: Boolean get() = false
+    val playerLookBadge: String? get() = null
+    val rideVehicleSupported: Boolean get() = playerLookSupported
     val playerLooks: List<String> get() = emptyList()
     val playerLook: String? get() = null
     /** The player's own hero here, by name (the picker's OFF tile); null before the save has a gender. */

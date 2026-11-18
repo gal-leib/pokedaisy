@@ -6,11 +6,17 @@ import okio.Path
 /** Prepares the appearance choices for one cart using the player's ROM library. Call on an asset worker. */
 class PlayerLookAssets(private val files: Path, private val isRetail: (String) -> Boolean) {
     class Catalog(
+        val engine: LookEngine,
         val scan: PlayerLook.Scan,
         val known: Map<LookChar, Map<LookPart, ByteArray>>,
         val heroes: Map<Triple<Boolean, LookChar?, Boolean>, PlayerLook.Patch?>,
         val text: Map<LookEngine, List<PlayerLook.Block>>,
-    )
+    ) {
+        fun availableHeroes(female: Boolean?): List<LookChar> = LookChar.entries.filter { look ->
+            if (female == null) listOf(false, true).any { heroes[Triple(it, look, false)]?.blocks?.isNotEmpty() == true }
+            else heroes[Triple(female, look, false)]?.blocks?.isNotEmpty() == true
+        }
+    }
 
     fun prepare(
         running: AppearanceAssets.Source,
@@ -64,6 +70,6 @@ class PlayerLookAssets(private val files: Path, private val isRetail: (String) -
             val art = TextArt.load(files, style) ?: return@mapNotNull null
             TextLook.build(scan, host, style, art).takeIf { it.isNotEmpty() }?.let { style to it }
         }.toMap()
-        return Catalog(scan, known, heroes, texts)
+        return Catalog(engine, scan, known, heroes, texts)
     }
 }

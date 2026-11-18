@@ -3,6 +3,8 @@
 
 package com.pokedaisy.app.ios
 
+import com.pokedaisy.app.companion.data.FfMenuWatch
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
@@ -253,9 +255,11 @@ object PokeDaisyHost {
         }.getOrElse { onFailed(); return UIViewController() }
         val g = GameViewController(romPath, savePath, onFailed)
         game = g
+        val currentLook = IosPlayerLook(iosPreferences, appFilesDir()).also { playerLook = it }
         val defaults = platform.Foundation.NSUserDefaults.standardUserDefaults
         val stateSnapshot = { telemetry.forState()?.takeIf { it.hasData && !it.unsupported }?.let(SnapshotCache::encode) }
         val stateLoaded: (Path) -> Unit = { state ->
+            if (currentLook.supported) currentLook.renderer.settle()
             telemetry.reset()
             SnapshotCache.read(state)?.let(telemetry::showCached)
             sample()
@@ -279,7 +283,7 @@ object PokeDaisyHost {
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
             }, onEditTouch = { if (game === g) touch.edit() }, readTouchStage = { touch.readStage().takeIf { game === g } }, gameScreen = { screen.takeIf { game === g } }, playback = { currentRuntime },
-            tradeSupported = { game === g && evolution?.supported() == true })
+            looks = currentLook, tradeSupported = { game === g && evolution?.supported() == true })
             .also { s ->
                 L10n.apply(s.appLanguage, code)
                 s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
@@ -314,11 +318,18 @@ object PokeDaisyHost {
             }
             g.beforeFrame = {
                 p.beforeFrame()
+                currentLook.renderer.service()
                 g.camera.flying = p.flight?.state?.let { it != 0 } == true
                 g.camera.flightZoom = p.flight?.scenicAirborne == true
                 p.gameBoyFields?.keepEncounters(PkApiCore, p.options.wildEncounters == 0)
             }
-            g.afterFrame = { p.flight?.afterFrame(); p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1); gameOptions.tick(); gameOptions.markExp(PkApiCore::read, PkApiCore::write) }
+            g.afterFrame = {
+                p.flight?.afterFrame()
+                p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1)
+                if (p.onField && !p.session.mapOpen && !FfMenuWatch.battling) currentLook.renderer.fieldFrame()
+                gameOptions.tick()
+                gameOptions.markExp(PkApiCore::read, PkApiCore::write)
+            }
         }
         val p = playback!!
         val fields = com.pokedaisy.app.companion.data.FieldItemSupportCache()
@@ -436,6 +447,10 @@ object PokeDaisyHost {
                 g.camera.level = iosPreferences.zoomLevelFor(key)
                 g.setExpandedTables(tables)
                 p.start(romPath.toPath(), code, crc, areaMapCrc = tables)
+                if (code != null && !blocked) {
+                    currentLook.load(romPath.toPath(), code, key) { games().map { it.toPath() } }
+                    if (currentLook.supported) currentLook.renderer.service(force = true)
+                }
                 if (code != null) p.bindFollower(PkApiCore, appFilesDir()) { current ->
                     val assets = com.pokedaisy.app.companion.data.AppearanceAssets(appFilesDir())
                     assets.prepareFollowers(com.pokedaisy.app.companion.data.AppearanceAssets.file(romPath.toPath()),
@@ -477,6 +492,7 @@ object PokeDaisyHost {
             current = { game === g && g.isRunning }, after = {
                 currentOptions.settingsChanged(currentSettings)
                 p.flight?.sync()
+                if (it.blocked == null) currentLook.observe(it.playerGender) else currentLook.close()
                 if (it.blocked != null && g.wideSupported) g.setExpandedTables(0)
             }, periodMillis = SAMPLE_MILLIS)
         return g
@@ -504,9 +520,13 @@ object PokeDaisyHost {
         platform.Foundation.NSLog("PokeDaisy: couldn't update resume data")
     }
 
+    private var playerLook: IosPlayerLook? = null
+
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
         stateError = null
+        playerLook?.close()
+        playerLook = null
         playback?.quiesce()
         items = null
         fly = null

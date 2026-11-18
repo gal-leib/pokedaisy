@@ -181,7 +181,10 @@ fun CompanionSettingsScreen(
             // EDIT LAYOUT saves over the game, outside this page: its revision redraws TOUCH CONTROLS.
             val touchRevision = settings?.touchRevision ?: 0
             val overlayRevision = settings?.overlayRevision ?: 0
-            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision, overlayRevision, removingCheats, removingOverlays) {
+            // PLAYER LOOK's catalog arrives from an asset worker while Settings may already be open.
+            val lookOptions = settings?.takeIf { page == Page.HOME && it.playerLookSupported }?.playerLooks
+            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision,
+                overlayRevision, removingCheats, removingOverlays, lookOptions) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
@@ -591,7 +594,7 @@ private fun homeRows(
             tk("PLAYER LOOK"),
             if (s.playerLooks.isEmpty()) tk("N/A") else s.playerLook?.let { s.playerLookLabel(it) } ?: tk("OFF"),
             enabled = s.playerLooks.isNotEmpty(),
-            labelBadge = NewFeatures.badge(NewFeatures.PLAYER_LOOK),
+            labelBadge = s.playerLookBadge ?: NewFeatures.badge(NewFeatures.PLAYER_LOOK),
             // No description line; only why it's greyed out.
             subtitle = if (s.playerLooks.isEmpty()) "Needs FireRed, LeafGreen, Ruby, Sapphire or Emerald too" else null,
         ) {
@@ -638,7 +641,7 @@ private fun homeRows(
             }
         } else null,
         // What the player rides in place of the bike (RideOn.kt: our own pixel art in the hero's bike sheets).
-        if (looks) {
+        if (s.rideVehicleSupported) {
             SettingRow(tk("RIDE ON"), s.rideVehicle.label, labelBadge = NewFeatures.badge(NewFeatures.RIDE_ON)) {
                 val all = com.pokedaisy.app.companion.data.RideVehicle.entries
                 select(Selector(tk("RIDE ON"), all.map { it.label }, s.rideVehicle.label) { l ->
