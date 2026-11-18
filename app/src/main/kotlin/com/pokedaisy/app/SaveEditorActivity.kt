@@ -686,15 +686,7 @@ class SaveEditorActivity : ComponentActivity() {
             }
             is Page.Trade -> {
                 val s = p.state
-                BackHandler {
-                    when {
-                        s.evolving != null -> s.evolving = null
-                        s.confirmSave -> s.confirmSave = false
-                        s.confirmDiscard -> s.confirmDiscard = false
-                        s.changed -> s.confirmDiscard = true
-                        else -> leaveTrade()
-                    }
-                }
+                BackHandler { if (!saving) s.back(::leaveTrade) }
                 TradeScreen(
                     s, m, onBack = { leaveTrade() }, onSave = { saveTrade(p) }, saving = saving,
                     iconsA = icons[p.a.rom.absolutePath], iconsB = icons[p.b.rom.absolutePath],

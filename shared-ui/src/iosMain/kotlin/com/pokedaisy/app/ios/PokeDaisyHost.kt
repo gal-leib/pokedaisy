@@ -277,6 +277,7 @@ object PokeDaisyHost {
 
     /** The shared import dialog retains a bounded copy until the player confirms. */
     fun loadSave(romPath: String, bytes: ByteArray): String? {
+        if (!recoverIosSaveTrades()) return iosSaveTradeRecoveryError()
         val current = RomPicker.savePathFor(romPath).toPath()
         return when (val result = com.pokedaisy.app.GameSaves.load(current, bytes,
             states = { StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath())) },
@@ -295,6 +296,7 @@ object PokeDaisyHost {
         telemetry.reset()
         val savePath = RomPicker.savePathFor(romPath)
         val files = runCatching {
+            check(recoverIosSaveTrades())
             StateFiles.backupBattery(savePath.toPath())
             StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(romPath.toPath())).also {
                 if (fresh) StateResume.startFresh(it)

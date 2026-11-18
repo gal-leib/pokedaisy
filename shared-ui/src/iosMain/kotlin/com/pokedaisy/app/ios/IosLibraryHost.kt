@@ -64,6 +64,7 @@ internal class IosLibraryHost(
     private var restorePath by mutableStateOf<String?>(null)
 
     private var choosingEditSave by mutableStateOf(false)
+    private var tradingSaves by mutableStateOf(false)
     private var editingSave by mutableStateOf<String?>(null)
     private var infoPath by mutableStateOf<String?>(null)
     private var renaming by mutableStateOf<String?>(null)
@@ -134,8 +135,11 @@ internal class IosLibraryHost(
                         SideEffect { screen = DpSize(maxWidth, maxHeight); scale = density }
                         val edit = editingSave
                         val flow = setup
-                        if (edit != null) {
-                            IosSaveEditor(edit, label(edit), onClose = { editingSave = null }, onSaved = ::refreshGames)
+                        if (tradingSaves) {
+                            IosSaveTrade(paths, edit, ::label, onClose = { tradingSaves = false }, onSaved = ::refreshGames)
+                        } else if (edit != null) {
+                            IosSaveEditor(edit, label(edit), onClose = { editingSave = null }, onSaved = ::refreshGames,
+                                onTrade = { tradingSaves = true })
                         } else {
                             if (flow == null) Library() else Setup(flow)
                             Dialogs()
@@ -191,6 +195,8 @@ internal class IosLibraryHost(
                 open = { if (paths.isEmpty()) library.selectSection(LibrarySection.GAMES) else choosingSaveGame = true }),
             LibraryTool("EDIT", "SAVE EDITOR", "Change a game's Pokémon, bag and Pokédex",
                 NewFeatures.badge(NewFeatures.IOS_SAVE_EDITOR), open = { choosingEditSave = true }),
+            LibraryTool("TRADE", "TRADE SAVES", "Move Pokémon between your games' saves",
+                NewFeatures.badge(NewFeatures.IOS_SAVE_TRADE), open = { tradingSaves = true }),
         )
         val state = LibraryPresentation(shown, library.grid, library.section, views, view,
             projection.counts, games.isNotEmpty(), library.query,

@@ -17,17 +17,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.SaveEditFiles
-import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
-import com.pokedaisy.app.companion.data.isFile
-import com.pokedaisy.app.companion.data.length
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
-import com.pokedaisy.app.companion.data.save.Gen3SaveReader
-import com.pokedaisy.app.companion.data.save.RomMonIcons
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CompanionBackHandler
 import com.pokedaisy.app.companion.ui.GbaText
-import com.pokedaisy.app.companion.ui.MonIconLoader
 import com.pokedaisy.app.companion.ui.OptionColors
 import com.pokedaisy.app.companion.ui.OptionConfirm
 import com.pokedaisy.app.companion.ui.OptionListWindow
@@ -37,7 +31,6 @@ import com.pokedaisy.app.companion.ui.OptionTitleWindow
 import com.pokedaisy.app.companion.ui.PcBoxesScreen
 import com.pokedaisy.app.companion.ui.PcBoxesState
 import com.pokedaisy.app.companion.ui.SaveEditorText
-import com.pokedaisy.app.companion.ui.imageBitmap
 import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
 import com.pokedaisy.app.game.RomPicker
 import kotlinx.coroutines.Dispatchers
@@ -52,11 +45,7 @@ internal fun IosSaveEditorPicker(paths: List<String>, label: (String) -> String,
     var choices by remember(paths) { mutableStateOf<List<String>?>(null) }
     LaunchedEffect(paths) {
         choices = withContext(Dispatchers.Default) {
-            paths.filter {
-                val rom = it.toPath()
-                RomPicker.savePathFor(it).toPath().isFile &&
-                    Gen3SaveReader.formatFor(RomIdentityReader.forPath(rom)) { rom.length } != null
-            }
+            editableIosGames(paths)
         }
     }
     val games = choices
@@ -68,10 +57,12 @@ internal fun IosSaveEditorPicker(paths: List<String>, label: (String) -> String,
     }
 }
 
-private class OpenedSave(val bytes: ByteArray, val state: PcBoxesState, val icons: MonIconLoader?)
+private class OpenedSave(val source: IosGen3Save.Ready, val state: PcBoxesState)
 
 @Composable
-internal fun IosSaveEditor(path: String, title: String, onClose: () -> Unit, onSaved: () -> Unit) = SaveEditorText {
+internal fun IosSaveEditor(
+    path: String, title: String, onClose: () -> Unit, onSaved: () -> Unit, onTrade: () -> Unit,
+) = SaveEditorText {
     val m = rememberGbaTextMetrics()
     var generation by remember(path) { mutableIntStateOf(0) }
     var opened by remember(path) { mutableStateOf<OpenedSave?>(null) }
@@ -81,24 +72,9 @@ internal fun IosSaveEditor(path: String, title: String, onClose: () -> Unit, onS
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(path, generation) {
-        val new = withContext(Dispatchers.Default) {
-            runCatching {
-                val rom = path.toPath()
-                val reader = RomIdentityReader.forPath(rom)
-                val format = Gen3SaveReader.formatFor(reader) { rom.length }
-                    ?: return@runCatching Gen3SaveReader.Result.Failed(tr("The save editor can't read this game's save format.")) to null
-                val result = Gen3SaveReader.open(RomPicker.savePathFor(path).toPath(), format)
-                val icons = (result as? Gen3SaveReader.Result.Ready)?.let {
-                    RomMonIcons.tablesFor(reader.sha1(), reader.gameCode(), reader.revision())?.let { tables ->
-                        RomMonIcons.open(rom, tables)?.let { source -> MonIconLoader { id -> source.get(id)?.imageBitmap() } }
-                    }
-                }
-                result to icons
-            }.getOrElse { Gen3SaveReader.Result.Failed(tr("Can't read the save {0}", title)) to null }
-        }
-        when (val result = new.first) {
-            is Gen3SaveReader.Result.Ready -> opened = OpenedSave(result.bytes, PcBoxesState(Gen3SaveEditor(result.save)), new.second)
-            is Gen3SaveReader.Result.Failed -> {
+        when (val result = withContext(Dispatchers.Default) { readIosGen3Save(path, title) }) {
+            is IosGen3Save.Ready -> opened = OpenedSave(result, PcBoxesState(Gen3SaveEditor(result.source.save)))
+            is IosGen3Save.Failed -> {
                 opened = null
                 openError = result.message
             }
@@ -114,7 +90,7 @@ internal fun IosSaveEditor(path: String, title: String, onClose: () -> Unit, onS
     } else {
         val state = edit.state
         CompanionBackHandler { if (!saving) state.back(onClose) }
-        PcBoxesScreen(state, title, m, onBack = onClose, saving = saving, icons = edit.icons, onSave = {
+        PcBoxesScreen(state, title, m, onBack = onClose, saving = saving, icons = edit.source.icons, onTrade = onTrade, onSave = {
             if (!saving) {
                 val bytes = runCatching { state.editor.build() }.getOrNull()
                 if (bytes == null) {
@@ -124,10 +100,8 @@ internal fun IosSaveEditor(path: String, title: String, onClose: () -> Unit, onS
                     scope.launch {
                         val result = withContext(NonCancellable + Dispatchers.Default) {
                             runCatching {
-                                val rom = path.toPath()
-                                val save = RomPicker.savePathFor(path).toPath()
-                                val states = StateFiles(RomPicker.statesDir.toPath() / StateFiles.romKey(rom))
-                                commitIosSaveEdit(save, states, edit.bytes, bytes)
+                                val states = StateFiles(RomPicker.statesDir.toPath() / edit.source.stateKey)
+                                commitIosSaveEdit(edit.source.path, states, edit.source.source.bytes, bytes)
                             }.getOrElse { SaveEditFiles.Result.Failed(tr("Can't write the save")) }
                         }
                         saving = false
@@ -145,17 +119,22 @@ internal fun IosSaveEditor(path: String, title: String, onClose: () -> Unit, onS
             }
         })
     }
+    IosSaveWriteStatus(tr("SAVE EDITOR"), saving, notice, clearNotice = { notice = null })
+}
+
+@Composable
+internal fun IosSaveWriteStatus(title: String, saving: Boolean, notice: String?, clearNotice: () -> Unit) {
+    val m = rememberGbaTextMetrics()
     if (saving) {
         OptionOverlay({}, Modifier.widthIn(max = 480.dp)) {
             Column {
-                OptionTitleWindow(tr("SAVE EDITOR"), m)
+                OptionTitleWindow(title, m)
                 OptionListWindow(m, Modifier.fillMaxWidth()) {
                     GbaText(tr("SAVING…"), OptionColors.label, OptionColors.labelShadow, m, Modifier.padding(16.dp))
                 }
             }
         }
     } else if (notice != null) {
-        OptionConfirm(tr("SAVE EDITOR"), notice.orEmpty(), tr("OK"), m,
-            onConfirm = { notice = null }, onDismiss = { notice = null }, cancelLabel = null)
+        OptionConfirm(title, notice, tr("OK"), m, onConfirm = clearNotice, onDismiss = clearNotice, cancelLabel = null)
     }
 }

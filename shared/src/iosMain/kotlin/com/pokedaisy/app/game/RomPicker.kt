@@ -76,10 +76,12 @@ object RomPicker {
     /** State files, visible in Files alongside battery saves. */
     val statesDir: String get() = documents("states")
 
+    val savesDir: String get() = documents("saves")
+
     /** Where the game at [romPath] keeps its battery save: `Documents/saves/<name>.sav`. */
     fun savePathFor(romPath: String): String {
         val name = romPath.substringAfterLast('/').substringBeforeLast('.')
-        return "${documents("saves")}/$name.sav"
+        return "$savesDir/$name.sav"
     }
 
     /** Moves the picker's copy at [url] into [romsDir]; its path there, or null if it couldn't. */
