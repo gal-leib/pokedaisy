@@ -43,9 +43,11 @@ internal class IosCompanionSettings(
             languageRomCode = { romCode }, allowDisableResume = onDisableResume),
 ) : CompanionSettings, com.pokedaisy.app.companion.StoredCompanionSettings by stored {
     override val playerLookSupported get() = looks?.supported == true
-    override val playerLookBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PLAYER_LOOK)
+    override val playerLookBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_POKEMON_COSTUMES) ?:
+        com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PLAYER_LOOK)
     override val playerLooks get() = looks?.choices.orEmpty()
     override val playerLook get() = looks?.selected
+    override fun playerLookLabel(name: String) = looks?.costumeLabel(name) ?: super<CompanionSettings>.playerLookLabel(name)
     override val playerLookOwn get() = looks?.own
     override val rivalLookSupported get() = looks?.rivalSupported == true
     override val rivalLookBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_RIVAL_LOOK)

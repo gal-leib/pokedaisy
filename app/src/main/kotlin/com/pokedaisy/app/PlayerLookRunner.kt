@@ -10,6 +10,7 @@ import com.pokedaisy.app.companion.data.LookPart
 import com.pokedaisy.app.companion.data.MonArt
 import com.pokedaisy.app.companion.data.PlayerLook
 import com.pokedaisy.app.companion.data.PlayerLookAssets
+import com.pokedaisy.app.companion.data.PokemonCostumes
 import com.pokedaisy.app.companion.data.RideOn
 import com.pokedaisy.app.companion.data.TextLook
 import com.pokedaisy.app.companion.data.RideVehicle
@@ -202,14 +203,12 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
         val scan = keptScan ?: return null
         if (!building.add(female to n)) return null
         val gen = generation
+        val available = offeredMons.value
+        val known = keptKnown
         Thread({
             try {
-                val mon = MonArt.load(context.filesDir.toOkioPath(), n) ?: return@Thread
-                val own = { p: LookPart -> scan.data(me, p) }
-                // The party's other Pokémon: a state made wearing one of them may have loaded its palette.
-                val extra = offeredMons.value.filter { it != n }.mapNotNull { MonArt.load(context.filesDir.toOkioPath(), it) }.mapNotNull { PlayerLook.wearMon(me, it, own) }
-                val patch = PlayerLook.buildMon(scan, me, mon, keptKnown, extra)
-                if (patch != null) monPatches[female to n] = patch
+                val patch = PokemonCostumes.build(context.filesDir.toOkioPath(), scan, me, n, available, known)
+                if (patch != null && gen == generation) monPatches[female to n] = patch
                 Log.i("pokedaisy", "player look: ${if (patch == null) "no" else patch.blocks.size} blocks for Pokémon $n")
             } catch (t: Throwable) {
                 Log.w("pokedaisy", "player look: Pokémon $n failed", t)

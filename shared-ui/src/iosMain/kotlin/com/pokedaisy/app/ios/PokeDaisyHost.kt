@@ -327,10 +327,11 @@ object PokeDaisyHost {
             g.afterFrame = {
                 p.flight?.afterFrame()
                 p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1)
-                val field = p.onField && !p.session.mapOpen && !FfMenuWatch.battling
-                if (field) currentLook.renderer.fieldFrame()
-                // The core reports the mounted bike even while the callback watcher is learning this field.
+                // Native flags identify a clear field even while the callback watcher is learning it.
                 val gameOwnsScreen = p.fieldState and (GameField.LOCKED or GameField.BATTLE or GameField.WINDOW) != 0
+                val field = !p.session.mapOpen && !gameOwnsScreen &&
+                    (p.fieldState and GameField.KNOWN != 0 || p.onField && !FfMenuWatch.battling)
+                if (field) currentLook.renderer.fieldFrame()
                 currentLook.ride.step(p.riding && !p.session.mapOpen && !gameOwnsScreen, currentLook.renderer.ride)
                 gameOptions.tick()
                 gameOptions.markExp(PkApiCore::read, PkApiCore::write)
@@ -498,7 +499,7 @@ object PokeDaisyHost {
             current = { game === g && g.isRunning }, after = {
                 currentOptions.settingsChanged(currentSettings)
                 p.flight?.sync()
-                if (it.blocked == null) currentLook.observe(it.playerGender) else currentLook.close()
+                if (it.blocked == null) currentLook.observe(it) else currentLook.close()
                 if (it.blocked != null && g.wideSupported) g.setExpandedTables(0)
             }, periodMillis = SAMPLE_MILLIS)
         return g

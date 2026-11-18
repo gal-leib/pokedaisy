@@ -183,9 +183,10 @@ fun CompanionSettingsScreen(
             val overlayRevision = settings?.overlayRevision ?: 0
             // PLAYER LOOK's catalog arrives from an asset worker while Settings may already be open.
             val lookOptions = settings?.takeIf { page == Page.HOME && it.playerLookSupported }?.playerLooks
+            val selectedLook = if (page == Page.HOME) settings?.playerLook else null
             val textOptions = if (page == Page.HOME) settings?.textLooks else null
             val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision,
-                overlayRevision, removingCheats, removingOverlays, lookOptions, textOptions) {
+                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->

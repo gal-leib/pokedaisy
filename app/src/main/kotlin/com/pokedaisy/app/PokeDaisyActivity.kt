@@ -1701,13 +1701,9 @@ class PokeDaisyActivity : Activity() {
                 .distinctUntilChanged().collect { (species, dex) ->
                 val tables = dex?.tables ?: return@collect
                 val named = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    species.distinct().mapNotNull { sp ->
-                        runCatching { com.pokedaisy.app.companion.data.PokedexSource.nationalOf(tables, sp) }.getOrNull()
-                            ?.takeIf { it in 1..com.pokedaisy.app.companion.data.MonArt.LAST }
-                            ?.let { it to com.pokedaisy.app.companion.data.speciesName(sp) }
-                    }
+                    com.pokedaisy.app.companion.data.PokemonCostumes.party(tables, species)
                 }
-                lookRunner.onParty(named.map { it.first }.distinct(), named.toMap())
+                lookRunner.onParty(named.keys.toList(), named)
             }
         }
         // HIDE BATTLE MENU follows the game being detected, the companion and the second screen.

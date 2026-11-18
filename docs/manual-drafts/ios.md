@@ -37,6 +37,8 @@ kept for this ROM when you reopen the game. Game Boy cheats are not supported by
 
 In a supported GBA game on iPhone or iPad, choose a hero under `SETTINGS` > `MAKEOVER` > `PLAYER LOOK`. Import a compatible GBA game to supply its hero's graphics. Your choice is saved for the current game, and `OFF` restores its original look.
 
+`PLAYER LOOK` can also show Pokémon from your current party when their costume graphics are available. Add a compatible game with follower sprites to your library. The picker uses the same sprite cache as `FOLLOWER`.
+
 In Ruby, Sapphire and Emerald, `RIVAL LOOK` starts on. Pick a `PLAYER LOOK` to dress your rival as the other hero of that game when their graphics are available. Turn it off to keep your rival's original look.
 
 `TEXT LOOK` changes the dialogue boxes and compatible fonts in supported GBA games when you have a compatible game's style in your library. The choice is saved for the current game and can be used together with `PLAYER LOOK`. Choose `OFF` to return to the game's own text.
