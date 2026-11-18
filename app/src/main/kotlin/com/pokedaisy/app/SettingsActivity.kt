@@ -1340,7 +1340,7 @@ class SettingsActivity : ComponentActivity() {
     // ---- co-op --------------------------------------------------------------
 
     /** CO-OP's pages and their state (PAIR, PARTNERS, RELAY); internal for ui-preview's stand-in ([CoopSettingsPages.preview]). */
-    internal val coop by lazy { CoopSettingsPages(this, { prefs }) { revision++ } }
+    internal val coop by lazy { androidCoopSettings(this, { prefs }) { revision++ } }
 
     /** The CO-OP group, only while the co-op flag is on; the companion's SETTINGS has the same rows in the same place. */
     private fun coopRows(): List<SettingRow> {

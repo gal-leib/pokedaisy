@@ -58,6 +58,7 @@ val sharedUiSources by extra(
         "com/pokedaisy/app/companion/ui/**",
         "com/pokedaisy/app/companion/*.kt",
         "com/pokedaisy/app/companion/coop/**",
+        "com/pokedaisy/app/CoopSettingsPages.kt",
         "com/pokedaisy/app/cheats/Cheats.kt",
         "com/pokedaisy/app/achievements/RaRecords.kt",
         "com/pokedaisy/app/achievements/RaSession.kt",
