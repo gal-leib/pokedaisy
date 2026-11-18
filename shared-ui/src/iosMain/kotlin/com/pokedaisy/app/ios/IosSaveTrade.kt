@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import com.pokedaisy.app.SaveEditFiles
 import com.pokedaisy.app.SaveTradeJournal
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
+import com.pokedaisy.app.companion.data.save.MonRef
 import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CompanionBackHandler
@@ -30,6 +31,7 @@ private class OpenTrade(val a: IosGen3Save.Ready, val b: IosGen3Save.Ready, val 
 @Composable
 internal fun IosSaveTrade(
     paths: List<String>, fixedFrom: String?, title: (String) -> String, onClose: () -> Unit, onSaved: () -> Unit,
+    initialPick: MonRef? = null,
 ) = SaveEditorText {
     val m = rememberGbaTextMetrics()
     val scope = rememberCoroutineScope()
@@ -61,6 +63,7 @@ internal fun IosSaveTrade(
         if (a is IosGen3Save.Ready && b is IosGen3Save.Ready && a.path != b.path) {
             val state = TradeState(TradeSide(aName, Gen3SaveEditor(a.source.save), a.gameCode),
                 TradeSide(bName, Gen3SaveEditor(b.source.save), b.gameCode))
+            if (reload == 0) initialPick?.let { state.focus(it, firstSide = true) }
             open = OpenTrade(a, b, state)
         } else {
             notice = (a as? IosGen3Save.Failed)?.message ?: (b as? IosGen3Save.Failed)?.message

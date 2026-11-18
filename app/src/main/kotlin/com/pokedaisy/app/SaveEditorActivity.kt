@@ -528,7 +528,7 @@ class SaveEditorActivity : ComponentActivity() {
             val next = when (val o = open(rom)) {
                 is Opened -> Page.Ready(PcBoxesState(o.editor()).also { st ->
                     // From COLLECTION: on the Pokémon picked there.
-                    focus?.let { at -> st.selected = at; (at as? com.pokedaisy.app.companion.data.save.MonRef.Pc)?.let { st.box = it.at.box } }
+                    focus?.let(st::focus)
                 }, o)
                 else -> Page.Message(o as String)
             }
@@ -657,8 +657,8 @@ class SaveEditorActivity : ComponentActivity() {
                 is Opened -> {
                     val st = TradeState(TradeSide(a.name, a.editor(), a.gameCode), TradeSide(o.name, o.editor(), o.gameCode))
                     // From MISSING: the Pokémon to bring already picked on the other side.
-                    pick?.let { st.selB = it; (it as? com.pokedaisy.app.companion.data.save.MonRef.Pc)?.let { pc -> st.boxB = pc.at.box } }
-                    pickA?.let { st.selA = it; (it as? com.pokedaisy.app.companion.data.save.MonRef.Pc)?.let { pc -> st.boxA = pc.at.box } }
+                    pick?.let { st.focus(it, firstSide = false) }
+                    pickA?.let { st.focus(it, firstSide = true) }
                     Page.Trade(st, a, o)
                 }
                 else -> null.also { runOnUiThread { Toast.makeText(this, o as String, Toast.LENGTH_LONG).show() } }

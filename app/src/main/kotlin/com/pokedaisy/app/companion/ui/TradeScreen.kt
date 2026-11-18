@@ -64,6 +64,16 @@ class TradeState(a: TradeSide, b: TradeSide) {
     /** What the last TRADE AND BACK did. */
     var notice by mutableStateOf<String?>(null)
 
+    fun focus(at: MonRef, firstSide: Boolean) {
+        if (firstSide) {
+            selA = at
+            if (at is MonRef.Pc) boxA = at.at.box
+        } else {
+            selB = at
+            if (at is MonRef.Pc) boxB = at.at.box
+        }
+    }
+
     fun back(onLeave: () -> Unit) {
         when {
             evolving != null -> evolving = null

@@ -125,6 +125,8 @@ Each one arrives the way the Lab makes it: the same Pokémon with its trainer, n
 
 ## Collection
 
+On iPhone and iPad, `COLLECTION` lists Pokémon from your supported GBA saves. Tap a Pokémon to open its save in the editor or pick it for a trade.
+
 Tap `TOOLS` in the library, then `COLLECTION`, to see every Pokémon in all your saves in one list: the party and every box of each game the save editor can read. The title counts them, and how many different kinds you have. Each row shows the Pokémon's number, name and level, with the game and the box it's in (or `PARTY`) under it, and a `SHINY` tag on a shiny one.
 
 - Type in the box at the top to find one by its name or its species.

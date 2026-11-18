@@ -99,6 +99,11 @@ class PcBoxesState(editor: MonSaveEditor) {
     /** A pick-list, amount, name or confirm over the page, if one is open. */
     var editing by mutableStateOf<Editing?>(null)
 
+    fun focus(at: MonRef) {
+        selected = at
+        if (at is MonRef.Pc) box = at.at.box
+    }
+
     fun back(onLeave: () -> Unit) {
         when {
             editing != null -> editing = null

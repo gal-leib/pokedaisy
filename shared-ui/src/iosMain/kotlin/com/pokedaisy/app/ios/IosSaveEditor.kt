@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.SaveEditFiles
 import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
+import com.pokedaisy.app.companion.data.save.MonRef
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CompanionBackHandler
 import com.pokedaisy.app.companion.ui.GbaText
@@ -61,7 +62,7 @@ private class OpenedSave(val source: IosGen3Save.Ready, val state: PcBoxesState)
 
 @Composable
 internal fun IosSaveEditor(
-    path: String, title: String, onClose: () -> Unit, onSaved: () -> Unit, onTrade: () -> Unit,
+    path: String, title: String, onClose: () -> Unit, onSaved: () -> Unit, onTrade: () -> Unit, initialPick: MonRef? = null,
 ) = SaveEditorText {
     val m = rememberGbaTextMetrics()
     var generation by remember(path) { mutableIntStateOf(0) }
@@ -73,7 +74,11 @@ internal fun IosSaveEditor(
 
     LaunchedEffect(path, generation) {
         when (val result = withContext(Dispatchers.Default) { readIosGen3Save(path, title) }) {
-            is IosGen3Save.Ready -> opened = OpenedSave(result, PcBoxesState(Gen3SaveEditor(result.source.save)))
+            is IosGen3Save.Ready -> {
+                val state = PcBoxesState(Gen3SaveEditor(result.source.save))
+                if (generation == 0) initialPick?.let(state::focus)
+                opened = OpenedSave(result, state)
+            }
             is IosGen3Save.Failed -> {
                 opened = null
                 openError = result.message
