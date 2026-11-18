@@ -262,7 +262,7 @@ class PokeDaisyActivity : Activity() {
 
     /** Each sample (emu thread): a wild battle counted, and a shiny foe announced, with FF and turbo stopped. */
     private fun updateShinyHunt(snap: com.pokedaisy.app.companion.data.SnapshotView) {
-        if (!snap.connected || !shinyAlertOn || shinyTarget == null) return
+        if (!snap.connected || !shinyAlertOn || !(::engine.isInitialized && engine.shiny.supported)) return
         val step = shinyHunt.sample(snap.inBattle, com.pokedaisy.app.companion.data.ShinyHunt.wild(snap), snap.battleOpponent)
         val key = romKey
         if (step.counted) {
@@ -1259,7 +1259,7 @@ class PokeDaisyActivity : Activity() {
             shinyAlertOn = on
         }
         override val shinyHuntCount get() = shinyHuntState.intValue
-        override val shinyAlertSupported get() = shinyTarget != null
+        override val shinyAlertSupported get() = (::engine.isInitialized && engine.shiny.supported)
         override val battleRetry get() = Prefs(this@PokeDaisyActivity).battleRetry
         override fun setBattleRetry(on: Boolean) {
             Prefs(this@PokeDaisyActivity).battleRetry = on

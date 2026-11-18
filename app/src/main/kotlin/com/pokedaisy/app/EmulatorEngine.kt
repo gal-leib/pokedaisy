@@ -1276,6 +1276,7 @@ class EmulatorEngine(
                 }
             }
             rewinding = rewindHeld && rewindWanted > 0
+            if (rewinding) playback.cancelFieldActions()
             MgbaCore.pkSetRewinding(rewinding)
             // TURBO A / B: pressed 2 frames, released 2, in game frames - so FF mashes faster too.
             val reset = if (softResetFrames > 0) { softResetFrames--; SOFT_RESET_KEYS } else 0
@@ -1365,8 +1366,7 @@ class EmulatorEngine(
             }
             // FREE FLIGHT's state after this frame (pk_flight.c ticks inside pkRunFrame): TAKE OFF / LAND, the scenic FLY.
             if (gba) {
-                flightState = MgbaCore.pkFlightState()
-                if (scenicFlight && flightState == MgbaCore.FLIGHT_IDLE) scenicFlight = false
+                playback.flight?.afterFrame()
             }
             // DsFrameSkip learns from the core's own time (drawn or not), after the frame is out.
             if (dsSkipTimed) {
@@ -1504,14 +1504,7 @@ class EmulatorEngine(
                 wildApplied = wildFlag
                 playback.resetFieldMoves()
             }
-            // WILD ENCOUNTERS on a Game Boy game: held every frame while OFF, put back once on the field when ON.
-            gbField?.let { gf ->
-                val hold = wildEncounters == 0
-                runCatching {
-                    if (hold) { gf.holdWild(gameCalls); gbWildHeld = true }
-                    else if (gbWildHeld != false && gbOnField && gf.releaseWild(gameCalls)) gbWildHeld = false
-                }.onFailure { Log.e("pokedaisy", "Game Boy wild encounters failed", it) }
-            } ?: run { gbWildHeld = null }
+            if (!rewinding) playback.gameBoyFields?.keepEncounters(gameCalls, wildEncounters == 0, gbOnField)
             // A DS game holds its own switch in its field read (pk_nds_field.cpp: the map's rates at 0).
             val wildKeep = if (wildFlag != 0L || nds) wildEncounters else 100
             if (nds) {
@@ -1524,12 +1517,7 @@ class EmulatorEngine(
                 else -> 0
             }
             // SHINY ODDS: a new wild foe, between the frame it's made and the battle drawing it.
-            if (gba && shinyOdds < com.pokedaisy.app.companion.data.ShinyOdds.NORMAL) shinyRoller?.let { r ->
-                runCatching {
-                    val n = r.tick(shinyOdds, InProcessReader::readCoreMemory, MgbaCore::pkWriteBytes)
-                    if (n > 0) Log.i("pokedaisy", "shiny odds: foe made shiny (1 in $shinyOdds)")
-                }.onFailure { Log.w("pokedaisy", "shiny odds failed", it) }
-            }
+            if (gba) shiny.tick()
             if (gba) gameOptions.markExp(InProcessReader::readCoreMemory, MgbaCore::pkWriteBytes)
             playback.fieldChanged(fieldState)
             val bike = MgbaCore.FIELD_AVATAR or MgbaCore.FIELD_BIKE
