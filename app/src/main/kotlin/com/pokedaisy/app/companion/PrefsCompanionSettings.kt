@@ -84,6 +84,10 @@ class PrefsCompanionSettings(
     override fun setAutoRun(on: Boolean) { prefs.autoRun = on; changed(Change.FIELD_OPTIONS) }
     override val runIndoors get() = prefs.runIndoors
     override fun setRunIndoors(on: Boolean) { prefs.runIndoors = on; changed(Change.FIELD_OPTIONS) }
+    override val lowHpBeep get() = prefs.lowHpBeep
+    override fun setLowHpBeep(on: Boolean) { prefs.lowHpBeep = on; changed(Change.FIELD_OPTIONS) }
+    override val fieldPoison get() = prefs.fieldPoison
+    override fun setFieldPoison(on: Boolean) { prefs.fieldPoison = on; changed(Change.FIELD_OPTIONS) }
     override val instantText get() = prefs.instantText
     override fun setInstantText(on: Boolean) { prefs.instantText = on; changed(Change.FIELD_OPTIONS) }
     override val reusableTms get() = prefs.reusableTms

@@ -100,12 +100,10 @@ interface CompanionSettings : StoredCompanionSettings {
     val shinyAlertBadge: String? get() = null
     /** LOW HP BEEP / FIELD POISON - see [com.pokedaisy.app.Prefs.lowHpBeep]; supported = the ROM's code is known
      * ([com.pokedaisy.app.companion.data.QuietPatches]). */
-    val lowHpBeep: Boolean get() = true
-    fun setLowHpBeep(on: Boolean) {}
     val lowHpBeepSupported: Boolean get() = false
-    val fieldPoison: Boolean get() = true
-    fun setFieldPoison(on: Boolean) {}
+    val lowHpBeepBadge: String? get() = null
     val fieldPoisonSupported: Boolean get() = false
+    val fieldPoisonBadge: String? get() = null
     /** AUTO REFILL - see [com.pokedaisy.app.Prefs.repelRefill]; [repelRefillSupported]: the game can take a REPEL from the
      * companion (the quick menu's REPEL). */
     val repelRefill: Boolean get() = false

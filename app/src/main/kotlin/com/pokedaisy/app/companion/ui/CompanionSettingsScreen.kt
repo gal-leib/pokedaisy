@@ -187,9 +187,10 @@ fun CompanionSettingsScreen(
             val textOptions = if (page == Page.HOME) settings?.textLooks else null
             val shinyAlertSupported = if (page == Page.HOME) settings?.shinyAlertSupported else null
             val shinyHuntCount = if (page == Page.HOME && settings?.shinyAlert == true) settings.shinyHuntCount else null
+            val quietOptions = if (page == Page.HOME) settings?.let { it.lowHpBeepSupported to it.fieldPoisonSupported } else null
             val refillSupported = if (page == Page.HOME) settings?.repelRefillSupported else null
             val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision,
-                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions, refillSupported, shinyAlertSupported, shinyHuntCount) {
+                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions, refillSupported, shinyAlertSupported, shinyHuntCount, quietOptions) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
@@ -816,13 +817,13 @@ private fun homeRows(
         // (QuietPatches.kt). Two values: a tap flips them.
         SettingRow(
             tk("LOW HP BEEP"), if (s.lowHpBeepSupported) onOff(s.lowHpBeep) else tk("N/A"),
-            enabled = s.lowHpBeepSupported, labelBadge = NewFeatures.badge(NewFeatures.LOW_HP_BEEP),
+            enabled = s.lowHpBeepSupported, labelBadge = s.lowHpBeepBadge ?: NewFeatures.badge(NewFeatures.LOW_HP_BEEP),
         ) {
             if (s.lowHpBeepSupported) { s.setLowHpBeep(!s.lowHpBeep); changed() }
         },
         SettingRow(
             tk("FIELD POISON"), if (s.fieldPoisonSupported) onOff(s.fieldPoison) else tk("N/A"),
-            enabled = s.fieldPoisonSupported, labelBadge = NewFeatures.badge(NewFeatures.FIELD_POISON),
+            enabled = s.fieldPoisonSupported, labelBadge = s.fieldPoisonBadge ?: NewFeatures.badge(NewFeatures.FIELD_POISON),
             subtitle = "Poison hurts while you walk",
         ) {
             if (s.fieldPoisonSupported) { s.setFieldPoison(!s.fieldPoison); changed() }

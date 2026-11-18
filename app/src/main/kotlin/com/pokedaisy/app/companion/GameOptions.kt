@@ -26,7 +26,7 @@ class GameOptions internal constructor(
     data class Discovery(val wildFlag: Long = 0, val sites: List<ReusableTms.Site> = emptyList(),
                          val text: InstantText.Patch? = null, val hm: HmFree.Patch? = null,
                          val exp: ExpShare.Found? = null, val cap: LevelCap.Found? = null,
-                         val center: PokemonCenter.Found? = null)
+                         val center: PokemonCenter.Found? = null, val quiet: QuietPatches.Found? = null)
     private data class Patches(val sites: List<ReusableTms.Site> = emptyList(), val tms: Boolean = false,
                                val text: InstantText.Patch? = null, val instant: Boolean = false,
                                val hm: HmFree.Patch? = null, val full: ExpShare.Found? = null,
@@ -60,6 +60,8 @@ class GameOptions internal constructor(
     val hmFreeSupported get() = allowed() && discovery.hm != null
     val expShareSupported get() = allowed() && discovery.exp != null
     val expShareActive get() = !closed.value && allowed() && expMetadata.value != null && expMode.value != ExpShare.Mode.OFF
+    val lowHpBeepSupported get() = allowed() && discovery.quiet?.beep != null
+    val fieldPoisonSupported get() = allowed() && discovery.quiet?.poison != null
     val levelCapSupported get() = allowed() && discovery.cap != null && capBosses.value != false
     val levelCapNow: LevelCap.Cap? get() { revision; return capNow.value }
     val dirty get() = !closed.value && if (allowed()) desired.value != applied else appliedAny
@@ -91,9 +93,9 @@ class GameOptions internal constructor(
     fun setLevelCap(found: LevelCap.Found?, level: Int) {
         desired.update { it.copy(cap = found.takeIf { level in 1..99 }, level = level.takeIf { it in 1..99 } ?: 0) }
     }
-    /** LOW HP BEEP / FIELD POISON off: the ROM's patches ([QuietPatches.find], by the host) and which go in. */
-    fun setQuietPatches(found: QuietPatches.Found?, beepOff: Boolean, poisonOff: Boolean) {
-        desired.update { it.copy(beep = found?.beep.takeIf { beepOff }, poison = found?.poison.takeIf { poisonOff }) }
+    fun setQuietOptions(beep: Boolean, poison: Boolean) {
+        val quiet = found.value.quiet
+        desired.update { it.copy(beep = quiet?.beep.takeUnless { beep }, poison = quiet?.poison.takeUnless { poison }) }
     }
     fun setExpShare(found: ExpShare.Found?, mode: ExpShare.Mode) {
         expMetadata.value = found; expMode.value = mode
@@ -151,6 +153,7 @@ class GameOptions internal constructor(
         setHmFree(metadata.hm, s.hmFree)
         setExpShare(metadata.exp, s.expShare)
         setLevelCapEnabled(s.levelCap)
+        setQuietOptions(s.lowHpBeep, s.fieldPoison)
     }
 
     /** Discovery reads files off-thread; publication, availability checks and host notifications use its UI dispatcher. */
@@ -166,7 +169,8 @@ class GameOptions internal constructor(
                 runCatching { HmFree.find(path) }.getOrNull(),
                 runCatching { ExpShare.find(path) }.getOrNull(),
                 runCatching { LevelCap.find(path) }.getOrNull(),
-                runCatching { PokemonCenter.find(path) }.getOrNull())
+                runCatching { PokemonCenter.find(path) }.getOrNull(),
+                runCatching { QuietPatches.find(path) }.getOrNull())
             withContext(publish) {
                 if (closed.value || ticket != generation.value || !allowed()) return@withContext
                 found.value = result

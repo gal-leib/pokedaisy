@@ -55,6 +55,8 @@ On iPhone and iPad, `LAST BALL` is available in supported FireRed, LeafGreen and
 
 ## From controls.md
 
+On iPhone and iPad, `SETTINGS` > `GAMEPLAY` includes `LOW HP BEEP` and `FIELD POISON` where the GBA game's code supports them. Turn off `LOW HP BEEP` to silence the warning during battle. Turn off `FIELD POISON` to prevent damage from poison while walking. Poison still works in battle.
+
 On iPhone and iPad, `SETTINGS` > `GAMEPLAY` > `BOSS RETRY` is available in supported GBA games. After losing a trainer battle, choose `RETRY` to return to the stored start of that battle. `UNDO LOAD` returns you to the moment before you retried.
 
 In a supported GBA game on iPhone or iPad, turn on `SETTINGS` > `GAMEPLAY` > `SHINY ALERT` to start a hunt. The row counts wild battles for the current game. A shiny foe stops fast-forward and held turbo, shows its name and the count over the game, then resets the count. The alert uses your touch vibration setting for haptic feedback.

@@ -44,6 +44,10 @@ interface StoredCompanionSettings {
     fun setReusableTms(on: Boolean) {}
     /** INSTANT TEXT - see [com.pokedaisy.app.Prefs.instantText]; [CompanionSettings.instantTextSupported]: the ROM's text code is known
      * ([com.pokedaisy.app.companion.data.InstantText]). */
+    val lowHpBeep: Boolean get() = true
+    fun setLowHpBeep(on: Boolean) {}
+    val fieldPoison: Boolean get() = true
+    fun setFieldPoison(on: Boolean) {}
     val instantText: Boolean get() = false
     fun setInstantText(on: Boolean) {}
     /** TRADE EVOLUTIONS - see [com.pokedaisy.app.Prefs.tradeEvolutions]; [CompanionSettings.tradeEvolutionsSupported]: this game's

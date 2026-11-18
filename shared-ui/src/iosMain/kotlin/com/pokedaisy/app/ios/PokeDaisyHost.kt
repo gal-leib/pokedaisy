@@ -506,7 +506,7 @@ object PokeDaisyHost {
                         }, turned = { screen?.showQuickNotice(tr("You haven't been there yet.")) },
                         askStyle = { com.pokedaisy.app.companion.ui.FlyStyleAsk.showing = true })
                 }
-                currentOptions.start(romPath.toPath(), PkApiCore::configureWild)
+                currentOptions.start(romPath.toPath(), PkApiCore::configureWild) { currentOptions.settingsChanged(currentSettings) }
                 currentCheats.start()
                 g.withState { resume.restore() }
             }

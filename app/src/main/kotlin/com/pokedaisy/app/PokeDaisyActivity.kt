@@ -226,13 +226,6 @@ class PokeDaisyActivity : Activity() {
      * edge tab ([SidePanel.openTabShown]) - shown at all (Compose state: the HUD reads it). */
     private val companionButtonShown = androidx.compose.runtime.mutableStateOf(true)
 
-    /** LOW HP BEEP / FIELD POISON: the ROM's patches ([com.pokedaisy.app.companion.data.QuietPatches]; null = both N/A). */
-    private var quietFound: com.pokedaisy.app.companion.data.QuietPatches.Found? = null
-
-    private fun syncQuietPatches() {
-        val p = Prefs(this)
-        if (::engine.isInitialized) engine.setQuietPatches(quietFound, !p.lowHpBeep, !p.fieldPoison)
-    }
     private fun syncLevelCap() { currentGameOptions()?.setLevelCapEnabled(Prefs(this).levelCap) }
     private fun syncHmFree(on: Boolean = Prefs(this).hmFree) { currentGameOptions()?.setHmFree(hmPatch, on) }
     /** EXPAND's one-time offer is up on the companion ([CompanionSettings.expandOffer]). */
@@ -1088,20 +1081,18 @@ class PokeDaisyActivity : Activity() {
             syncHmFree(on)
         }
         override val hmFreeSupported get() = hmPatch != null
-        override val lowHpBeep get() = Prefs(this@PokeDaisyActivity).lowHpBeep
         override fun setLowHpBeep(on: Boolean) {
             if (coopRefuses()) return
-            Prefs(this@PokeDaisyActivity).lowHpBeep = on
-            syncQuietPatches()
+            stored.setLowHpBeep(on)
+            currentGameOptions()?.setQuietOptions(on, stored.fieldPoison)
         }
-        override val lowHpBeepSupported get() = quietFound?.beep != null
-        override val fieldPoison get() = Prefs(this@PokeDaisyActivity).fieldPoison
+        override val lowHpBeepSupported get() = currentGameOptions()?.lowHpBeepSupported == true
         override fun setFieldPoison(on: Boolean) {
             if (coopRefuses()) return
-            Prefs(this@PokeDaisyActivity).fieldPoison = on
-            syncQuietPatches()
+            stored.setFieldPoison(on)
+            currentGameOptions()?.setQuietOptions(stored.lowHpBeep, on)
         }
-        override val fieldPoisonSupported get() = quietFound?.poison != null
+        override val fieldPoisonSupported get() = currentGameOptions()?.fieldPoisonSupported == true
         override val expShare get() = com.pokedaisy.app.companion.data.ExpShare.Mode.of(Prefs(this@PokeDaisyActivity).expShare)
         override fun setExpShare(mode: com.pokedaisy.app.companion.data.ExpShare.Mode) {
             if (coopRefuses()) return
@@ -1867,22 +1858,9 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized) engine.setInstantText(null, false)
         syncHmFree(false)
         syncExpShare()
-        quietFound = null
-        syncQuietPatches()
         syncLevelCap()
         if (::engine.isInitialized) engine.shiny.observe(null)
         syncShinyAchievements()
-        // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
-        // GameOptions' discovery).
-        if (gba && romBlocked == null) Thread({
-            val quiet = runCatching { com.pokedaisy.app.companion.data.QuietPatches.find(r.toOkioPath()) }.getOrNull()
-            Log.i("pokedaisy", "quiet patches: beep ${quiet?.beep != null}, poison ${quiet?.poison != null}")
-            runOnUiThread {
-                if (romData != r) return@runOnUiThread
-                quietFound = quiet
-                syncQuietPatches()
-            }
-        }, "quiet-patches").start()
         Prefs(this).let { p ->
             expandOfferUp.value = wideGame != WideScreen.OFF && !p.expandGameOfferSeen &&
                 p.gameAspect != com.pokedaisy.app.companion.GameAspect.WIDE
@@ -2070,7 +2048,9 @@ class PokeDaisyActivity : Activity() {
                     tmSites = found.sites; textPatch = found.text
                     syncHmFree(); syncExpShare(); syncLevelCap()
                     current.setReusableTms(tmSites, Prefs(this).reusableTms)
-                    current.setInstantText(textPatch, Prefs(this).instantText)
+                    val preferences = Prefs(this)
+                    current.setInstantText(textPatch, preferences.instantText)
+                    current.gameOptions.setQuietOptions(preferences.lowHpBeep, preferences.fieldPoison)
                 }
             })
         }
@@ -2206,7 +2186,7 @@ class PokeDaisyActivity : Activity() {
         e.setHmFree(hmPatch, p.hmFree)
         e.setExpShare(expShareFound, if (expShareFound != null) com.pokedaisy.app.companion.data.ExpShare.Mode.of(p.expShare) else com.pokedaisy.app.companion.data.ExpShare.Mode.OFF)
         e.setLevelCap(levelCapFound, if (levelCapFound != null && p.levelCap) levelCapNow?.level ?: 0 else 0)
-        e.setQuietPatches(quietFound, !p.lowHpBeep, !p.fieldPoison)
+        e.gameOptions.setQuietOptions(p.lowHpBeep, p.fieldPoison)
     }
 
     override fun onNewIntent(intent: Intent) {

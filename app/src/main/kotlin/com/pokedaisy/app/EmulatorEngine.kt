@@ -181,9 +181,6 @@ class EmulatorEngine(
 
     fun setExpShare(found: com.pokedaisy.app.companion.data.ExpShare.Found?, mode: com.pokedaisy.app.companion.data.ExpShare.Mode) =
         gameOptions.setExpShare(found, mode)
-    /** LOW HP BEEP / FIELD POISON off ([com.pokedaisy.app.companion.data.QuietPatches]; null = none known). */
-    fun setQuietPatches(found: com.pokedaisy.app.companion.data.QuietPatches.Found?, beepOff: Boolean, poisonOff: Boolean) =
-        gameOptions.setQuietPatches(found, beepOff, poisonOff)
     fun setLevelCap(found: com.pokedaisy.app.companion.data.LevelCap.Found?, level: Int) =
         gameOptions.setLevelCap(found, level)
     fun setHmFree(patch: com.pokedaisy.app.companion.data.HmFree.Patch?, on: Boolean) =
