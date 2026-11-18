@@ -67,8 +67,7 @@ internal class IosLibraryHost(
     private var choosingEditSave by mutableStateOf(false)
     private var collection by mutableStateOf<CollectionState?>(null)
     private var collectionPick: MonRef? = null
-    private var collectionTradeFrom: String? = null
-    private var tradingSaves by mutableStateOf(false)
+    private var tradeRequest by mutableStateOf<IosTradeRequest?>(null)
     private var editingSave by mutableStateOf<String?>(null)
     private var infoPath by mutableStateOf<String?>(null)
     private var renaming by mutableStateOf<String?>(null)
@@ -140,23 +139,18 @@ internal class IosLibraryHost(
                         val edit = editingSave
                         val flow = setup
                         val collectionScreen = collection
-                        if (tradingSaves) {
-                            IosSaveTrade(paths, collectionTradeFrom ?: edit, ::label,
-                                onClose = { tradingSaves = false; collectionTradeFrom = null },
-                                onSaved = ::refreshGames,
-                                initialPick = collectionPick.takeIf { collectionTradeFrom != null })
+                        val trade = tradeRequest
+                        if (trade != null) {
+                            IosSaveTrade(paths, trade, ::label, onClose = { tradeRequest = null }, onSaved = ::refreshGames)
                         } else if (edit != null) {
-                            IosSaveEditor(edit, label(edit), onClose = { editingSave = null; collectionPick = null },
-                                onSaved = ::refreshGames, onTrade = { tradingSaves = true }, initialPick = collectionPick)
+                            IosSaveEditor(edit, label(edit), paths, ::label,
+                                onClose = { editingSave = null; collectionPick = null },
+                                onSaved = ::refreshGames, onTrade = { tradeRequest = it }, initialPick = collectionPick)
                         } else if (collectionScreen != null) {
                             IosSaveCollection(paths, ::label, collectionScreen,
                                 onClose = { collection = null; collectionPick = null },
                                 onOpen = { path, at -> collectionPick = at; editingSave = path },
-                                onTrade = { path, at ->
-                                    collectionPick = at
-                                    collectionTradeFrom = path
-                                    tradingSaves = true
-                                })
+                                onTrade = { path, at -> tradeRequest = IosTradeRequest(first = path, firstPick = at) })
                         } else {
                             if (flow == null) Library() else Setup(flow)
                             Dialogs()
@@ -213,7 +207,7 @@ internal class IosLibraryHost(
             LibraryTool("EDIT", "SAVE EDITOR", "Change a game's Pokémon, bag and Pokédex",
                 NewFeatures.badge(NewFeatures.IOS_SAVE_EDITOR), open = { choosingEditSave = true }),
             LibraryTool("TRADE", "TRADE SAVES", "Move Pokémon between your games' saves",
-                NewFeatures.badge(NewFeatures.IOS_SAVE_TRADE), open = { tradingSaves = true }),
+                NewFeatures.badge(NewFeatures.IOS_SAVE_TRADE), open = { tradeRequest = IosTradeRequest() }),
             LibraryTool("COLLECTION", "COLLECTION", "Every Pokémon in all your saves, in one list",
                 NewFeatures.badge(NewFeatures.IOS_SAVE_COLLECTION), open = { collection = CollectionState() }),
         )

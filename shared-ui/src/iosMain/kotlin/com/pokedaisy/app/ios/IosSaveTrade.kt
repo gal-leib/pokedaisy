@@ -10,9 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.SaveEditFiles
 import com.pokedaisy.app.SaveTradeJournal
-import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.MonRef
-import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CompanionBackHandler
 import com.pokedaisy.app.companion.ui.OptionConfirm
@@ -26,18 +24,22 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal data class IosTradeRequest(
+    val first: String? = null, val second: String? = null,
+    val firstPick: MonRef? = null, val secondPick: MonRef? = null,
+)
+
 private class OpenTrade(val a: IosGen3Save.Ready, val b: IosGen3Save.Ready, val state: TradeState)
 
 @Composable
 internal fun IosSaveTrade(
-    paths: List<String>, fixedFrom: String?, title: (String) -> String, onClose: () -> Unit, onSaved: () -> Unit,
-    initialPick: MonRef? = null,
+    paths: List<String>, request: IosTradeRequest, title: (String) -> String, onClose: () -> Unit, onSaved: () -> Unit,
 ) = SaveEditorText {
     val m = rememberGbaTextMetrics()
     val scope = rememberCoroutineScope()
     var candidates by remember(paths) { mutableStateOf<List<String>?>(null) }
-    var from by remember(fixedFrom) { mutableStateOf(fixedFrom) }
-    var to by remember(fixedFrom) { mutableStateOf<String?>(null) }
+    var from by remember(request) { mutableStateOf(request.first) }
+    var to by remember(request) { mutableStateOf(request.second) }
     var open by remember { mutableStateOf<OpenTrade?>(null) }
     var saving by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
@@ -61,9 +63,11 @@ internal fun IosSaveTrade(
             readIosGen3Save(source, aName) to readIosGen3Save(partner, bName)
         }
         if (a is IosGen3Save.Ready && b is IosGen3Save.Ready && a.path != b.path) {
-            val state = TradeState(TradeSide(aName, Gen3SaveEditor(a.source.save), a.gameCode),
-                TradeSide(bName, Gen3SaveEditor(b.source.save), b.gameCode))
-            if (reload == 0) initialPick?.let { state.focus(it, firstSide = true) }
+            val state = TradeState(a.tradeSide(aName), b.tradeSide(bName))
+            if (reload == 0) {
+                request.firstPick?.let { state.focus(it, firstSide = true) }
+                request.secondPick?.let { state.focus(it, firstSide = false) }
+            }
             open = OpenTrade(a, b, state)
         } else {
             notice = (a as? IosGen3Save.Failed)?.message ?: (b as? IosGen3Save.Failed)?.message
@@ -117,7 +121,7 @@ internal fun IosSaveTrade(
         } else {
             OptionSelector(if (source == null) tr("TRADE FROM") else tr("TRADE WITH"), choices, choices.first(), title, m,
                 onPick = { if (source == null) from = it else to = it },
-                onDismiss = { if (source == null || fixedFrom != null) onClose() else from = null })
+                onDismiss = { if (source == null || request.first != null) onClose() else from = null })
         }
     }
     IosSaveWriteStatus(tr("TRADE SAVES"), saving, notice, clearNotice = { notice = null })

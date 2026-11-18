@@ -19,10 +19,14 @@ import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.SaveEditFiles
 import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
+import com.pokedaisy.app.companion.data.save.Gen3SaveFile
+import com.pokedaisy.app.companion.data.save.MissingDex
 import com.pokedaisy.app.companion.data.save.MonRef
+import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CompanionBackHandler
 import com.pokedaisy.app.companion.ui.GbaText
+import com.pokedaisy.app.companion.ui.MissingView
 import com.pokedaisy.app.companion.ui.OptionColors
 import com.pokedaisy.app.companion.ui.OptionConfirm
 import com.pokedaisy.app.companion.ui.OptionListWindow
@@ -62,7 +66,8 @@ private class OpenedSave(val source: IosGen3Save.Ready, val state: PcBoxesState)
 
 @Composable
 internal fun IosSaveEditor(
-    path: String, title: String, onClose: () -> Unit, onSaved: () -> Unit, onTrade: () -> Unit, initialPick: MonRef? = null,
+    path: String, title: String, paths: List<String>, label: (String) -> String, onClose: () -> Unit, onSaved: () -> Unit,
+    onTrade: (IosTradeRequest) -> Unit, initialPick: MonRef? = null,
 ) = SaveEditorText {
     val m = rememberGbaTextMetrics()
     var generation by remember(path) { mutableIntStateOf(0) }
@@ -94,35 +99,78 @@ internal fun IosSaveEditor(
         }
     } else {
         val state = edit.state
-        CompanionBackHandler { if (!saving) state.back(onClose) }
-        PcBoxesScreen(state, title, m, onBack = onClose, saving = saving, icons = edit.source.icons, onTrade = onTrade, onSave = {
-            if (!saving) {
-                val bytes = runCatching { state.editor.build() }.getOrNull()
-                if (bytes == null) {
-                    notice = tr("Can't write the save")
-                } else {
-                    saving = true
-                    scope.launch {
-                        val result = withContext(NonCancellable + Dispatchers.Default) {
-                            runCatching {
-                                val states = StateFiles(RomPicker.statesDir.toPath() / edit.source.stateKey)
-                                commitIosSaveEdit(edit.source.path, states, edit.source.source.bytes, bytes)
-                            }.getOrElse { SaveEditFiles.Result.Failed(tr("Can't write the save")) }
-                        }
-                        saving = false
-                        when (result) {
-                            is SaveEditFiles.Result.Written -> {
-                                opened = null
-                                generation++
-                                notice = tr("Saved. The previous save is in {0}", result.backup.parent?.name ?: "pokedaisy-backups")
-                                onSaved()
-                            }
-                            is SaveEditFiles.Result.Failed -> notice = result.reason
-                        }
+        var dexSources by remember(state) { mutableStateOf<List<String>>(emptyList()) }
+        fun loadMissing() {
+            if (saving) return
+            val target = if (state.changed) {
+                val bytes = runCatching { state.editor.build() }.getOrNull() ?: return
+                val parsed = Gen3SaveFile.parse(bytes, edit.source.source.save.format) as? Gen3SaveFile.Parsed.Ok ?: return
+                TradeSide(title, Gen3SaveEditor(parsed.save), edit.source.gameCode)
+            } else edit.source.tradeSide(title)
+            val loading = MissingView(null, emptyList())
+            state.missing = loading
+            val gamePaths = paths.filter { it != path }
+            val titles = gamePaths.associateWith(label)
+            scope.launch {
+                val (sources, sides, missing) = withContext(Dispatchers.Default) {
+                    val read = editableIosGames(gamePaths).mapNotNull { candidate ->
+                        val save = readIosGen3Save(candidate, titles.getValue(candidate)) as? IosGen3Save.Ready
+                        if (save == null || save.path == edit.source.path) null else candidate to save
                     }
+                    val sides = read.map { (candidate, save) -> save.tradeSide(titles.getValue(candidate)) }
+                    Triple(read.map { it.first }, sides, MissingDex.find(target, sides))
+                }
+                if (state.missing === loading) {
+                    dexSources = sources
+                    state.missing = MissingView(missing, sides)
                 }
             }
-        })
+        }
+        fun saveChanges() {
+            if (saving) return
+            val bytes = runCatching { state.editor.build() }.getOrNull()
+            if (bytes == null) {
+                notice = tr("Can't write the save")
+                return
+            }
+            saving = true
+            scope.launch {
+                val result = withContext(NonCancellable + Dispatchers.Default) {
+                    runCatching {
+                        val states = StateFiles(RomPicker.statesDir.toPath() / edit.source.stateKey)
+                        commitIosSaveEdit(edit.source.path, states, edit.source.source.bytes, bytes)
+                    }.getOrElse { SaveEditFiles.Result.Failed(tr("Can't write the save")) }
+                }
+                saving = false
+                when (result) {
+                    is SaveEditFiles.Result.Written -> {
+                        opened = null
+                        generation++
+                        notice = tr("Saved. The previous save is in {0}", result.backup.parent?.name ?: "pokedaisy-backups")
+                        onSaved()
+                    }
+                    is SaveEditFiles.Result.Failed -> notice = result.reason
+                }
+            }
+        }
+        CompanionBackHandler { if (!saving) state.back(onClose) }
+        PcBoxesScreen(state, title, m, onBack = onClose, saving = saving, icons = edit.source.icons,
+            onTrade = { onTrade(IosTradeRequest(first = path)) },
+            onMissing = ::loadMissing,
+            onGet = { selected ->
+                val source = dexSources.getOrNull(selected.source)
+                if (state.changed) {
+                    state.missing = null
+                    state.notice = tr("Save your changes first, then bring it over")
+                } else if (source != null) {
+                    val trade = if (selected.way == MissingDex.Way.TRADE_BACK)
+                        IosTradeRequest(first = path, second = source, firstPick = selected.at)
+                    else IosTradeRequest(first = path, second = source, secondPick = selected.at)
+                    onTrade(trade)
+                }
+            },
+            onSave = ::saveChanges,
+        )
     }
     IosSaveWriteStatus(tr("SAVE EDITOR"), saving, notice, clearNotice = { notice = null })
 }

@@ -6,10 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.MonRef
 import com.pokedaisy.app.companion.data.save.SaveCollection
-import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CollectionScreen
 import com.pokedaisy.app.companion.ui.CollectionState
@@ -39,7 +37,7 @@ internal fun IosSaveCollection(
                 val save = readIosGen3Save(path, name) as? IosGen3Save.Ready ?: return@mapNotNull null
                 CollectedGame(path, name, save)
             }
-            val sides = read.map { TradeSide(it.label, Gen3SaveEditor(it.save.source.save), it.save.gameCode) }
+            val sides = read.map { it.save.tradeSide(it.label) }
             Triple(read, sides, SaveCollection.gather(sides))
         }
         if (collection == null) {

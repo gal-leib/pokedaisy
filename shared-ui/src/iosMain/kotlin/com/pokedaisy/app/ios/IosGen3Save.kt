@@ -4,7 +4,9 @@ import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.isFile
 import com.pokedaisy.app.companion.data.length
+import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.Gen3SaveReader
+import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.data.save.RomMonIcons
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.MonIconLoader
@@ -17,7 +19,9 @@ internal sealed interface IosGen3Save {
     class Ready(
         val path: Path, val stateKey: String, val gameCode: String,
         val source: Gen3SaveReader.Result.Ready, val icons: MonIconLoader?,
-    ) : IosGen3Save
+    ) : IosGen3Save {
+        fun tradeSide(title: String) = TradeSide(title, Gen3SaveEditor(source.save), gameCode)
+    }
     class Failed(val message: String) : IosGen3Save
 }
 
