@@ -506,6 +506,11 @@ object PokeDaisyHost {
             { if (screen?.state?.side?.windowOpen == true) screen?.state?.hide() },
         )
         evolution = trades
+        val sharedPc = com.pokedaisy.app.companion.GamePcAction(
+            gameBoy = { gbFields }, gba = sharedItems,
+            handedOver = { if (game === g && screen?.state?.side?.windowOpen == true) screen?.state?.hide() },
+            pcUsed = { if (game === g) FeatureTips.used(TipId.PC) },
+        )
         items = object : com.pokedaisy.app.companion.ItemUse by trades {
             override val evolveBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TRADE_EVOLUTION)
             override val partyBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_PARTY_STORAGE)
@@ -515,17 +520,8 @@ object PokeDaisyHost {
             override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
                 if (gbFields.available) com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS
                 else com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_ITEMS)
-            override fun canPc() = gbFields.available || sharedItems.canPc()
-            override fun openPc(done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
-                val completed = { outcome: com.pokedaisy.app.companion.data.ItemUseOutcome ->
-                    if (game === g && outcome.result == com.pokedaisy.app.companion.data.ItemUseResult.USED) {
-                        FeatureTips.used(TipId.PC)
-                        if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
-                    }
-                    done(outcome)
-                }
-                if (gbFields.available) gbFields.openPc(completed) else sharedItems.openPc(completed)
-            }
+            override fun canPc() = sharedPc.available()
+            override fun openPc(done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) = sharedPc.open(done)
         }
         val currentSettings = settings!!
         val currentCheats = p.bindCheats(

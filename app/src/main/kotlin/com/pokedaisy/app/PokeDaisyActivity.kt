@@ -576,6 +576,11 @@ class PokeDaisyActivity : Activity() {
         { Prefs(this).tradeEvolutions }, { ::engine.isInitialized && engine.onField.value }, ::closeCompanionWindow,
     )
 
+    private val sharedPc = com.pokedaisy.app.companion.GamePcAction(
+        gameBoy = ::gameBoyFields, gba = sharedItemUse, handedOver = ::closeCompanionWindow,
+        pcUsed = { com.pokedaisy.app.companion.FeatureTips.used(TipId.PC) },
+    )
+
     private val itemUse = object : com.pokedaisy.app.companion.ItemUse by tradeEvolutions {
         /** A DS game's Repels ([com.pokedaisy.app.companion.data.useGen4Repel], Black's [com.pokedaisy.app.companion.data.useGen5Repel]);
          * nothing else yet. */
@@ -609,19 +614,17 @@ class PokeDaisyActivity : Activity() {
             sharedItemUse.use(itemId, done)
         }
 
-        override fun canPc() = dsCalls() || fieldItemSupport()?.canPc == true || gbField() != null
+        override fun canPc() = dsCalls() || sharedPc.available()
 
-        // The PC is worked with the game's buttons: an open companion window steps aside once it's up.
         override fun openPc(done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
-            com.pokedaisy.app.companion.FeatureTips.used(TipId.PC)
-            val opened: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit = { o ->
-                if (o.result == com.pokedaisy.app.companion.data.ItemUseResult.USED) closeCompanionWindow()
-                done(o)
+            if (!dsCalls()) return sharedPc.open(done)
+            dsAction(MgbaCore.NDS_ACTION_PC, intArrayOf(0, 0, 0, 0)) { result ->
+                if (result.result == com.pokedaisy.app.companion.data.ItemUseResult.USED) {
+                    closeCompanionWindow()
+                    com.pokedaisy.app.companion.FeatureTips.used(TipId.PC)
+                }
+                done(result)
             }
-            if (dsCalls()) return dsAction(MgbaCore.NDS_ACTION_PC, intArrayOf(0, 0, 0, 0), done = opened)
-            val gb = gameBoyFields()
-            if (gb?.available == true) return gb.openPc(done)
-            sharedItemUse.openPc(opened)
         }
 
         /** A DS game whose PC pk_nds_call knows (Platinum, HeartGold / SoulSilver, Black). */
