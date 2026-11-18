@@ -188,9 +188,10 @@ fun CompanionSettingsScreen(
             val shinyAlertSupported = if (page == Page.HOME) settings?.shinyAlertSupported else null
             val shinyHuntCount = if (page == Page.HOME && settings?.shinyAlert == true) settings.shinyHuntCount else null
             val quietOptions = if (page == Page.HOME) settings?.let { it.lowHpBeepSupported to it.fieldPoisonSupported } else null
+            val nuzlockeSupported = if (page == Page.HOME) settings?.nuzlockeSupported else null
             val refillSupported = if (page == Page.HOME) settings?.repelRefillSupported else null
             val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision,
-                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions, refillSupported, shinyAlertSupported, shinyHuntCount, quietOptions) {
+                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions, refillSupported, shinyAlertSupported, shinyHuntCount, quietOptions, nuzlockeSupported) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
@@ -847,7 +848,7 @@ private fun homeRows(
         // The NUZLOCKE tab and its tracker for this game (Nuzlocke.kt): first encounter per area, fainted = out of the run.
         SettingRow(
             tk("NUZLOCKE"), if (s.nuzlockeSupported) onOff(s.nuzlocke) else tk("N/A"), enabled = s.nuzlockeSupported,
-            labelBadge = NewFeatures.badge(NewFeatures.NUZLOCKE),
+            labelBadge = s.nuzlockeBadge ?: NewFeatures.badge(NewFeatures.NUZLOCKE),
             subtitle = tk("Track a run: one catch per area, a faint is final"),
         ) {
             if (s.nuzlockeSupported) { s.setNuzlocke(!s.nuzlocke); changed() }

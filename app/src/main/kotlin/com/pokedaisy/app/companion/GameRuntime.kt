@@ -143,6 +143,10 @@ class GameRuntime(
     val shinyAlert = GameShinyAlert(prefs)
 
     val battleRetry = GameBattleRetry(prefs)
+    @Volatile private var nuzlockeGame: Int? = null
+    val nuzlockeSupported get() = nuzlockeGame != null && telemetry.snapshot.value.let {
+        !it.unsupported && Nuzlocke.supports(it.game)
+    }
     val lastBall get() = battle.ball
 
     fun bindLastBall(removeBagItem: () -> Long, handOver: () -> Unit) {
@@ -175,7 +179,8 @@ class GameRuntime(
     /** Configure once per loaded game. Capture/delivery use [game]; decode remains on the sampler worker. */
     fun startSampling(gameBoy: Boolean, nds: Boolean = false, game: CoroutineDispatcher,
                       current: () -> Boolean, after: (SnapshotView) -> Unit = {}, periodMillis: Long? = null,
-                      onShinyFound: (GameShinyAlert.Alert) -> Unit = {}) {
+                      onShinyFound: (GameShinyAlert.Alert) -> Unit = {},
+                      onNuzlockeNotices: (List<String>) -> Unit = {}) {
         if (closed.value) return
         check(sampler == null) { "Sampling is already configured for this game" }
         require(periodMillis == null || periodMillis > 0)
@@ -185,6 +190,8 @@ class GameRuntime(
                 battle.sampled()
                 shinyAlert.observe(snapshot, shiny?.supported == true)?.let(onShinyFound)
                 after(snapshot)
+                val notices = nuzlockeGame?.let { Nuzlocke.onSample(it, snapshot) }.orEmpty()
+                if (notices.isNotEmpty()) onNuzlockeNotices(notices)
             }).also { if (periodMillis != null) it.startPeriodic(periodMillis) }
         battle.changed = ::sample
     }
@@ -248,6 +255,8 @@ class GameRuntime(
         val romKey = crc.toString(16).padStart(8, '0')
         shinyAlert.start(romKey)
         blocked = BlockedGames.forCrc(romKey) != null
+        nuzlockeGame?.let(Nuzlocke::close)
+        nuzlockeGame = if (gba && !blocked) Nuzlocke.start(prefs, romKey) else null
         if (gba && !blocked) battle.ball?.start(romPath, romKey)
         activeAreaMapCrc = if (gba && !blocked) areaMapCrc else 0L
         AreaMaps.romChanged()
@@ -345,6 +354,7 @@ class GameRuntime(
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }
         battleRetry.reset()
+        nuzlockeGame?.let(Nuzlocke::close)
         release { autoRefill.reset(); session.close() }
         release {
             if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {

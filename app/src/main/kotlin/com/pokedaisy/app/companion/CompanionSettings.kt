@@ -144,6 +144,7 @@ interface CompanionSettings : StoredCompanionSettings {
 
     /** NUZLOCKE ([Nuzlocke]): [nuzlockeSupported] = a GBA game whose party and battles are read; the switch is per game. */
     val nuzlockeSupported: Boolean get() = false
+    val nuzlockeBadge: String? get() = null
     val nuzlocke: Boolean get() = false
     fun setNuzlocke(on: Boolean) {}
     /** SHINY ODDS: a wild foe is shiny 1 in [shinyOdds] - see [com.pokedaisy.app.Prefs.shinyOdds]; [shinyOddsChoices] the

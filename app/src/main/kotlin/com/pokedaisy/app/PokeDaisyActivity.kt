@@ -1159,7 +1159,7 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).dsLayout = layout
             runOnUiThread { syncGameScreen() }
         }
-        override val nuzlockeSupported get() = telemetry.snapshot.value.let { !it.unsupported && com.pokedaisy.app.companion.Nuzlocke.supports(it.game) }
+        override val nuzlockeSupported get() = ::engine.isInitialized && engine.playback.nuzlockeSupported
         override val nuzlocke get() = com.pokedaisy.app.companion.Nuzlocke.on
         override fun setNuzlocke(on: Boolean) = com.pokedaisy.app.companion.Nuzlocke.setOn(on)
         override val shinyOdds get() = if (::engine.isInitialized) engine.shiny.odds else com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
@@ -1787,10 +1787,6 @@ class PokeDaisyActivity : Activity() {
         com.pokedaisy.app.companion.ui.CompanionTweaks.load { Prefs(this).tweak(it) }
         Prefs(this).let { prefs ->
             com.pokedaisy.app.companion.FavoriteItems.load(prefs.favoriteItemsFor(crc)) { prefs.setFavoriteItemsFor(crc, it) }
-            com.pokedaisy.app.companion.Nuzlocke.load(
-                prefs.nuzlockeFor(crc), prefs.nuzlockeRunFor(crc),
-                saveOn = { prefs.setNuzlockeFor(crc, it) }, saveRun = { prefs.setNuzlockeRunFor(crc, it) },
-            )
         }
         // RetroAchievements unlocks play the game's level-up fanfare, rendered the same way.
         unlockSound?.release()
@@ -2004,10 +2000,6 @@ class PokeDaisyActivity : Activity() {
                 // right then faithfully captures a real but useless "partyCount=0"
                 // moment. Bit the first fixture capture this existed for.
                 if (snap.connected && (snap.party.isNotEmpty() || forceFixtureDump)) dumpFixtureIfPending()
-                // NUZLOCKE: the run follows every sample; its notices go on the game screen.
-                com.pokedaisy.app.companion.Nuzlocke.onSample(snap).takeIf { it.isNotEmpty() }?.let { notes ->
-                    runOnUiThread { showHud(notes.joinToString("\n"), NUZLOCKE_NOTICE_MS) }
-                }
             }
             playback.startSampling(romIsGameBoy, romIsNds,
                 game = object : kotlinx.coroutines.CoroutineDispatcher() {
@@ -2023,6 +2015,12 @@ class PokeDaisyActivity : Activity() {
                         input.releaseAll()
                         unlockSound?.play()
                         showHud(alert.message(), com.pokedaisy.app.companion.GameShinyAlert.NOTICE_MILLIS)
+                    }
+                }, onNuzlockeNotices = { notices ->
+                    val current = this
+                    runOnUiThread {
+                        if (::engine.isInitialized && engine === current && current.running)
+                            showHud(notices.joinToString("\n"), com.pokedaisy.app.companion.Nuzlocke.NOTICE_MILLIS)
                     }
                 })
             onSample = { startSample(this) }   // runs on the emu thread
@@ -5354,8 +5352,6 @@ class PokeDaisyActivity : Activity() {
          *  steps more. */
         private const val PLAY_POSITIONS = 5
         /** LEVEL CAP: how often a sample may work the cap out again (a badge moves it). */
-        /** How long a NUZLOCKE notice stays on the game screen: long enough to read in a battle's opening. */
-        private const val NUZLOCKE_NOTICE_MS = 3500L
 
         private const val EXTRA_DUMP_FIXTURE = "dumpFixture"
         private const val EXTRA_DUMP_FIXTURE_FORCE = "dumpFixtureForce"

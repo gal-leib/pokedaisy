@@ -85,9 +85,9 @@ internal class IosGameScreen(
     private var quickNotice by mutableStateOf<String?>(null)
     val quickMenu = QuickMenuState().also { it.onClose = ::syncInputCapture }
     var canOpenQuickMenu: () -> Boolean = { false }
-    fun showItemNotice(item: Int, message: String, millis: Long = ITEM_NOTICE_MILLIS) {
+    fun showItemNotice(item: Int, message: String, millis: Long = ITEM_NOTICE_MILLIS, ok: Boolean = true) {
         itemNoticeMillis = millis
-        itemNotice = ItemNotice(item, message)
+        itemNotice = ItemNotice(item, message, ok)
     }
     fun showQuickNotice(message: String) {
         captureButtons()

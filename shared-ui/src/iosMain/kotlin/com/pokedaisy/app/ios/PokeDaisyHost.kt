@@ -552,6 +552,9 @@ object PokeDaisyHost {
                     IosTouchPreferences.feel(IosTouchPreferences.style.vibration)
                     screen?.showItemNotice(0, alert.message(), com.pokedaisy.app.companion.GameShinyAlert.NOTICE_MILLIS)
                 }
+            }, onNuzlockeNotices = { notices ->
+                if (live()) screen?.showItemNotice(0, notices.joinToString("\n"),
+                    com.pokedaisy.app.companion.Nuzlocke.NOTICE_MILLIS, ok = false)
             })
         return g
     }

@@ -223,7 +223,7 @@ open class CompanionScreenshotTest {
 
     private fun nuzlockeShot(tab: String, barTabs: List<String> = com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS) {
         val party = SampleCompanion.snapshot.party.mapIndexed { i, m -> m.copy(personality = i + 1L, heldItemId = if (i == 1) 200 else 0) }
-        com.pokedaisy.app.companion.Nuzlocke.preview(
+        val preview = com.pokedaisy.app.companion.Nuzlocke.preview(
             com.pokedaisy.app.companion.data.NuzlockeRun(
                 encounters = listOf(
                     com.pokedaisy.app.companion.data.NuzlockeEncounter(89, "ROUTE 1", 16, com.pokedaisy.app.companion.data.NuzlockeOutcome.CAUGHT),
@@ -243,7 +243,7 @@ open class CompanionScreenshotTest {
                 CompanionScreen(SampleCompanion.snapshot.copy(party = party, regionMapSectionId = 88), SampleCompanion.Slots, SampleCompanion.Settings(barTabs), initialTab = tab)
             }
         } finally {
-            com.pokedaisy.app.companion.Nuzlocke.load(false, null, {}, {})
+            com.pokedaisy.app.companion.Nuzlocke.close(preview)
         }
     }
 
