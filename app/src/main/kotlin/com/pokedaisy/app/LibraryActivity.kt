@@ -72,6 +72,8 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import com.pokedaisy.app.companion.ui.LibraryRestoreBackupDialog
+import com.pokedaisy.app.companion.ui.LibraryLoadSaveDialog
 import com.pokedaisy.app.companion.ui.LibraryIcons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -793,9 +795,8 @@ class LibraryActivity : ComponentActivity() {
             }
 
             backupPick?.let { b ->
-                OptionSelector(
-                    tr("RESTORE BACKUP"), b.files.indices.toList(), -1, { backupLabel(b.files[it]) }, m,
-                    onPick = { backupPick = null; readBackup(b.rom, b.files[it]) },
+                LibraryRestoreBackupDialog(b.files, ::backupLabel, m,
+                    onPick = { backupPick = null; readBackup(b.rom, it) },
                     onDismiss = { backupPick = null },
                 )
             }
@@ -805,19 +806,9 @@ class LibraryActivity : ComponentActivity() {
                 val current = remember(p) { SavesLocation.saveFor(this@LibraryActivity, prefs, p.target) }
                 val size = p.bytes.size.toLong()
                 val what = "${p.fileName} (${AndroidGameInfo.sizeLabel(size)}${GameSaves.kind(size)?.let { " · $it" } ?: ""})"
-                OptionConfirm(
-                    title = tr("LOAD SAVE?"),
-                    message = (if (current.isFile) {
-                        tr(
-                            "{0}: replace its save with {1}? The current save is kept, renamed to {2}.",
-                            name, what, GameSaves.backupName(current),
-                        )
-                    } else {
-                        tr("{0} has no save yet: use {1} as its save?", name, what)
-                    }) + " " + tr("The game starts from this save next time, not from where you left off.") +
-                        (if (GameSaves.kind(size) == null) " " + tr("This doesn't look like a GBA save file.") else ""),
-                    confirmLabel = tr("LOAD"),
-                    m = m,
+                LibraryLoadSaveDialog(
+                    name, what, current.takeIf { it.isFile }?.let { GameSaves.backupName(it) }, m,
+                    warnAboutGbaSize = GameSaves.kind(size) == null,
                     onDismiss = { saveImports.dismiss(p) },
                     onConfirm = { saveImports.confirm(p)?.let(::loadSave) },
                 )

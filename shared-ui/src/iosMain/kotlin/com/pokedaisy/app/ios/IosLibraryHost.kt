@@ -14,10 +14,12 @@ import androidx.compose.material.icons.filled.*
 import com.pokedaisy.app.companion.SaveImportFlow
 import com.pokedaisy.app.GameInfo
 import com.pokedaisy.app.GameInfoDialog
+import com.pokedaisy.app.GameInfoDetails
 import com.pokedaisy.app.GameSaves
 import com.pokedaisy.app.RomPatchFiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.pokedaisy.app.companion.gameButtonRequest
 import com.pokedaisy.app.companion.SetupFlow
@@ -59,6 +61,7 @@ internal class IosLibraryHost(
     private enum class AddChoice(val label: String) { ROM("ADD A ROM FILE"), PATCH("PATCH A ROM") }
     private var choosingAdd by mutableStateOf(false)
     private var choosingSaveGame by mutableStateOf(false)
+    private var restorePath by mutableStateOf<String?>(null)
     private var infoPath by mutableStateOf<String?>(null)
     private var renaming by mutableStateOf<String?>(null)
     private var notice by mutableStateOf<Pair<String, String>?>(failed?.let { tr("ERROR") to it.substringAfterLast('/') })
@@ -205,7 +208,8 @@ internal class IosLibraryHost(
                     pixel = if (game.favorite) PixelIcons.starOutline else PixelIcons.star) { prefs.toggleFavorite(key(game.id)) },
                 LibraryMenuItem("INFO", Icons.Filled.Info, opens = true) { infoPath = game.id },
                 LibraryMenuItem("RENAME", Icons.Filled.Edit, opens = true) { renaming = game.id },
-                LibraryMenuItem("LOAD SAVE", LibraryIcons.FileOpen, opens = true) { pickSave(game.id) })
+                LibraryMenuItem("LOAD SAVE", LibraryIcons.FileOpen, opens = true) { pickSave(game.id) },
+                LibraryMenuItem("RESTORE BACKUP", LibraryIcons.History, opens = true) { restorePath = game.id })
             val onPlay = {
                 playGame(game.id)
             }
@@ -252,6 +256,7 @@ internal class IosLibraryHost(
     private fun Dialogs() {
         val m = rememberGbaTextMetrics()
         val small = rememberGbaTextMetrics(1f)
+        val scope = rememberCoroutineScope()
         LibraryNavigationDialogs(library, m, small)
         if (choosingAdd) OptionSelector(tr("ADD GAMES"), AddChoice.entries, AddChoice.ROM, { tr(it.label) }, m,
             onPick = {
@@ -289,6 +294,40 @@ internal class IosLibraryHost(
         PatchWindow(patches, m, small, onPlay = { playGame(it.toString()) }, describePath = ::patchDisplayPath)
         if (choosingSaveGame && paths.isNotEmpty()) OptionSelector(tr("LOAD SAVE"), paths, paths.first(), ::label, m,
             onPick = { choosingSaveGame = false; pickSave(it) }, onDismiss = { choosingSaveGame = false })
+        restorePath?.let { game ->
+            var files by remember(game) { mutableStateOf<List<Pair<Path, String>>?>(null) }
+            LaunchedEffect(game) {
+                files = withContext(Dispatchers.Default) {
+                    val save = RomPicker.savePathFor(game).toPath()
+                    runCatching {
+                        iosSaveBackups(save).map { backup ->
+                            val date = FoundationDates.shortDateTime(backup.lastModified)
+                            backup to "$date  ${GameInfoDetails.sizeLabel(backup.length)}"
+                        }
+                    }.getOrDefault(emptyList())
+                }
+            }
+            val backups = files
+            if (backups.isNullOrEmpty()) {
+                OptionConfirm(tr("RESTORE BACKUP"),
+                    if (backups == null) "…" else tr("No backups of this game's save yet"),
+                    tr("CLOSE"), m, onConfirm = { restorePath = null }, onDismiss = { restorePath = null }, cancelLabel = null)
+            } else {
+                LibraryRestoreBackupDialog(backups, { it.second }, m,
+                    onPick = { (path, _) ->
+                        val pick = saveImports.begin(game) ?: return@LibraryRestoreBackupDialog
+                        restorePath = null
+                        scope.launch {
+                            val bytes = withContext(Dispatchers.Default) {
+                                runCatching { GameSaves.readPicked(FileSystem.SYSTEM.source(path)) }.getOrNull()
+                            }
+                            finishSaveRead(pick, bytes, path.name)
+                        }
+                    },
+                    onDismiss = { restorePath = null },
+                )
+            }
+        }
         LaunchedEffect(saveImports.importing) {
             val picked = saveImports.importing ?: return@LaunchedEffect
             val result = withContext(NonCancellable + Dispatchers.Default) {
@@ -301,11 +340,10 @@ internal class IosLibraryHost(
             }
         }
         saveImports.pending?.let { picked ->
-            val base = label(picked.target)
-            val backup = "saves/$base.backup-*.sav"
-            OptionConfirm(tr("LOAD SAVE?"),
-                tr("{0}: replace its save with {1}? The current save is kept, renamed to {2}.", base, picked.fileName, backup) +
-                    "\n" + tr("The game starts from this save next time, not from where you left off."), tr("LOAD"), m,
+            val currentExists = remember(picked) { RomPicker.savePathFor(picked.target).toPath().isFile }
+            val backup = "saves/${iosRomTitle(picked.target)}.backup-*.sav".takeIf { currentExists }
+            val size = GameInfoDetails.sizeLabel(picked.bytes.size.toLong())
+            LibraryLoadSaveDialog(label(picked.target), "${picked.fileName} ($size)", backup, m,
                 onConfirm = { saveImports.confirm(picked) }, onDismiss = { saveImports.dismiss(picked) })
         }
         notice?.let { (title, message) ->
@@ -352,10 +390,18 @@ internal class IosLibraryHost(
             if (picked == null) saveImports.cancel(pick)
             else {
                 val bytes = runCatching { GameSaves.readPicked(FileSystem.SYSTEM.source(picked.toPath())) }.getOrNull()
-                if (saveImports.ready(pick, bytes, picked.substringAfterLast('/')) != null)
-                    notice = tr("LOAD SAVE") to tr("This doesn't look like a GBA save file.")
+                finishSaveRead(pick, bytes, picked.substringAfterLast('/'))
             }
         }
+    }
+
+    private fun finishSaveRead(pick: SaveImportFlow.Request<String>, bytes: ByteArray?, name: String) {
+        val problem = saveImports.ready(pick, bytes, name) ?: return
+        val message = when (problem.failure) {
+            SaveImportFlow.Failure.UNREADABLE -> tr("Couldn't read {0}", name)
+            SaveImportFlow.Failure.TOO_LARGE -> tr("That isn't a game save")
+        }
+        notice = tr("LOAD SAVE") to message
     }
 
     private fun disableResume(): Boolean = runCatching {

@@ -2,11 +2,9 @@ package com.pokedaisy.app.ios
 
 import com.pokedaisy.app.GameInfo
 import com.pokedaisy.app.GameInfoDetails
-import com.pokedaisy.app.GameSaves
 import com.pokedaisy.app.companion.data.BlockedGames
 import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
-import com.pokedaisy.app.companion.data.lastModified
 import com.pokedaisy.app.companion.data.romCrc32
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.game.RomPicker
@@ -28,8 +26,7 @@ internal fun readIosGameInfo(path: String, title: String, recent: Int): GameInfo
     val blocked = BlockedGames.forSha1(sha1) ?: BlockedGames.forCrc(crc)
     val states = runCatching { RomPicker.statesDir.toPath() / StateFiles.romKey(rom) }.getOrNull()
     val game = GameInfoDetails.baseGame(code) ?: headerTitle
-    val backups = (GameSaves.backups(save.parent!!, save.name.substringBeforeLast('.')) + StateFiles.batteryBackups(save))
-        .sortedByDescending { it.lastModified }
+    val backups = iosSaveBackups(save)
     val date = FoundationDates::shortDateTime
 
     val gameRows = buildList {
