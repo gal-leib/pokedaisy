@@ -121,16 +121,24 @@ object PokeDaisyHost {
                 registeredItems = { currentRuntime.registeredItems }, flash = { flash },
                 extra = object : com.pokedaisy.app.companion.ui.QuickActions {
                     override fun offered(action: com.pokedaisy.app.companion.QuickAction) =
-                        action == com.pokedaisy.app.companion.QuickAction.COMPANION && !panels.portrait
+                        action == com.pokedaisy.app.companion.QuickAction.COMPANION && !panels.portrait ||
+                            action == com.pokedaisy.app.companion.QuickAction.FLIGHT && fly?.canFreeFlight() == true
                     override fun run(action: com.pokedaisy.app.companion.QuickAction) {
                         if (action == com.pokedaisy.app.companion.QuickAction.COMPANION) panels.toggleCompanion()
+                        if (action == com.pokedaisy.app.companion.QuickAction.FLIGHT) fly?.toggleFlight { result ->
+                            if (result != null && result != com.pokedaisy.app.companion.data.FlyResult.OK)
+                                panels.showQuickNotice(com.pokedaisy.app.companion.ui.flyMessage(result))
+                        }
                     }
                     override fun riding() = currentRuntime.riding
+                    override fun flying() = currentRuntime.flight?.state?.let { it != 0 } == true
                 })
             game?.onHotkey = {
                 if (it.action == com.pokedaisy.app.Hotkeys.Action.QUICK_MENU) panels.triggerQuickMenu(it.pressed)
                 else if (!it.pressed || !panels.quickMenu.open) {
                     if (it.action == com.pokedaisy.app.Hotkeys.Action.ZOOM && it.pressed) currentSettings.cycleZoom()
+                    else if (it.action == com.pokedaisy.app.Hotkeys.Action.FREE_FLIGHT && it.pressed)
+                        quickActions?.run(com.pokedaisy.app.companion.QuickAction.FLIGHT)
                     else shortcuts.hotkey(it)
                 }
             }
@@ -168,6 +176,9 @@ object PokeDaisyHost {
                                 com.pokedaisy.app.companion.ui.QuickMenu(panels.quickMenu, snapshot, actions,
                                     currentSettings!!.quickMenuActions, iosPreferences.fieldHudStyle.look)
                             }
+                            com.pokedaisy.app.companion.ui.FlyStyleAskHost(
+                                active = true, roomy = panels.portrait,
+                                onAnswer = { currentRuntime?.flight?.answerStyle(it) })
                         })
                     touch.EditorOverlay()
                 }
@@ -289,7 +300,10 @@ object PokeDaisyHost {
             val currentSettings = settings!!
             currentSettings.playbackChanged = { p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld) }
             p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld)
-            g.frameSpeed = { p.speed().let { if (it.isInfinite()) 0.0 else it.toDouble() } }
+            g.frameSpeed = {
+                val speed = p.speed().let { if (it.isInfinite()) 0.0 else it.toDouble() }
+                if (p.flight?.scenicAirborne == true && speed != 0.0) maxOf(speed, 2.0) else speed
+            }
             val bKeys = battle!!::keys
             val gameOptions = p.options.also { o ->
                 currentSettings.optionsChanged = { o.settingsChanged(currentSettings) }
@@ -300,9 +314,11 @@ object PokeDaisyHost {
             }
             g.beforeFrame = {
                 p.beforeFrame()
+                g.camera.flying = p.flight?.state?.let { it != 0 } == true
+                g.camera.flightZoom = p.flight?.scenicAirborne == true
                 p.gameBoyFields?.keepEncounters(PkApiCore, p.options.wildEncounters == 0)
             }
-            g.afterFrame = { p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1); gameOptions.tick(); gameOptions.markExp(PkApiCore::read, PkApiCore::write) }
+            g.afterFrame = { p.flight?.afterFrame(); p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1); gameOptions.tick(); gameOptions.markExp(PkApiCore::read, PkApiCore::write) }
         }
         val p = playback!!
         val fields = com.pokedaisy.app.companion.data.FieldItemSupportCache()
@@ -342,14 +358,26 @@ object PokeDaisyHost {
         fly = object : com.pokedaisy.app.companion.FlyAction by classicFly {
             override val actionBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(
                 if (gbFields.available) com.pokedaisy.app.companion.NewFeatures.IOS_GB_FIELD_ACTIONS
+                else if (canFreeFlight()) com.pokedaisy.app.companion.NewFeatures.IOS_FLIGHT
                 else com.pokedaisy.app.companion.NewFeatures.IOS_CLASSIC_FLY)
-            override fun canFly() = gbFields.available || classicFly.canFly()
+            override fun canFly() = gbFields.available || readSupport()?.canFly == true
+            override fun canFreeFlight() = p.flight?.support() != null
+            override fun flying() = p.flight?.state?.let { it != 0 } == true
+            override fun toggleFlight(done: (com.pokedaisy.app.companion.data.FlyResult?) -> Unit) {
+                p.flight?.toggle { result, notOnFoot ->
+                    if (notOnFoot) screen?.showQuickNotice(tr("You can only take off from land."))
+                    else done(result?.takeUnless { it == com.pokedaisy.app.companion.data.FlyResult.OK })
+                }
+            }
             override fun targets(done: (com.pokedaisy.app.companion.data.FlyTargets) -> Unit) {
                 if (gbFields.available) gbFields.targets(done) else classicFly.targets(done)
             }
             override fun fly(mapsec: Int, targets: com.pokedaisy.app.companion.data.FlyTargets,
                              done: (com.pokedaisy.app.companion.data.FlyResult) -> Unit) {
-                if (gbFields.available) gbFields.fly(mapsec, targets, done) else classicFly.fly(mapsec, targets, done)
+                if (gbFields.available) return gbFields.fly(mapsec, targets, done)
+                val flight = p.flight
+                if (flight == null) classicFly.fly(mapsec, targets, done)
+                else flight.flyTo(mapsec, targets, classicFly, done)
             }
         }
         val partyActions = com.pokedaisy.app.companion.FieldPartyActions(
@@ -408,6 +436,20 @@ object PokeDaisyHost {
                 g.camera.level = iosPreferences.zoomLevelFor(key)
                 g.setExpandedTables(tables)
                 p.start(romPath.toPath(), code, crc, areaMapCrc = tables)
+                p.bindFlight {
+                    com.pokedaisy.app.companion.GameFlight(p.session, PkApiCore, iosPreferences, readSupport,
+                        kind = { telemetry.snapshot.value.game }, retail = telemetry::retailRom,
+                        inBattle = { telemetry.snapshot.value.inBattle }, standing = { p.settledOnField && p.fieldState and com.pokedaisy.app.companion.data.GameField.LOCKED == 0 },
+                        riding = { p.riding },
+                        bike = { com.pokedaisy.app.companion.data.KeyItems.firstIn(telemetry.snapshot.value.items,
+                            com.pokedaisy.app.companion.data.KeyItems.BIKES) },
+                        useItem = { p.registeredItems?.use(it) },
+                        keeper = com.pokedaisy.app.companion.data.FlightArea.Keeper(appFilesDir(), key),
+                        deliver = { it() }, tookOff = {
+                            if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
+                        }, turned = { screen?.showQuickNotice(tr("You haven't been there yet.")) },
+                        askStyle = { com.pokedaisy.app.companion.ui.FlyStyleAsk.showing = true })
+                }
                 currentOptions.start(romPath.toPath(), PkApiCore::configureWild)
                 currentCheats.start()
                 g.withState { resume.restore() }
@@ -427,6 +469,7 @@ object PokeDaisyHost {
             gameBoy = !romPath.lowercase().endsWith(".gba"), game = kotlinx.coroutines.Dispatchers.Main,
             current = { game === g && g.isRunning }, after = {
                 currentOptions.settingsChanged(currentSettings)
+                p.flight?.sync()
                 if (it.blocked != null && g.wideSupported) g.setExpandedTables(0)
             }, periodMillis = SAMPLE_MILLIS)
         return g

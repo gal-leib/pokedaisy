@@ -46,6 +46,16 @@ class GameRuntime(
     private var sampler: GameSampler? = null
     private val shinyOwner = atomic<GameShinyOdds?>(null)
     val shiny get() = shinyOwner.value
+    private val flightOwner = atomic<GameFlight?>(null)
+    val flight get() = flightOwner.value
+
+    fun bindFlight(create: () -> GameFlight): GameFlight {
+        flightOwner.value?.let { return it }
+        val owner = create()
+        if (!flightOwner.compareAndSet(null, owner)) { owner.close(); return flightOwner.value!! }
+        if (closed.value) owner.close()
+        return owner
+    }
 
     fun bindShiny(core: GameCalls, debug: Boolean, changed: () -> Unit = {}): GameShinyOdds {
         shinyOwner.value?.let { return it }
@@ -113,6 +123,7 @@ class GameRuntime(
 
     /** Between frames, while the old state still exists: native save/load/rewind adapters share this cleanup. */
     fun cancelFieldActions() {
+        flight?.cancelActions()
         try { registeredItems?.cancel() } finally { gameBoyFields?.cancel() }
     }
 
@@ -195,6 +206,7 @@ class GameRuntime(
         this.gba = gba
         shiny?.observe(null)
         resetTint()
+        flight?.reset()
         session.reset()
         settledOnField = false
         val romKey = crc.toString(16).padStart(8, '0')
@@ -285,6 +297,7 @@ class GameRuntime(
         release { actions?.close() }
         release { cheats?.close() }
         release { shiny?.close() }
+        release { flight?.close() }
         release { stateSlots.value?.close() }
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }

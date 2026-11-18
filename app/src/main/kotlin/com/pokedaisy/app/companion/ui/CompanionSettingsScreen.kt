@@ -622,7 +622,7 @@ private fun homeRows(
         } else null,
         // What FREE FLIGHT and the scenic FLY fly on (FlightVehicle: our own pixel art, the player in its seat).
         if (s.flyStyleSupported) {
-            SettingRow(tk("FLY ON"), s.flightVehicle.label, labelBadge = NewFeatures.badge(NewFeatures.FLY_ON)) {
+            SettingRow(tk("FLY ON"), s.flightVehicle.label, labelBadge = s.flightBadge ?: NewFeatures.badge(NewFeatures.FLY_ON)) {
                 val all = com.pokedaisy.app.companion.data.FlightVehicle.entries
                 select(Selector(tk("FLY ON"), all.map { it.label }, s.flightVehicle.label) { l ->
                     all.firstOrNull { it.label == l }?.let(s::setFlightVehicle)
@@ -696,7 +696,7 @@ private fun homeRows(
         // The companion's FLY: the game's own (CLASSIC) or flown over the field to the town (SCENIC, Flight.kt). Two values: a tap flips it.
         SettingRow(
             tk("FLY STYLE"), if (s.flyStyleSupported) s.flyStyle.label else tk("N/A"),
-            enabled = s.flyStyleSupported, labelBadge = NewFeatures.badge(NewFeatures.SCENIC_FLY),
+            enabled = s.flyStyleSupported, labelBadge = s.flightBadge ?: NewFeatures.badge(NewFeatures.SCENIC_FLY),
             subtitle = "SCENIC flies you there over the map",
         ) {
             if (s.flyStyleSupported) {
@@ -707,7 +707,7 @@ private fun homeRows(
         // Where FREE FLIGHT and the scenic FLY may go: the maps seen (FlightArea.kt) or anywhere. Two values: a tap flips it.
         SettingRow(
             tk("FLIGHT AREA"), if (s.flyStyleSupported) s.flightArea.label else tk("N/A"),
-            enabled = s.flyStyleSupported, labelBadge = NewFeatures.badge(NewFeatures.FLIGHT_AREA),
+            enabled = s.flyStyleSupported, labelBadge = s.flightBadge ?: NewFeatures.badge(NewFeatures.FLIGHT_AREA),
         ) {
             if (s.flyStyleSupported) {
                 s.setFlightArea(if (s.flightArea == FlightAreaMode.SEEN) FlightAreaMode.ANYWHERE else FlightAreaMode.SEEN)

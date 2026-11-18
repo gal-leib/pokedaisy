@@ -130,16 +130,15 @@ class EmulatorEngine(
 
     /** FREE FLIGHT's state after the last frame (pk_flight.c: [MgbaCore.FLIGHT_IDLE] ... [MgbaCore.FLIGHT_DISMOUNT]): the
      * QUICK MENU's TAKE OFF / LAND, the HUD. GBA games only; IDLE elsewhere. */
-    @Volatile var flightState = MgbaCore.FLIGHT_IDLE
-        private set
+    val flightState get() = playback.flight?.state ?: MgbaCore.FLIGHT_IDLE
 
     /** The flight is the scenic FLY's (a route to a town): EXPAND zoomed out and the game at [SCENIC_SPEED] while it's in
      * the air. Cleared once it's down. */
-    @Volatile var scenicFlight = false
+    val scenicFlight get() = playback.flight?.scenic == true
 
     /** In the air on the scenic FLY. */
     private val scenicAirborne: Boolean
-        get() = scenicFlight && flightState != MgbaCore.FLIGHT_IDLE && flightState != MgbaCore.FLIGHT_DISMOUNT
+        get() = playback.flight?.scenicAirborne == true
 
     /** AUTO-RUN: B held for the player while walking on the field (holding B walks); never on a bike or in a menu. */
     var autoRun
@@ -776,6 +775,16 @@ class EmulatorEngine(
             applyTint = MgbaCore::pkSetTint)
     }
 
+    val flightCore = object : com.pokedaisy.app.game.FlightCore {
+        override fun configureFlight(words: IntArray?) = MgbaCore.pkFlightConfigure(words)
+        override fun flightTakeOff() = MgbaCore.pkFlightTakeOff()
+        override fun flightLand() = MgbaCore.pkFlightLand()
+        override fun setFlightRoute(directions: ByteArray) = MgbaCore.pkFlightRoute(directions)
+        override fun setFlightArea(bits: ByteArray?) = MgbaCore.pkFlightArea(bits)
+        override val flightAreaTurned get() = MgbaCore.pkFlightAreaTurned()
+        override val flightState get() = MgbaCore.pkFlightState()
+    }
+
     /** Runs [job] on the emu thread before the next frame; dropped if the game closes first. */
     fun postToEmu(job: () -> Unit) = gameSession.post(job)
 
@@ -957,6 +966,7 @@ class EmulatorEngine(
         followerShown = false
         battleMenuHideSent = -1
         playback.resetTint()
+        playback.flight?.reset()
         endDsHold()
         onCoreReady?.invoke(vw, vh)
 
@@ -1270,8 +1280,7 @@ class EmulatorEngine(
                 }
                 // FREE FLIGHT's state after this frame (pk_flight.c ticks inside pkRunFrame): TAKE OFF / LAND, the scenic FLY.
                 if (gba) {
-                    flightState = MgbaCore.pkFlightState()
-                    if (scenicFlight && flightState == MgbaCore.FLIGHT_IDLE) scenicFlight = false
+                    playback.flight?.afterFrame()
                 }
                 // DsFrameSkip learns from the core's own time (drawn or not), after the frame is out.
                 if (dsSkipTimed) {

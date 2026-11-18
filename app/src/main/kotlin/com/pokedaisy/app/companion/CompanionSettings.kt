@@ -57,6 +57,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val flyStyle: FlyStyle get() = FlyStyle.CLASSIC
     fun setFlyStyle(style: FlyStyle) {}
     val flyStyleSupported: Boolean get() = false
+    val flightBadge: String? get() = null
     /** FLIGHT AREA (where [flyStyleSupported]) - see [com.pokedaisy.app.Prefs.flightAreaId]. */
     val flightArea: FlightAreaMode get() = FlightAreaMode.SEEN
     fun setFlightArea(mode: FlightAreaMode) {}
