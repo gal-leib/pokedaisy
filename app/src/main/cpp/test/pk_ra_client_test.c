@@ -52,7 +52,7 @@ static void request(int id, const char* url, const char* post, const char* conte
         REQUIRE(strstr(post, "r=ping"));
         response = "{\"Success\":true}";
     }
-    pk_ra_queue_response(id, 200, response, strlen(response));
+    pk_ra_queue_response(id, 200, (const uint8_t*) response, strlen(response));
 }
 
 static void login(int result, const char* error, const struct pk_ra_user* user) {

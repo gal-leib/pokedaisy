@@ -260,7 +260,7 @@ RA_FN(raQueueResponse)(JNIEnv* env, jobject thiz, jint id, jint status, jbyteArr
     jsize len = jBody ? (*env)->GetArrayLength(env, jBody) : 0;
     jbyte* bytes = len ? (*env)->GetByteArrayElements(env, jBody, NULL) : NULL;
     pk_ra_queue_response(id, bytes || !len ? status : RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR,
-                           (const char*) bytes, bytes ? (size_t) len : 0);
+                           (const uint8_t*) bytes, bytes ? (size_t) len : 0);
     if (bytes) (*env)->ReleaseByteArrayElements(env, jBody, bytes, JNI_ABORT);
 }
 

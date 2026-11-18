@@ -53,7 +53,7 @@ struct pk_ra_callbacks {
 bool pk_ra_init(const struct pk_ra_callbacks* callbacks);
 bool pk_ra_ready(void);
 void pk_ra_user_agent(char* out, size_t capacity);
-void pk_ra_queue_response(int id, int status, const char* body, size_t length);
+void pk_ra_queue_response(int id, int status, const uint8_t* body, size_t length);
 void pk_ra_pump(void);
 void pk_ra_login_password(const char* username, const char* password);
 void pk_ra_login_token(const char* username, const char* token);

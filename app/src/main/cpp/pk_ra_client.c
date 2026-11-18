@@ -132,8 +132,8 @@ void pk_ra_user_agent(char* out, size_t capacity) {
     if (client) rc_client_get_user_agent_clause(client, out, capacity);
 }
 
-void pk_ra_queue_response(int id, int status, const char* body, size_t length) {
-    pk_ra_requests_respond(id, status, body, length);
+void pk_ra_queue_response(int id, int status, const uint8_t* body, size_t length) {
+    pk_ra_requests_respond(id, status, (const char*) body, length);
 }
 
 void pk_ra_pump(void) { pk_ra_requests_pump(); }
