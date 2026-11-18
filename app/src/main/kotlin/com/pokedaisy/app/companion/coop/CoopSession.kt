@@ -37,7 +37,7 @@ object CoopSession {
         initialized = Environment(context.applicationContext, prefs)
     }
 
-    internal fun bind(context: Context, prefs: Prefs): CoopEndpointSession {
+    fun bind(context: Context, prefs: Prefs): CoopEndpointSession {
         configure(context, prefs)
         return session
     }
