@@ -2,6 +2,8 @@
 
 package render
 
+import com.pokedaisy.app.companion.ui.RomPatchFlow
+import okio.Path.Companion.toPath
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
 import androidx.compose.runtime.Composable
@@ -2938,14 +2940,14 @@ fun main(args: Array<String>) {
             }
         }),
         // PATCH A ROM: found and ready, patching, done (a hack the companion may read as its base game), and not found.
-        Shot("library-patch-ready", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("ready") } }),
-        Shot("library-patch-patching", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("patching") } }),
-        Shot("library-patch-done", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("done") } }),
-        Shot("library-patch-done-unsupported", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("unsupported") } }),
-        Shot("library-patch-not-found", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("notfound") } }),
-        Shot("library-patch-not-found-unknown", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("unknown") } }),
-        Shot("library-patch-looking", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("looking") } }),
-        Shot("library-patch-failed", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("failed") } }),
+        Shot("library-patch-ready", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("ready") } }),
+        Shot("library-patch-patching", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("patching") } }),
+        Shot("library-patch-done", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("done") } }),
+        Shot("library-patch-done-unsupported", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("unsupported") } }),
+        Shot("library-patch-not-found", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("notfound") } }),
+        Shot("library-patch-not-found-unknown", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("unknown") } }),
+        Shot("library-patch-looking", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("looking") } }),
+        Shot("library-patch-failed", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("failed") } }),
         // TOOLS > SPRITE PACK's window: loaded (everything new, some refused), nothing new, and a file that isn't one.
         Shot("library-sprite-pack-done", tw, th, td, activity { LibraryActivity().apply { spritePack.step = SpritePackFlow.Step.Done(
             com.pokedaisy.app.companion.data.SpritePack.Result("2026-11-15", com.pokedaisy.app.companion.data.LookChar.entries,
@@ -3564,23 +3566,23 @@ fun PreviewGame(content: @Composable () -> Unit) {
 }
 
 /** PATCH A ROM's window in each state, over a made-up hack (no real patch or ROM). */
-private fun fakePatch(state: String): com.pokedaisy.app.RomPatchFlow.Step {
-    val info = com.pokedaisy.app.RomPatchFlow.PatchInfo("Daisy Quest (v1.2).bps", 16L shl 20, 0x84EE4776L, 32L shl 20, "")
-    val unknown = com.pokedaisy.app.RomPatchFlow.PatchInfo("Daisy Quest (v1.2).bps", 16L shl 20, 0x12345678L, 32L shl 20, "")
-    val plan = com.pokedaisy.app.RomPatchFlow.Plan(
-        File("/storage/emulated/0/ROMs/gba/Pokemon - FireRed Version (USA, Europe) (Rev 1).gba"), "Pokémon FireRed",
-        File("/storage/emulated/0/ROMs/gba"), "Daisy Quest (v1.2).gba",
+private fun fakePatch(state: String): RomPatchFlow.Step {
+    val info = RomPatchFlow.PatchInfo("Daisy Quest (v1.2).bps", 16L shl 20, 0x84EE4776L, 32L shl 20, "")
+    val unknown = RomPatchFlow.PatchInfo("Daisy Quest (v1.2).bps", 16L shl 20, 0x12345678L, 32L shl 20, "")
+    val plan = RomPatchFlow.Plan(
+        "/storage/emulated/0/ROMs/gba/Pokemon - FireRed Version (USA, Europe) (Rev 1).gba".toPath(), "Pokémon FireRed",
+        "/storage/emulated/0/ROMs/gba".toPath(), "Daisy Quest (v1.2).gba",
     )
-    val out = File(plan.dir, plan.name)
+    val out = plan.dir / plan.name
     return when (state) {
-        "ready" -> com.pokedaisy.app.RomPatchFlow.Step.Ready(info, plan)
-        "patching" -> com.pokedaisy.app.RomPatchFlow.Step.Patching(info, plan, 0.6f)
-        "done" -> com.pokedaisy.app.RomPatchFlow.Step.Done(info, plan, out, false, com.pokedaisy.app.CompanionSupport.Verdict.TRYABLE, "Daisy Quest (v1.2)")
-        "unsupported" -> com.pokedaisy.app.RomPatchFlow.Step.Done(info, plan, out, false, com.pokedaisy.app.CompanionSupport.Verdict.UNSUPPORTED, "Daisy Quest (v1.2)")
-        "notfound" -> com.pokedaisy.app.RomPatchFlow.Step.NotFound(info)
-        "unknown" -> com.pokedaisy.app.RomPatchFlow.Step.NotFound(unknown)
-        "looking" -> com.pokedaisy.app.RomPatchFlow.Step.Looking(info, 0.35f)
-        else -> com.pokedaisy.app.RomPatchFlow.Step.Failed(com.pokedaisy.app.RomPatchFlow.messageFor(com.pokedaisy.app.BpsPatch.Reason.DAMAGED))
+        "ready" -> RomPatchFlow.Step.Ready(info, plan)
+        "patching" -> RomPatchFlow.Step.Patching(info, plan, 0.6f)
+        "done" -> RomPatchFlow.Step.Done(RomPatchFlow.Result(out, false, RomPatchFlow.Support.TRYABLE, "Daisy Quest (v1.2)"))
+        "unsupported" -> RomPatchFlow.Step.Done(RomPatchFlow.Result(out, false, RomPatchFlow.Support.UNLISTED, "Daisy Quest (v1.2)"))
+        "notfound" -> RomPatchFlow.Step.NotFound(info)
+        "unknown" -> RomPatchFlow.Step.NotFound(unknown)
+        "looking" -> RomPatchFlow.Step.Looking(info, 0.35f)
+        else -> RomPatchFlow.Step.Failed(RomPatchFlow.messageFor(com.pokedaisy.app.BpsPatch.Reason.DAMAGED))
     }
 }
 

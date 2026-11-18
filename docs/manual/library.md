@@ -111,6 +111,8 @@ If you see `BASE ROM NOT FOUND`, none of your games has the checksum the patch w
 
 If the companion doesn't support the patched game, you're told so and it stays out of the library, but the file is still saved. `ASK FOR SUPPORT` asks for the game to be added. If it was saved in PokeDaisy's own games folder, Settings > `HIDDEN GAMES` can still show it in the library.
 
+On iPhone and iPad, use `+ → PATCH A ROM` or `TOOLS → PATCH A ROM` and choose the patch in Files. First add the clean GBA, Game Boy or Game Boy Color base ROM to your library. The patched copy is saved to `PokeDaisy/roms` in Files and is ready to play from the library.
+
 ### File types
 
 - `.gba` files, and Game Boy / Game Boy Color `.gb` and `.gbc`.

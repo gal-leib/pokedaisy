@@ -30,8 +30,7 @@ import com.pokedaisy.app.companion.ui.OptionColors
 import com.pokedaisy.app.companion.ui.OptionListWindow
 import com.pokedaisy.app.companion.ui.OptionOverlay
 import com.pokedaisy.app.companion.ui.OptionTitleWindow
-import com.pokedaisy.app.companion.ui.drawRowDivider
-import androidx.compose.ui.draw.drawBehind
+import com.pokedaisy.app.companion.ui.InfoRows
 import com.pokedaisy.app.achievements.RetroAchievements
 import java.io.File
 import java.text.DateFormat
@@ -292,24 +291,5 @@ fun GameInfoDialog(
 }
 
 @Composable
-internal fun InfoSection(section: GameInfo.Section, first: Boolean, m: GbaTextMetrics, small: GbaTextMetrics) {
-    GbaText(
-        section.title, OptionColors.value, OptionColors.valueShadow, m,
-        Modifier.padding(top = if (first) m.u * 2 else m.u * 8, bottom = m.u * 2),
-    )
-    section.rows.forEachIndexed { j, (label, value) ->
-        Row(
-            Modifier.fillMaxWidth()
-                .then(
-                    if (j < section.rows.lastIndex) {
-                        Modifier.drawBehind { drawRowDivider(OptionColors.divider, m.u.toPx(), 0f) }
-                    } else Modifier,
-                )
-                .padding(vertical = small.u * 3),
-            horizontalArrangement = Arrangement.spacedBy(m.u * 6),
-        ) {
-            GbaText(label, OptionColors.muted, OptionColors.mutedShadow, small, Modifier.weight(0.34f))
-            GbaText(value, OptionColors.label, OptionColors.labelShadow, small, Modifier.weight(0.66f), maxLines = 3)
-        }
-    }
-}
+private fun InfoSection(section: GameInfo.Section, first: Boolean, m: GbaTextMetrics, small: GbaTextMetrics) =
+    InfoRows(section.title, section.rows, first, m, small)

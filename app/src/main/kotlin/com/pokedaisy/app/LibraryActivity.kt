@@ -174,13 +174,15 @@ class LibraryActivity : ComponentActivity() {
     }
 
     /** PATCH A ROM: a .bps applied to a ROM the library has (internal for ui-preview). */
-    internal val patcher by lazy {
-        RomPatchFlow(this) { out ->
+    private val patcherDelegate = lazy {
+        AndroidRomPatches(this) { out ->
             generateAutoCoverAsync(out)
             identifyGames()
             bump()
         }
     }
+    internal val patcher by patcherDelegate
+
     /** SETTINGS opened as the rail's / bar's tab: its own GAMES / TOOLS come back here as the place to show. */
     private val settingsTab = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         when (r.data?.getStringExtra(SettingsActivity.EXTRA_SECTION)) {
@@ -390,6 +392,7 @@ class LibraryActivity : ComponentActivity() {
 
     override fun onDestroy() {
         saveImports.close()
+        if (patcherDelegate.isInitialized()) patcher.flow.close()
         setup?.let { it.flow.close(); it.capture.cancel() }
         super.onDestroy()
     }
@@ -703,10 +706,10 @@ class LibraryActivity : ComponentActivity() {
                     },
                 ) }
 
-            PatchWindow(
-                patcher, m, small,
-                onPlay = ::play,
-                onAskSupport = { rom -> Thread({ val url = RomSupportRequest.url(rom); runOnUiThread { openUrl(url) } }, "pokedaisy-support-url").start() },
+            com.pokedaisy.app.companion.ui.PatchWindow(
+                patcher.flow, m, small,
+                onPlay = { play(it.toFile()) },
+                onAskSupport = { rom -> Thread({ val url = RomSupportRequest.url(rom.toFile()); runOnUiThread { openUrl(url) } }, "pokedaisy-support-url").start() },
             )
 
             SpritePackWindow(spritePack, m, small)
@@ -1546,7 +1549,7 @@ class LibraryActivity : ComponentActivity() {
     /** Every window over the main screen (pass keys to them, not the launcher). */
     private val libraryDialogOpen
         get() = searching || pickingSort || addMenu || renaming != null || deleting != null || gameInfo != null || coverPickerFor != null ||
-            pendingImport != null || patcher.step != null || spritePack.step != null || saveImports.pending != null || saveImports.importing != null || backupPick != null || updates.release != null || crashAsk ||
+            pendingImport != null || patcher.flow.step != null || spritePack.step != null || saveImports.pending != null || saveImports.importing != null || backupPick != null || updates.release != null || crashAsk ||
             (expandIntro && !crashAsk) || battleStyleIntroShown || ssIntroShown || whatsNewShown || supportShown || seasonalShown
 
     /** BACK for the library's windows (OptionOverlay & co.): the newest open one closes. */
