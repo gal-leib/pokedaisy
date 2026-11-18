@@ -36,6 +36,8 @@ val sharedCoreSources by extra(
         "com/pokedaisy/app/BpsPatch.kt",
         "com/pokedaisy/app/RomPatchFiles.kt",
         "com/pokedaisy/app/FlacWriter.kt",
+        "com/pokedaisy/app/FfMusicCache.kt",
+        "com/pokedaisy/app/FfMusicBudget.kt",
         "com/pokedaisy/app/ScriptInput.kt",
         "com/pokedaisy/app/WideCamera.kt",
         "com/pokedaisy/app/companion/KeyCapture.kt",

@@ -59,7 +59,7 @@ class Gen1MusicRenderer(
     private fun run() {
         val background = if (cache.prefetched) emptyList() else tables.songs.map { (b, id) -> Background(Gen1Music.key(b, id)) }
         background.forEach { queue.offerLast(it) }
-        cache.prepare { stopped || queue.peekFirst() is String }
+        cache.prepareOnAndroid { stopped || queue.peekFirst() is String }
         var left = background.size
         var allOk = true
         var backgroundFull = false

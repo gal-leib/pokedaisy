@@ -76,11 +76,11 @@ class FlacWriterTest {
         val pcm = chipMusic(30000)
         val wav = tmp.newFile("old.wav")
         writeWav(wav, pcm, pcm.size, 48000)
-        val (rate, read) = readWav(wav)!!
+        val (rate, read) = readWav(wav.toOkioPath())!!
         assertEquals(48000, rate)
         assertArrayEquals(pcm, read)
         roundTrip(read)
-        assertEquals(null, readWav(tmp.newFile("junk.wav").apply { writeBytes(ByteArray(100)) }))
+        assertEquals(null, readWav(tmp.newFile("junk.wav").apply { writeBytes(ByteArray(100)) }.toOkioPath()))
     }
 
     /** Square waves, a triangle, a decaying noise channel and gaps: what the games' sound chips play. */

@@ -117,7 +117,7 @@ class FfMusicRenderer(
         if (fanfare?.hasOwn == false && fanfareSongId() != null) queue.offerFirst(FANFARE)
         if (click?.hasOwn == false) queue.offerFirst(CLICK)
         // The click / fanfare and a song being heard come before converting old clips.
-        cache.prepare { stopped || queue.peekFirst().let { it is String || it === CLICK || it === FANFARE } }
+        cache.prepareOnAndroid { stopped || queue.peekFirst().let { it is String || it === CLICK || it === FANFARE } }
         var prefetchLeft = prefetch.size
         var prefetchOk = true
         var backgroundFull = false

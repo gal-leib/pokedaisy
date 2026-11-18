@@ -1762,7 +1762,7 @@ class PokeDaisyActivity : Activity() {
         romBlocked = com.pokedaisy.app.companion.data.BlockedGames.forCrc(crc)
         RetroAchievements.setFlightAnywhere(false)
         states = SaveStates(getExternalFilesDir(null) ?: filesDir, crc)
-        val ffMusicCache = FfMusicCache(getExternalFilesDir(null) ?: filesDir, crc, gameBoy = RomIdentity.isGameBoy(r))
+        val ffMusicCache = androidFfMusicCache(getExternalFilesDir(null) ?: filesDir, crc, gameBoy = RomIdentity.isGameBoy(r))
         // STEADY FF music: songs rendered on their own from this ROM, in the
         // background, as the game starts them (see FfMusicRenderer).
         // The companion's button click is rendered from this ROM the same way.
@@ -3356,7 +3356,7 @@ class PokeDaisyActivity : Activity() {
         // AUTO language: the title id names none (its 4th character is a digit); the session sets the save's.
         com.pokedaisy.app.companion.i18n.L10n.apply(Prefs(this).appLanguage, key)
         states = SaveStates(getExternalFilesDir(null) ?: filesDir, key)
-        engine = EmulatorEngine(input, states!!, FfMusicCache(getExternalFilesDir(null) ?: filesDir, key), com.pokedaisy.app.companion.GameBattleInput(telemetry, null, 0, input = input), Prefs(this), telemetry)
+        engine = EmulatorEngine(input, states!!, androidFfMusicCache(getExternalFilesDir(null) ?: filesDir, key), com.pokedaisy.app.companion.GameBattleInput(telemetry, null, 0, input = input), Prefs(this), telemetry)
         val session = com.pokedaisy.app.n3ds.N3dsSession(
             this, romFile, header.titleId, input,
             onSnapshot = { telemetry.publish(it) },

@@ -1512,11 +1512,11 @@ class EmulatorEngine(
             // plays straight through a menu instead of handing over to the game's music
             // (at another spot in the song) and starting over when FF picks up again.
             val clip = if (ffWanted && mode == FfMusicMode.STEADY && ffMusicKey != null) {
-                ffMusicCache.fileIfCached(ffMusicKey)
+                ffMusicCache.fileIfCached(ffMusicKey)?.toFile()
             } else null
             if (ffClipNotice.changed(clip)) {
                 onFfMusicChanged?.invoke(
-                    clip?.let { FfMusicPlayer.Clip(it, ffMusicCache.introIfCached(ffMusicKey!!), songStartedAt) },
+                    clip?.let { FfMusicPlayer.Clip(it, ffMusicCache.introIfCached(ffMusicKey!!)?.toFile(), songStartedAt) },
                 )
             }
             // STEADY with the song's clip still rendering: FF stays silent until it's in (it used to
