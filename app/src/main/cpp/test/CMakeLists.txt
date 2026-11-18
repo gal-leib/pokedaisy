@@ -60,3 +60,8 @@ add_executable(pk_ra_requests_test pk_ra_requests_test.c)
 target_link_libraries(pk_ra_requests_test PRIVATE pk_ra_requests)
 add_test(NAME pk_ra_requests COMMAND pk_ra_requests_test)
 set_tests_properties(pk_ra_requests PROPERTIES TIMEOUT 30)
+
+add_executable(pk_ra_client_test pk_ra_client_test.c)
+target_link_libraries(pk_ra_client_test PRIVATE pk_ra_client)
+add_test(NAME pk_ra_client COMMAND pk_ra_client_test "${CMAKE_CURRENT_BINARY_DIR}")
+set_tests_properties(pk_ra_client PROPERTIES FIXTURES_REQUIRED diagnostics TIMEOUT 30)

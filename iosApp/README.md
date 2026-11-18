@@ -71,6 +71,7 @@ On a Mac with Xcode 16, a JDK 17 and the Android SDK (Gradle configures the shar
 
 ```sh
 brew install xcodegen
+git submodule update --init third_party/mgba third_party/rcheevos
 cd iosApp
 xcodegen
 open PokeDaisy.xcodeproj

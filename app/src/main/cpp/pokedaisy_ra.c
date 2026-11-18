@@ -20,15 +20,14 @@
 #include <time.h>
 
 #include "pk_api.h"
-#include "pk_ra_requests.h"
+#include "pk_ra_client.h"
+#include "pk_ra_client_internal.h"
 
-#include "rc_client.h"
 #include "rc_consoles.h"
 
 #include "nds/pk_nds.h"
 
 #define LOG_TAG "pokedaisy/ra"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  LOG_TAG, __VA_ARGS__)
 
 static JavaVM* ra_vm;
@@ -84,22 +83,6 @@ static void raDeleteLocal(JNIEnv* env, jobject o) {
 
 // --- rc_client callbacks -----------------------------------------------------
 
-// Debug counters for raDebugStatus: reads that came back short, and the last such address.
-static volatile uint32_t ra_shortReads, ra_lastShortAddr, ra_reads;
-
-static uint32_t raReadMemoryImpl(uint32_t address, uint8_t* buffer, uint32_t num_bytes);
-
-static uint32_t raReadMemory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client) {
-    (void) client;
-    uint32_t n = raReadMemoryImpl(address, buffer, num_bytes);
-    ra_reads++;
-    if (n < num_bytes) {
-        ra_shortReads++;
-        ra_lastShortAddr = address;
-    }
-    return n;
-}
-
 // RA's DS map (rcheevos consoleinfo.c): $0000000-$03FFFFF main RAM (0x02000000), $0400000-$0FFFFFF the DSi's
 // extra RAM (none on a DS: zeros), $1000000-$1003FFF the ARM9's data TCM.
 static uint32_t raReadMemoryNds(uint32_t address, uint8_t* buffer, uint32_t num_bytes) {
@@ -144,128 +127,59 @@ static uint32_t raReadMemoryImpl(uint32_t address, uint8_t* buffer, uint32_t num
     return pk_api_ra_read_memory(address, buffer, num_bytes);
 }
 
-static void raServerCall(const rc_api_request_t* request, rc_client_server_callback_t callback,
-                         void* callback_data, rc_client_t* client) {
-    (void) client;
-    int id = pk_ra_requests_begin(callback, callback_data);
-
-    if (!id) {
-        // Out of slots: fail it now (retryable, so rc_client tries again later).
-        LOGW("server call dropped: too many in flight");
-        rc_api_server_response_t r = { NULL, 0, RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR };
-        callback(&r, callback_data);
-        return;
-    }
+static void raServerCall(int id, const char* url, const char* post, const char* contentType) {
     JNIEnv* env = raEnv();
-    jstring url = raStr(env, request->url);
-    jstring post = raStr(env, request->post_data);
-    jstring type = raStr(env, request->content_type);
-    raCallback(env, ra_serverCall, (jint) id, url, post, type);
-    raDeleteLocal(env, url);
-    raDeleteLocal(env, post);
-    raDeleteLocal(env, type);
+    jstring u = raStr(env, url);
+    jstring p = raStr(env, post);
+    jstring t = raStr(env, contentType);
+    raCallback(env, ra_serverCall, (jint) id, u, p, t);
+    raDeleteLocal(env, u);
+    raDeleteLocal(env, p);
+    raDeleteLocal(env, t);
 }
 
-static void raLog(const char* message, const rc_client_t* client) {
-    (void) client;
+static void raLog(const char* message) {
     JNIEnv* env = raEnv();
-    jstring m = raStr(env, message);
-    raCallback(env, ra_onLog, m);
-    raDeleteLocal(env, m);
+    jstring text = raStr(env, message);
+    raCallback(env, ra_onLog, text);
+    raDeleteLocal(env, text);
 }
 
-static void raEvent(const rc_client_event_t* event, rc_client_t* client) {
-    (void) client;
+static void raEvent(const struct pk_ra_event* event) {
     JNIEnv* env = raEnv();
-    jint id = 0, points = 0;
-    const char *title = NULL, *description = NULL, *badge = NULL, *extra = NULL;
-    char buf[64];
-    if (event->achievement) {
-        const rc_client_achievement_t* a = event->achievement;
-        id = (jint) a->id;
-        points = (jint) a->points;
-        title = a->title;
-        description = a->description;
-        badge = a->badge_url;
-        extra = a->measured_progress;
-    } else if (event->leaderboard) {
-        const rc_client_leaderboard_t* l = event->leaderboard;
-        id = (jint) l->id;
-        title = l->title;
-        description = l->description;
-        extra = l->tracker_value;
-    } else if (event->leaderboard_tracker) {
-        id = (jint) event->leaderboard_tracker->id;
-        extra = event->leaderboard_tracker->display;
-    } else if (event->leaderboard_scoreboard) {
-        const rc_client_leaderboard_scoreboard_t* s = event->leaderboard_scoreboard;
-        id = (jint) s->leaderboard_id;
-        points = (jint) s->new_rank;
-        extra = s->submitted_score;
-    } else if (event->server_error) {
-        id = (jint) event->server_error->related_id;
-        title = event->server_error->api;
-        description = event->server_error->error_message;
-    } else if (event->subset) {
-        id = (jint) event->subset->id;
-        title = event->subset->title;
-        badge = event->subset->badge_url;
-    }
-    if (event->type == RC_CLIENT_EVENT_GAME_COMPLETED) {
-        const rc_client_game_t* g = rc_client_get_game_info(ra_client);
-        if (g) {
-            id = (jint) g->id;
-            title = g->title;
-            badge = g->badge_url;
-        }
-    }
-    if (!extra) {
-        buf[0] = '\0';
-        extra = buf;
-    }
-    jstring jt = raStr(env, title), jd = raStr(env, description), jb = raStr(env, badge), je = raStr(env, extra);
-    raCallback(env, ra_onEvent, (jint) event->type, id, jt, jd, jb, je, points);
-    raDeleteLocal(env, jt);
-    raDeleteLocal(env, jd);
-    raDeleteLocal(env, jb);
-    raDeleteLocal(env, je);
+    jstring title = raStr(env, event->title), description = raStr(env, event->description);
+    jstring badge = raStr(env, event->badge_url), extra = raStr(env, event->extra);
+    raCallback(env, ra_onEvent, (jint) event->type, (jint) event->id, title, description, badge, extra, (jint) event->points);
+    raDeleteLocal(env, title);
+    raDeleteLocal(env, description);
+    raDeleteLocal(env, badge);
+    raDeleteLocal(env, extra);
 }
 
-static void raLoginDone(int result, const char* error_message, rc_client_t* client, void* userdata) {
-    (void) userdata;
+static void raLoginDone(int result, const char* error, const struct pk_ra_user* user) {
     JNIEnv* env = raEnv();
-    const rc_client_user_t* u = result == RC_OK ? rc_client_get_user_info(client) : NULL;
-    jstring err = raStr(env, error_message);
-    jstring user = raStr(env, u ? u->username : NULL);
-    jstring display = raStr(env, u ? u->display_name : NULL);
-    jstring token = raStr(env, u ? u->token : NULL);
-    jstring avatar = raStr(env, u ? u->avatar_url : NULL);
-    raCallback(env, ra_onLogin, (jint) result, err, user, display, token, avatar,
-                                 (jint) (u ? u->score : 0), (jint) (u ? u->score_softcore : 0));
+    jstring err = raStr(env, error);
+    jstring name = raStr(env, user ? user->username : NULL);
+    jstring display = raStr(env, user ? user->display_name : NULL);
+    jstring token = raStr(env, user ? user->token : NULL);
+    jstring avatar = raStr(env, user ? user->avatar_url : NULL);
+    raCallback(env, ra_onLogin, (jint) result, err, name, display, token, avatar,
+               (jint) (user ? user->score : 0), (jint) (user ? user->softcore_score : 0));
     raDeleteLocal(env, err);
-    raDeleteLocal(env, user);
+    raDeleteLocal(env, name);
     raDeleteLocal(env, display);
     raDeleteLocal(env, token);
     raDeleteLocal(env, avatar);
 }
 
-static void raGameLoaded(int result, const char* error_message, rc_client_t* client, void* userdata) {
-    (void) userdata;
+static void raGameLoaded(int result, const char* error, const struct pk_ra_game* game) {
     JNIEnv* env = raEnv();
-    const rc_client_game_t* g = rc_client_get_game_info(client);
-    rc_client_user_game_summary_t s;
-    memset(&s, 0, sizeof(s));
-    if (result == RC_OK) {
-        rc_client_get_user_game_summary(client, &s);
-    }
-    jstring err = raStr(env, error_message);
-    jstring title = raStr(env, g ? g->title : NULL);
-    jstring badge = raStr(env, g ? g->badge_url : NULL);
-    jstring hash = raStr(env, g ? g->hash : NULL);
-    raCallback(env, ra_onGameLoaded, (jint) result, err, (jint) (g ? g->id : 0),
-                                 title, badge, hash,
-                                 (jint) s.num_core_achievements, (jint) s.num_unlocked_achievements,
-                                 (jint) s.points_core, (jint) s.points_unlocked);
+    jstring err = raStr(env, error);
+    jstring title = raStr(env, game->title);
+    jstring badge = raStr(env, game->badge_url);
+    jstring hash = raStr(env, game->hash);
+    raCallback(env, ra_onGameLoaded, (jint) result, err, (jint) game->id, title, badge, hash,
+               (jint) game->achievements, (jint) game->unlocked, (jint) game->points, (jint) game->points_unlocked);
     raDeleteLocal(env, err);
     raDeleteLocal(env, title);
     raDeleteLocal(env, badge);
@@ -305,25 +219,19 @@ RA_FN(raInit)(JNIEnv* env, jobject thiz) {
     if (!ra_serverCall || !ra_onLogin || !ra_onGameLoaded || !ra_onEvent || !ra_onLog || !ra_onLeaderboardEntries || !ra_onAllProgress) {
         return JNI_FALSE;               // NoSuchMethodError is pending for Kotlin
     }
-    ra_client = rc_client_create(raReadMemory, raServerCall);
-    if (!ra_client) {
-        return JNI_FALSE;
-    }
-    rc_client_enable_logging(ra_client, RC_CLIENT_LOG_LEVEL_INFO, raLog);
-    rc_client_set_event_handler(ra_client, raEvent);
-    // Softcore until PokeDaisy is a recognised hardcore client: loading states,
-    // rewinds and the automated battle input aren't blocked yet.
-    rc_client_set_hardcore_enabled(ra_client, 0);
+    const struct pk_ra_callbacks callbacks = {
+        .request = raServerCall, .login = raLoginDone, .game_loaded = raGameLoaded,
+        .event = raEvent, .log = raLog, .read_memory = raReadMemoryImpl,
+    };
+    if (!pk_ra_init(&callbacks)) return JNI_FALSE;
+    ra_client = pk_ra_client_handle();
     return JNI_TRUE;
 }
 
 JNIEXPORT jstring JNICALL
 RA_FN(raUserAgentClause)(JNIEnv* env, jobject thiz) {
     char buf[64];
-    buf[0] = '\0';
-    if (ra_client) {
-        rc_client_get_user_agent_clause(ra_client, buf, sizeof(buf));
-    }
+    pk_ra_user_agent(buf, sizeof(buf));
     return (*env)->NewStringUTF(env, buf);
 }
 
@@ -331,21 +239,21 @@ JNIEXPORT void JNICALL
 RA_FN(raQueueResponse)(JNIEnv* env, jobject thiz, jint id, jint status, jbyteArray jBody) {
     jsize len = jBody ? (*env)->GetArrayLength(env, jBody) : 0;
     jbyte* bytes = len ? (*env)->GetByteArrayElements(env, jBody, NULL) : NULL;
-    pk_ra_requests_respond(id, bytes || !len ? status : RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR,
+    pk_ra_queue_response(id, bytes || !len ? status : RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR,
                            (const char*) bytes, bytes ? (size_t) len : 0);
     if (bytes) (*env)->ReleaseByteArrayElements(env, jBody, bytes, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raPump)(JNIEnv* env, jobject thiz) {
-    pk_ra_requests_pump();
+    pk_ra_pump();
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raLoginWithPassword)(JNIEnv* env, jobject thiz, jstring jUser, jstring jPassword) {
     const char* user = (*env)->GetStringUTFChars(env, jUser, NULL);
     const char* pass = (*env)->GetStringUTFChars(env, jPassword, NULL);
-    rc_client_begin_login_with_password(ra_client, user, pass, raLoginDone, NULL);
+    pk_ra_login_password(user, pass);
     (*env)->ReleaseStringUTFChars(env, jUser, user);
     (*env)->ReleaseStringUTFChars(env, jPassword, pass);
 }
@@ -354,14 +262,14 @@ JNIEXPORT void JNICALL
 RA_FN(raLoginWithToken)(JNIEnv* env, jobject thiz, jstring jUser, jstring jToken) {
     const char* user = (*env)->GetStringUTFChars(env, jUser, NULL);
     const char* token = (*env)->GetStringUTFChars(env, jToken, NULL);
-    rc_client_begin_login_with_token(ra_client, user, token, raLoginDone, NULL);
+    pk_ra_login_token(user, token);
     (*env)->ReleaseStringUTFChars(env, jUser, user);
     (*env)->ReleaseStringUTFChars(env, jToken, token);
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raLogout)(JNIEnv* env, jobject thiz) {
-    rc_client_logout(ra_client);
+    pk_ra_logout();
 }
 
 // Emu thread, after pkInit: asks the server which game [jHash] is - RetroAchievements' hash of the ROM *file*
@@ -377,48 +285,42 @@ RA_FN(raLoadGame)(JNIEnv* env, jobject thiz, jstring jHash) {
     if (!hash) {
         return JNI_FALSE;
     }
-    rc_client_begin_load_game(ra_client, hash, raGameLoaded, NULL);
+    bool started = pk_ra_load_game(hash);
     (*env)->ReleaseStringUTFChars(env, jHash, hash);
-    return JNI_TRUE;
+    return started;
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raUnloadGame)(JNIEnv* env, jobject thiz) {
-    rc_client_unload_game(ra_client);
+    pk_ra_unload_game();
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raDoFrame)(JNIEnv* env, jobject thiz) {
-    rc_client_do_frame(ra_client);
+    pk_ra_frame();
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raIdle)(JNIEnv* env, jobject thiz) {
-    rc_client_idle(ra_client);
+    pk_ra_idle();
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raReset)(JNIEnv* env, jobject thiz) {
-    rc_client_reset(ra_client);
+    pk_ra_reset();
 }
 
 /** Achievement / leaderboard progress to keep beside a savestate, or null (no game). */
 JNIEXPORT jbyteArray JNICALL
 RA_FN(raSerializeProgress)(JNIEnv* env, jobject thiz) {
-    if (!rc_client_is_game_loaded(ra_client)) {
-        return NULL;
-    }
-    size_t size = rc_client_progress_size(ra_client);
-    if (!size) {
-        return NULL;
-    }
-    uint8_t* buf = malloc(size);
+    size_t size;
+    uint8_t* bytes = pk_ra_serialize(&size);
     jbyteArray out = NULL;
-    if (rc_client_serialize_progress_sized(ra_client, buf, size) == RC_OK) {
+    if (bytes && size <= INT32_MAX) {
         out = (*env)->NewByteArray(env, (jsize) size);
-        (*env)->SetByteArrayRegion(env, out, 0, (jsize) size, (const jbyte*) buf);
+        if (out) (*env)->SetByteArrayRegion(env, out, 0, (jsize) size, (const jbyte*) bytes);
     }
-    free(buf);
+    free(bytes);
     return out;
 }
 
@@ -426,12 +328,12 @@ RA_FN(raSerializeProgress)(JNIEnv* env, jobject thiz) {
 JNIEXPORT void JNICALL
 RA_FN(raDeserializeProgress)(JNIEnv* env, jobject thiz, jbyteArray jData) {
     if (!jData) {
-        rc_client_deserialize_progress_sized(ra_client, NULL, 0);
+        pk_ra_deserialize(NULL, 0);
         return;
     }
     jsize len = (*env)->GetArrayLength(env, jData);
     jbyte* data = (*env)->GetByteArrayElements(env, jData, NULL);
-    rc_client_deserialize_progress_sized(ra_client, (const uint8_t*) data, (size_t) len);
+    pk_ra_deserialize((const uint8_t*) data, (size_t) len);
     (*env)->ReleaseByteArrayElements(env, jData, data, JNI_ABORT);
 }
 
@@ -490,40 +392,7 @@ RA_FN(raAchievementList)(JNIEnv* env, jobject thiz) {
 JNIEXPORT jstring JNICALL
 RA_FN(raDebugStatus)(JNIEnv* env, jobject thiz) {
     char out[2048];
-    char rp[256];
-    rp[0] = '\0';
-    if (!ra_client || !rc_client_is_game_loaded(ra_client)) {
-        return raStr(env, "no game");
-    }
-    rc_client_get_rich_presence_message(ra_client, rp, sizeof(rp));
-    int counts[4] = { 0, 0, 0, 0 };
-    char odd[1024];
-    size_t oddLen = 0;
-    odd[0] = '\0';
-    rc_client_achievement_list_t* list = rc_client_create_achievement_list(ra_client,
-        RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE_AND_UNOFFICIAL, RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_LOCK_STATE);
-    if (list) {
-        for (uint32_t b = 0; b < list->num_buckets; b++) {
-            for (uint32_t i = 0; i < list->buckets[b].num_achievements; i++) {
-                const rc_client_achievement_t* a = list->buckets[b].achievements[i];
-                if (a->state < 4) {
-                    counts[a->state]++;
-                }
-                if (a->state != RC_CLIENT_ACHIEVEMENT_STATE_ACTIVE && oddLen < sizeof(odd) - 64) {
-                    int n = snprintf(odd + oddLen, sizeof(odd) - oddLen, " [%u s%u %s]",
-                        (unsigned) a->id, (unsigned) a->state, a->title ? a->title : "");
-                    if (n > 0) {
-                        oddLen += (size_t) n;
-                    }
-                }
-            }
-        }
-        rc_client_destroy_achievement_list(list);
-    }
-    snprintf(out, sizeof(out), "rp=\"%s\" reads=%u short=%u last_short=$%06X active=%d unlocked=%d disabled=%d inactive=%d%s",
-        rp, (unsigned) ra_reads, (unsigned) ra_shortReads, (unsigned) ra_lastShortAddr,
-        counts[RC_CLIENT_ACHIEVEMENT_STATE_ACTIVE], counts[RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED],
-        counts[RC_CLIENT_ACHIEVEMENT_STATE_DISABLED], counts[RC_CLIENT_ACHIEVEMENT_STATE_INACTIVE], odd);
+    pk_ra_debug_status(out, sizeof(out));
     return raStr(env, out);
 }
 

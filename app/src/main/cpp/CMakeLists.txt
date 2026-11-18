@@ -57,8 +57,7 @@ endif()
 # pk_api brings mGBA with its headers and the definitions they need (pk_api.cmake).
 target_link_libraries(pokedaisy
     pk_api
-    rcheevos
-    pk_ra_requests
+    pk_ra_client
     core
     dsperate_core
     z
