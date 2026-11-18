@@ -1,6 +1,8 @@
 package com.pokedaisy.app.companion
 
+import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.Prefs
+import com.pokedaisy.app.companion.ui.battleButtonsColumnWidth
 import com.pokedaisy.app.companion.data.*
 import kotlin.test.*
 
@@ -26,6 +28,14 @@ class BattleOverlayStateTest {
             battle.copy(unsupported = true), battle.copy(isDoubleBattle = true), battle.copy(game = null))) {
             assertFalse(battleButtonsWanted(true, true, false, snapshot))
         }
+    }
+
+    @Test fun tabletKeepsBattleButtonsWhenTheLandscapePictureFillsTheWidth() {
+        val unit = 1.5.dp
+        assertEquals(96.dp, battleButtonsColumnWidth(0.dp, unit, allowPictureOverlap = true))
+        assertEquals(96.dp, battleButtonsColumnWidth(18.dp, unit, allowPictureOverlap = true))
+        assertNull(battleButtonsColumnWidth(18.dp, unit, allowPictureOverlap = false))
+        assertEquals(100.dp, battleButtonsColumnWidth(100.dp, unit, allowPictureOverlap = false))
     }
 
     @Test fun actionLaneMovesOffShouldersAndFaceButtonsAndDeclinesAnObstructedScreen() {

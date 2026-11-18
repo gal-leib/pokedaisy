@@ -52,6 +52,8 @@ import okio.Path.Companion.toPath
 import okio.buffer
 import okio.use
 import platform.Foundation.NSFileManager
+import platform.UIKit.UIDevice
+import platform.UIKit.UIUserInterfaceIdiomPad
 import platform.UIKit.UIViewController
 
 /** How often the companion reads the running game (Android's sampler runs about this often too). */
@@ -120,6 +122,7 @@ object PokeDaisyHost {
         panels.coopKey = { currentCoop?.key(it) == true }
         val currentRuntime = playback
         val title = iosRomTitle(romPath)
+        val isPad = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad
         val statusBar: @Composable () -> Unit = {
             val snapshot by telemetry.snapshot.collectAsState()
             RunningGameStatusBar(title, snapshot, FoundationDates::shortTime)
@@ -218,6 +221,7 @@ object PokeDaisyHost {
                             com.pokedaisy.app.companion.ui.BattleButtons(snapshot, buttons, battle,
                                 currentSettings?.showHints == true, core = panels.coreFrame(),
                                 clearTop = clear.first, clearBottom = clear.second, avoid = panels.hudAvoid(),
+                                allowPictureOverlap = isPad,
                                 onWindow = { panels.captureOverlay(IosGameScreen.Overlay.BATTLE, it) })
                             quickActions?.let { actions ->
                                 com.pokedaisy.app.companion.ui.QuickMenu(panels.quickMenu, snapshot, actions,

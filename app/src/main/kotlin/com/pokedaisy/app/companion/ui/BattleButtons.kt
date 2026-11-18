@@ -86,8 +86,8 @@ fun rememberBattleButtonsRead(snapshot: SnapshotView): Boolean {
 
 /**
  * The battle buttons in the room right of [core] (px: where the GBA's own picture is in this box; null = its middle
- * at the box's height, EXPAND's battle). [shown] false fades them out. No room for them (STRETCH, a docked side
- * panel, a narrow screen) = nothing. [clearTop] / [clearBottom] (px): the touch controls' rows, kept clear.
+ * at the box's height, EXPAND's battle). [shown] false fades them out. [allowPictureOverlap] keeps the column
+ * available on a tablet with little room beside the picture. [clearTop] / [clearBottom] (px) reserve touch-control rows.
  * [initialWindow]: a window already open (screenshot tests can't tap).
  */
 @Composable
@@ -107,6 +107,7 @@ fun BattleButtons(
     style: com.pokedaisy.app.companion.BattleStyle = com.pokedaisy.app.companion.BattleStyle.GEN4,
     /** Touch-control bounds in this overlay's pixels; the action column moves left to keep them reachable. */
     avoid: List<Rect> = emptyList(),
+    allowPictureOverlap: Boolean = false,
 ) {
     var window by remember { mutableStateOf(initialWindow) }
     val state = snapshot.battleInputState
@@ -139,7 +140,7 @@ fun BattleButtons(
         val boxH = with(density) { maxHeight.toPx() }
         val right = core?.right ?: ((boxW + boxH * 1.5f) / 2)
         val room = with(density) { (boxW - right).toDp() }
-        if (room < u * MIN_ROOM) return@BoxWithConstraints
+        val columnW = battleButtonsColumnWidth(room, u, allowPictureOverlap) ?: return@BoxWithConstraints
         val gap = u * 5
         val top = with(density) { clearTop.toDp() } + u * 3
         val actions = state == BATTLE_INPUT_ACTION_SELECT
@@ -147,7 +148,6 @@ fun BattleButtons(
         val active = snapshot.battlePlayer.getOrNull(0)
         val moves = active?.moves.orEmpty().take(4)
         val wild = snapshot.enemyParty.isEmpty()
-        val columnW = maxOf(u * MIN_WIDTH, minOf(room, u * MAX_WIDTH))
         val edgePx = with(density) { (u * EDGE).toPx() }
         val columnPx = with(density) { columnW.toPx() }
         val lane = com.pokedaisy.app.companion.battleButtonsLane(Rect(0f, 0f, boxW + edgePx, boxH),
@@ -231,7 +231,12 @@ private const val PARTY_LIST_W = 192
 private const val PARTY_ROW = 34
 private const val PARTY_GAP = 3
 
-/** Below this much room (GBA pixels) right of the picture, no buttons. */
+internal fun battleButtonsColumnWidth(room: Dp, unit: Dp, allowPictureOverlap: Boolean): Dp? {
+    if (room < unit * MIN_ROOM && !allowPictureOverlap) return null
+    return room.coerceIn(unit * MIN_WIDTH, unit * MAX_WIDTH)
+}
+
+/** The usual minimum room (GBA pixels) beside the picture. */
 private const val MIN_ROOM = 40
 /** What a button needs beside its icon (GBA pixels): its word, the bevel and the padding. */
 private const val WORD_ROOM = 18
