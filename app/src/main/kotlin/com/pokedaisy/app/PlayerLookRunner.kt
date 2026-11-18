@@ -3,6 +3,7 @@ package com.pokedaisy.app
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
+import com.pokedaisy.app.companion.data.AppearanceAssets
 import com.pokedaisy.app.companion.data.LookArt
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.LookEngine
@@ -15,8 +16,6 @@ import com.pokedaisy.app.companion.data.RideVehicle
 import com.pokedaisy.app.companion.data.TextArt
 import com.pokedaisy.app.companion.data.TextBlob
 import com.pokedaisy.app.companion.data.TextLook
-import com.pokedaisy.app.companion.data.readLines
-import com.pokedaisy.app.companion.data.writeText
 import java.io.File
 import okio.Path.Companion.toOkioPath
 
@@ -73,7 +72,7 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
     @Volatile private var textPatches: Map<LookEngine, List<PlayerLook.Block>> = emptyMap()
     @Volatile var female: Boolean? = null
         private set
-    private var generation = 0
+    @Volatile private var generation = 0
 
     /** A ROM loaded: forget the last one's patches and start this one's pass (off the UI thread). */
     fun load(rom: File, key: String, code: String, save: File?) {
@@ -98,8 +97,8 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
             Thread({
                 try {
                     val filesDir = context.filesDir.toOkioPath()
-                    MonArt.keep(filesDir, rom.readBytes())
-                    if (MonArt.sources(filesDir).size < MonArt.Source.entries.size) scanLibrary(rom)
+                    AppearanceAssets(filesDir).prepareFollowers(AppearanceAssets.file(rom.toOkioPath()),
+                        ::librarySources, { gen == generation })
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         if (gen == generation) offeredMons.value = party.filter { it in MonArt.available(filesDir) }
                     }
@@ -115,9 +114,7 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
                 val bytes = rom.readBytes()
                 val scan = PlayerLook.scan(bytes, TextBlob.entries)
                 val filesDir = context.filesDir.toOkioPath()
-                LookArt.keep(filesDir, scan)
-                TextArt.keep(filesDir, scan)
-                MonArt.keep(filesDir, bytes)
+                AppearanceAssets(filesDir).keep(bytes, scan)
                 // Only retail carts (a collection dump of one too, or one randomized: the randomizer leaves the hero's
                 // pictures alone) and the hacks played dressed up headless ([PlayerLook.HACKS]) wear another look: a hack
                 // may load its hero's pictures or palettes its own way. Every ROM's heroes are still kept for the other games.
@@ -268,33 +265,17 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
 
     /** Heroes, text looks and following Pokémon still missing are looked for in the library's other FireRed / LeafGreen
      * / Ruby / Sapphire / Emerald ROMs (the hacks with following Pokémon carry those game codes), each once. */
-    private fun scanLibrary(running: File) {
-        val filesDir = context.filesDir.toOkioPath()
-        val seenFile = LookArt.dir(filesDir) / "scanned.txt"
-        val seen = runCatching { seenFile.readLines().toMutableSet() }.getOrDefault(mutableSetOf())
-        fun done() = LookArt.available(filesDir).size == LookChar.entries.size && TextLook.STYLES.all { TextArt.load(filesDir, it) != null } &&
-            MonArt.sources(filesDir).size == MonArt.Source.entries.size
-        for (f in runCatching { RomFolder.libraryRoms(context, Prefs(context)) }.getOrDefault(emptyList())) {
-            if (done()) break
-            val id = "$LIBRARY_SCAN_VERSION|${f.absolutePath}|${f.length()}|${f.lastModified()}"
-            if (id in seen || runCatching { f.canonicalPath == running.canonicalPath }.getOrDefault(false)) continue
-            seen += id
-            if (PlayerLook.engineFor(RomIdentity.gameCode(f)) == null) continue
-            val bytes = runCatching { RomArchive.open(f).use { it.readBytes() } }.getOrNull() ?: continue
-            val scan = PlayerLook.scan(bytes, TextBlob.entries)
-            val kept = LookArt.keep(filesDir, scan)
-            val text = TextArt.keep(filesDir, scan)
-            val mons = MonArt.keep(filesDir, bytes)
-            Log.i("pokedaisy", "player look: ${f.name} gave $kept, text $text, $mons Pokémon")
+    private fun librarySources() = runCatching { RomFolder.libraryRoms(context, Prefs(context)) }
+        .getOrDefault(emptyList()).map { f ->
+            AppearanceAssets.Source(f.canonicalPath, "${f.absolutePath}|${f.length()}|${f.lastModified()}", f.name,
+                { RomIdentity.gameCode(f) }) { RomArchive.open(f).use { it.readBytes() } }
         }
-        runCatching { seenFile.writeText(seen.joinToString("\n")) }
+
+    private fun scanLibrary(running: File) {
+        AppearanceAssets(context.filesDir.toOkioPath()).scanMissing(running.canonicalPath, librarySources())
     }
 
     companion object {
-        /** In every `scanned.txt` line: a bump looks through the library again (2: Ruby / Sapphire's heroes, 3: Heart
-         * and Soul's, 4: the text looks, 5: Heart and Soul's Pokémon, 6: R.O.W.E.'s, Recharged Yellow's, Seaglass's). */
-        private const val LIBRARY_SCAN_VERSION = 6
-
         /**
          * The save's player gender (SaveBlock2 +8: after the 8-byte name in every Gen 3 game) from the save file's newer
          * slot - sector id 0 (SaveBlock2) with the higher save counter. Null if no sector checks out.

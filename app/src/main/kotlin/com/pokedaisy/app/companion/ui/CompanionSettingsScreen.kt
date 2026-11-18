@@ -624,7 +624,7 @@ private fun homeRows(
         if (s.followerSupported) {
             SettingRow(
                 tk("FOLLOWER"), if (s.followerReady) onOff(s.follower) else tk("N/A"), enabled = s.followerReady,
-                labelBadge = NewFeatures.badge(NewFeatures.FOLLOWER),
+                labelBadge = s.followerBadge ?: NewFeatures.badge(NewFeatures.FOLLOWER),
                 subtitle = if (s.followerReady) null else "Needs a game with following Pokémon too",
             ) { if (s.followerReady) { s.setFollower(!s.follower); changed() } }
         } else null,

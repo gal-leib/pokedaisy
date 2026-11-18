@@ -91,6 +91,7 @@ tasks.withType<KotlinCompile>().configureEach {
     // FieldItemUse reaches the shared frame-work queue; compile that same source here too.
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/GameSession.kt"))
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/FlightCore.kt"))
+    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/FollowerCore.kt"))
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/PictureEffects.kt"))
     if (gameExport) {
         dependsOn(stubCore)

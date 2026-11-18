@@ -48,6 +48,24 @@ class GameRuntime(
     val shiny get() = shinyOwner.value
     private val flightOwner = atomic<GameFlight?>(null)
     val flight get() = flightOwner.value
+    private val followerOwner = atomic<GameFollower?>(null)
+    val follower get() = followerOwner.value
+    val followerSupported get() = GameFollower.supported(gba,
+        blocked || telemetry.snapshot.value.blocked != null, fieldReadable, activeGame)
+
+    fun bindFollower(core: com.pokedaisy.app.game.FollowerCore, files: Path,
+                     prepareAssets: ((() -> Boolean) -> Unit) = {}): GameFollower {
+        followerOwner.value?.let { return it }
+        val owner = GameFollower(prefs, core, files, { followerSupported }, prepareAssets)
+        if (!followerOwner.compareAndSet(null, owner)) { owner.close(); return followerOwner.value!! }
+        if (closed.value) owner.close()
+        return owner
+    }
+
+    fun stepFollower() {
+        follower?.step(onField && !map && !FfMenuWatch.battling && battle.gameState == BATTLE_INPUT_NONE &&
+            fieldState and GameField.SURF == 0)
+    }
 
     fun bindFlight(create: () -> GameFlight): GameFlight {
         flightOwner.value?.let { return it }
@@ -207,6 +225,7 @@ class GameRuntime(
         shiny?.observe(null)
         resetTint()
         flight?.reset()
+        follower?.reset()
         session.reset()
         settledOnField = false
         val romKey = crc.toString(16).padStart(8, '0')
@@ -226,6 +245,7 @@ class GameRuntime(
 
     private fun sampled() {
         val snapshot = telemetry.snapshot.value
+        follower?.observe(snapshot)
         if (snapshot.blocked != null) {
             blocked = true
             disableField()
@@ -254,6 +274,7 @@ class GameRuntime(
         session.observeField(readable && FfMenuWatch.onField && !map, wideScene, battle.gameState, battle.holdPicture)
         fieldChanged(if (readable && fieldReadable) readField() else 0)
         shiny?.tick()
+        stepFollower()
         stepTint()
     }
 
@@ -298,6 +319,7 @@ class GameRuntime(
         release { cheats?.close() }
         release { shiny?.close() }
         release { flight?.close() }
+        release { follower?.close() }
         release { stateSlots.value?.close() }
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }

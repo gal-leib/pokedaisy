@@ -3,6 +3,7 @@
 package com.pokedaisy.app.core
 
 import com.pokedaisy.app.game.FlightCore
+import com.pokedaisy.app.game.FollowerCore
 
 import com.pokedaisy.app.companion.data.GameCalls
 import com.pokedaisy.app.companion.data.InProcessReader
@@ -89,7 +90,7 @@ import kotlinx.cinterop.value
  *
  * Threads, as pk_api.h says: one thread (the game's) starts, runs and stops it; the reads may come from any thread.
  */
-object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore {
+object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore, FollowerCore {
     /** Existing field actions use this same interface on Android. Game thread between frames only. */
     fun callSafe(): Boolean = pk_api_call_safe()
     override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int): Long =
@@ -198,7 +199,7 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore {
     fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
     fun fieldState(): Int = pk_api_field_state()
     fun setTint(red: Int, green: Int, blue: Int) = pk_api_set_tint(red, green, blue)
-    fun setFollower(frames: ByteArray?, palette: ByteArray?) {
+    override fun setFollower(frames: ByteArray?, palette: ByteArray?) {
         if (frames == null || palette == null || frames.size != PK_API_FOLLOWER_FRAME_BYTES.toInt() ||
             palette.size != PK_API_FOLLOWER_PALETTE_BYTES.toInt())
             pk_api_follower_set(null, 0, null, 0)
@@ -206,7 +207,7 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore {
             pk_api_follower_set(f.addressOf(0).reinterpret(), frames.size, p.addressOf(0).reinterpret(), palette.size)
         } }
     }
-    fun showFollower(on: Boolean) = pk_api_follower_show(on)
+    override fun showFollower(on: Boolean) = pk_api_follower_show(on)
     override fun configureFlight(words: IntArray?) {
         if (words == null || words.isEmpty()) pk_api_flight_configure(null, 0)
         else words.usePinned { pk_api_flight_configure(it.addressOf(0).reinterpret(), words.size) }

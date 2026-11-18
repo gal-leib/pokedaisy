@@ -174,6 +174,7 @@ interface CompanionSettings : StoredCompanionSettings {
      * Pokémon sprites kept, from Heart and Soul). */
     val followerSupported: Boolean get() = false
     val followerReady: Boolean get() = false
+    val followerBadge: String? get() = null
     /** DAY AND NIGHT ([com.pokedaisy.app.companion.data.DayNight]): the overworld tinted by the clock. */
     val dayNightSupported: Boolean get() = false
     val dayNightBadge: String? get() = NewFeatures.badge(NewFeatures.DAY_NIGHT)

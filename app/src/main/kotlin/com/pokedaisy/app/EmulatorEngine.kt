@@ -483,12 +483,6 @@ class EmulatorEngine(
     @Volatile var dsBattleMenuFloats = false
     private var touchFrames = 0
 
-    /** FOLLOWER ([com.pokedaisy.app.companion.data.MonArt]): the party lead's sprite to walk behind the player (null =
-     * none: the row off, no sprite kept). Shown on the field's own screen, not surfing; set by the activity. */
-    @Volatile var follower: com.pokedaisy.app.companion.data.MonArt.Mon? = null
-    private var followerSent: com.pokedaisy.app.companion.data.MonArt.Mon? = null
-    private var followerShown = false
-
     /** PLAYER LOOK changed (or a state loaded): the player's sprite is set up again on the field ([MgbaCore.pkLookRefresh]). */
     @Volatile private var lookRefreshPending = false
     private var lookRefreshTries = 0
@@ -534,21 +528,6 @@ class EmulatorEngine(
         }
     }
 
-    /** FOLLOWER, once a frame (emu thread): its sprite to the core when it changed, and shown or not. */
-    private fun stepFollower(field: Boolean) {
-        val mon = follower
-        if (mon !== followerSent) {
-            MgbaCore.pkFollowerSet(mon?.frames, mon?.owPal)
-            followerSent = mon
-        }
-        val show = field && mon != null
-        // Also every second while shown: a core started since (another game, a restart) is hooked when told.
-        if (show != followerShown || (show && ++followerFrames % 60 == 0)) {
-            MgbaCore.pkFollowerShow(show)
-            followerShown = show
-        }
-    }
-    private var followerFrames = 0
 
     /**
      * HIDE BATTLE MENU ([Prefs.hideBattleMenu]): what the activity wants - 0 = the game's battle menus shown, 1 = hidden
@@ -799,6 +778,11 @@ class EmulatorEngine(
         override val flightState get() = MgbaCore.pkFlightState()
     }
 
+    val followerCore = object : com.pokedaisy.app.game.FollowerCore {
+        override fun setFollower(frames: ByteArray?, palette: ByteArray?) = MgbaCore.pkFollowerSet(frames, palette)
+        override fun showFollower(on: Boolean) = MgbaCore.pkFollowerShow(on)
+    }
+
     /** Runs [job] on the emu thread before the next frame; dropped if the game closes first. */
     fun postToEmu(job: () -> Unit) = gameSession.post(job)
 
@@ -980,8 +964,7 @@ class EmulatorEngine(
         vh = MgbaCore.pkVideoHeight()
         videoBuf = MgbaCore.pkVideoBuffer()
         // The core starts with no follower and no tint (pk_wide_extras_reset): so do what this engine last sent.
-        followerSent = null
-        followerShown = false
+        playback.follower?.reset()
         battleMenuHideSent = -1
         playback.resetTint()
         playback.flight?.reset()
@@ -1537,8 +1520,7 @@ class EmulatorEngine(
             }
             if (gba) stepRide(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
                 battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
-            if (gba) stepFollower(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
-                battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE && fieldState and MgbaCore.FIELD_SURF == 0)
+            if (gba) playback.stepFollower()
             if (gba) coopLock?.onFrame()
             if (gba) coopPresence?.onFrame(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
                 battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)

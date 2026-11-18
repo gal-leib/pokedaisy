@@ -1054,21 +1054,7 @@ class PokeDaisyActivity : Activity() {
     /** The loaded ROM is a Game Boy / Color cart (no GBA header, no L/R). */
     @Volatile private var romIsGameBoy = false
 
-    /** FOLLOWER: the party lead's national number (null: none / unknown). */
-    @Volatile private var followerLead: Int? = null
-
-    /** FOLLOWER works here: a GBA game (not a Game Boy or DS one) that has no following Pokémon of its own. */
-    private fun followerSupported() = !romIsGameBoy && !romIsNds && ::engine.isInitialized && fieldGame != WideScreen.OFF &&
-        com.pokedaisy.app.companion.data.activeGame !in FOLLOWERS_OF_THEIR_OWN
-
-    /** The engine's follower: the lead's sprite while the row is on. */
-    private fun applyFollower() {
-        if (!::engine.isInitialized) return
-        val on = Prefs(this).follower && followerSupported()
-        val n = followerLead
-        engine.follower = if (on && n != null) engine.follower?.takeIf { it.national == n }
-            ?: com.pokedaisy.app.companion.data.MonArt.load(filesDir.toOkioPath(), n) else null
-    }
+    private fun followerSupported() = ::engine.isInitialized && engine.playback.followerSupported
 
     /** DAY AND NIGHT works here: a GBA game (not a Game Boy or DS one) that doesn't change with the time itself. */
     /** HIDE BATTLE MENU works in this game: FireRed, LeafGreen or Emerald's engine (their text box, pk_wide.c's
@@ -1325,10 +1311,9 @@ class PokeDaisyActivity : Activity() {
             lookRunner.apply()
         }
         override val followerSupported get() = followerSupported()
-        override val followerReady get() = com.pokedaisy.app.companion.data.MonArt.available(filesDir.toOkioPath()).isNotEmpty()
+        override val followerReady get() = ::engine.isInitialized && engine.playback.follower?.ready == true
         override fun setFollower(on: Boolean) {
-            stored.setFollower(on)
-            applyFollower()
+            if (::engine.isInitialized) engine.playback.follower?.set(on)
         }
         override val dayNightSupported get() = dayNightSupported()
         override val rivalLookSupported get() = lookRunner.rivalSupported
@@ -1712,8 +1697,8 @@ class PokeDaisyActivity : Activity() {
         }
         // PLAYER LOOK's Pokémon: the party's species (national numbers) with their names in the game.
         lookGender.launch {
-            telemetry.snapshot.map { Triple(it.party.map { m -> m.species }, it.party.firstOrNull { m -> !m.isEgg }?.species, it.pokedex) }
-                .distinctUntilChanged().collect { (species, leadSpecies, dex) ->
+            telemetry.snapshot.map { it.party.map { m -> m.species } to it.pokedex }
+                .distinctUntilChanged().collect { (species, dex) ->
                 val tables = dex?.tables ?: return@collect
                 val named = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     species.distinct().mapNotNull { sp ->
@@ -1723,12 +1708,6 @@ class PokeDaisyActivity : Activity() {
                     }
                 }
                 lookRunner.onParty(named.map { it.first }.distinct(), named.toMap())
-                followerLead = leadSpecies?.let { sp ->
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        runCatching { com.pokedaisy.app.companion.data.PokedexSource.nationalOf(tables, sp) }.getOrNull()
-                    }
-                }?.takeIf { it in 1..com.pokedaisy.app.companion.data.MonArt.LAST }
-                applyFollower()
             }
         }
         // HIDE BATTLE MENU follows the game being detected, the companion and the second screen.
@@ -2093,6 +2072,7 @@ class PokeDaisyActivity : Activity() {
             drawStatsSource = { view.repeatedDraws to view.unshownFrames }
             if (BuildConfig.DEBUG) audioTapDir = getExternalFilesDir("debug")
             this.gba = gba
+            playback.bindFollower(followerCore, this@PokeDaisyActivity.filesDir.toOkioPath())
             this.nds = nds
             ndsGameCode = ndsCode
             wideCamera = view.camera.also {
@@ -5481,13 +5461,6 @@ class PokeDaisyActivity : Activity() {
 
         /** Retail English Emerald (BPEE): the only game co-op presence runs on. */
         private const val RETAIL_EMERALD_SHA1 = "f3ae088181bf583e55daf962a92bb46f4f1d07b7"
-        /** Games whose Pokémon follow the player already: FOLLOWER isn't offered there. */
-        private val FOLLOWERS_OF_THEIR_OWN = setOf(
-            com.pokedaisy.app.companion.data.GameKind.HEART_AND_SOUL, com.pokedaisy.app.companion.data.GameKind.SOULGOLD,
-            com.pokedaisy.app.companion.data.GameKind.ROWE, com.pokedaisy.app.companion.data.GameKind.EMERALD_SEAGLASS,
-            com.pokedaisy.app.companion.data.GameKind.RECHARGED_YELLOW,
-        )
-
         /** BIKE / ROD's SELECT presses before giving up, and the frames each waits to see it take (~3 s in all at 1x). */
         /** How long a tap beside the floating touch screen holds B for the game (a few frames at 1x). */
         private const val DS_B_PRESS_MS = 80L

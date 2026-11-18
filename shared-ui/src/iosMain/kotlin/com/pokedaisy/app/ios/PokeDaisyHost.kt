@@ -436,6 +436,13 @@ object PokeDaisyHost {
                 g.camera.level = iosPreferences.zoomLevelFor(key)
                 g.setExpandedTables(tables)
                 p.start(romPath.toPath(), code, crc, areaMapCrc = tables)
+                if (code != null) p.bindFollower(PkApiCore, appFilesDir()) { current ->
+                    val assets = com.pokedaisy.app.companion.data.AppearanceAssets(appFilesDir())
+                    assets.prepareFollowers(com.pokedaisy.app.companion.data.AppearanceAssets.file(romPath.toPath()),
+                        { games().mapNotNull { path -> runCatching {
+                            com.pokedaisy.app.companion.data.AppearanceAssets.file(path.toPath())
+                        }.getOrNull() } }, current)
+                }
                 p.bindFlight {
                     com.pokedaisy.app.companion.GameFlight(p.session, PkApiCore, iosPreferences, readSupport,
                         kind = { telemetry.snapshot.value.game }, retail = telemetry::retailRom,
