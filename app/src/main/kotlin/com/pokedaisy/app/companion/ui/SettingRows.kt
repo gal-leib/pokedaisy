@@ -64,6 +64,7 @@ class SettingRow(
     /** More (or less) of the line for the label than the page's default: a long label beside a short value. */
     val labelWeight: Float? = null,
     val setting: SharedSetting? = null,
+    val requiresGameSupport: Boolean = false,
     val onClick: () -> Unit,
 )
 
@@ -227,11 +228,13 @@ val SETTING_KEYWORDS: Map<String, String> = mapOf(
 private fun fold(s: String): String = stripAccents(s.lowercase())
 
 /** A group's title row in [GroupedRows]. */
-fun groupTitle(label: String) = SettingRow(label, null, header = true) {}
+fun groupTitle(label: String, requiresGameSupport: Boolean = false) =
+    SettingRow(label, null, header = true, requiresGameSupport = requiresGameSupport) {}
 
 /** A group's title that stands out from the others (MAKEOVER, the user's call): a framed blue band with gold stars and
  * [tagline] under the title. */
-fun featuredGroupTitle(label: String, tagline: String) = SettingRow(label, null, header = true, subtitle = tagline, featured = true) {}
+fun featuredGroupTitle(label: String, tagline: String, requiresGameSupport: Boolean = false) =
+    SettingRow(label, null, header = true, subtitle = tagline, featured = true, requiresGameSupport = requiresGameSupport) {}
 
 /**
  * A settings list in groups, shared by both screens' SETTINGS: group titles (red, like

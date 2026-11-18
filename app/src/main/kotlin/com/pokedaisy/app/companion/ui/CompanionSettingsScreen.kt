@@ -560,19 +560,18 @@ private class Confirm(val title: String, val message: String, val confirmLabel: 
     var onDismiss: () -> Unit = {}
 }
 
-/** The groups (by title) a blocked game ([CompanionSettings.gameBlocked]) leaves out whole: none of them works there. */
-private val BLOCKED_GROUPS = setOf(tk("MAKEOVER"), tk("GAMEPLAY"), tk("COMPANION"), tk("CO-OP"))
-
-/** And the single rows it leaves out: EXPAND's, the HUD's, the battle buttons and the quick menu. */
-private val BLOCKED_ROWS = setOf(tk("ZOOM"), tk("AUTO ZOOM IN"), tk("LOOK AROUND"), tk("HUD"), tk("BATTLE BUTTONS"), tk("QUICK MENU"))
+private val blockedSettings = setOf(
+    SharedSetting.ZOOM, SharedSetting.AUTO_ZOOM_IN, SharedSetting.LOOK_AROUND,
+    SharedSetting.HUD, SharedSetting.BATTLE_BUTTONS, SharedSetting.QUICK_MENU,
+)
 
 /** HOME for a game its makers asked PokéDaisy not to read: the emulator's settings only (speed, sound, screen, controls,
  * the app), none of the game's own features. */
 private fun withoutGameRows(rows: List<SettingRow>): List<SettingRow> {
     var skipping = false
     return rows.filter { r ->
-        if (r.header) skipping = r.label in BLOCKED_GROUPS
-        !skipping && r.label !in BLOCKED_ROWS
+        if (r.header) skipping = r.requiresGameSupport
+        !skipping && r.setting !in blockedSettings
     }
 }
 
@@ -596,7 +595,7 @@ private fun homeRows(
     // game it works in).
     val looks = s.playerLookSupported
     val makeover = if (!looks && !s.dayNightSupported && !s.followerSupported && !s.flyStyleSupported) emptyList() else listOfNotNull(
-        featuredGroupTitle(tk("MAKEOVER"), if (looks) "Other games' looks in this one" else "A fresh look for this game"),
+        featuredGroupTitle(tk("MAKEOVER"), if (looks) "Other games' looks in this one" else "A fresh look for this game", requiresGameSupport = true),
         // Another game's hero for the player (PlayerLook.kt: their sprites from the player's own ROM of that game,
         // patched into this one in memory). The heroes' names are the games' own, so they aren't translated.
         if (!looks) null else SettingRow(
@@ -700,7 +699,7 @@ private fun homeRows(
         SettingRow(tk("AUDIO EFFECTS"), onOff(s.audioEffects),
             labelBadge = NewFeatures.badge(NewFeatures.AUDIO_EFFECTS),
             subtitle = "For equalizer apps, on the next start") { s.setAudioEffects(!s.audioEffects); changed() },
-        groupTitle(tk("GAMEPLAY")),
+        groupTitle(tk("GAMEPLAY"), requiresGameSupport = true),
         // The game's own switch for random encounters (WildEncounters.kt): ON (the game's rate) or OFF.
         SettingRow(tk("WILD ENCOUNTERS"), if (s.wildEncountersSupported) wildEncountersLabel(s.wildEncounters) else tk("N/A"), setting = SharedSetting.WILD_ENCOUNTERS,
             enabled = s.wildEncountersSupported, labelBadge = s.fieldOptionsBadge) {
@@ -1033,7 +1032,7 @@ private fun homeRows(
         // The game's frames per second and the app's CPU share, in the game's corner.
         SettingRow(tk("FPS / CPU"), onOff(s.showPerformance), setting = SharedSetting.FPS_CPU, labelBadge = s.performanceBadge,
             subtitle = "Speed and CPU use in the game's corner") { s.setShowPerformance(!s.showPerformance); changed() },
-        groupTitle(tk("COMPANION")),
+        groupTitle(tk("COMPANION"), requiresGameSupport = true),
         // Move effectiveness and the foe's weak-to/resists during battle.
         // Off: the battle buttons alone - no INFO, SUGGESTIONS or move ratings. The rows about them go with it.
         SettingRow(
@@ -1165,7 +1164,7 @@ internal fun coopRows(
         else -> partnerName
     }
     return listOf(
-        groupTitle(tk("CO-OP")),
+        groupTitle(tk("CO-OP"), requiresGameSupport = true),
         SettingRow(tk("LINK"), coopLinkLabel(state), subtitle = why) {},
         SettingRow(tk("PAIR"), null, enabled = false,
             labelBadge = NewFeatures.badge(if (s.coopSettingsInLibrary) NewFeatures.IOS_COOP else NewFeatures.COOP),
