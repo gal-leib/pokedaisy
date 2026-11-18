@@ -11,6 +11,7 @@ import com.pokedaisy.app.companion.data.MonArt
 import com.pokedaisy.app.companion.data.PlayerLook
 import com.pokedaisy.app.companion.data.PlayerLookAssets
 import com.pokedaisy.app.companion.data.RideOn
+import com.pokedaisy.app.companion.data.TextLook
 import com.pokedaisy.app.companion.data.RideVehicle
 import java.io.File
 import okio.Path.Companion.toOkioPath
@@ -155,7 +156,7 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
             worn.value = null
             own.value = null
             picked.value = LookChar.byName(prefs.playerLookFor(key))?.takeIf { it in offered.value }
-            onPatch(PlayerLook.Patch(textBlocks, emptyList()).takeIf { textBlocks.isNotEmpty() })
+            onPatch(TextLook.withAppearance(null, textBlocks))
             return
         }
         val me = LookChar.of(engine ?: return, f)
@@ -168,7 +169,7 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
             worn.value = null
             picked.value = null
             val patch = monPatch(f, me, n) ?: return
-            onPatch(if (textBlocks.isEmpty()) patch else PlayerLook.Patch(patch.blocks + textBlocks, patch.palettes, patch.playerPal))
+            onPatch(TextLook.withAppearance(patch, textBlocks))
             return
         }
         pickedMon.value = null
@@ -177,7 +178,7 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
         picked.value = pick
         val rival = prefs.rivalLook && PlayerLook.hasRival(me.engine)
         val look = ride(me, patches[Triple(f, pick, rival)] ?: patches[Triple(f, pick, false)], RideVehicle.of(prefs.rideVehicleId))
-        onPatch(if (textBlocks.isEmpty()) look else PlayerLook.Patch(look?.blocks.orEmpty() + textBlocks, look?.palettes.orEmpty(), look?.playerPal, look?.ride))
+        onPatch(TextLook.withAppearance(look, textBlocks))
     }
 
     /** RIDE ON: [look]'s patch with [vehicle] written over [me]'s bike sheets as worn (RideOn), in the worn palette. */

@@ -185,6 +185,7 @@ interface CompanionSettings : StoredCompanionSettings {
      * the game's own). */
     val textLooks: List<String> get() = emptyList()
     val textLook: String? get() = null
+    val textLookBadge: String? get() = null
     fun setTextLook(style: String?) {}
 
 

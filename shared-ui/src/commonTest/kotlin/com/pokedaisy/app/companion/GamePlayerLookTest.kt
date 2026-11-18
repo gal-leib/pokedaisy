@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.companion.data.PlayerLook
+import com.pokedaisy.app.companion.data.TextLook
 import com.pokedaisy.app.game.PlayerLookCore
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -43,6 +44,30 @@ class GamePlayerLookTest {
         look.select(null)
         assertTrue(look.service())
         assertTrue(core.addresses.isEmpty())
+    }
+
+    @Test fun clearingTextLeavesTheChosenHeroInstalled() {
+        val core = Core()
+        val look = GamePlayerLook(core)
+        val palette = ByteArray(32) { 0x11 }
+        val hero = PlayerLook.Patch(listOf(PlayerLook.Block(0x20, -1, byteArrayOf(1, 2))), emptyList(), palette)
+        val text = listOf(PlayerLook.Block(0x40, -1, byteArrayOf(3)))
+
+        look.select(TextLook.withAppearance(null, text))
+        assertTrue(look.service())
+        assertContentEquals(intArrayOf(0x08000040), core.addresses)
+
+        look.select(TextLook.withAppearance(hero, text))
+        assertTrue(look.service())
+        assertContentEquals(intArrayOf(0x08000020, 0x08000040), core.addresses)
+        assertContentEquals(byteArrayOf(1, 2, 3), core.bytes)
+        look.fieldFrame()
+        assertContentEquals(palette, core.lastPalette)
+
+        look.select(TextLook.withAppearance(hero, emptyList()))
+        assertTrue(look.service())
+        assertContentEquals(intArrayOf(0x08000020), core.addresses)
+        assertContentEquals(byteArrayOf(1, 2), core.bytes)
     }
 
     private class Core : PlayerLookCore {

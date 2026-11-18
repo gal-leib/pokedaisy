@@ -39,6 +39,8 @@ In a supported GBA game on iPhone or iPad, choose a hero under `SETTINGS` > `MAK
 
 In Ruby, Sapphire and Emerald, `RIVAL LOOK` starts on. Pick a `PLAYER LOOK` to dress your rival as the other hero of that game when their graphics are available. Turn it off to keep your rival's original look.
 
+`TEXT LOOK` changes the dialogue boxes and compatible fonts in supported GBA games when you have a compatible game's style in your library. The choice is saved for the current game and can be used together with `PLAYER LOOK`. Choose `OFF` to return to the game's own text.
+
 On iPhone and iPad, open `SETTINGS` > `MAKEOVER` > `FOLLOWER` while playing a supported GBA game. The first Pokémon in your party that isn't an Egg follows you on foot and waits while you surf. To supply its sprite, import a compatible game with its own followers, such as Emerald Seaglass, into your library. The row can show `N/A` while PokeDaisy scans your games.
 
 ## From controls.md

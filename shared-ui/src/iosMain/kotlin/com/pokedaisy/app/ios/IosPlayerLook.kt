@@ -10,6 +10,7 @@ import com.pokedaisy.app.companion.data.Logs
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.PlayerLook
 import com.pokedaisy.app.companion.data.PlayerLookAssets
+import com.pokedaisy.app.companion.data.TextLook
 import com.pokedaisy.app.companion.data.RETAIL_LOOK_TITLES
 import com.pokedaisy.app.companion.data.RETAIL_PORT_TITLES
 import com.pokedaisy.app.core.PkApiCore
@@ -36,6 +37,9 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
     val rivalSupported get() = catalog?.engine?.let(PlayerLook::hasRival) == true
     val choices get() = catalog?.availableHeroes(female).orEmpty().map { it.name }
     val selected get() = pick?.name
+    val textChoices get() = catalog?.text?.keys.orEmpty().map { it.name }
+    private var pickedText by mutableStateOf<String?>(null)
+    val textSelected get() = pickedText
     val own get() = catalog?.let { current -> female?.let { LookChar.of(current.engine, it).name } }
 
     fun load(rom: Path, code: String, romKey: String, library: () -> List<Path>) {
@@ -74,6 +78,13 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
         apply()
     }
 
+    fun selectText(style: String?) {
+        val currentKey = key ?: return
+        if (style != null && style !in textChoices) return
+        prefs.setTextLookFor(currentKey, style)
+        apply()
+    }
+
     fun apply() {
         val current = catalog ?: return
         val currentKey = key ?: return
@@ -83,7 +94,9 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
             current.heroes[Triple(gender, pick, rival)] ?: current.heroes[Triple(gender, pick, false)]
         }
         PlayerLook.worn.value = pick.takeIf { patch?.blocks?.isNotEmpty() == true }
-        renderer.select(patch)
+        val style = current.text.keys.firstOrNull { it.name == prefs.textLookFor(currentKey) }
+        pickedText = style?.name
+        renderer.select(TextLook.withAppearance(patch, style?.let { current.text[it] }.orEmpty()))
     }
 
     fun close() {
