@@ -295,7 +295,7 @@ object CoopSession {
 
     private fun startEndpoint(app: Context, prefs: Prefs) {
         val key = try {
-            CoopIdentity.secretKey(File(app.filesDir, "coop"))
+            CoopIdentity.secretKey(File(app.filesDir, "coop").toOkioPath(), JvmCoopCrypto)
         } catch (e: IOException) {
             coopLog("no device key: ${e.message}")
             setOverride(CoopState.Off(CoopOffReason.NETWORK_ERROR))
