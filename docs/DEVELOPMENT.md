@@ -4002,7 +4002,13 @@ up first. For automatic resume, establish a save match first; changed or unverif
 State writes target a temporary file before the host atomically replaces its slot. The C host test `pk_state`
 checks round trips, invalid states, cross-platform refusal and detection of a changed battery save.
 
-### The shared module (`shared/`, for the iPad app)
+### The shared module (`shared/`, Android and iOS)
+
+Put portable game rules, save transactions and their tests under `shared/src/commonMain` and
+`shared/src/commonTest`. Common Compose screens and the actions they present belong under
+`shared-ui/src/commonMain`. Both modules compile their own directories for both mobile targets.
+The filename lists in the root build select older sources still under `app/src/main/kotlin`.
+A new file in a module-owned directory needs no entry in those lists.
 
 The companion's data and language code, `app/src/main/kotlin/com/pokedaisy/app/companion/data` and `companion/i18n`,
 is compiled by its own Kotlin Multiplatform module, `shared/` (Android and iOS), in place: the files stay where
@@ -4018,15 +4024,13 @@ for iOS" job compiles both iOS targets, then links and runs the iOS tests in the
 and the portable smoke tests in `shared/src/commonTest` (files, PNGs, background work / locks and a fake emulator).
 Run them locally with `./gradlew :shared:iosSimulatorArm64Test` on an Apple Silicon Mac with Xcode and an iOS simulator.
 For focused JVM tests, use `make test-quick MODULE=shared T='*RomFilesTest'` (`MODULE=app` for app tests).
-A filter must match a test in that module; unfiltered `make test-quick` still runs both modules.
+A filter must match a test in that module. Unfiltered `make test-quick` runs the app and both shared modules.
 ui-preview still compiles the same files straight into its desktop build.
 
 The canonical key codes, `GbaControls`, `Hotkeys`, `GbaInput`, `ScriptInput` and `KeyCapture` also compile in
 `shared/`, from their existing app paths (`sharedCoreSources` in the root build). Both native hosts can use the same
 bindings, chord capture, deferred taps, turbo and script ownership. `AndroidGbaInput.kt` converts Android motion
 events to the common axis policy; UI badges stay in `shared-ui/`. The app excludes these files from its own compile.
-
-### The companion's screens (`shared-ui/`)
 
 `GameSaves` shares battery-save import transactions and dated backup names/listing. Hosts choose locations and
 their existing compression/extra-backup adapters. The common import rejects invalid input before opening state
@@ -4036,11 +4040,18 @@ If restoration is blocked too, the error names the retained battery backup. Same
 usual extension. Backup stamps use common date/time code in the device's timezone. Android keeps its RZIP decoder;
 iOS keeps its existing compressed-save refusal. A native host test verifies the iOS save/state paths and backup.
 
+For closed-game edits, `ClosedSaveEdits` checks the pending trade journal before either host opens
+the save. It publishes a fresh-boot marker before replacing a single battery save. A two-save
+trade journals both versions before the first replacement. Recovery keeps both committed edits or
+rolls back a partial trade. The host supplies the save location, backup policy and state directory.
+
 `RomIdentityReader` shares header parsing, console detection, streaming SHA1/MD5 and the DS achievement hash.
 Raw paths use okio; Android's `RomIdentity` supplies its existing archive reader. Both game hosts use the same
 header parser. The DS hash consumes the contained cart too, rather than a compressed archive's bytes, and retains
 the header/code/icon ordering, SuperCard prefix handling, zero padding and code-size limit used for loose carts.
 No core is needed and whole-file fingerprints still stream through a bounded buffer.
+
+### The companion's screens (`shared-ui/`)
 
 The battle menu driver (`BattleInputController.kt`) also compiles in `shared-ui/`, in place. The core module's
 `ScriptInput` interface delivers synthetic keys to the platform input (`GbaInput` on Android); logging uses `Logs` and its lock is
