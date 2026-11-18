@@ -57,6 +57,7 @@ internal class IosLibraryHost(
     private enum class AddChoice(val label: String) { ROM("ADD A ROM FILE"), PATCH("PATCH A ROM") }
     private var choosingAdd by mutableStateOf(false)
     private var choosingSaveGame by mutableStateOf(false)
+    private var renaming by mutableStateOf<String?>(null)
     private var notice by mutableStateOf<Pair<String, String>?>(failed?.let { tr("ERROR") to it.substringAfterLast('/') })
     private val saveImports = SaveImportFlow<String>(GameSaves.MAX_BYTES)
     private val patches = RomPatchFlow(
@@ -145,7 +146,7 @@ internal class IosLibraryHost(
     }
 
     private fun key(path: String) = path.substringAfterLast('/')
-    private fun label(path: String) = iosRomTitle(path)
+    private fun label(path: String) = prefs.displayName(key(path), iosRomTitle(path))
     private fun category(path: String): RomCategory = when (path.substringAfterLast('.').lowercase()) {
         "gb" -> RomCategory.GB; "gbc" -> RomCategory.GBC; else -> RomCategory.GBA
     }
@@ -199,6 +200,7 @@ internal class IosLibraryHost(
                 LibraryMenuItem(if (game.favorite) "UNFAVORITE" else "FAVORITE",
                     if (game.favorite) LibraryIcons.StarBorder else Icons.Filled.Star,
                     pixel = if (game.favorite) PixelIcons.starOutline else PixelIcons.star) { prefs.toggleFavorite(key(game.id)) },
+                LibraryMenuItem("RENAME", Icons.Filled.Edit, opens = true) { renaming = game.id },
                 LibraryMenuItem("LOAD SAVE", LibraryIcons.FileOpen, opens = true) { pickSave(game.id) })
             val onPlay = {
                 playGame(game.id)
@@ -257,6 +259,12 @@ internal class IosLibraryHost(
             },
             onDismiss = { choosingAdd = false },
             badge = { if (it == AddChoice.PATCH) NewFeatures.badge(NewFeatures.ROM_PATCH) else null })
+        renaming?.let { game ->
+            LibraryRenameDialog(label(game), m, small, onDismiss = { renaming = null }) { name ->
+                prefs.rename(key(game), name, iosRomTitle(game))
+                renaming = null
+            }
+        }
         PatchWindow(patches, m, small, onPlay = { playGame(it.toString()) }, describePath = ::patchDisplayPath)
         if (choosingSaveGame && paths.isNotEmpty()) OptionSelector(tr("LOAD SAVE"), paths, paths.first(), ::label, m,
             onPick = { choosingSaveGame = false; pickSave(it) }, onDismiss = { choosingSaveGame = false })

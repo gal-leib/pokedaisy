@@ -127,7 +127,7 @@ import com.pokedaisy.app.companion.ui.OptionLine
 import com.pokedaisy.app.companion.ui.OptionListWindow
 import com.pokedaisy.app.companion.ui.OptionOverlay
 import com.pokedaisy.app.companion.ui.OptionSelector
-import com.pokedaisy.app.companion.ui.OptionTextField
+import com.pokedaisy.app.companion.ui.LibraryRenameDialog
 import com.pokedaisy.app.companion.ui.OptionTitleWindow
 import com.pokedaisy.app.companion.ui.drawLayeredFrame
 import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
@@ -640,12 +640,12 @@ class LibraryActivity : ComponentActivity() {
             com.pokedaisy.app.companion.ui.LibraryNavigationDialogs(library, m, small)
 
             renaming?.let { rom ->
-                RenameDialog(
+                LibraryRenameDialog(
                     current = romLabel(rom),
                     m = m, small = small,
                     onDismiss = { renaming = null },
                     onConfirm = { name ->
-                        prefs.setRomDisplayName(rom, name.takeIf { it != GameTitles.defaultLabel(this@LibraryActivity, rom) })
+                        libraryPreferences.rename(rom.name, name, GameTitles.defaultLabel(this@LibraryActivity, rom))
                         renaming = null
                         bump()
                     },
@@ -1139,35 +1139,6 @@ class LibraryActivity : ComponentActivity() {
     @Composable
     private fun SearchStrip(m: GbaTextMetrics) {
         if (!toolsOpen) com.pokedaisy.app.companion.ui.LibrarySearchStrip(searchQuery, m, { searching = true }, ::search)
-    }
-
-    @Composable
-    private fun RenameDialog(
-        current: String,
-        m: GbaTextMetrics,
-        small: GbaTextMetrics,
-        onDismiss: () -> Unit,
-        onConfirm: (String) -> Unit,
-    ) {
-        var text by remember { mutableStateOf(current) }
-        OptionOverlay(onDismiss, Modifier.widthIn(max = 520.dp)) {
-            Column {
-                OptionTitleWindow(tr("RENAME"), m)
-                Spacer(Modifier.height(m.u * 4))
-                OptionListWindow(m, Modifier.fillMaxWidth()) {
-                    Column {
-                        GbaText(
-                            tr("Name shown in the list (display only - the file keeps its name)."),
-                            OptionColors.label, OptionColors.labelShadow, small, maxLines = Int.MAX_VALUE,
-                            modifier = Modifier.padding(horizontal = m.u * 8, vertical = m.u * 2),
-                        )
-                        OptionTextField(text, { text = it }, small, Modifier.padding(horizontal = m.u * 8, vertical = m.u * 2))
-                        OptionLine(tr("SAVE"), null, selected = false, m, height = m.rowHeight * 1.3f) { onConfirm(text) }
-                        OptionLine(tr("CANCEL"), null, selected = true, m, height = m.rowHeight * 1.3f, onClick = onDismiss)
-                    }
-                }
-            }
-        }
     }
 
     /** Imported ROMs plus the linked folders' supported ones (from their last scan). */

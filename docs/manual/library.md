@@ -122,7 +122,7 @@ On iPhone and iPad, use `+ → PATCH A ROM` or `TOOLS → PATCH A ROM` and choos
 
 PokeDaisy recognizes the games it supports and shows their proper names ("Pokémon FireRed", "Pokémon Unbound") whatever the file is called. Other games show their file name, tidied up: dump tags like `(USA, Europe)` and numbering are dropped.
 
-To call a game something else, use `RENAME` in its menu. It only changes what the library shows; the file keeps its name, so its save is still found.
+To call a game something else, use `RENAME` in its menu. On iPhone and iPad, touch and hold a game, or tap the menu button in list view. It only changes what the library shows; the file keeps its name, so its save is still found.
 
 Prefer your own file names? Set `GAME NAMES` to `FILE NAME` in Settings, in the `LIBRARY` group.
 
