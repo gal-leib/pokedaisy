@@ -186,35 +186,10 @@ class PokeDaisyActivity : Activity() {
         runCatching { com.pokedaisy.app.achievements.RetroAchievements.setExpShareActive(options?.expShareActive == true) }
     }
 
-    /** BOSS RETRY: the option (cached for the emu thread); this battle's state taken / a loss seen; the battle before. */
-    @Volatile private var battleRetryOn = false
-    private var retryTaken = false
-    private var retryLost = false
-    private var retryInBattle = false
-
-    /** Each sample (emu thread): a state as a trainer battle begins, the party all fainted noted, and after a loss the card. */
-    private fun updateBattleRetry(snap: com.pokedaisy.app.companion.data.SnapshotView) {
-        if (!snap.connected || n3ds != null) return
-        if (snap.inBattle) {
-            if (!retryTaken && battleRetryOn && snap.isTrainerBattle == true) {
-                retryTaken = true
-                engine.requestRetrySave()
-            }
-            if (snap.party.isNotEmpty() && snap.party.all { it.isEgg || it.hp <= 0 }) retryLost = true
-        } else if (retryInBattle) {
-            if (retryTaken && retryLost && battleRetryOn) {
-                Log.i("pokedaisy", "boss retry: a trainer battle lost, asking")
-                runOnUiThread { com.pokedaisy.app.companion.ui.BattleRetryAsk.showing = true }
-            }
-            retryTaken = false
-            retryLost = false
-        }
-        retryInBattle = snap.inBattle
-    }
-
-    /** BattleRetryAsk's answer: RETRY loads the battle's start; no leaves the game as it is. */
     private fun answerBattleRetry(retry: Boolean) {
-        if (retry && ::engine.isInitialized && !coopRefuses()) engine.requestRetryLoad()
+        if (!::engine.isInitialized) return
+        val current = engine
+        if (current.playback.battleRetry.answer(retry) && !coopRefuses()) current.requestRetryLoad()
     }
 
     /** Whether this game can take a REPEL from the companion: what AUTO REFILL needs (the quick menu's REPEL rule). */
@@ -1155,10 +1130,11 @@ class PokeDaisyActivity : Activity() {
         }
         override val shinyHuntCount get() = if (::engine.isInitialized) engine.playback.shinyAlert.count else 0
         override val shinyAlertSupported get() = (::engine.isInitialized && engine.shiny.supported)
+        override val battleRetryAsking get() = hudEngine.value?.playback?.battleRetry?.asking == true
         override val battleRetry get() = Prefs(this@PokeDaisyActivity).battleRetry
         override fun setBattleRetry(on: Boolean) {
-            Prefs(this@PokeDaisyActivity).battleRetry = on
-            battleRetryOn = on
+            if (::engine.isInitialized) engine.playback.battleRetry.set(on)
+            else Prefs(this@PokeDaisyActivity).battleRetry = on
         }
         override fun answerBattleRetry(retry: Boolean) = this@PokeDaisyActivity.answerBattleRetry(retry)
         override val lastBallButton get() = Prefs(this@PokeDaisyActivity).lastBallButton
@@ -1894,10 +1870,6 @@ class PokeDaisyActivity : Activity() {
         quietFound = null
         syncQuietPatches()
         syncLevelCap()
-        battleRetryOn = Prefs(this).battleRetry
-        retryTaken = false
-        retryLost = false
-        retryInBattle = false
         if (::engine.isInitialized) engine.shiny.observe(null)
         syncShinyAchievements()
         // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
@@ -2044,8 +2016,7 @@ class PokeDaisyActivity : Activity() {
                 }
                 // AUTO REFILL: another REPEL on before the one working runs out.
                 updateRepelRefill(snap)
-                // BOSS RETRY: a state as a trainer battle starts, and the question after a loss.
-                updateBattleRetry(snap)
+                playback.battleRetry.observe(snap, !CoopGuards.battleActive(), ::captureRetry)
                 // WILD ENCOUNTERS on a Game Boy game is held by the engine, frame by frame.
                 if (snap.connected && romIsGameBoy) gameBoyFields()
                 // party.isNotEmpty(), not just connected: `connected` flips true as
@@ -4107,7 +4078,7 @@ class PokeDaisyActivity : Activity() {
                     maxWidth = maxWidth, onAnswer = ::answerFlyStyle,
                 )
                 com.pokedaisy.app.companion.ui.BattleRetryAskHost(
-                    active = !tipsOnCompanion.value, roomy = false,
+                    asking = companionSettings.battleRetryAsking, active = !tipsOnCompanion.value, roomy = false,
                     modifier = androidx.compose.ui.Modifier.padding(top = clearTop + 8.dp),
                     cardModifier = androidx.compose.ui.Modifier.width(maxWidth * if (narrow) 0.94f else 0.54f),
                     maxWidth = maxWidth, onAnswer = ::answerBattleRetry,
@@ -4353,7 +4324,7 @@ class PokeDaisyActivity : Activity() {
         if (expandOfferUp.value || bottomFocus.value || companionOverGame.value) return false
         if (!tipsOnCompanion.value && com.pokedaisy.app.companion.FeatureTips.scheduler?.current != null) return false
         if (!tipsOnCompanion.value && com.pokedaisy.app.companion.ui.FlyStyleAsk.showing) return false
-        if (!tipsOnCompanion.value && com.pokedaisy.app.companion.ui.BattleRetryAsk.showing) return false
+        if (!tipsOnCompanion.value && companionSettings.battleRetryAsking) return false
         return true
     }
 

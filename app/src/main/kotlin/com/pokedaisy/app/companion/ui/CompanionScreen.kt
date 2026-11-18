@@ -929,7 +929,7 @@ fun CompanionScreen(
                     maxWidth = 1200.dp, onAnswer = settings::answerFlyStyle,
                 )
                 BattleRetryAskHost(
-                    active = settings.showsTips, roomy = true,
+                    asking = settings.battleRetryAsking, active = settings.showsTips, roomy = true,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), cardModifier = Modifier.fillMaxWidth(),
                     maxWidth = 1200.dp, onAnswer = settings::answerBattleRetry,
                 )

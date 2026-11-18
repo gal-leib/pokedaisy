@@ -40,7 +40,7 @@ internal class IosGameScreen(
     val back = CompanionBack()
     private val overlayBack = CompanionBack()
     private val overlayKeys = CompanionKeys()
-    enum class Overlay { FIELD_HUD, BATTLE }
+    enum class Overlay { FIELD_HUD, BATTLE, BATTLE_RETRY }
     private val capturedOverlays = mutableSetOf<Overlay>()
     private val overlayCaptured get() = capturedOverlays.isNotEmpty()
     private var closed = false

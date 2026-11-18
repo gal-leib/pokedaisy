@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.UIKitViewController
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
@@ -182,6 +183,16 @@ object PokeDaisyHost {
                             com.pokedaisy.app.companion.ui.FlyStyleAskHost(
                                 active = true, roomy = panels.portrait,
                                 onAnswer = { currentRuntime?.flight?.answerStyle(it) })
+                            val asking = currentSettings?.battleRetryAsking == true
+                            DisposableEffect(asking) {
+                                panels.captureOverlay(IosGameScreen.Overlay.BATTLE_RETRY, asking)
+                                onDispose { panels.captureOverlay(IosGameScreen.Overlay.BATTLE_RETRY, false) }
+                            }
+                            com.pokedaisy.app.companion.ui.BattleRetryAskHost(
+                                asking = asking, active = true, roomy = panels.portrait,
+                                onAnswer = { retry ->
+                                    if (currentRuntime?.battleRetry?.answer(retry) == true) currentSlots?.loadRetry()
+                                })
                         })
                     touch.EditorOverlay()
                 }
@@ -258,8 +269,10 @@ object PokeDaisyHost {
         game = g
         val currentLook = IosPlayerLook(iosPreferences, appFilesDir()).also { playerLook = it }
         val defaults = platform.Foundation.NSUserDefaults.standardUserDefaults
+        var currentRuntime: com.pokedaisy.app.companion.GameRuntime? = null
         val stateSnapshot = { telemetry.forState()?.takeIf { it.hasData && !it.unsupported }?.let(SnapshotCache::encode) }
         val stateLoaded: (Path) -> Unit = { state ->
+            currentRuntime?.battleRetry?.reset()
             if (currentLook.supported) currentLook.renderer.settle()
             telemetry.reset()
             SnapshotCache.read(state)?.let(telemetry::showCached)
@@ -277,7 +290,6 @@ object PokeDaisyHost {
             if (!saved) resumeFailed()
             saved
         }
-        var currentRuntime: com.pokedaisy.app.companion.GameRuntime? = null
         settings = IosCompanionSettings(romPath, code, g,
             onClose = { if (game === g) finishClose() },
             onRestart = { if (game === g && prepareClose()) { restartFresh = true; onRestartRequested() } },
@@ -444,7 +456,7 @@ object PokeDaisyHost {
             enabled = { currentSettings.cheatsEnabled },
             submit = { text -> if (g.isRunning && PkApiCore.applyCheats(text) < 0) com.pokedaisy.app.companion.data.Logs.i("cheats didn't load") })
         val currentBattle = battle!!
-        g.beforeRewind = { p.cancelFieldActions(); currentBattle.cancel() }
+        g.beforeRewind = { p.battleRetry.reset(); p.cancelFieldActions(); currentBattle.cancel() }
         val currentOptions = p.options
         g.onCoreStarted = {
             if (game === g) {
@@ -508,6 +520,7 @@ object PokeDaisyHost {
             current = { game === g && g.isRunning }, after = {
                 currentOptions.settingsChanged(currentSettings)
                 p.flight?.sync()
+                p.battleRetry.observe(it, live()) { slots?.captureRetry() == true }
                 if (live()) {
                     val steps = sharedItems.repelVar?.let { varId ->
                         it.progress?.variable(varId)?.let(sharedItems::repelSteps)

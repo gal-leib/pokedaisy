@@ -46,12 +46,25 @@ class StateSlotController(
     override fun requestLoad(index: Int) {
         if (!select(index)) return
         perform(tr("Slot {0}: nothing to load", index), Hotkeys.Action.LOAD_STATE) {
-            if (!files.exists(index)) return@perform false
-            beforeLoad()
-            // Refuse the load if its undo snapshot couldn't be made.
-            if (!files.writeState(files.undoLoadFile, write, snapshot = snapshot())) return@perform false
-            load(files.stateFile(index))
+            loadWithUndo(files.stateFile(index))
         }
+    }
+
+    /** The trainer's start is separate from all interactive slots and their save backups. */
+    fun captureRetry(): Boolean = runCatching {
+        !closed.value && onCore { !closed.value && files.writeState(files.retryFile, write, snapshot = snapshot()) }
+    }.getOrDefault(false)
+
+    fun loadRetry() = perform(tr("Can't go back to that battle"), Hotkeys.Action.LOAD_STATE, index = -1) {
+        loadWithUndo(files.retryFile)
+    }
+
+    private fun loadWithUndo(source: Path): Boolean {
+        if (!source.isFile || source.length <= 0L) return false
+        beforeLoad()
+        // Refuse the load if its undo snapshot couldn't be made.
+        if (!files.writeState(files.undoLoadFile, write, snapshot = snapshot())) return false
+        return load(source)
     }
 
     override fun requestDelete(index: Int) {
@@ -81,9 +94,8 @@ class StateSlotController(
         return true
     }
 
-    private fun perform(message: String, kind: Hotkeys.Action? = null, action: () -> Boolean) {
+    private fun perform(message: String, kind: Hotkeys.Action? = null, index: Int = currentIndex, action: () -> Boolean) {
         if (closed.value) return
-        val index = currentIndex
         val ok = runCatching { onCore { !closed.value && action() } }.getOrDefault(false)
         if (closed.value) return
         if (!ok) failed(message)

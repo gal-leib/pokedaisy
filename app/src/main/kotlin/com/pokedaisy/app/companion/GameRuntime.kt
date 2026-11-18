@@ -142,6 +142,7 @@ class GameRuntime(
     val autoRefill = GameAutoRefill(prefs, session)
     val shinyAlert = GameShinyAlert(prefs)
 
+    val battleRetry = GameBattleRetry(prefs)
     val lastBall get() = battle.ball
 
     fun bindLastBall(removeBagItem: () -> Long, handOver: () -> Unit) {
@@ -241,6 +242,7 @@ class GameRuntime(
         flight?.reset()
         follower?.reset()
         autoRefill.reset()
+        battleRetry.reset()
         session.reset()
         settledOnField = false
         val romKey = crc.toString(16).padStart(8, '0')
@@ -342,6 +344,7 @@ class GameRuntime(
         release { stateSlots.value?.close() }
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }
+        battleRetry.reset()
         release { autoRefill.reset(); session.close() }
         release {
             if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {

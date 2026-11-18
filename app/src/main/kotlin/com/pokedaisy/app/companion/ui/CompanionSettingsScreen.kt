@@ -830,7 +830,7 @@ private fun homeRows(
         // A state as each trainer battle starts; after a loss the card asks to go back to it (BattleRetryAsk).
         SettingRow(
             tk("BOSS RETRY"), onOff(s.battleRetry),
-            labelBadge = NewFeatures.badge(NewFeatures.BOSS_RETRY), subtitle = "Lost a trainer battle? Try it again",
+            labelBadge = s.battleRetryBadge ?: NewFeatures.badge(NewFeatures.BOSS_RETRY), subtitle = "Lost a trainer battle? Try it again",
         ) {
             s.setBattleRetry(!s.battleRetry); changed()
         },

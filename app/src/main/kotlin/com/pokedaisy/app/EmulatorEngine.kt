@@ -66,8 +66,6 @@ class EmulatorEngine(
     @Volatile private var pendingLoad = -1
     @Volatile private var pendingUndoSave = false
     @Volatile private var pendingUndoLoad = false
-    @Volatile private var pendingRetrySave = false
-    @Volatile private var pendingRetryLoad = false
     @Volatile private var pendingSuspend: File? = null
 
     @Volatile private var ffHeld = false
@@ -781,10 +779,14 @@ class EmulatorEngine(
     fun requestLoadState(slot: Int) { pendingLoad = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
     fun requestUndoSave() { if (!CoopGuards.battleActive()) pendingUndoSave = true }   // no state of a co-op battle is ever written
     fun requestUndoLoad() { pendingUndoLoad = true }
-    /** BOSS RETRY: a state of this moment (a trainer battle's start) into [SaveStates.retryFile]; never of a co-op battle. */
-    fun requestRetrySave() { if (!CoopGuards.battleActive()) pendingRetrySave = true }
-    /** BOSS RETRY: back to that state ([onStateResult] with LOAD_STATE, slot -1); undoable like any load. */
-    fun requestRetryLoad() { pendingRetryLoad = true }
+    /** Sample delivery runs on the emulator thread between frames. Co-op battles never write a retry state. */
+    fun captureRetry(): Boolean = !CoopGuards.battleActive() && slots.captureRetry()
+
+    fun requestRetryLoad() = postToEmu {
+        if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
+            onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, -1, false)
+        } else slots.loadRetry()
+    }
 
     fun cycleSlot(delta: Int) {
         val n = (currentSlot + delta).mod(SaveStates.SLOT_MAX - SaveStates.SLOT_MIN + 1)
@@ -1232,7 +1234,10 @@ class EmulatorEngine(
                 }
             }
             rewinding = rewindHeld && rewindWanted > 0
-            if (rewinding) playback.cancelFieldActions()
+            if (rewinding) {
+                playback.cancelFieldActions()
+                playback.battleRetry.reset()
+            }
             MgbaCore.pkSetRewinding(rewinding)
             // TURBO A / B: pressed 2 frames, released 2, in game frames - so FF mashes faster too.
             val reset = if (softResetFrames > 0) { softResetFrames--; SOFT_RESET_KEYS } else 0
@@ -1968,19 +1973,6 @@ class EmulatorEngine(
             } else slots.requestLoad(load)
         }
         if (pendingUndoSave) { pendingUndoSave = false; slots.select(currentSlot); slots.requestUndoSave() }
-        if (pendingRetrySave) {
-            pendingRetrySave = false
-            val ok = saveState(states.retryFile)
-            Log.i("pokedaisy", "boss retry: state ${if (ok) "taken" else "failed"}")
-        }
-        if (pendingRetryLoad) {
-            pendingRetryLoad = false
-            val ok = !refuseLoad(CoopGuards.statesBlocked, isResume = false) &&
-                states.retryFile.let { it.isFile && it.length() > 0 } &&
-                run { runCatching { saveState(states.undoLoadFile) }; loadState(states.retryFile) }
-            Log.i("pokedaisy", "boss retry: load $ok")
-            onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, -1, ok)
-        }
         if (pendingUndoLoad) {
             pendingUndoLoad = false
             if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
@@ -2030,6 +2022,7 @@ class EmulatorEngine(
 
     /** Loads [source] and puts achievement progress back to where that state had it. */
     private fun loadState(source: File): Boolean {
+        playback.battleRetry.reset()
         playback.cancelFieldActions()
         val ok = MgbaCore.pkLoadState(source.absolutePath)
         if (ok) RetroAchievements.afterLoadState(source)

@@ -41,6 +41,27 @@ class StateTransactionsTest {
         assertFalse(ra(files.bakFile(4)).isFile)
     }
 
+    @Test fun battleRetryDoesNotTouchAUserSlotAndCanBeUndone() = temporary { files ->
+        var moment = "trainer start"
+        val events = mutableListOf<Triple<Hotkeys.Action, Int, Boolean>>()
+        val slots = StateSlotController(files, onCore = { it() },
+            write = { path -> path.writeText(moment); true },
+            read = { path -> moment = path.readText(); true },
+            beforeLoad = {}, initialIndex = 3,
+            completed = { action, index, ok -> events += Triple(action, index, ok) })
+
+        assertTrue(slots.captureRetry())
+        moment = "after loss"
+        slots.loadRetry()
+        assertEquals("trainer start", moment)
+        assertEquals(3, slots.currentIndex)
+        assertFalse(files.exists(3))
+        assertEquals(Triple(Hotkeys.Action.LOAD_STATE, -1, true), events.single())
+
+        slots.requestUndoLoad()
+        assertEquals("after loss", moment)
+    }
+
     @Test fun failedPartialWritesPreserveSlotsAndNeverReuseStagedSidecars() = temporary { files ->
         assertTrue(files.saveSlot(0, { path -> path.writeText("good"); ra(path).writeText("good progress"); true }))
         assertFalse(files.saveSlot(0, { path -> path.writeText("partial"); ra(path).writeText("partial progress"); false }))

@@ -66,7 +66,7 @@ interface CompanionSettings : StoredCompanionSettings {
     fun setFlightVehicle(v: com.pokedaisy.app.companion.data.FlightVehicle) {}
     /** The first scenic FLY's question (ui.FlyStyleAsk) answered: CLASSIC switches, SCENIC / null (it timed out) keeps it. */
     fun answerFlyStyle(style: FlyStyle?) {}
-    /** BOSS RETRY's card answered: true = back to the lost battle's start ([com.pokedaisy.app.companion.ui.BattleRetryAsk]). */
+    /** BOSS RETRY's card answered: true = back to the lost battle's start ([com.pokedaisy.app.companion.ui.BattleRetryAskHost]). */
     fun answerBattleRetry(retry: Boolean) {}
 
     /** REUSABLE TMS - see [com.pokedaisy.app.Prefs.reusableTms]; [reusableTmsSupported]: the ROM's code that uses a TM
@@ -87,6 +87,8 @@ interface CompanionSettings : StoredCompanionSettings {
     val levelCapLevel: Int? get() = null
     /** BOSS RETRY - see [com.pokedaisy.app.Prefs.battleRetry]. */
     val battleRetry: Boolean get() = false
+    val battleRetryAsking: Boolean get() = false
+    val battleRetryBadge: String? get() = null
     fun setBattleRetry(on: Boolean) {}
     /** SHINY ALERT - see [com.pokedaisy.app.Prefs.shinyAlert]; [shinyHuntCount]: this game's wild battles since the last
      * shiny (or since it was turned on). */
