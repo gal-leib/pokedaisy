@@ -23,6 +23,7 @@ class StateSlotController(
     initialIndex: Int = 0,
     private val selected: (Int) -> Unit = {},
     private val completed: (Hotkeys.Action, Int, Boolean) -> Unit = { _, _, _ -> },
+    private val allowed: (Hotkeys.Action?) -> Boolean = { true },
 ) : StateSlots {
     private val closed = atomic(false)
     fun close() { closed.value = true }
@@ -95,7 +96,7 @@ class StateSlotController(
     }
 
     private fun perform(message: String, kind: Hotkeys.Action? = null, index: Int = currentIndex, action: () -> Boolean) {
-        if (closed.value) return
+        if (closed.value || !allowed(kind)) return
         val ok = runCatching { onCore { !closed.value && action() } }.getOrDefault(false)
         if (closed.value) return
         if (!ok) failed(message)

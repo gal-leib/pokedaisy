@@ -35,7 +35,7 @@ internal object IosCoopHost {
         get() = (NSBundle.mainBundle.objectForInfoDictionaryKey("PokeDaisyCoopRelayURL") as? String)
             ?.let(CoopRelay::normalize).orEmpty()
 
-    private fun directory() = NSFileManager.defaultManager
+    fun directory() = NSFileManager.defaultManager
         .URLsForDirectory(NSApplicationSupportDirectory, NSUserDomainMask)
         .filterIsInstance<NSURL>().firstNotNullOf { it.path }.toPath() / "coop"
 

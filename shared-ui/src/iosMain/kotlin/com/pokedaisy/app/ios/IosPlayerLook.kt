@@ -44,6 +44,7 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
     private var female by mutableStateOf<Boolean?>(null)
     private var pick by mutableStateOf<LookChar?>(null)
     val supported get() = catalog != null
+    val isFemale get() = female == true
     val rivalSupported get() = catalog?.engine?.let(PlayerLook::hasRival) == true
     private var party: Pair<PokedexTables, List<Int>>? = null
     private var partyJob: Job? = null

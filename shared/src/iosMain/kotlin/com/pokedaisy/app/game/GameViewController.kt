@@ -169,9 +169,10 @@ class GameViewController(
     private var rewinding = false
     /** Cancel queued battle commands on either transport edge. No state operation or touch release here. */
     var beforeRewind: () -> Unit = {}
+    var rewindAllowed: () -> Boolean = { true }
 
     fun holdRewind(on: Boolean) {
-        val next = on && rewindEnabled
+        val next = on && rewindEnabled && rewindAllowed()
         if (next == rewinding) return
         rewinding = next
         camera.reset()
@@ -187,6 +188,8 @@ class GameViewController(
     var frameKeys: (Int) -> Int = { it }
     var frameSpeed: () -> Double = { speed }
     var beforeFrame: () -> Unit = {}
+    /** May replace input or hold the core while the main-thread game loop continues polling. */
+    var frameGate: ((Int) -> Int?)? = null
     var afterFrame: () -> Unit = {}
     var holdPicture: () -> Boolean = { false }
     var quietPress: () -> Boolean = { false }
@@ -200,6 +203,7 @@ class GameViewController(
     var onCoreStarted: () -> Unit = {}
     /** Main thread, after pausing frames/audio but while state operations can still use the core. */
     var beforeSuspend: () -> Boolean = { true }
+    var onForeground: () -> Unit = {}
 
     /** Whether a game is open and running in this controller. */
     val isRunning: Boolean get() = running
@@ -265,6 +269,7 @@ class GameViewController(
     fun resume() {
         if (!running || uiPaused) return
         input.backgroundCaptured(false)
+        onForeground()
         onMusicPause(false)
         active = true
         pacer.reset()
@@ -309,6 +314,9 @@ class GameViewController(
         onHotkey = {}
         beforeRewind = {}
         beforeFrame = {}
+        frameGate = null
+        onForeground = {}
+        rewindAllowed = { true }
         afterFrame = {}
         onMusicPause = {}
         steadyClip = null
@@ -344,9 +352,17 @@ class GameViewController(
             // Unlimited FF still leaves time for the companion and touch events on the main thread.
             if (rate == 0.0 && ran && CACurrentMediaTime() - now >= 0.008) break
             val workStarted = if (performance != null) CACurrentMediaTime() else 0.0
-            if (!rewinding) beforeFrame()
             if (!running || !active || uiPaused) break
-            val held = input.keys()
+            if (rewinding && !rewindAllowed()) holdRewind(false)
+            val gate = frameGate
+            val held = if (gate == null) {
+                if (!rewinding) beforeFrame()
+                input.keys()
+            } else {
+                val allowed = gate(input.keys()) ?: break
+                if (!rewinding) beforeFrame()
+                allowed
+            }
             if (!running || !active || uiPaused) break
             val keys = if (rewinding) 0 else frameKeys(held)
             if (!running || !active || uiPaused) break
