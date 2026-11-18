@@ -8,11 +8,14 @@ import com.pokedaisy.app.companion.data.GameField
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.UIKitViewController
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.runtime.collectAsState
@@ -190,6 +193,9 @@ object PokeDaisyHost {
                             }
                             com.pokedaisy.app.companion.ui.BattleRetryAskHost(
                                 asking = asking, active = true, roomy = panels.portrait,
+                                modifier = Modifier.padding(top = with(LocalDensity.current) {
+                                    maxOf(48.dp, clear.first.toDp()) + 4.dp
+                                }),
                                 onAnswer = { retry ->
                                     if (currentRuntime?.battleRetry?.answer(retry) == true) currentSlots?.loadRetry()
                                 })
