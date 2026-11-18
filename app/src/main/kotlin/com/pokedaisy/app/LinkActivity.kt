@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,15 +39,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.companion.LinkSetupFlow
 import com.pokedaisy.app.companion.ui.AppBackdrop
+import com.pokedaisy.app.companion.ui.LinkSetupScreen
 import com.pokedaisy.app.companion.ui.GbaText
 import com.pokedaisy.app.companion.ui.GbaTextMetrics
 import com.pokedaisy.app.companion.ui.OptionButton
 import com.pokedaisy.app.companion.ui.OptionColors
 import com.pokedaisy.app.companion.ui.OptionConfirm
 import com.pokedaisy.app.companion.ui.OptionListWindow
-import com.pokedaisy.app.companion.ui.OptionRows
-import com.pokedaisy.app.companion.ui.OptionSelector
 import com.pokedaisy.app.companion.ui.OptionTitleWindow
 import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
 import com.pokedaisy.app.companion.ui.theme.AppColors
@@ -57,6 +56,8 @@ import kotlinx.coroutines.delay
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ConcurrentHashMap
+import okio.Path.Companion.toOkioPath
 import kotlin.concurrent.thread
 
 /**
@@ -77,10 +78,8 @@ class LinkActivity : ComponentActivity() {
     private class Game(val rom: File, val playable: File, val save: File)
 
     private lateinit var prefs: Prefs
-    private val slots = mutableStateListOf<File>()
-    private val labels = HashMap<String, String>()
-    /** The slot being picked for (slots.size = a new one), with the GBA games to pick from. */
-    private var picking by mutableStateOf<Pair<Int, List<File>>?>(null)
+    private val setup = LinkSetupFlow<File>()
+    private val labels = ConcurrentHashMap<String, String>()
     private var phase by mutableStateOf(Phase.SETUP)
     private var notice by mutableStateOf<String?>(null)
     private var confirmLeave by mutableStateOf(false)
@@ -107,8 +106,9 @@ class LinkActivity : ComponentActivity() {
         prefs = Prefs(this)
         com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
         input.setControls(GbaControls.load(controlsDir))
-        intent?.getStringExtra(EXTRA_ROM)?.let { File(it) }?.takeIf { it.isFile }?.let { slots.add(it) }
-        thread { slots.forEach { label(it) } }
+        intent?.getStringExtra(EXTRA_ROM)?.let { File(it) }?.takeIf { it.isFile }?.let(setup::seed)
+        val preset = setup.slots.toList()
+        thread { preset.forEach { label(it) } }
         setContent { AppTheme { com.pokedaisy.app.companion.ui.CompactTextOnSmallWindows { Root() } } }
     }
 
@@ -152,40 +152,27 @@ class LinkActivity : ComponentActivity() {
         RomFolder.libraryRoms(this, prefs).filter { !RomIdentity.isGameBoy(it) && !RomIdentity.isNds(it) }
 
     private fun pick(slot: Int) {
+        val scan = setup.begin(slot) ?: return
         thread {
             val list = gbaGames().onEach { label(it) }
             runOnUiThread {
-                if (list.isEmpty()) notice = tr("No GBA games in the library yet")
-                else picking = slot to list
+                if (setup.ready(scan, list) && list.isEmpty()) notice = tr("No GBA games in the library yet")
             }
         }
     }
 
-    /** What a slot shows: the game, and which save a second copy of it plays. */
-    private fun slotValue(i: Int): String {
-        val rom = slots[i]
-        val copy = slots.take(i).count { it.absolutePath == rom.absolutePath }
-        return if (copy == 0) label(rom) else tr("{0}, save {1}", label(rom), copy + 1)
-    }
-
-    /** [rom]'s save for its [copy]-th place in the link (0 = the game's own save). */
-    private fun saveFor(rom: File, copy: Int): File {
-        val own = SavesLocation.saveFor(this, prefs, rom)
-        if (copy == 0) return own
-        return File(own.parentFile, "${own.nameWithoutExtension} (link ${copy + 1}).${own.extension}")
-    }
-
     private fun start() {
-        if (slots.size < 2 || phase != Phase.SETUP) return
+        if (setup.slots.size < LinkSetupFlow.MIN_GAMES || phase != Phase.SETUP) return
+        setup.clearPicker()
         phase = Phase.STARTING
-        val picked = slots.toList()
+        val picked = setup.slots.toList()
         thread(name = "pokedaisy-link-open") {
             var refused: String? = null
-            val list = picked.mapIndexed { i, rom ->
-                val copy = picked.take(i).count { it.absolutePath == rom.absolutePath }
-                val save = saveFor(rom, copy)
+            val saves = LinkSavePaths.forGames(picked.map { SavesLocation.saveFor(this, prefs, it).absoluteFile.toOkioPath(normalize = true) })
+            val list = picked.zip(saves).map { (rom, path) ->
+                val save = File(path.toString())
                 SaveBackups.snapshot(save)
-                RzipSave.unpackForPlay(save)?.let { refused = refused ?: it }   // RetroArch's compressed .srm
+                RzipSave.unpackForPlay(save)?.let { refused = refused ?: it }
                 Game(rom, RomArchive.playable(rom, cacheDir) ?: rom, save)
             }
             refused?.let { why ->
@@ -387,49 +374,9 @@ class LinkActivity : ComponentActivity() {
 
     @Composable
     private fun Setup(m: GbaTextMetrics) {
-        BackHandler { finish() }
-        Box(Modifier.fillMaxSize()) {
-            AppBackdrop()
-            // OptionRows scrolls by itself: the column around it doesn't (a scroll inside a scroll can't be measured).
-            Column(Modifier.fillMaxSize().padding(16.dp)) {
-                OptionTitleWindow(tk("LINK PLAY"), m, onBack = { finish() })
-                Spacer(Modifier.height(m.u * 4))
-                OptionListWindow(m, Modifier.fillMaxWidth().weight(1f, fill = false)) {
-                    Column {
-                        com.pokedaisy.app.companion.ui.LinkSlots(
-                            slots.indices.map { i -> tr("GAME {0}", i + 1) to slotValue(i) }, canAdd = slots.size < LinkCore.MAX_GAMES, m,
-                            onPick = { pick(it) }, onAdd = { pick(slots.size) }, modifier = Modifier.weight(1f, fill = false),
-                        )
-                        GbaText(
-                            tr("Up to four GBA games run at once, joined as if by a link cable: trade, battle and mix records at the games' own Pokémon Centers. Tap a game to play it (L2 / R2 on a controller). The same game twice plays its second copy on a save of its own."),
-                            OptionColors.label, OptionColors.labelShadow, rememberGbaTextMetrics(0.8f), maxLines = Int.MAX_VALUE,
-                            modifier = Modifier.padding(m.u * 4),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(m.u * 4))
-                OptionButton(
-                    if (phase == Phase.STARTING) tr("STARTING…") else tr("START LINK"), m, onClick = { start() },
-                    modifier = Modifier.align(Alignment.End), emphasis = true, enabled = slots.size >= 2 && phase == Phase.SETUP,
-                )
-            }
-            picking?.let { (slot, list) ->
-                val remove = slot < slots.size
-                val options: List<File?> = list + if (remove) listOf(null) else emptyList()
-                OptionSelector(
-                    tk("PICK A GAME"), options, slots.getOrNull(slot), { it?.let(::label) ?: tk("REMOVE") }, m,
-                    onPick = { f ->
-                        picking = null
-                        when {
-                            f == null -> slots.removeAt(slot)
-                            slot < slots.size -> slots[slot] = f
-                            else -> slots.add(f)
-                        }
-                    },
-                    onDismiss = { picking = null },
-                )
-            }
-        }
+        BackHandler { if (phase == Phase.SETUP) finish() }
+        LinkSetupScreen(setup, m, phase == Phase.STARTING, ::label, { it.absolutePath },
+            onPick = ::pick, onStart = ::start, onClose = ::finish)
     }
 
     @Composable
