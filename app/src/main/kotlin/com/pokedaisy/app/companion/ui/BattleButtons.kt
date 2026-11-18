@@ -162,7 +162,7 @@ fun BattleButtons(
             // Running off the screen's right edge ([EDGE] GBA pixels past it): no right border or corners, a tab coming out
             // of the side.
             Modifier.align(Alignment.TopEnd).offset(x = u * EDGE - with(density) { shift.toDp() }).width(columnW + u * EDGE).fillMaxHeight()
-                .graphicsLayer { translationX = slide * size.width }
+                .graphicsLayer { translationX = slide * (size.width + shift) }
                 .padding(top = top, bottom = with(density) { clearBottom.toDp() } + u * 3)
                 .padding(start = u * 2),
         ) {
