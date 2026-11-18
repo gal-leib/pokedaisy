@@ -1861,8 +1861,8 @@ class PokeDaisyActivity : Activity() {
             com.pokedaisy.app.companion.data.Gen1Music.forSha1(sha1)
         }
         ffMusicRenderer = when {
-            gba -> FfMusicRenderer(r, crc, ffMusicCache, clickSound, unlockSound).also { it.start() }
-            gen1Music != null -> Gen1MusicRenderer(r, gen1Music!!, ffMusicCache).also { it.start() }
+            gba -> FfMusicRenderer(r.toOkioPath(), crc, ffMusicCache, androidMusicRenderHost, clickSound, unlockSound).also { it.start() }
+            gen1Music != null -> Gen1MusicRenderer(r.toOkioPath(), gen1Music!!, ffMusicCache, androidMusicRenderHost).also { it.start() }
             else -> null
         }
         // A FireRed-engine hack's own region map (Unbound, Odyssey, ...), read

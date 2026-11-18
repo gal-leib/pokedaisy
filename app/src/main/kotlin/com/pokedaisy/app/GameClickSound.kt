@@ -13,7 +13,7 @@ import java.io.File
  * `sfx/<crc>-<name>.wav`. A ROM whose sound engine the renderer can't drive
  * (pokeemerald-expansion hacks) borrows the newest one another game rendered.
  */
-class GameClickSound(filesDir: File, romCrc: String, name: String = CLICK) {
+class GameClickSound(filesDir: File, romCrc: String, name: String = CLICK) : RenderedGameSound {
     private val dir = File(filesDir, "sfx").apply { mkdirs() }
     private val suffix = "-$name.wav"
     private val own = File(dir, "$romCrc$suffix")
@@ -39,7 +39,7 @@ class GameClickSound(filesDir: File, romCrc: String, name: String = CLICK) {
     }
 
     /** Whether this ROM's own sound has been rendered yet. */
-    val hasOwn: Boolean get() = own.isFile && own.length() > 0
+    override val hasOwn: Boolean get() = own.isFile && own.length() > 0
 
     private fun load() {
         val f = own.takeIf { hasOwn }
@@ -49,7 +49,7 @@ class GameClickSound(filesDir: File, romCrc: String, name: String = CLICK) {
     }
 
     /** Stores this ROM's sound ([len] samples of interleaved stereo [pcm]), silence trimmed off both ends, and plays it from now on. */
-    fun write(pcm: ShortArray, len: Int, sampleRate: Int) {
+    override fun write(pcm: ShortArray, len: Int, sampleRate: Int) {
         fun loud(frame: Int) = maxOf(Math.abs(pcm[frame * 2].toInt()), Math.abs(pcm[frame * 2 + 1].toInt())) > SILENCE
         val frames = len / 2
         val first = (0 until frames).firstOrNull(::loud) ?: return
