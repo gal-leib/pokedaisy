@@ -1,10 +1,6 @@
 package com.pokedaisy.app.companion.coop
 
 import com.pokedaisy.app.companion.data.Gen3Text
-import com.pokedaisy.app.companion.data.readBytes
-import com.pokedaisy.app.companion.data.save.Gen3SaveData
-import com.pokedaisy.app.companion.data.save.Gen3SaveFile
-import com.pokedaisy.app.companion.data.save.Gen3SaveFormat
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
@@ -169,27 +165,37 @@ class CoopEndpointSession(
     /** The save the invite page pairs: what the HELLO names while no game is up. */
     fun usePairingSave(saveFile: Path, romSha1: String?) = post { pageOwn = ownFor(saveFile, romSha1) }
 
-    fun startForGame(romSha1: String?, saveFile: Path, cheatsLoaded: Boolean) {
-        post {
-            val id = if (romSha1 == EMERALD_COOP_SHA1) CoopSaveId.read(saveFile) else null
-            val paired = id != null && try {
-                pairs.forSave(id) != null
+    /** Reads the save and its pairing once, before either host adopts its game hooks. */
+    fun resolveGame(romSha1: String?, saveFile: Path): CoopGameSelection {
+        val own = if (romSha1 == EMERALD_COOP_SHA1) ownFor(saveFile, romSha1) else null
+        val paired = own?.let {
+            try {
+                pairs.forSave(it.save)
             } catch (e: IOException) {
                 coopLog("pairs.json unreadable: ${e.message}")
-                false
+                null
             }
-            val reason = gate(romSha1, id, paired, cheatsLoaded)
+        }
+        return CoopGameSelection(romSha1, own?.save, paired, own?.female ?: false)
+    }
+
+    fun startForGame(decision: CoopGameDecision) {
+        post {
+            val reason = decision.reason
             if (reason != null) {
                 endGame()
                 setOverride(CoopState.Off(reason))
                 return@post
             }
+            val selection = decision.selection
+            val save = checkNotNull(selection.save)
+            val hash = checkNotNull(selection.romSha1)
             setOverride(null)
-            gameOwn = ownFor(saveFile, romSha1)
-            gameSave = id
+            gameOwn = Own(save, selection.female, hash)
+            gameSave = save
             if (!gameHold) { gameHold = true; holds++ }
             ensureRunning()
-            if (running) impl.startFor(id!!)
+            if (running) impl.startFor(save)
         }
     }
 
@@ -238,22 +244,9 @@ class CoopEndpointSession(
     }
 
     private fun ownFor(saveFile: Path, romSha1: String?): Own? {
-        val id = CoopSaveId.read(saveFile) ?: return null
         val sha = romSha1 ?: return null
-        return Own(id, readFemale(saveFile), sha)
-    }
-
-    /** SaveBlock2's gender byte, read the way [CoopSaveId.read] reads the rest. */
-    private fun readFemale(saveFile: Path): Boolean = try {
-        val format = Gen3SaveFormat.forGameCode("BPEE")!!
-        when (val parsed = Gen3SaveFile.parse(saveFile.readBytes(), format)) {
-            is Gen3SaveFile.Parsed.Ok -> Gen3SaveData(parsed.save).isFemale
-            else -> false
-        }
-    } catch (e: IOException) {
-        false
-    } catch (e: RuntimeException) {
-        false
+        val (id, female) = CoopSaveId.readIdentity(saveFile) ?: return null
+        return Own(id, female, sha)
     }
 
     private fun post(block: () -> Unit) {

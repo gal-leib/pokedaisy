@@ -16,15 +16,16 @@ import com.pokedaisy.app.CoopPresenceChannel
 import com.pokedaisy.app.LockNative
 import com.pokedaisy.app.PartnerCore
 import com.pokedaisy.app.companion.coop.CoopEndpointSession
+import com.pokedaisy.app.companion.coop.CoopGameStartup
 import com.pokedaisy.app.companion.coop.CoopPair
 import com.pokedaisy.app.companion.coop.CoopSaveId
 import com.pokedaisy.app.companion.coop.EMERALD_COOP_SHA1
 import com.pokedaisy.app.companion.coop.coopLog
+import com.pokedaisy.app.companion.coop.coopRetailSha1
 import com.pokedaisy.app.companion.coop.lock.CoopLockStore
 import com.pokedaisy.app.companion.coop.lock.LockWait
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.PlayerLook
-import com.pokedaisy.app.companion.data.RetailDumps
 import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.coop.CoopIdentity
@@ -50,7 +51,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.FileSystem
-import okio.IOException
 import okio.Path
 
 /** Binds the shared co-op game to the iOS controller, whose frame and UI callbacks run on main. */
@@ -69,6 +69,11 @@ internal class IosCoopGame(
     private val battle = CoopBattleSession(::now) { PkCoopCore }
     val overlay = CoopOverlayState()
     private var hook: CoopFrameHook? = null
+    private var startupPending = false
+    private val startup = CoopGameStartup { pending ->
+        startupPending = pending
+        setFrameGate(if (pending) ({ _: Int -> null }) else if (engaged) ::beforeFrame else null)
+    }
     private var started = false
     private var closed = false
     private var pair by mutableStateOf<CoopPair?>(null)
@@ -77,7 +82,7 @@ internal class IosCoopGame(
     val partnerName get() = pair?.partner?.name ?: tr("Partner")
     val engaged get() = pair != null
     val battleActive get() = battle.busy
-    val blocksLoad get() = CoopGuards.statesBlocked
+    val blocksLoad get() = startupPending || CoopGuards.statesBlocked
     private var presence: CoopPresence? = null
     private val art = mutableMapOf<Pair<Boolean, LookChar?>, ByteArray?>()
     private var artJob: Job? = null
@@ -96,37 +101,24 @@ internal class IosCoopGame(
         val fs = FileSystem.SYSTEM
         val size = fs.metadataOrNull(rom)?.size ?: 0L
         if (!CoopEndpointSession.mayBeRetailEmerald(code, size)) {
-            endpoint.startForGame(null, save, cheatsLoaded())
+            endpoint.startForGame(endpoint.resolveGame(null, save).decide(false))
             return
         }
-        // A persisted story lock must be adopted before the first playable frame after a resume.
-        setFrameGate { null }
-        scope.launch {
-            val (hash, id, pairing) = try {
-                withContext(Dispatchers.Default) {
-                    val actual = RomIdentityReader.forPath(rom).sha1()
-                    val retail = when (actual) {
-                        null, EMERALD_COOP_SHA1 -> actual
-                        else -> try {
-                            RetailDumps.matchStream(code, revision, size) { fs.source(rom) } ?: actual
-                        } catch (e: IOException) {
-                            coopLog("couldn't check the Emerald ROM: ${e.message}")
-                            actual
-                        }
-                    }
-                    val saved = if (retail == EMERALD_COOP_SHA1) CoopSaveId.read(save) else null
-                    Triple(retail, saved, saved?.let { id -> endpoint.pairsList().firstOrNull { it.ownSave.key == id.key } })
-                }
-            } finally {
-                setFrameGate(null)
+        startup.start(scope, resolve = {
+            withContext(Dispatchers.Default) {
+                val hash = coopRetailSha1(code, revision, size, { RomIdentityReader.forPath(rom).sha1() }) { fs.source(rom) }
+                val selection = endpoint.resolveGame(hash, save)
+                selection to selection.decide(false).pair?.let { makeStoryLock(it.ownSave, it) }
             }
-            val cheats = cheatsLoaded()
-            endpoint.startForGame(hash, save, cheats)
-            if (id != null && pairing != null && CoopEndpointSession.gate(hash, id, true, cheats) == null) attach(id, pairing)
+        }) { (selection, lock) ->
+            val decision = selection.decide(cheatsLoaded())
+            val paired = decision.pair
+            if (paired != null && lock != null) attach(paired.ownSave, paired, lock)
+            endpoint.startForGame(decision)
         }
     }
 
-    private fun attach(id: CoopSaveId, paired: CoopPair) {
+    private fun attach(id: CoopSaveId, paired: CoopPair, lock: CoopLock) {
         pair = paired
         val channel = CoopPresenceChannel(link)
         presence = CoopPresence(IosPartnerCore, ::now, ::partnerArt).also { player ->
@@ -142,11 +134,9 @@ internal class IosCoopGame(
             override fun setHook(hook: CoopFrameHook?) { this@IosCoopGame.hook = hook }
         }, link, EMERALD_COOP_SHA1)
 
-        setFrameGate(::beforeFrame)
-        storyLock = makeStoryLock(id, paired).also { lock ->
-            lock.start()
-            scope.launch { link.messages.collect(lock::onMessage) }
-        }
+        storyLock = lock
+        lock.start()
+        scope.launch { link.messages.collect(lock::onMessage) }
     }
 
     private fun makeStoryLock(id: CoopSaveId, paired: CoopPair) = CoopLock(
@@ -267,6 +257,7 @@ internal class IosCoopGame(
         presence = null
         if (engaged) PkCoopCore.disable()
         pair = null
+        startup.cancel()
         scope.cancel()
         if (started) endpoint.stopGame()
     }

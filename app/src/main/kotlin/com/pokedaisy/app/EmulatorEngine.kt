@@ -355,7 +355,7 @@ class EmulatorEngine(
     fun softReset() { softResetFrames = SOFT_RESET_FRAMES }
 
     fun setRewindHeld(on: Boolean) {
-        rewindHeld = on && rewindAllowed(CoopGuards.statesBlocked)
+        rewindHeld = on && rewindAllowed(coopStatesBlocked)
     }
 
     fun setSlowmoHeld(on: Boolean) {
@@ -541,6 +541,8 @@ class EmulatorEngine(
     @Volatile var coopPresence: CoopPresence? = null
     /** The co-op lock (PLAY TOGETHER ONLY): stepped every loop turn, also while a hold runs no frame. */
     @Volatile var coopLock: CoopLock? = null
+    @Volatile var coopStartupPending = false
+    private val coopStatesBlocked get() = coopStartupPending || CoopGuards.statesBlocked
 
     /**
      * Co-op joined battles ([CoopBattles]): asked every tick (also while [CoopGuards.held], when no frame runs) for the keys of
@@ -766,7 +768,7 @@ class EmulatorEngine(
 
     fun requestSaveState(slot: Int) { if (CoopGuards.battleActive()) return; pendingSave = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
     /** False while co-op blocks LOAD STATE (slot loads and UNDO LOAD; the launch's resume is never blocked). */
-    fun loadAllowed(): Boolean = !CoopGuards.statesBlocked
+    fun loadAllowed(): Boolean = !coopStatesBlocked
 
     fun requestLoadState(slot: Int) { pendingLoad = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
     fun requestUndoSave() { if (!CoopGuards.battleActive()) pendingUndoSave = true }   // no state of a co-op battle is ever written
@@ -775,7 +777,7 @@ class EmulatorEngine(
     fun captureRetry(): Boolean = !CoopGuards.battleActive() && slots.captureRetry()
 
     fun requestRetryLoad() = postToEmu {
-        if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
+        if (refuseLoad(coopStatesBlocked, isResume = false)) {
             onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, -1, false)
         } else slots.loadRetry()
     }
@@ -1154,8 +1156,8 @@ class EmulatorEngine(
         /** Before the core runs: holds, rewind, EXPAND's camera, the keys, DS drawing. False = no frame this time round. */
         fun beforeFrame(): Boolean {
             frameStart = System.nanoTime()
-            if (rewindHeld && !rewindAllowed(CoopGuards.statesBlocked)) rewindHeld = false
-            if (loopAction(CoopGuards.held, !running, pendingSave >= 0) != LoopAction.RUN) {
+            if (rewindHeld && !rewindAllowed(coopStatesBlocked)) rewindHeld = false
+            if (loopAction(coopStartupPending || CoopGuards.held, !running, pendingSave >= 0) != LoopAction.RUN) {
                 wasHeld = true
                 // Co-op holds the game: no frame, the last picture stays; saves, suspend, sleep and stop still served.
                 gameAudioPaused = true
@@ -1181,7 +1183,7 @@ class EmulatorEngine(
             battleInput.tick()
             if (nds) ndsTaps.tick()
             // No ring while a co-op battle runs: it would fill with the other game's frames.
-            val rewindWanted = if (CoopGuards.statesBlocked) 0 else rewindEntries
+            val rewindWanted = if (coopStatesBlocked) 0 else rewindEntries
             if (rewindWanted != rewindApplied) {
                 MgbaCore.pkSetRewind(rewindWanted)
                 rewindApplied = rewindWanted
@@ -1936,14 +1938,14 @@ class EmulatorEngine(
         val load = pendingLoad
         if (load >= 0) {
             pendingLoad = -1
-            if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
+            if (refuseLoad(coopStatesBlocked, isResume = false)) {
                 onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, load, false)
             } else slots.requestLoad(load)
         }
         if (pendingUndoSave) { pendingUndoSave = false; slots.select(currentSlot); slots.requestUndoSave() }
         if (pendingUndoLoad) {
             pendingUndoLoad = false
-            if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
+            if (refuseLoad(coopStatesBlocked, isResume = false)) {
                 onStateResult?.invoke(Hotkeys.Action.UNDO_LOAD, currentSlot, false)
             } else { slots.select(currentSlot); slots.requestUndoLoad() }
         }

@@ -5,7 +5,6 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import com.pokedaisy.app.BuildConfig
-import com.pokedaisy.app.FeatureFlags
 import com.pokedaisy.app.Prefs
 import java.io.File
 import okio.Path.Companion.toOkioPath
@@ -61,14 +60,6 @@ object CoopSession {
     fun afterStart(block: () -> Unit) = session.afterStart(block)
     fun findRoom(code: String, onResult: (CoopLobby.FindResult) -> Unit) = session.findRoom(code, onResult)
     fun refreshRooms() = session.refreshRooms()
-
-    fun startForGame(context: Context, prefs: Prefs, romSha1: String?, saveFile: File, cheatsLoaded: Boolean) {
-        if (!FeatureFlags.coop(context.applicationContext)) return
-        configure(context, prefs)
-        session.startForGame(romSha1, saveFile.toOkioPath(), cheatsLoaded)
-    }
-
-    fun stopGame() = session.stopGame()
 
     fun restart(context: Context, prefs: Prefs) {
         configure(context, prefs)
