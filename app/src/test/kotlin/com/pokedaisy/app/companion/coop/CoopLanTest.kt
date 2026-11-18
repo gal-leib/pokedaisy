@@ -1,6 +1,5 @@
 package com.pokedaisy.app.companion.coop
 
-import java.net.InetSocketAddress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -12,9 +11,9 @@ class CoopLanTest {
     private val b = CoopPeerId("b".repeat(64))
 
     private class Rec : CoopLan.Listener {
-        val found = mutableListOf<Triple<CoopPeerId, String, List<InetSocketAddress>>>()
+        val found = mutableListOf<Triple<CoopPeerId, String, List<CoopEndpoint>>>()
         val lost = mutableListOf<CoopPeerId>()
-        override fun found(peer: CoopPeerId, userData: String, addresses: List<InetSocketAddress>) { found.add(Triple(peer, userData, addresses)) }
+        override fun found(peer: CoopPeerId, userData: String, addresses: List<CoopEndpoint>) { found.add(Triple(peer, userData, addresses)) }
         override fun lost(peer: CoopPeerId) { lost.add(peer) }
     }
 
@@ -26,7 +25,7 @@ class CoopLanTest {
         lb.start(b, 2222, null, rb)
         assertEquals(listOf(b), ra.found.map { it.first })
         assertEquals("", ra.found[0].second)
-        assertEquals(2222, ra.found[0].third[0].port)
+        assertEquals(2222, ra.found[0].third[0].address.port)
         assertEquals(listOf(a), rb.found.map { it.first })
         assertEquals("ann", rb.found[0].second)
     }

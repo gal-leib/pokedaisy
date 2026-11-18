@@ -82,8 +82,8 @@ val sharedUiSources by extra(
 )
 val sharedUiAppOnly by extra(
     listOf(
-        "CoopDirect", "CoopIdentity", "CoopIpHello", "CoopKeys", "CoopLan", "JvmCoopCrypto",
-        "CoopSession", "OkHttpRelayConnector", "RelayCoopTransport", "lock/CoopLockStore",
+        "AndroidCoopNetwork", "CoopDirect", "CoopIdentity", "CoopIpHello", "CoopKeys", "CoopLan", "JvmCoopCrypto",
+        "CoopSession", "OkHttpRelayConnector", "lock/CoopLockStore",
     ).map { "com/pokedaisy/app/companion/coop/$it.kt" },
 )
 // Test helpers in those folders that the app's own tests use too: compiled in both modules' tests.

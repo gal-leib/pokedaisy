@@ -8,30 +8,6 @@ import java.util.ArrayDeque
 import java.util.concurrent.TimeUnit
 
 /**
- * Same-Wi-Fi discovery: a device advertises its key, TCP port and a short pairing label,
- * and hears about the others doing the same. Nothing here connects; the transport dials
- * the addresses it is given.
- */
-interface CoopLan {
-    interface Listener {
-        /** A peer appeared, or its [userData] / addresses changed ("" when it sent no label). */
-        fun found(peer: CoopPeerId, userData: String, addresses: List<InetSocketAddress>)
-        fun lost(peer: CoopPeerId)
-    }
-
-    fun start(self: CoopPeerId, port: Int, userData: String?, listener: Listener)
-    fun setUserData(userData: String?)
-    fun stop()
-}
-
-/** No LAN discovery (no NSD, or it failed). */
-object NoCoopLan : CoopLan {
-    override fun start(self: CoopPeerId, port: Int, userData: String?, listener: CoopLan.Listener) {}
-    override fun setUserData(userData: String?) {}
-    override fun stop() {}
-}
-
-/**
  * [CoopLan] over Android's NSD: service type `_pdcoop._tcp`, name `pdco-` + the first 12 hex
  * of the key, TXT `k` = the key (64 hex) and `u` = the label (up to 200 UTF-8 bytes).
  * Resolves one service at a time (before API 34 a second resolve fails ALREADY_ACTIVE).
@@ -200,7 +176,7 @@ class NsdCoopLan(context: Context) : CoopLan {
                             val (peer, u) = parsed
                             if (peer != synchronized(lock) { self }) {
                                 synchronized(lock) { keyByName[info.serviceName] = peer }
-                                notify("found") { t.found(peer, u, listOf(InetSocketAddress(host, info.port))) }
+                                notify("found") { t.found(peer, u, listOf(InetSocketAddress(host, info.port).toCoopEndpoint())) }
                             }
                         }
                     }

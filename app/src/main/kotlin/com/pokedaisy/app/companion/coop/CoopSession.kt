@@ -38,7 +38,7 @@ object CoopSession {
 
     @Synchronized
     private fun transportOf(app: Context): CoopTransport =
-        transportStore ?: RelayCoopTransport(lan = NsdCoopLan(app)).also { transportStore = it }
+        transportStore ?: androidCoopTransport(lan = NsdCoopLan(app)).also { transportStore = it }
 
     private val clock: () -> Long = { System.currentTimeMillis() }
 
