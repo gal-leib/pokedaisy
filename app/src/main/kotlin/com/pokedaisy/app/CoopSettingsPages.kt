@@ -237,9 +237,12 @@ class CoopSettingsPages(
             onDismiss = { unpairing = null },
             onConfirm = {
                 unpairing = null
-                session().unpair(p.ownSave)
-                pairs = pairs - p
-                changed()
+                session().unpair(p.ownSave) { removed ->
+                    if (removed) {
+                        pairs = pairs - p
+                        changed()
+                    }
+                }
             },
         )
     }
@@ -250,10 +253,9 @@ class CoopSettingsPages(
         var text by remember { mutableStateOf(host.relayOverride.orEmpty()) }
         var error by remember { mutableStateOf<String?>(null) }
         fun use(url: String?) {
-            host.relayOverride = url
+            if (!session().changeRelay { host.relayOverride = url }) return
             text = url.orEmpty()
             error = null
-            session().restart()
             changed()
         }
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {

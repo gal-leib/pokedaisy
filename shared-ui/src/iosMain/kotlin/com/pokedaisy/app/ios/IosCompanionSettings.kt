@@ -268,13 +268,11 @@ internal class IosCompanionSettings(
         set(value) { iosPreferences.coopNearbyRange = value }
 
     override fun setCoopRelayOnly(on: Boolean) {
-        if (coop?.refuseBattle() == true) return
-        iosPreferences.coopRelayOnly = on
-        IosCoopHost.session.restart()
+        IosCoopHost.session.changeRelay { iosPreferences.coopRelayOnly = on }
     }
 
     override fun coopUnpair(save: com.pokedaisy.app.companion.coop.CoopSaveId) {
-        coop?.unpair(save)
+        IosCoopHost.session.unpair(save)
     }
 
     override val gameName: String get() = if (game == null) "" else activeGame.displayName()

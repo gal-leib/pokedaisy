@@ -1359,9 +1359,7 @@ class SettingsActivity : ComponentActivity() {
             ) { prefs.coopNearbyRange = it },
             SettingRow(tk("RELAY"), CoopRelay.rowValue(prefs.coopRelayUrl, BuildConfig.COOP_RELAY_URL), opensPage = true) { screen = Screen.COOP_RELAY },
             SettingRow(tk("RELAY ONLY"), onOff(prefs.coopRelayOnly), subtitle = "Hide your IP address from your partner") {
-                prefs.coopRelayOnly = !prefs.coopRelayOnly
-                CoopSession.restart(this, prefs)
-                revision++
+                if (CoopSession.bind(this, prefs).changeRelay { prefs.coopRelayOnly = !prefs.coopRelayOnly }) revision++
             },
             // PLAY TOGETHER ONLY: no game runs behind this screen, so it only says it needs one (the row is the game's SETTINGS').
             *listOfNotNull(

@@ -4,6 +4,8 @@ import com.pokedaisy.app.companion.data.Gen3Text
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -36,10 +38,21 @@ class CoopEndpointSession(
     private val options: () -> CoopEndpointOptions,
     private val localNetworkActive: (Boolean) -> Unit = {},
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    settingsDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) {
     private val transport by lazy(createTransport)
     private val commands = Channel<() -> Unit>(Channel.UNLIMITED)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val settingsScope = CoroutineScope(SupervisorJob() + settingsDispatcher)
+    private var gameSettings: CoopGameSettings? = null
+
+    fun bindGameSettings(settings: CoopGameSettings) {
+        gameSettings = settings
+    }
+
+    fun unbindGameSettings(settings: CoopGameSettings) {
+        if (gameSettings === settings) gameSettings = null
+    }
     private val pairs by lazy { CoopPairs(directory() / "pairs.json") }
 
     // What the HELLO says: the game's, else the invite page's save.
@@ -166,7 +179,11 @@ class CoopEndpointSession(
     fun usePairingSave(saveFile: Path, romSha1: String?) = post { pageOwn = ownFor(saveFile, romSha1) }
 
     /** Reads the save and its pairing once, before either host adopts its game hooks. */
-    fun resolveGame(romSha1: String?, saveFile: Path): CoopGameSelection {
+    suspend fun lookupGame(romSha1: String?, saveFile: Path): CoopGameSelection = onWorker { resolveGame(romSha1, saveFile) }
+
+    fun startUnsupportedGame() = startForGame(CoopGameSelection(null, null, null, false).decide(false))
+
+    private fun resolveGame(romSha1: String?, saveFile: Path): CoopGameSelection {
         val own = if (romSha1 == EMERALD_COOP_SHA1) ownFor(saveFile, romSha1) else null
         val paired = own?.let {
             try {
@@ -201,26 +218,77 @@ class CoopEndpointSession(
 
     fun stopGame() = post { endGame() }
 
-    /** RELAY / RELAY ONLY changed: closes the endpoint and starts it again with the new settings, if anything holds it. */
-    fun restart() {
+    /** Checks the running game before applying either relay setting and restarting the endpoint. */
+    fun changeRelay(change: () -> Unit): Boolean {
+        if (gameSettings?.canChangeRelay() == false) return false
+        change()
         post {
             if (holds == 0) return@post
             stopEndpoint()
             startEndpoint()
             gameSave?.let { if (running) impl.startFor(it) }
         }
+        return true
     }
 
-    /** BYE if connected to them, the pairing removed, the policy refreshed. */
-    fun unpair(save: CoopSaveId) {
+    /** Edits the pairing on the endpoint worker. Only confirmed removal of the current pair detaches its game. */
+    fun unpair(save: CoopSaveId, onResult: (Boolean) -> Unit = {}) {
+        settingsScope.launch {
+            // A lookup may already have read this pairing. Let the host adopt it before checking the guard.
+            var owner: CoopGameSettings?
+            do {
+                owner = gameSettings
+                owner?.startup?.awaitLookup()
+            } while (gameSettings !== owner)
+            if (owner?.canRemove(save) == false) {
+                onResult(false)
+                return@launch
+            }
+            val current = owner?.takeIf { it.ownSave() == save }
+            if (current != null) {
+                if (current.removingCurrent || !current.pauseBattles()) {
+                    onResult(false)
+                    return@launch
+                }
+                current.removingCurrent = true
+            }
+            val removed = onWorker {
+                try {
+                    pairs.remove(save)
+                } catch (e: IOException) {
+                    coopLog("couldn't unpair: ${e.message}")
+                    return@onWorker false
+                }
+                if (gameSave == save) {
+                    endGame()
+                    setOverride(CoopState.Off(CoopOffReason.NOT_PAIRED))
+                }
+                if (running && gameSave == null) {
+                    guarded("refreshing the pairing policy") { transport.setPolicy(pairs.allowedPeers(), pairingHold, null) }
+                }
+                true
+            }
+            if (current != null) {
+                current.removingCurrent = false
+                if (gameSettings === current) {
+                    if (removed) current.detach() else current.resumeBattles()
+                }
+            }
+            onResult(removed)
+        }
+    }
+
+    private suspend fun <T> onWorker(operation: () -> T): T {
+        val result = CompletableDeferred<Result<T>>()
         post {
-            val mine = gameSave == save && running
-            if (mine) impl.stop()
-            try { pairs.remove(save) } catch (e: IOException) { coopLog("couldn't unpair: ${e.message}") }
-            if (mine) impl.startFor(save)
-            else if (running) try {
-                transport.setPolicy(pairs.allowedPeers(), pairingHold, null)
-            } catch (e: IOException) { coopLog("couldn't refresh the policy: ${e.message}") }
+            if (result.isActive) {
+                result.complete(runCatching(operation))
+            }
+        }
+        return try {
+            result.await().getOrThrow()
+        } finally {
+            result.cancel()
         }
     }
 

@@ -17,6 +17,7 @@ import com.pokedaisy.app.LockNative
 import com.pokedaisy.app.PartnerCore
 import com.pokedaisy.app.companion.coop.CoopEndpointSession
 import com.pokedaisy.app.companion.coop.CoopGameStartup
+import com.pokedaisy.app.companion.coop.CoopGameSettings
 import com.pokedaisy.app.companion.coop.CoopPair
 import com.pokedaisy.app.companion.coop.CoopSaveId
 import com.pokedaisy.app.companion.coop.EMERALD_COOP_SHA1
@@ -74,6 +75,14 @@ internal class IosCoopGame(
         startupPending = pending
         setFrameGate(if (pending) ({ _: Int -> null }) else if (engaged) ::beforeFrame else null)
     }
+    private val settings = CoopGameSettings(
+        startup = startup,
+        ownSave = { pair?.ownSave },
+        refuseBattle = ::refuseBattle,
+        pauseBattles = battle::stopNow,
+        resumeBattles = battle::resume,
+        detach = ::detach,
+    )
     private var started = false
     private var closed = false
     private var pair by mutableStateOf<CoopPair?>(null)
@@ -98,16 +107,17 @@ internal class IosCoopGame(
     fun start(code: String?, revision: Int, cheatsLoaded: () -> Boolean) {
         if (started || closed) return
         started = true
+        endpoint.bindGameSettings(settings)
         val fs = FileSystem.SYSTEM
         val size = fs.metadataOrNull(rom)?.size ?: 0L
         if (!CoopEndpointSession.mayBeRetailEmerald(code, size)) {
-            endpoint.startForGame(endpoint.resolveGame(null, save).decide(false))
+            endpoint.startUnsupportedGame()
             return
         }
         startup.start(scope, resolve = {
             withContext(Dispatchers.Default) {
                 val hash = coopRetailSha1(code, revision, size, { RomIdentityReader.forPath(rom).sha1() }) { fs.source(rom) }
-                val selection = endpoint.resolveGame(hash, save)
+                val selection = endpoint.lookupGame(hash, save)
                 selection to selection.decide(false).pair?.let { makeStoryLock(it.ownSave, it) }
             }
         }) { (selection, lock) ->
@@ -238,16 +248,15 @@ internal class IosCoopGame(
     fun suspendGame(): Boolean = battle.stopNow()
     fun resumeGame() { battle.resume() }
 
-    fun unpair(save: CoopSaveId) {
-        if (refuseBattle()) return
-        endpoint.unpair(save)
-        if (pair?.ownSave == save) close()
-    }
-
     fun close() {
         if (closed) return
-        closed = true
         battle.stopNow()
+        if (started) endpoint.stopGame()
+        detach()
+    }
+
+    private fun detach() {
+        closed = true
         battle.detach()
         hook = null
         setFrameGate(null)
@@ -257,9 +266,9 @@ internal class IosCoopGame(
         presence = null
         if (engaged) PkCoopCore.disable()
         pair = null
+        endpoint.unbindGameSettings(settings)
         startup.cancel()
         scope.cancel()
-        if (started) endpoint.stopGame()
     }
 }
 

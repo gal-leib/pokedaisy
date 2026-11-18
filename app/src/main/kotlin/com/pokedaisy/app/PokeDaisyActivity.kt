@@ -75,6 +75,7 @@ import com.pokedaisy.app.companion.ui.PerformanceCounters
 import java.io.File
 import com.pokedaisy.app.companion.coop.CoopEndpointSession
 import com.pokedaisy.app.companion.coop.CoopGameStartup
+import com.pokedaisy.app.companion.coop.CoopGameSettings
 import com.pokedaisy.app.companion.coop.CoopPair
 import com.pokedaisy.app.companion.coop.CoopSession
 import com.pokedaisy.app.companion.coop.coopRetailSha1
@@ -1517,8 +1518,7 @@ class PokeDaisyActivity : Activity() {
             set(v) { Prefs(this@PokeDaisyActivity).coopNearbyRange = v }
         override fun setCoopRelayOnly(on: Boolean) {
             val prefs = Prefs(this@PokeDaisyActivity)
-            prefs.coopRelayOnly = on
-            com.pokedaisy.app.companion.coop.CoopSession.restart(this@PokeDaisyActivity, prefs)
+            CoopSession.bind(this@PokeDaisyActivity, prefs).changeRelay { prefs.coopRelayOnly = on }
         }
         override fun coopUnpair(save: com.pokedaisy.app.companion.coop.CoopSaveId) =
             com.pokedaisy.app.companion.coop.CoopSession.unpair(this@PokeDaisyActivity, save)
@@ -2265,16 +2265,30 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized) engine.coopStartupPending = pending
     }
 
+    private val coopSettings = CoopGameSettings(
+        startup = coopStartup,
+        ownSave = { currentCoopPair?.ownSave },
+        refuseBattle = ::coopRefuses,
+        pauseBattles = CoopBattles::stopNow,
+        resumeBattles = { if (engine.running && !engine.sleeping) CoopBattles.resume() },
+        detach = ::detachCoop,
+    )
+
     private fun coopStop() {
         // Restore a joined battle before the engine can write a suspend state.
         if (!CoopBattles.stopNow()) coopLost = true
+        coopEndpoint?.stopGame()
+        detachCoop()
+    }
+
+    private fun detachCoop() {
         CoopBattles.detach(coopApp)
         stopCoopPresence()
         stopCoopLock()
         currentCoopPair = null
-        coopStartup.cancel()
-        coopEndpoint?.stopGame()
+        coopEndpoint?.unbindGameSettings(coopSettings)
         coopEndpoint = null
+        coopStartup.cancel()
     }
 
     private var coopEndpoint: CoopEndpointSession? = null
@@ -2469,15 +2483,16 @@ class PokeDaisyActivity : Activity() {
         val rev = romRev
         val endpoint = CoopSession.bind(applicationContext, prefs)
         coopEndpoint = endpoint
+        endpoint.bindGameSettings(coopSettings)
         if (!CoopEndpointSession.mayBeRetailEmerald(code, r.takeUnless(RomArchive::isArchive)?.length() ?: 0L)) {
-            endpoint.startForGame(endpoint.resolveGame(null, save.toOkioPath()).decide(false))
+            endpoint.startUnsupportedGame()
             return
         }
         val artRom = romData ?: r
         coopStartup.start(lookGender, resolve = {
             withContext(Dispatchers.IO) {
                 val sha = coopRetailSha1(code, rev, RomArchive.romSize(r), { RomIdentity.sha1(r) }) { RomArchive.open(r).source() }
-                val selection = endpoint.resolveGame(sha, save.toOkioPath())
+                val selection = endpoint.lookupGame(sha, save.toOkioPath())
                 selection to selection.decide(false).pair?.let(::makeCoopLock)
             }
         }) { (selection, lock) ->

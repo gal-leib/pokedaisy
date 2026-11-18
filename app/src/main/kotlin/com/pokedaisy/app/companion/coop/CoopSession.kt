@@ -61,11 +61,6 @@ object CoopSession {
     fun findRoom(code: String, onResult: (CoopLobby.FindResult) -> Unit) = session.findRoom(code, onResult)
     fun refreshRooms() = session.refreshRooms()
 
-    fun restart(context: Context, prefs: Prefs) {
-        configure(context, prefs)
-        session.restart()
-    }
-
     fun unpair(context: Context, save: CoopSaveId) {
         configure(context)
         session.unpair(save)

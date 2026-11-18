@@ -348,9 +348,9 @@ internal class IosLibraryHost(
                         SettingRow(tk("RELAY"), CoopRelay.rowValue(iosPreferences.coopRelayUrl, IosCoopHost.defaultRelay),
                             opensPage = true) { coopPage = CoopPage.RELAY },
                         SettingRow(tk("RELAY ONLY"), tk(if (IosCoopHost.relayOnly) "ON" else "OFF")) {
-                            iosPreferences.coopRelayOnly = !iosPreferences.coopRelayOnly
-                            IosCoopHost.session.restart()
-                            coopRevision++
+                            if (IosCoopHost.session.changeRelay { iosPreferences.coopRelayOnly = !iosPreferences.coopRelayOnly }) {
+                                coopRevision++
+                            }
                         },
                     )
                     OptionListWindow(m, Modifier.fillMaxWidth()) {

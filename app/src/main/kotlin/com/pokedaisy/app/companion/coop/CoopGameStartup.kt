@@ -3,25 +3,37 @@ package com.pokedaisy.app.companion.coop
 import com.pokedaisy.app.companion.data.RetailDumps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okio.IOException
 import okio.Source
 
 /** Keeps the frame gate closed from lookup through adoption. Called on the host's UI dispatcher. */
 class CoopGameStartup(private val pending: (Boolean) -> Unit) {
+    private val resolving = MutableStateFlow(false)
     private var lookup: Job? = null
     private var generation = 0
+
+    internal suspend fun awaitLookup() {
+        resolving.first { !it }
+    }
+
+    private fun setPending(on: Boolean) {
+        pending(on)
+        resolving.value = on
+    }
 
     fun <T> start(scope: CoroutineScope, resolve: suspend () -> T, adopt: (T) -> Unit) {
         val current = ++generation
         lookup?.cancel()
-        pending(true)
+        setPending(true)
         lookup = scope.launch {
             try {
                 val result = resolve()
                 if (generation == current) adopt(result)
             } finally {
-                if (generation == current) pending(false)
+                if (generation == current) setPending(false)
             }
         }
     }
@@ -31,7 +43,7 @@ class CoopGameStartup(private val pending: (Boolean) -> Unit) {
         val previous = lookup
         lookup = null
         previous?.cancel()
-        pending(false)
+        setPending(false)
     }
 }
 
