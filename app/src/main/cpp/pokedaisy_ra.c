@@ -21,7 +21,7 @@
 
 #include "pk_api.h"
 #include "pk_ra_client.h"
-#include "pk_ra_client_internal.h"
+#include "rc_client.h"
 
 #include "rc_consoles.h"
 
@@ -36,7 +36,6 @@ static jmethodID ra_serverCall, ra_onLogin, ra_onGameLoaded, ra_onEvent, ra_onLo
 static jclass ra_stringClass;
 static jmethodID ra_stringFromBytes;    // String(byte[], String charsetName)
 static jstring ra_utf8;
-static rc_client_t* ra_client;
 
 static JNIEnv* raEnv(void) {
     JNIEnv* env = NULL;
@@ -190,12 +189,34 @@ static void raGameLoaded(int result, const char* error, const struct pk_ra_game*
 
 #define RA_FN(name) Java_com_pokedaisy_app_achievements_RaNative_##name
 
-// rc_client.c's RC_CLIENT_ACHIEVEMENT_WARNING_ID: ids from here up are its placeholders.
-#define RA_WARNING_ACHIEVEMENT_ID 101000001u
+static jbyteArray raBytes(JNIEnv* env, const uint8_t* records, size_t length) {
+    if (!records || length > INT32_MAX) return NULL;
+    jbyteArray bytes = (*env)->NewByteArray(env, (jsize) length);
+    if (bytes && length) (*env)->SetByteArrayRegion(env, bytes, 0, (jsize) length, (const jbyte*) records);
+    return bytes;
+}
+
+static void raEntries(int token, bool aroundUser, int result, const char* error, const uint8_t* records,
+                      size_t length, int total, int userIndex) {
+    JNIEnv* env = raEnv();
+    jstring err = raStr(env, error);
+    jbyteArray bytes = raBytes(env, records, length);
+    raCallback(env, ra_onLeaderboardEntries, (jint) token, (jboolean) aroundUser,
+               (jint) result, err, bytes, (jint) total, (jint) userIndex);
+    raDeleteLocal(env, err);
+    raDeleteLocal(env, bytes);
+}
+
+static void raAllProgress(int token, int result, const uint8_t* records, size_t length) {
+    JNIEnv* env = raEnv();
+    jbyteArray bytes = raBytes(env, records, length);
+    raCallback(env, ra_onAllProgress, (jint) token, (jint) result, bytes);
+    raDeleteLocal(env, bytes);
+}
 
 JNIEXPORT jboolean JNICALL
 RA_FN(raInit)(JNIEnv* env, jobject thiz) {
-    if (ra_client) {
+    if (pk_ra_ready()) {
         return JNI_TRUE;
     }
     (*env)->GetJavaVM(env, &ra_vm);
@@ -222,10 +243,9 @@ RA_FN(raInit)(JNIEnv* env, jobject thiz) {
     const struct pk_ra_callbacks callbacks = {
         .request = raServerCall, .login = raLoginDone, .game_loaded = raGameLoaded,
         .event = raEvent, .log = raLog, .read_memory = raReadMemoryImpl,
+        .leaderboard = raEntries, .all_progress = raAllProgress,
     };
-    if (!pk_ra_init(&callbacks)) return JNI_FALSE;
-    ra_client = pk_ra_client_handle();
-    return JNI_TRUE;
+    return pk_ra_init(&callbacks);
 }
 
 JNIEXPORT jstring JNICALL
@@ -278,7 +298,7 @@ RA_FN(raLogout)(JNIEnv* env, jobject thiz) {
 // resume its hash was one the server didn't know - NO ACHIEVEMENTS FOR THIS ROM until the game was restarted (GitHub #197).
 JNIEXPORT jboolean JNICALL
 RA_FN(raLoadGame)(JNIEnv* env, jobject thiz, jstring jHash) {
-    if (!ra_client || !jHash) {
+    if (!pk_ra_ready() || !jHash) {
         return JNI_FALSE;
     }
     const char* hash = (*env)->GetStringUTFChars(env, jHash, NULL);
@@ -315,11 +335,7 @@ JNIEXPORT jbyteArray JNICALL
 RA_FN(raSerializeProgress)(JNIEnv* env, jobject thiz) {
     size_t size;
     uint8_t* bytes = pk_ra_serialize(&size);
-    jbyteArray out = NULL;
-    if (bytes && size <= INT32_MAX) {
-        out = (*env)->NewByteArray(env, (jsize) size);
-        if (out) (*env)->SetByteArrayRegion(env, out, 0, (jsize) size, (const jbyte*) bytes);
-    }
+    jbyteArray out = raBytes(env, bytes, size);
     free(bytes);
     return out;
 }
@@ -337,58 +353,15 @@ RA_FN(raDeserializeProgress)(JNIEnv* env, jobject thiz, jbyteArray jData) {
     (*env)->ReleaseByteArrayElements(env, jData, data, JNI_ABORT);
 }
 
-// The loaded game's achievements as UTF-8 text for RaNative to parse: records
-// split by 0x1E, fields by 0x1F - bucket type, bucket label, id, title,
-// description, points, unlocked, badge URL, locked badge URL, measured progress,
-// measured percent, rarity, type. In rc_client's PROGRESS grouping order
-// (recently unlocked, active challenges, almost there, locked, ..., unlocked).
 JNIEXPORT jbyteArray JNICALL
 RA_FN(raAchievementList)(JNIEnv* env, jobject thiz) {
-    if (!ra_client || !rc_client_has_achievements(ra_client)) {
-        return NULL;
-    }
-    rc_client_achievement_list_t* list = rc_client_create_achievement_list(ra_client,
-        RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE, RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_PROGRESS);
-    if (!list) {
-        return NULL;
-    }
-    size_t cap = 4096, len = 0;
-    char* out = malloc(cap);
-    for (uint32_t b = 0; b < list->num_buckets; b++) {
-        const rc_client_achievement_bucket_t* bucket = &list->buckets[b];
-        for (uint32_t i = 0; i < bucket->num_achievements; i++) {
-            const rc_client_achievement_t* a = bucket->achievements[i];
-            // rc_client's own placeholders ("Warning: Unknown Emulator" for a client the
-            // server doesn't recognise yet) - its game summary skips them too.
-            if (a->id >= RA_WARNING_ACHIEVEMENT_ID) {
-                continue;
-            }
-            for (;;) {
-                int n = snprintf(out + len, cap - len, "%u\x1F%s\x1F%u\x1F%s\x1F%s\x1F%u\x1F%u\x1F%s\x1F%s\x1F%s\x1F%.3f\x1F%.3f\x1F%u\x1E",
-                    (unsigned) bucket->bucket_type, bucket->label ? bucket->label : "",
-                    (unsigned) a->id, a->title ? a->title : "", a->description ? a->description : "",
-                    (unsigned) a->points, (unsigned) a->unlocked,
-                    a->badge_url ? a->badge_url : "", a->badge_locked_url ? a->badge_locked_url : "",
-                    a->measured_progress, a->measured_percent, a->rarity, (unsigned) a->type);
-                if (n >= 0 && (size_t) n < cap - len) {
-                    len += (size_t) n;
-                    break;
-                }
-                cap *= 2;
-                out = realloc(out, cap);
-            }
-        }
-    }
-    rc_client_destroy_achievement_list(list);
-    jbyteArray arr = (*env)->NewByteArray(env, (jsize) len);
-    (*env)->SetByteArrayRegion(env, arr, 0, (jsize) len, (const jbyte*) out);
-    free(out);
-    return arr;
+    size_t length;
+    uint8_t* records = pk_ra_achievement_list(&length);
+    jbyteArray bytes = raBytes(env, records, length);
+    free(records);
+    return bytes;
 }
 
-// Debug: one line on what rc_client sees - rich presence (built from game memory, so
-// it shows whether reads land), memory reads so far / short ones, and achievements by
-// state (active / unlocked / disabled / inactive), naming every one that isn't active.
 JNIEXPORT jstring JNICALL
 RA_FN(raDebugStatus)(JNIEnv* env, jobject thiz) {
     char out[2048];
@@ -396,129 +369,21 @@ RA_FN(raDebugStatus)(JNIEnv* env, jobject thiz) {
     return raStr(env, out);
 }
 
-// A growable text buffer for the record lists below.
-typedef struct { char* p; size_t len, cap; } ra_text;
-
-static void raTextAppend(ra_text* t, const char* fmt, ...) __attribute__((format(printf, 2, 3)));
-static void raTextAppend(ra_text* t, const char* fmt, ...) {
-    for (;;) {
-        va_list ap;
-        va_start(ap, fmt);
-        int n = vsnprintf(t->p + t->len, t->cap - t->len, fmt, ap);
-        va_end(ap);
-        if (n >= 0 && (size_t) n < t->cap - t->len) {
-            t->len += (size_t) n;
-            return;
-        }
-        t->cap *= 2;
-        t->p = realloc(t->p, t->cap);
-    }
-}
-
-static jbyteArray raTextToBytes(JNIEnv* env, ra_text* t) {
-    jbyteArray arr = (*env)->NewByteArray(env, (jsize) t->len);
-    (*env)->SetByteArrayRegion(env, arr, 0, (jsize) t->len, (const jbyte*) t->p);
-    free(t->p);
-    return arr;
-}
-
-// The loaded game's leaderboards, records split by 0x1E, fields by 0x1F: bucket label,
-// id, title, description, lower is better.
 JNIEXPORT jbyteArray JNICALL
 RA_FN(raLeaderboardList)(JNIEnv* env, jobject thiz) {
-    if (!ra_client || !rc_client_has_leaderboards(ra_client)) {
-        return NULL;
-    }
-    rc_client_leaderboard_list_t* list = rc_client_create_leaderboard_list(ra_client, RC_CLIENT_LEADERBOARD_LIST_GROUPING_NONE);
-    if (!list) {
-        return NULL;
-    }
-    ra_text t = { malloc(4096), 0, 4096 };
-    for (uint32_t b = 0; b < list->num_buckets; b++) {
-        const rc_client_leaderboard_bucket_t* bucket = &list->buckets[b];
-        for (uint32_t i = 0; i < bucket->num_leaderboards; i++) {
-            const rc_client_leaderboard_t* l = bucket->leaderboards[i];
-            raTextAppend(&t, "%s\x1F%u\x1F%s\x1F%s\x1F%u\x1E", bucket->label ? bucket->label : "", (unsigned) l->id,
-                l->title ? l->title : "", l->description ? l->description : "", (unsigned) l->lower_is_better);
-        }
-    }
-    rc_client_destroy_leaderboard_list(list);
-    return raTextToBytes(env, &t);
+    size_t length;
+    uint8_t* records = pk_ra_leaderboard_list(&length);
+    jbyteArray bytes = raBytes(env, records, length);
+    free(records);
+    return bytes;
 }
 
-// userdata for a fetch: Kotlin's request token, and which half of the page it is.
-typedef struct { int token; int aroundUser; } ra_fetch;
-
-static void raEntriesFetched(int result, const char* error_message, rc_client_leaderboard_entry_list_t* list,
-                             rc_client_t* client, void* userdata) {
-    (void) client;
-    ra_fetch* f = userdata;
-    JNIEnv* env = raEnv();
-    jbyteArray bytes = NULL;
-    jint total = 0, userIndex = -1;
-    if (list) {
-        // Records (0x1E) of fields (0x1F): rank, user, score as the game shows it.
-        ra_text t = { malloc(1024), 0, 1024 };
-        for (uint32_t i = 0; i < list->num_entries; i++) {
-            const rc_client_leaderboard_entry_t* e = &list->entries[i];
-            raTextAppend(&t, "%u\x1F%s\x1F%s\x1E", (unsigned) e->rank, e->user ? e->user : "", e->display);
-        }
-        bytes = raTextToBytes(env, &t);
-        total = (jint) list->total_entries;
-        userIndex = (jint) list->user_index;
-        rc_client_destroy_leaderboard_entry_list(list);
-    }
-    jstring err = raStr(env, error_message);
-    raCallback(env, ra_onLeaderboardEntries, (jint) f->token, (jboolean) (f->aroundUser != 0),
-                                 (jint) result, err, bytes, total, userIndex);
-    raDeleteLocal(env, err);
-    raDeleteLocal(env, bytes);
-    free(f);
-}
-
-// Asks the server for [count] entries of leaderboard [id]: from rank [first], or
-// (aroundUser) centred on the signed-in player. Answers in RaNative.onLeaderboardEntries.
 JNIEXPORT void JNICALL
 RA_FN(raFetchLeaderboard)(JNIEnv* env, jobject thiz, jint token, jint id, jboolean aroundUser, jint first, jint count) {
-    if (!ra_client) {
-        return;
-    }
-    ra_fetch* f = malloc(sizeof(*f));
-    f->token = token;
-    f->aroundUser = aroundUser;
-    if (aroundUser) {
-        rc_client_begin_fetch_leaderboard_entries_around_user(ra_client, (uint32_t) id, (uint32_t) count, raEntriesFetched, f);
-    } else {
-        rc_client_begin_fetch_leaderboard_entries(ra_client, (uint32_t) id, (uint32_t) first, (uint32_t) count, raEntriesFetched, f);
-    }
+    pk_ra_fetch_leaderboard(token, (uint32_t) id, aroundUser, (uint32_t) first, (uint32_t) count);
 }
 
-static void raAllProgressFetched(int result, const char* error_message, rc_client_all_user_progress_t* list,
-                                 rc_client_t* client, void* userdata) {
-    (void) error_message;
-    (void) client;
-    JNIEnv* env = raEnv();
-    jbyteArray bytes = NULL;
-    if (list) {
-        // Records (0x1E) of fields (0x1F): game id, achievements, unlocked (softcore), unlocked (hardcore).
-        ra_text t = { malloc(4096), 0, 4096 };
-        for (uint32_t i = 0; i < list->num_entries; i++) {
-            const rc_client_all_user_progress_entry_t* e = &list->entries[i];
-            raTextAppend(&t, "%u\x1F%u\x1F%u\x1F%u\x1E", (unsigned) e->game_id, (unsigned) e->num_achievements,
-                (unsigned) e->num_unlocked_achievements, (unsigned) e->num_unlocked_achievements_hardcore);
-        }
-        bytes = raTextToBytes(env, &t);
-        rc_client_destroy_all_user_progress(list);
-    }
-    raCallback(env, ra_onAllProgress, (jint) (intptr_t) userdata, (jint) result, bytes);
-    raDeleteLocal(env, bytes);
-}
-
-// The signed-in player's unlock counts for every game of [console] (an RC_CONSOLE_* id) they've played; answers in
-// RaNative.onAllProgress (the library's INFO).
 JNIEXPORT void JNICALL
 RA_FN(raFetchAllProgress)(JNIEnv* env, jobject thiz, jint token, jint console) {
-    if (ra_client) {
-        rc_client_begin_fetch_all_user_progress(ra_client, (uint32_t) console, raAllProgressFetched, (void*) (intptr_t) token);
-    }
+    pk_ra_fetch_all_progress(token, (uint32_t) console);
 }

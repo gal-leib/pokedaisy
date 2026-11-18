@@ -1,8 +1,8 @@
 #include "pk_ra_client.h"
-#include "pk_ra_client_internal.h"
 #include "pk_ra_requests.h"
 #include "pk_api.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -125,7 +125,6 @@ bool pk_ra_init(const struct pk_ra_callbacks* callbacks) {
 }
 
 bool pk_ra_ready(void) { return client != NULL; }
-rc_client_t* pk_ra_client_handle(void) { return client; }
 
 void pk_ra_user_agent(char* out, size_t capacity) {
     if (!out || !capacity) return;
@@ -217,4 +216,156 @@ void pk_ra_debug_status(char* out, size_t size) {
         rp, (unsigned) reads, (unsigned) shortReads, (unsigned) lastShortAddress,
         counts[RC_CLIENT_ACHIEVEMENT_STATE_ACTIVE], counts[RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED],
         counts[RC_CLIENT_ACHIEVEMENT_STATE_DISABLED], counts[RC_CLIENT_ACHIEVEMENT_STATE_INACTIVE], odd);
+}
+
+/* The rc_client placeholders above this ID are also omitted from its own game summary. */
+#define WARNING_ACHIEVEMENT_ID 101000001u
+
+struct TextRecords {
+    char* text;
+    size_t size;
+    size_t capacity;
+};
+
+static struct TextRecords recordsNew(size_t capacity) {
+    return (struct TextRecords) { malloc(capacity), 0, capacity };
+}
+
+static void recordsAppend(struct TextRecords* records, const char* format, ...) __attribute__((format(printf, 2, 3)));
+static void recordsAppend(struct TextRecords* records, const char* format, ...) {
+    if (!records->text) return;
+    va_list args;
+    va_start(args, format);
+    va_list copied;
+    va_copy(copied, args);
+    int count = vsnprintf(records->text + records->size, records->capacity - records->size, format, args);
+    va_end(args);
+    bool stored = count >= 0 && (size_t) count < records->capacity - records->size;
+    if (!stored && count >= 0 && (size_t) count < SIZE_MAX - records->size) {
+        size_t needed = records->size + (size_t) count + 1;
+        size_t capacity = records->capacity <= SIZE_MAX / 2 ? records->capacity * 2 : needed;
+        if (capacity < needed) capacity = needed;
+        char* grown = realloc(records->text, capacity);
+        if (grown) {
+            records->text = grown;
+            records->capacity = capacity;
+            stored = vsnprintf(grown + records->size, capacity - records->size, format, copied) == count;
+        }
+    }
+    va_end(copied);
+    if (stored) records->size += (size_t) count;
+    else {
+        free(records->text);
+        *records = (struct TextRecords) {0};
+    }
+}
+
+uint8_t* pk_ra_achievement_list(size_t* length) {
+    if (!length) return NULL;
+    *length = 0;
+    if (!client || !rc_client_has_achievements(client)) return NULL;
+    rc_client_achievement_list_t* list = rc_client_create_achievement_list(client,
+        RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE, RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_PROGRESS);
+    if (!list) return NULL;
+    struct TextRecords records = recordsNew(4096);
+    for (uint32_t b = 0; b < list->num_buckets; b++) {
+        const rc_client_achievement_bucket_t* bucket = &list->buckets[b];
+        for (uint32_t i = 0; i < bucket->num_achievements; i++) {
+            const rc_client_achievement_t* a = bucket->achievements[i];
+            if (a->id >= WARNING_ACHIEVEMENT_ID) continue;
+            recordsAppend(&records, "%u\x1F%s\x1F%u\x1F%s\x1F%s\x1F%u\x1F%u\x1F%s\x1F%s\x1F%s\x1F%.3f\x1F%.3f\x1F%u\x1E",
+                (unsigned) bucket->bucket_type, bucket->label ? bucket->label : "",
+                (unsigned) a->id, a->title ? a->title : "", a->description ? a->description : "",
+                (unsigned) a->points, (unsigned) a->unlocked, a->badge_url ? a->badge_url : "",
+                a->badge_locked_url ? a->badge_locked_url : "", a->measured_progress,
+                a->measured_percent, a->rarity, (unsigned) a->type);
+        }
+    }
+    rc_client_destroy_achievement_list(list);
+    *length = records.size;
+    return (uint8_t*) records.text;
+}
+
+uint8_t* pk_ra_leaderboard_list(size_t* length) {
+    if (!length) return NULL;
+    *length = 0;
+    if (!client || !rc_client_has_leaderboards(client)) return NULL;
+    rc_client_leaderboard_list_t* list = rc_client_create_leaderboard_list(client, RC_CLIENT_LEADERBOARD_LIST_GROUPING_NONE);
+    if (!list) return NULL;
+    struct TextRecords records = recordsNew(4096);
+    for (uint32_t b = 0; b < list->num_buckets; b++) {
+        const rc_client_leaderboard_bucket_t* bucket = &list->buckets[b];
+        for (uint32_t i = 0; i < bucket->num_leaderboards; i++) {
+            const rc_client_leaderboard_t* l = bucket->leaderboards[i];
+            recordsAppend(&records, "%s\x1F%u\x1F%s\x1F%s\x1F%u\x1E", bucket->label ? bucket->label : "",
+                (unsigned) l->id, l->title ? l->title : "", l->description ? l->description : "", (unsigned) l->lower_is_better);
+        }
+    }
+    rc_client_destroy_leaderboard_list(list);
+    *length = records.size;
+    return (uint8_t*) records.text;
+}
+
+struct BoardRequest {
+    int token;
+    bool aroundUser;
+};
+
+static void entriesFetched(int result, const char* error, rc_client_leaderboard_entry_list_t* list,
+                           rc_client_t* active, void* userdata) {
+    (void) active;
+    struct BoardRequest* request = userdata;
+    struct TextRecords records = {0};
+    int total = 0;
+    int userIndex = -1;
+    if (list) {
+        records = recordsNew(1024);
+        for (uint32_t i = 0; i < list->num_entries; i++) {
+            const rc_client_leaderboard_entry_t* e = &list->entries[i];
+            recordsAppend(&records, "%u\x1F%s\x1F%s\x1E", (unsigned) e->rank, e->user ? e->user : "", e->display);
+        }
+        total = (int) list->total_entries;
+        userIndex = (int) list->user_index;
+        rc_client_destroy_leaderboard_entry_list(list);
+    }
+    if (host.leaderboard) host.leaderboard(request->token, request->aroundUser, result, error,
+        (const uint8_t*) records.text, records.size, total, userIndex);
+    free(records.text);
+    free(request);
+}
+
+void pk_ra_fetch_leaderboard(int token, uint32_t id, bool aroundUser, uint32_t first, uint32_t count) {
+    if (!client || !host.leaderboard) return;
+    struct BoardRequest* request = malloc(sizeof(*request));
+    if (!request) {
+        host.leaderboard(token, aroundUser, RC_OUT_OF_MEMORY, NULL, NULL, 0, 0, -1);
+        return;
+    }
+    *request = (struct BoardRequest) {token, aroundUser};
+    if (aroundUser) rc_client_begin_fetch_leaderboard_entries_around_user(client, id, count, entriesFetched, request);
+    else rc_client_begin_fetch_leaderboard_entries(client, id, first, count, entriesFetched, request);
+}
+
+static void allProgressFetched(int result, const char* error, rc_client_all_user_progress_t* list,
+                               rc_client_t* active, void* userdata) {
+    (void) active;
+    (void) error;
+    struct TextRecords records = {0};
+    if (list) {
+        records = recordsNew(4096);
+        for (uint32_t i = 0; i < list->num_entries; i++) {
+            const rc_client_all_user_progress_entry_t* e = &list->entries[i];
+            recordsAppend(&records, "%u\x1F%u\x1F%u\x1F%u\x1E", (unsigned) e->game_id, (unsigned) e->num_achievements,
+                (unsigned) e->num_unlocked_achievements, (unsigned) e->num_unlocked_achievements_hardcore);
+        }
+        rc_client_destroy_all_user_progress(list);
+    }
+    if (host.all_progress) host.all_progress((int) (intptr_t) userdata, result, (const uint8_t*) records.text, records.size);
+    free(records.text);
+}
+
+void pk_ra_fetch_all_progress(int token, uint32_t console) {
+    if (client && host.all_progress) {
+        rc_client_begin_fetch_all_user_progress(client, console, allProgressFetched, (void*) (intptr_t) token);
+    }
 }

@@ -42,6 +42,9 @@ struct pk_ra_callbacks {
     void (*game_loaded)(int result, const char* error, const struct pk_ra_game* game);
     void (*event)(const struct pk_ra_event* event);
     void (*log)(const char* message);
+    void (*leaderboard)(int token, bool around_user, int result, const char* error,
+                        const uint8_t* records, size_t length, int total, int user_index);
+    void (*all_progress)(int token, int result, const uint8_t* records, size_t length);
     /** Optional alternate console mapping. Null uses the current GB/GBC/GBA player core. */
     uint32_t (*read_memory)(uint32_t address, uint8_t* out, uint32_t bytes);
 };
@@ -65,5 +68,11 @@ void pk_ra_reset(void);
 uint8_t* pk_ra_serialize(size_t* size);
 void pk_ra_deserialize(const uint8_t* data, size_t size);
 void pk_ra_debug_status(char* out, size_t size);
+
+/** UTF-8 records separated by 0x1E and fields by 0x1F. Caller frees a non-null result. */
+uint8_t* pk_ra_achievement_list(size_t* length);
+uint8_t* pk_ra_leaderboard_list(size_t* length);
+void pk_ra_fetch_leaderboard(int token, uint32_t id, bool around_user, uint32_t first, uint32_t count);
+void pk_ra_fetch_all_progress(int token, uint32_t console);
 
 #endif
