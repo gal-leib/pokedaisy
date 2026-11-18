@@ -2941,6 +2941,7 @@ fun main(args: Array<String>) {
         }),
         // PATCH A ROM: found and ready, patching, done (a hack the companion may read as its base game), and not found.
         Shot("library-patch-ready", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("ready") } }),
+        Shot("library-patch-ready-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("ready") } }),
         Shot("library-patch-patching", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("patching") } }),
         Shot("library-patch-done", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("done") } }),
         Shot("library-patch-done-unsupported", tw, th, td, activity { LibraryActivity().apply { patcher.flow.step = fakePatch("unsupported") } }),

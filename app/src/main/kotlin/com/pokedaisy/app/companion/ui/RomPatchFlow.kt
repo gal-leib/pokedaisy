@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -260,17 +261,30 @@ private fun PatchBody(
             )
         }
         is RomPatchFlow.Step.Ready -> {
-            // Two columns, like INFO: where the patched game goes is in view without scrolling on a landscape screen.
-            Row(horizontalArrangement = Arrangement.spacedBy(m.u * 12)) {
-                Column(Modifier.weight(1f)) {
-                    // MADE FOR is the base ROM below.
+            val patchDetails: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier) {
                     InfoRows(tr("PATCH"), patchRows(step.info).filter { it.first != tr("MADE FOR") }, first = true, m, small)
                     InfoRows(tr("BASE ROM"), baseRows(step.plan, step.info), first = false, m, small)
                 }
-                Column(Modifier.weight(1f)) {
+            }
+            val outputDetails: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier) {
                     InfoRows(tr("PATCHED ROM"), outRows(step.plan, step.info), first = true, m, small)
                     Spacer(Modifier.height(m.u * 6))
                     Message(tr("Your base ROM stays as it is: the patched game is saved as a new file."), small)
+                }
+            }
+            BoxWithConstraints {
+                if (maxWidth < 460.dp) {
+                    Column(verticalArrangement = Arrangement.spacedBy(m.u * 6)) {
+                        patchDetails(Modifier.fillMaxWidth())
+                        outputDetails(Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(m.u * 12)) {
+                        patchDetails(Modifier.weight(1f))
+                        outputDetails(Modifier.weight(1f))
+                    }
                 }
             }
         }
