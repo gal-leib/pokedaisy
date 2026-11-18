@@ -14,6 +14,7 @@ plugins {
 val appSrc = rootDir.resolve("app/src/main/kotlin")
 @Suppress("UNCHECKED_CAST")
 val sharedCoreSources = rootProject.extra["sharedCoreSources"] as List<String>
+val legacyCoreFiles = fileTree(appSrc) { include(sharedCoreSources) }.files
 val appTest = rootDir.resolve("app/src/test/kotlin/com/pokedaisy/app/companion")
 
 // The emulator core for iOS (pk_api.h: mGBA + the app's portable C), built with Xcode's tools by
@@ -59,8 +60,8 @@ kotlin {
     sourceSets {
         commonMain {
             kotlin.srcDir(appSrc)
-            kotlin.include(sharedCoreSources)
-            kotlin.include("com/pokedaisy/app/game/**")
+            // Restrict only imported app sources. The module owns its entire commonMain directory.
+            kotlin.exclude { !it.isDirectory && it.file.startsWith(appSrc) && it.file !in legacyCoreFiles }
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 implementation("org.jetbrains.kotlinx:atomicfu:0.23.1")

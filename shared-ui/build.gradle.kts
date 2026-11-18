@@ -20,6 +20,13 @@ val sharedUiSources = rootProject.extra["sharedUiSources"] as List<String>
 @Suppress("UNCHECKED_CAST")
 val sharedUiAppOnly = rootProject.extra["sharedUiAppOnly"] as List<String>
 
+@Suppress("UNCHECKED_CAST")
+val legacyUiFiles = fileTree(app) {
+    include(sharedUiSources)
+    exclude(sharedUiAppOnly)
+    exclude(rootProject.extra["sharedCoreSources"] as List<String>)
+}.files
+
 kotlin {
     androidTarget {
         compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
@@ -42,10 +49,7 @@ kotlin {
         iosMain { dependencies { implementation("io.ktor:ktor-client-darwin:3.6.1") } }
         commonMain {
             kotlin.srcDir(app)
-            kotlin.include(sharedUiSources)
-            kotlin.exclude(sharedUiAppOnly)
-            @Suppress("UNCHECKED_CAST")
-            kotlin.exclude(rootProject.extra["sharedCoreSources"] as List<String>)
+            kotlin.exclude { !it.isDirectory && it.file.startsWith(app) && it.file !in legacyUiFiles }
             dependencies {
                 api(project(":shared"))
                 // Compose Multiplatform 1.7.x, as shared/ (Compose 1.7 on Android, the app's BOM picks the exact version).
