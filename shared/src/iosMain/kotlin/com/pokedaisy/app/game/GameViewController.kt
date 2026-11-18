@@ -198,6 +198,7 @@ class GameViewController(
 
     /** Whether a game is open and running in this controller. */
     val isRunning: Boolean get() = running
+    val playingForward: Boolean get() = running && active && !uiPaused && !stateChanging && !rewinding
 
     // Kept by the controller: MTKView holds its delegate weakly.
     private val drawer = object : NSObject(), MTKViewDelegateProtocol {

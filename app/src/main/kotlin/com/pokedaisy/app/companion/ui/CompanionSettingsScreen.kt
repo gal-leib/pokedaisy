@@ -1110,7 +1110,7 @@ private fun homeRows(
             s.setAutoResume(!s.autoResume); changed()
         }.takeIf { s.resumeGamesEditable },
         // A card now and then about a feature the player hasn't found (FeatureTips).
-        tipsRow(s.tips) { s.setTips(it); changed() },
+        tipsRow(s.tips, s.tipsBadge) { s.setTips(it); changed() },
         // AUTO: the ROM's own language. Applies at once, both screens.
         SettingRow("LANGUAGE", L10n.settingLabel(s.appLanguage)) {
             val opts = L10n.options

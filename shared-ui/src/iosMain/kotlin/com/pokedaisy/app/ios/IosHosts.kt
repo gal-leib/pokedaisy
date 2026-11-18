@@ -63,6 +63,7 @@ object IosHosts {
         PictureCodec.current = SkiaPictures
         com.pokedaisy.app.companion.ui.SkinImages.decode = IosSkinImages::decode
         DeviceDates.current = FoundationDates
+        com.pokedaisy.app.companion.FeatureTips.init(iosPreferences.tipStore, iosPreferences.tips)
         installBattery()
         com.pokedaisy.app.cheats.CheatParser.current = com.pokedaisy.app.cheats.CheatParser(com.pokedaisy.app.core.PkApiCore::checkCheat)
         com.pokedaisy.app.companion.NewFeatures.init(iosPreferences.newFeatureSince,

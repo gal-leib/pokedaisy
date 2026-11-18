@@ -178,6 +178,8 @@ One card doesn't wait the half hour: the first time you play a DS game on a one-
 
 A card only shows while you're walking around the field, never in a battle, a menu or a conversation. There are always at least 5 minutes of play between two cards, and a feature you already use never gets one. Turn them off with `TIPS` in the `APP` group, on either screen.
 
+On iPhone and iPad, tips appear over the game in supported GBA games. The app waits for a clear field before showing one.
+
 ### LANGUAGE
 
 The app's own text comes in English, Japanese, Korean, French, German, Italian, Spanish and Portuguese, with Brazil's and Portugal's Portuguese as two choices. `LANGUAGE` starts on `AUTO`, which follows the game's language; pick another and both screens switch at once.

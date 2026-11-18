@@ -69,7 +69,10 @@ class PrefsCompanionSettings(
     override val audioEffects get() = prefs.audioEffects
     override fun setAudioEffects(on: Boolean) { prefs.audioEffects = on }
     override val tips get() = prefs.tips
-    override fun setTips(on: Boolean) { prefs.tips = on }
+    override fun setTips(on: Boolean) {
+        prefs.tips = on
+        FeatureTips.scheduler?.enabled = on
+    }
     override val raIcons get() = prefs.raIcons
     override fun setRaIcons(on: Boolean) { prefs.raIcons = on }
     override val dayNight get() = prefs.dayNight
@@ -87,7 +90,11 @@ class PrefsCompanionSettings(
     override val levelCap get() = prefs.levelCap
     override fun setLevelCap(on: Boolean) { prefs.levelCap = on; changed(Change.FIELD_OPTIONS) }
     override val autoRun get() = prefs.autoRun
-    override fun setAutoRun(on: Boolean) { prefs.autoRun = on; changed(Change.FIELD_OPTIONS) }
+    override fun setAutoRun(on: Boolean) {
+        prefs.autoRun = on
+        if (on) FeatureTips.used(TipId.AUTO_RUN)
+        changed(Change.FIELD_OPTIONS)
+    }
     override val runIndoors get() = prefs.runIndoors
     override fun setRunIndoors(on: Boolean) { prefs.runIndoors = on; changed(Change.FIELD_OPTIONS) }
     override val lowHpBeep get() = prefs.lowHpBeep
@@ -97,7 +104,11 @@ class PrefsCompanionSettings(
     override val instantText get() = prefs.instantText
     override fun setInstantText(on: Boolean) { prefs.instantText = on; changed(Change.FIELD_OPTIONS) }
     override val reusableTms get() = prefs.reusableTms
-    override fun setReusableTms(on: Boolean) { prefs.reusableTms = on; changed(Change.FIELD_OPTIONS) }
+    override fun setReusableTms(on: Boolean) {
+        prefs.reusableTms = on
+        if (on) FeatureTips.used(TipId.REUSABLE_TMS)
+        changed(Change.FIELD_OPTIONS)
+    }
     override val ffMaxSpeed get() = prefs.ffMaxSpeed
     override fun setFfMaxSpeed(v: Float) { if (v in FF_SPEEDS) { prefs.ffMaxSpeed = v; changed(Change.PLAYBACK) } }
     override val battleSpeed get() = prefs.battleSpeed.takeIf { it in SCENE_SPEEDS } ?: 0f
@@ -121,7 +132,11 @@ class PrefsCompanionSettings(
     override val gameMuted get() = prefs.gameMuted
     override fun setGameMuted(on: Boolean) { prefs.gameMuted = on; changed(Change.PLAYBACK) }
     override val wildEncounters get() = prefs.wildEncounters
-    override fun setWildEncounters(percent: Int) { prefs.wildEncounters = percent; changed(Change.FIELD_OPTIONS) }
+    override fun setWildEncounters(percent: Int) {
+        prefs.wildEncounters = percent
+        if (percent == 0) FeatureTips.used(TipId.WILD)
+        changed(Change.FIELD_OPTIONS)
+    }
     override val screenFilter get() = prefs.screenFilter
     override fun setScreenFilter(filter: ScreenFilter) { prefs.screenFilter = filter }
     override val gridStrength get() = prefs.gridStrength

@@ -116,8 +116,8 @@ fun FeatureTipHost(
             val id = shown ?: return@AnimatedVisibility
             FeatureTipCard(
                 featureTipText(id), cardModifier, keys = keys(id), left = left.value, roomy = roomy, maxWidth = maxWidth,
-                onTry = { scheduler.answered(id); onTry(id) },
-                onNoThanks = { scheduler.answered(id) },
+                onTry = { if (scheduler.current == id) { scheduler.answered(id); onTry(id) } },
+                onNoThanks = { if (scheduler.current == id) scheduler.answered(id) },
             )
         }
     }

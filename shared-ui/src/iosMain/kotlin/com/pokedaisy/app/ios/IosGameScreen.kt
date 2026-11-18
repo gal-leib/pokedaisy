@@ -44,6 +44,8 @@ internal class IosGameScreen(
     enum class Overlay { FIELD_HUD, BATTLE, BATTLE_RETRY }
     private val capturedOverlays = mutableSetOf<Overlay>()
     private val overlayCaptured get() = capturedOverlays.isNotEmpty()
+    val tipBlocked get() = quickMenu.open || state.side.windowOpen || overlayCaptured || rewindUnavailable ||
+        quickNotice != null || game?.keyCapture?.active == true || game?.keyboardInputCaptured == true
     private var closed = false
     fun captureOverlay(owner: Overlay, on: Boolean) {
         if (closed) return
@@ -114,6 +116,7 @@ internal class IosGameScreen(
                 game?.uiPaused == true)) return
         quickMenu.trigger(true)
         if (quickMenu.open) {
+            com.pokedaisy.app.companion.FeatureTips.used(com.pokedaisy.app.companion.TipId.QUICK_MENU)
             quickMenu.labels = prefs.quickMenuLabels
             quickMenu.ring = prefs.quickMenuStyle == com.pokedaisy.app.companion.QuickMenuStyle.RING
             captureButtons()

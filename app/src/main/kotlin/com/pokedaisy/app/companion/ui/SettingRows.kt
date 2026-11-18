@@ -619,9 +619,9 @@ fun settingsLookRows(changed: () -> Unit): List<SettingRow> {
 
 /** APP > TIPS, on both screens ([com.pokedaisy.app.companion.FeatureTips]): now and then a card about a feature the
  *  player hasn't found yet. */
-fun tipsRow(on: Boolean, set: (Boolean) -> Unit): SettingRow = SettingRow(
+fun tipsRow(on: Boolean, badge: String? = null, set: (Boolean) -> Unit): SettingRow = SettingRow(
     tk("TIPS"), if (on) tk("ON") else tk("OFF"), subtitle = "Now and then, a feature you haven't tried yet",
-    labelBadge = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.TIPS),
+    labelBadge = badge ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.TIPS),
 ) { set(!on) }
 
 /** COMPANION LOOK (SCREEN, under THEME, both screens): GAME = the companion and the HUD in the running game's own look

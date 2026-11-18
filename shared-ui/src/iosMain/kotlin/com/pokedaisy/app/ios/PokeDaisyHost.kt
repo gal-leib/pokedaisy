@@ -24,6 +24,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
+import com.pokedaisy.app.companion.FeatureTips
+import com.pokedaisy.app.companion.TipId
 import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.StateSlotController
 import com.pokedaisy.app.companion.data.StateFiles
@@ -156,8 +158,13 @@ object PokeDaisyHost {
                 }
             }
         }
+        val tips = if (current is GameViewController && currentRuntime != null && currentSettings != null) {
+            quickActions?.let { IosGameTips(current, currentRuntime, currentSettings, panels,
+                { telemetry.snapshot.value }, { items }, { fly }, it) }
+        } else null
         return ComposeUIViewController(configure = { configureUiAutomation() }) {
             AppTheme {
+                tips?.Clock()
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
                     panels.Content(
                         gameContent = { UIKitViewController(factory = { current }, modifier = Modifier.fillMaxSize(),
@@ -173,6 +180,9 @@ object PokeDaisyHost {
                                 com.pokedaisy.app.companion.ui.FieldHud(snapshot, hudShown, hudSettings.fieldHudStyle,
                                     itemUse = items, fly = fly, frame = panels.hudFrame(), avoid = panels.hudAvoid(),
                                     closePanels = panels.quickMenu.visit.toInt(),
+                                    openPanel = com.pokedaisy.app.companion.ui.FieldHudPanel.SUMMARY to 0,
+                                    openTick = tips?.summaryRequest ?: 0,
+                                    onTap = { FeatureTips.used(TipId.HUD) },
                                     onInputCapture = { panels.captureOverlay(IosGameScreen.Overlay.FIELD_HUD, it) },
                                     onOpenCompanion = if (!panels.portrait && (!panels.state.side.shown || panels.state.side.isWindow))
                                         ({ panels.toggleCompanion() }) else null)
@@ -200,6 +210,7 @@ object PokeDaisyHost {
                                 com.pokedaisy.app.companion.ui.QuickMenu(panels.quickMenu, snapshot, actions,
                                     currentSettings!!.quickMenuActions, iosPreferences.fieldHudStyle.look)
                             }
+                            tips?.Card()
                             com.pokedaisy.app.companion.ui.FlyStyleAskHost(
                                 active = true, roomy = panels.portrait,
                                 onAnswer = { currentRuntime?.flight?.answerStyle(it) })
@@ -309,6 +320,7 @@ object PokeDaisyHost {
         val (code, revision) = (if (romPath.lowercase().endsWith(".gba"))
             com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)
         g.beforeSuspend = {
+            FeatureTips.scheduler?.save()
             val saved = g.withState { resume.save() }
             if (!saved) resumeFailed()
             saved
@@ -353,8 +365,11 @@ object PokeDaisyHost {
                 currentSettings.optionsChanged = { o.settingsChanged(currentSettings) }
                 o.settingsChanged(currentSettings)
                 p.readField = { o.fieldState(PkApiCore::stepField, com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(code.orEmpty())) }
-                g.frameKeys = { held -> bKeys(o.keys(held, p.fieldState, p.onField,
-                    com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN)) }
+                g.frameKeys = { held ->
+                    val builtIn = com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
+                    p.tipMoments.movement(held, p.fieldState, p.onField, o.autoRun || builtIn)
+                    bKeys(o.keys(held, p.fieldState, p.onField, builtIn))
+                }
             }
             g.beforeFrame = {
                 p.beforeFrame()
@@ -435,10 +450,14 @@ object PokeDaisyHost {
             }
             override fun fly(mapsec: Int, targets: com.pokedaisy.app.companion.data.FlyTargets,
                              done: (com.pokedaisy.app.companion.data.FlyResult) -> Unit) {
-                if (gbFields.available) return gbFields.fly(mapsec, targets, done)
+                val completed = { result: com.pokedaisy.app.companion.data.FlyResult ->
+                    if (game === g && result == com.pokedaisy.app.companion.data.FlyResult.OK) FeatureTips.used(TipId.FLY)
+                    done(result)
+                }
+                if (gbFields.available) return gbFields.fly(mapsec, targets, completed)
                 val flight = p.flight
-                if (flight == null) classicFly.fly(mapsec, targets, done)
-                else flight.flyTo(mapsec, targets, classicFly, done)
+                if (flight == null) classicFly.fly(mapsec, targets, completed)
+                else flight.flyTo(mapsec, targets, classicFly, completed)
             }
         }
         val partyActions = com.pokedaisy.app.companion.FieldPartyActions(
@@ -464,11 +483,14 @@ object PokeDaisyHost {
                 else com.pokedaisy.app.companion.NewFeatures.IOS_FIELD_ITEMS)
             override fun canPc() = gbFields.available || sharedItems.canPc()
             override fun openPc(done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
-                if (gbFields.available) return gbFields.openPc(done)
-                sharedItems.openPc { outcome ->
-                    if (outcome.result == com.pokedaisy.app.companion.data.ItemUseResult.USED && screen?.state?.side?.windowOpen == true) screen?.state?.hide()
+                val completed = { outcome: com.pokedaisy.app.companion.data.ItemUseOutcome ->
+                    if (game === g && outcome.result == com.pokedaisy.app.companion.data.ItemUseResult.USED) {
+                        FeatureTips.used(TipId.PC)
+                        if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
+                    }
                     done(outcome)
                 }
+                if (gbFields.available) gbFields.openPc(completed) else sharedItems.openPc(completed)
             }
         }
         val currentSettings = settings!!
@@ -602,6 +624,8 @@ object PokeDaisyHost {
 
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
+        FeatureTips.available = { false }
+        FeatureTips.scheduler?.let { tips -> tips.current?.let(tips::timedOut); tips.save() }
         stateError = null
         playerLook?.close()
         playerLook = null

@@ -147,11 +147,6 @@ class EmulatorEngine(
     /** The running game runs by itself ([com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN]): flipping B there walks. */
     private val ownAutoRun get() = com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
 
-    /** With AUTO-RUN off: frames the player walked on the field where it would have run for them, and of those the ones
-     *  B was held (AUTO-RUN's tip: someone who runs everywhere). Emu thread writes, the UI reads and resets. */
-    @Volatile var walkFrames = 0L
-    @Volatile var runFrames = 0L
-
     /** The game's own region map (a Town Map, the Fly map) is up: [RegionMapWatch], GBA only. */
     @Volatile var regionMapOpen = false
         private set
@@ -1244,10 +1239,7 @@ class EmulatorEngine(
             // expansion's DexNav creeps on A (Seaglass & co.), but checks B's run first, so a held B scared the
             // Pokémon off. A while walking does nothing in the other games.
             if (autoRun && (gba || nds)) keys = gameOptions.keys(keys, fieldState, fieldScreen, ownAutoRun)
-            else if (!autoRun && !ownAutoRun && (gba || nds) && AutoRunPolicy.walking(keys, fieldState, fieldScreen)) {
-                walkFrames++
-                if (keys and CoreKey.B != 0) runFrames++
-            }
+            else if (gba || nds) playback.tipMoments.movement(keys, fieldState, fieldScreen, ownAutoRun)
             // CO-OP BATTLES (hook null = nothing changes): the hook gives this frame's keys (always the player's own: a joined
             // battle is the game's own link battle); null = the game is held (a joined battle waiting at its start, a stop in flight).
             val coop = coopBattles

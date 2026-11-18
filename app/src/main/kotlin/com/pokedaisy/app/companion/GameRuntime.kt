@@ -85,6 +85,7 @@ class GameRuntime(
     }
     val options = GameOptions(optionPatcher, { !closed.value && !blocked &&
         telemetry.snapshot.value.blocked == null && optionsAllowed() })
+    val tipMoments = GameTipMoments()
 
     private val stateSlots = atomic<StateSlotController?>(null)
 
