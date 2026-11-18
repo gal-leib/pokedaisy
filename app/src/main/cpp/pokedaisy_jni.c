@@ -2,7 +2,7 @@
 //
 // The GBA / Game Boy game itself - starting it, its frames, picture, sound, keys and memory reads - is pk_session.c,
 // behind the plain C API in pk_api.h that the iPad app calls too; the wrappers here add the DS games in front of it.
-// The rest (cheats, EXPAND, REWIND, the render core, the game calls...) still works on its state here as `g`
+// The rest (cheats, EXPAND, REWIND, the game calls...) still works on its state here as `g`
 // (pk_session.h) and moves under pk_api.h area by area.
 // Everything here is called from a single Kotlin "emu thread", which also copies
 // pkVideoBuffer()'s frames out for the GL thread (EmulatorView.publishFrame).
@@ -20,15 +20,11 @@
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
 #include <mgba/core/config.h>
-#include <mgba/core/blip_buf.h>
 #include <mgba/core/serialize.h>
 #include <mgba-util/vfs.h>
 #include <mgba/internal/arm/arm.h>
-#include <mgba/internal/arm/isa-inlines.h>
 #include <mgba/internal/gba/gba.h>
 #include <mgba/internal/gb/gb.h>
-#include <mgba/internal/gb/io.h>
-#include <mgba/internal/sm83/sm83.h>
 
 #include "pk_call.h"
 #include "pk_cheats.h"
@@ -50,21 +46,7 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// A second, fully independent core used only to prerecord FF background-
-// music clips (see FfMusicRenderer.kt / EmulatorEngine's "FF music"
-// section) — completely separate from `g` (the player's actual running
-// game). Never loads a save file, never shown on screen, never touched by
-// player input. Isolating it this way means even a mistake in the song-
-// injection below (pkRenderForceSong) can only break this disposable core,
-// never the player's real session.
-static struct {
-    struct mCore* core;
-    unsigned vw, vh;                    // unused (no video output) but core->init needs a buffer set
-    color_t* video;
-    int16_t audio[PK_AUDIO_SCRATCH_SAMPLES * 2];
-    int audioAvail;
-    struct pk_gb_audio gbAudio;         // as g's: STEADY clips of a Game Boy game's music
-} rg;
+static struct pk_sound_renderer* soundRenderer;
 
 // The DS game (if one is up) and then the GBA / Game Boy one closed: pkInit and pkDeinit.
 static void pkTeardown(void) {
@@ -72,38 +54,6 @@ static void pkTeardown(void) {
     pk_nds_deinit();
     pthread_rwlock_unlock(&pk_coreLock);
     pk_api_deinit();
-}
-
-static void pkRenderDrainAudio(void) {
-    if (rg.gbAudio.left) {
-        rg.audioAvail = pk_gb_audio_read(&rg.gbAudio, rg.audio, PK_AUDIO_SCRATCH_SAMPLES) * 2;
-        return;
-    }
-    struct blip_t* left = rg.core->getAudioChannel(rg.core, 0);
-    struct blip_t* right = rg.core->getAudioChannel(rg.core, 1);
-    int avail = blip_samples_avail(left);
-    if (avail > PK_AUDIO_SCRATCH_SAMPLES) {
-        avail = PK_AUDIO_SCRATCH_SAMPLES;
-    }
-    if (avail > 0) {
-        blip_read_samples(left, rg.audio, avail, 1);
-        blip_read_samples(right, rg.audio + 1, avail, 1);
-        rg.audioAvail = avail * 2;
-    } else {
-        rg.audioAvail = 0;
-    }
-}
-
-static void pkRenderTeardown(void) {
-    if (rg.core) {
-        pk_gb_audio_detach(&rg.gbAudio, rg.core);
-        rg.core->deinit(rg.core);       // no save VFile ever attached — nothing to flush
-        rg.core = NULL;
-    }
-    free(rg.video);
-    rg.video = NULL;
-    rg.vw = rg.vh = 0;
-    rg.audioAvail = 0;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -449,102 +399,39 @@ Java_com_pokedaisy_app_MgbaCore_pkSetRewinding(JNIEnv* env, jobject thiz, jboole
     pk_api_set_rewinding(on);
 }
 
-// --- FF-music prerecording: a second, disposable core (see `rg` above) ------
-// Same one-frame-then-drain contract as pkRunFrame/pkReadAudio, driven from
-// Kotlin the same way (FfMusicRenderer), just on its own separate handle.
-
+// The Android bridge owns the same separate render session the iOS host can open.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderInit(JNIEnv* env, jobject thiz, jstring jRomPath) {
-    if (rg.core) {
-        pkRenderTeardown();
-    }
+    pk_api_sound_close(soundRenderer);
     const char* romPath = (*env)->GetStringUTFChars(env, jRomPath, NULL);
-    struct VFile* rom = VFileOpen(romPath, O_RDONLY);
-    (*env)->ReleaseStringUTFChars(env, jRomPath, romPath);
-    if (!rom) {
-        LOGE("pkRenderInit: cannot open ROM");
-        return JNI_FALSE;
-    }
-
-    struct mCore* core = mCoreFindVF(rom);
-    if (!core) {
-        LOGE("pkRenderInit: mCoreFindVF failed");
-        rom->close(rom);
-        return JNI_FALSE;
-    }
-    if (!core->init(core)) {
-        LOGE("pkRenderInit: core->init failed");
-        rom->close(rom);
-        core->deinit(core);
-        return JNI_FALSE;
-    }
-    mCoreInitConfig(core, NULL);
-    pk_gb_config(core);
-
-    unsigned w, h;
-    core->desiredVideoDimensions(core, &w, &h);
-    // core->init's contract expects a video buffer even though this core's
-    // frames are never displayed or read back.
-    color_t* video = calloc((size_t) w * h, sizeof(color_t));
-    core->setVideoBuffer(core, video, w);
-
-    core->setAudioBufferSize(core, 2048);
-    blip_set_rates(core->getAudioChannel(core, 0), core->frequency(core), PK_SAMPLE_RATE);
-    blip_set_rates(core->getAudioChannel(core, 1), core->frequency(core), PK_SAMPLE_RATE);
-
-    if (!core->loadROM(core, rom)) {
-        LOGE("pkRenderInit: core->loadROM failed");
-        rom->close(rom);
-        core->deinit(core);
-        free(video);
-        return JNI_FALSE;
-    }
-
-    // Deliberately no core->loadSave call — this core never reads or writes
-    // the player's actual save file.
-    core->reset(core);
-
-    rg.core = core;
-    rg.video = video;
-    rg.vw = w;
-    rg.vh = h;
-    rg.audioAvail = 0;
-    pk_gb_audio_attach(&rg.gbAudio, core, PK_SAMPLE_RATE);
-    LOGI("render core up: %ux%u", w, h);
-    return JNI_TRUE;
+    soundRenderer = pk_api_sound_open(romPath);
+    if (romPath) (*env)->ReleaseStringUTFChars(env, jRomPath, romPath);
+    return soundRenderer ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderDeinit(JNIEnv* env, jobject thiz) {
-    pkRenderTeardown();
+    pk_api_sound_close(soundRenderer);
+    soundRenderer = NULL;
 }
 
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderRunFrame(JNIEnv* env, jobject thiz) {
-    if (!rg.core) {
-        return;
-    }
-    rg.core->runFrame(rg.core);
-    pkRenderDrainAudio();
+    pk_api_sound_frame(soundRenderer);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderSampleRate(JNIEnv* env, jobject thiz) {
-    return PK_SAMPLE_RATE;
+    return PK_API_SAMPLE_RATE;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderReadAudio(JNIEnv* env, jobject thiz, jshortArray out) {
-    if (rg.audioAvail <= 0) {
-        return 0;
-    }
-    jsize cap = (*env)->GetArrayLength(env, out);
-    int n = rg.audioAvail;
-    if (n > cap) {
-        n = cap;
-    }
-    (*env)->SetShortArrayRegion(env, out, 0, n, rg.audio);
-    return n;
+    if (!soundRenderer) return 0;
+    int16_t samples[PK_AUDIO_SCRATCH_SAMPLES * 2];
+    int count = pk_api_sound_audio(soundRenderer, samples, (*env)->GetArrayLength(env, out));
+    if (count > 0) (*env)->SetShortArrayRegion(env, out, 0, count, samples);
+    return count;
 }
 
 // Whether a pkCall on the player's core can run now (pk_call_safe): the field-item jobs wait a frame when it can't.
@@ -625,112 +512,24 @@ Java_com_pokedaisy_app_MgbaCore_pkFlightRouteDone(JNIEnv* env, jobject thiz) {
     return pk_api_flight_route_done();
 }
 
-// Calls the ROM's own m4aSongNumStart(songId, alt) at `addr` (FfMusicRenderer
-// finds it with M4aSongs) on the render core, cleanly (pk_call). `alt` picks
-// Heart and Soul's alternate soundtrack; other games' ignore r1.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderForceSong(JNIEnv* env, jobject thiz, jlong addr, jint songId, jint alt) {
-    if (!rg.core || !rg.core->cpu) {
-        return JNI_FALSE;
-    }
-    const uint32_t args[4] = {(uint32_t) songId, (uint32_t) alt, 0, 0};
-    return pk_call(rg.core, (uint32_t) addr, args, NULL) ? JNI_TRUE : JNI_FALSE;
+    return pk_api_sound_song(soundRenderer, (uint32_t) addr, songId, alt) ? JNI_TRUE : JNI_FALSE;
 }
 
-// Parks the render core's main loop on `spin` (a Thumb `b .`) so the booted
-// game can't change the music while a song records; the VBlank interrupt
-// keeps the sound engine running. Steps first until the CPU is in the main
-// context (System/User mode, IRQs on) with the VBlank IRQ fully enabled (IME,
-// IE bit 0, DISPSTAT bit 3) - games switch it off around loads, and parking
-// then left the music frozen (Unbound). Tested with mgba_dump's `park`.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderPark(JNIEnv* env, jobject thiz, jlong spin) {
-    if (!rg.core || !rg.core->cpu || !pk_is_gba(rg.core)) {
-        return JNI_FALSE;
-    }
-    struct mCore* core = rg.core;
-    struct ARMCore* cpu = (struct ARMCore*) core->cpu;
-    for (int i = 0; i < 5000000; i++) {
-        if ((cpu->privilegeMode == MODE_SYSTEM || cpu->privilegeMode == MODE_USER) && !cpu->cpsr.i && !cpu->halted
-            && (core->busRead16(core, 0x04000208) & 1) && (core->busRead16(core, 0x04000200) & 1)
-            && (core->busRead16(core, 0x04000004) & 8)) {
-            cpu->gprs[ARM_PC] = (int32_t) ((uint32_t) spin & ~1u);
-            _ARMSetMode(cpu, MODE_THUMB);
-            ThumbWritePC(cpu);
-            return JNI_TRUE;
-        }
-        core->step(core);
-    }
-    return JNI_FALSE;
+    return pk_api_sound_park_gba(soundRenderer, (uint32_t) spin) ? JNI_TRUE : JNI_FALSE;
 }
 
-// The Game Boy render core's twins of pkRenderPark / pkRenderForceSong (Gen 1's
-// music: FfMusicRenderer's Game Boy path). Park: once the main loop runs with
-// interrupts on (IME, IE's VBlank bit, the LCD on), its PC goes to `spin` - a
-// `jr @` (18 FE) in ROM bank 0 - and only the VBlank handler, which runs the
-// sound engine every frame, keeps going. Tested with mgba_dump's `gbpark`.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderGbPark(JNIEnv* env, jobject thiz, jint spin) {
-    if (!rg.core || pk_is_gba(rg.core)) {
-        return JNI_FALSE;
-    }
-    struct mCore* core = rg.core;
-    struct GB* gb = (struct GB*) core->board;
-    struct SM83Core* cpu = (struct SM83Core*) core->cpu;
-    for (int i = 0; i < 5000000; i++) {
-        core->step(core);   // ends on an instruction boundary (SM83_CORE_FETCH)
-        if (gb->memory.ime && (gb->memory.ie & 1) && (gb->memory.io[GB_REG_LCDC] & 0x80) && !cpu->halted && !cpu->irqPending) {
-            // A spin in WRAM (Red / Blue: bank 0 holds no `jr @`) is written there first - a byte the
-            // parked game never touches again.
-            if (spin >= 0xC000 && spin < 0xDFFF) {
-                core->busWrite8(core, (uint16_t) spin, 0x18);
-                core->busWrite8(core, (uint16_t) (spin + 1), 0xFE);
-            }
-            cpu->pc = (uint16_t) spin;
-            cpu->memory.setActiveRegion(cpu, cpu->pc);
-            return JNI_TRUE;
-        }
-    }
-    return JNI_FALSE;
+    return pk_api_sound_park_gb(soundRenderer, (uint16_t) spin) ? JNI_TRUE : JNI_FALSE;
 }
 
-// Calls the game's `fn` (bank 0) with A = `a`, C = `c` on the parked GB render core
-// and returns once it comes back to `ret` (the park loop, pushed as the return
-// address), interrupts held off meanwhile so the VBlank handler can't run halfway
-// through it. Gen 1: PlayMusic(a = song id, c = its audio bank); Crystal: PlayMusic(de = song id), so DE is set to c too.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderGbCall(JNIEnv* env, jobject thiz, jint fn, jint a, jint c, jint ret) {
-    if (!rg.core || pk_is_gba(rg.core)) {
-        return JNI_FALSE;
-    }
-    struct mCore* core = rg.core;
-    struct GB* gb = (struct GB*) core->board;
-    struct SM83Core* cpu = (struct SM83Core*) core->cpu;
-    bool ime = gb->memory.ime;
-    bool pending = cpu->irqPending;
-    gb->memory.ime = false;
-    cpu->irqPending = false;
-    cpu->sp -= 2;
-    core->busWrite8(core, cpu->sp, (uint8_t) (ret & 0xFF));
-    core->busWrite8(core, (uint16_t) (cpu->sp + 1), (uint8_t) ((ret >> 8) & 0xFF));
-    cpu->a = (uint8_t) a;
-    cpu->c = (uint8_t) c;
-    cpu->d = 0;   // and DE = c: Crystal's PlayMusic takes its song in E
-    cpu->e = (uint8_t) c;
-    cpu->halted = false;
-    cpu->pc = (uint16_t) fn;
-    cpu->memory.setActiveRegion(cpu, cpu->pc);
-    int ok = 0;
-    for (int i = 0; i < 2000000; i++) {
-        core->step(core);
-        if (cpu->pc == (uint16_t) ret) {
-            ok = 1;
-            break;
-        }
-    }
-    gb->memory.ime = ime;
-    cpu->irqPending = pending;
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return pk_api_sound_call_gb(soundRenderer, (uint16_t) fn, (uint8_t) a, (uint8_t) c, (uint16_t) ret) ? JNI_TRUE : JNI_FALSE;
 }
 
 // Copies up to out.length interleaved shorts of the most recent frame's audio
@@ -875,11 +674,11 @@ Java_com_pokedaisy_app_MgbaCore_pkGbCallAt(JNIEnv* env, jobject thiz, jint at, j
     return pk_api_gb_call_at((uint16_t) at, (uint16_t) fn, (uint8_t) a, (uint8_t) b, (uint16_t) hl) ? JNI_TRUE : JNI_FALSE;
 }
 
-// Same as pkReadBytes, from the FF-music render core (rg): FfMusicRenderer
+// Same as pkReadBytes, from the FF-music render core: FfMusicRenderer
 // reads which song header it actually started, like the live game's key.
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderReadBytes(JNIEnv* env, jobject thiz, jlong addr, jint len) {
-    if (!rg.core || len <= 0 || len > (1 << 24)) {
+    if (!soundRenderer || len <= 0 || len > (1 << 24)) {
         return NULL;
     }
     jbyteArray out = (*env)->NewByteArray(env, len);
@@ -890,8 +689,9 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadBytes(JNIEnv* env, jobject thiz, jlo
     if (!tmp) {
         return out;
     }
-    pk_read_range(rg.core, (uint32_t) addr, tmp, len);
-    (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) tmp);
+    if (pk_api_sound_read(soundRenderer, (uint32_t) addr, tmp, len)) {
+        (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) tmp);
+    }
     free(tmp);
     return out;
 }

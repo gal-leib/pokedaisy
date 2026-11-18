@@ -1,7 +1,7 @@
 // PokeDaisy's emulator core as a plain C API: what a host calls to run a GBA or Game Boy game on mGBA and read its
 // memory, with no JNI in it. Android's MgbaCore.kt reaches it through pokedaisy_jni.c (which adds the DS games on
 // melonDS / DSperate in front of it); the iPad app calls it straight from Kotlin / Swift. The rest of pokedaisy_jni.c
-// (EXPAND, the render core, the game calls...) moves under here area by area.
+// (EXPAND, the game calls...) moves under here area by area.
 //
 // Threads: the emu thread owns the game - init / deinit, frames, keys, audio. pk_api_read and the ROM reads may come
 // from any thread (they take the core lock); they return false with no game up. GPL-3.0 (see NOTICE).
@@ -202,6 +202,22 @@ int64_t pk_api_rom_size(void);
 /** A Game Boy cart's own bytes [off, off + len) into [dst] (it's bank-switched, so not on the bus whole). False on a
  * GBA game, with no game, or past the cart's end. Any thread. */
 bool pk_api_rom_read(int64_t off, uint8_t* dst, int len);
+
+/** A disposable, read-only cartridge session for rendering music and sound effects. Each handle belongs to one
+ * caller thread. It is independent of the player's game, inputs, and battery save. Close it on that same thread. */
+struct pk_sound_renderer;
+struct pk_sound_renderer* pk_api_sound_open(const char* romPath);
+void pk_api_sound_close(struct pk_sound_renderer* render);
+void pk_api_sound_frame(struct pk_sound_renderer* render);
+/** Copy the last frame's interleaved stereo samples at PK_API_SAMPLE_RATE and return the number of samples. */
+int pk_api_sound_audio(struct pk_sound_renderer* render, int16_t* dst, int capacity);
+bool pk_api_sound_read(struct pk_sound_renderer* render, uint32_t addr, uint8_t* dst, int len);
+/** Park the main loop while leaving the game's VBlank sound engine running. */
+bool pk_api_sound_park_gba(struct pk_sound_renderer* render, uint32_t spin);
+bool pk_api_sound_park_gb(struct pk_sound_renderer* render, uint16_t spin);
+/** Start a GBA song through the ROM's sound engine or A/C/DE on Game Boy. */
+bool pk_api_sound_song(struct pk_sound_renderer* render, uint32_t addr, int songId, int alt);
+bool pk_api_sound_call_gb(struct pk_sound_renderer* render, uint16_t fn, uint8_t a, uint8_t c, uint16_t ret);
 
 #ifdef __cplusplus
 }

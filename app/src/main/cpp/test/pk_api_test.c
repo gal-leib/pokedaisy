@@ -202,6 +202,59 @@ static void tint(const char* dir) {
     closed();
 }
 
+static void soundIsolation(const char* dir) {
+    char gbPath[1024], soundPath[1024], gbaPath[1024];
+    path(gbPath, sizeof gbPath, dir, "diagnostic.gb");
+    path(soundPath, sizeof soundPath, dir, "diagnostic-sound.gb");
+    path(gbaPath, sizeof gbaPath, dir, "diagnostic.gba");
+    CHECK(pk_api_sound_open(NULL) == NULL, "renderer opened a null cartridge");
+    if (!pk_api_init(gbPath, NULL)) {
+        CHECK(0, "player's GB cartridge could not open");
+        return;
+    }
+    for (int i = 0; i < 30; i++) pk_api_run_frame();
+    uint8_t before = 0, after = 0;
+    pk_api_read(0xC000, &before, 1);
+    struct pk_sound_renderer* gb = pk_api_sound_open(soundPath);
+    struct pk_sound_renderer* gba = pk_api_sound_open(gbaPath);
+    CHECK(gb && gba, "renderers could not open both cartridges");
+    uint8_t code[4] = {0};
+    CHECK(pk_api_sound_read(gba, 0x080000AC, code, sizeof code) && !memcmp(code, "BPRE", 4),
+          "GBA renderer read the wrong cartridge");
+    CHECK(!pk_api_sound_park_gba(gb, 0x08000000) && !pk_api_sound_song(gb, 0x08000001, 0, 0),
+          "GBA music operations accepted a GB cartridge");
+    CHECK(!pk_api_sound_park_gb(gba, 0xC100) && !pk_api_sound_call_gb(gba, 0x150, 0, 0, 0xC100),
+          "GB music operations accepted a GBA cartridge");
+
+    bool heardSound = false;
+    for (int i = 0; i < 30; i++) {
+        pk_api_sound_frame(gb);
+        pk_api_sound_frame(gba);
+        int16_t samples[4096];
+        int n = pk_api_sound_audio(gb, samples, 4096);
+        for (int k = 0; k < n; k++) heardSound |= samples[k] != 0;
+    }
+    CHECK(heardSound, "GB renderer delivered no audio from the diagnostic tone");
+    CHECK(pk_api_sound_park_gb(gb, 0xC100), "GB renderer didn't enter the park loop");
+    uint8_t spin[2] = {0};
+    CHECK(pk_api_sound_read(gb, 0xC100, spin, 2) && spin[0] == 0x18 && spin[1] == 0xFE,
+          "the GB renderer's private park loop wasn't installed");
+    uint8_t soundValue = 0;
+    CHECK(pk_api_sound_call_gb(gb, 0x310, 0x56, 0, 0xC100) && pk_api_sound_read(gb, 0xC102, &soundValue, 1) &&
+          soundValue == 0x56, "GB render call didn't write the expected value to its private WRAM");
+    pk_api_read(0xC100, spin, 2);
+    CHECK(spin[0] != 0x18 || spin[1] != 0xFE, "renderer changed the player's RAM");
+    pk_api_sound_close(gb);
+    pk_api_sound_close(gba);
+    pk_api_read(0xC000, &after, 1);
+    CHECK(after == before, "renderer advanced the player's game");
+    pk_api_run_frame();
+    pk_api_read(0xC000, &after, 1);
+    CHECK((uint8_t) (after - before) == 1, "the player's game didn't continue after closing the renderers");
+    pk_api_deinit();
+    closed();
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         fprintf(stderr, "usage: %s <dir with diagnostic.gb / .gba>\n", argv[0]);
@@ -211,6 +264,7 @@ int main(int argc, char** argv) {
     gameBoy(argv[1]);
     gba(argv[1]);
     tint(argv[1]);
+    soundIsolation(argv[1]);
     if (failures) fprintf(stderr, "%d failed\n", failures);
     else puts("pk_api: all passed");
     return failures != 0;
