@@ -1,10 +1,8 @@
 package com.pokedaisy.app.companion.coop
 
-import java.io.DataInputStream
-import java.io.EOFException
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import okio.BufferedSink
+import okio.BufferedSource
+import okio.IOException
 
 /** Framing and codes shared by the relay and TCP paths of the co-op transport. */
 object CoopFrames {
@@ -32,25 +30,17 @@ object CoopFrames {
     const val PENDING_EXPIRED = 7
     const val DUPLICATE = 8
 
-    /** TCP: a u32 BE length, then the body. */
-    fun writeTcp(out: OutputStream, bytes: ByteArray) {
+    /** TCP uses a four-byte big-endian length followed by the body. */
+    fun writeTcp(out: BufferedSink, bytes: ByteArray) {
         require(bytes.size <= MAX_TCP_FRAME) { "frame too large" }
-        val n = bytes.size
-        out.write(byteArrayOf((n ushr 24).toByte(), (n ushr 16).toByte(), (n ushr 8).toByte(), n.toByte()))
-        out.write(bytes)
-        out.flush()
+        out.writeInt(bytes.size).write(bytes).flush()
     }
 
-    /** One frame; [EOFException] at a clean end, [IOException] for a length over [MAX_TCP_FRAME] (the body is never read). */
-    fun readTcp(input: InputStream): ByteArray {
-        val first = input.read()
-        if (first < 0) throw EOFException()
-        val din = DataInputStream(input)
-        val n = (first shl 24) or (din.readUnsignedByte() shl 16) or (din.readUnsignedByte() shl 8) or din.readUnsignedByte()
-        if (n < 0 || n > MAX_TCP_FRAME) throw IOException("frame length $n")
-        val body = ByteArray(n)
-        din.readFully(body)
-        return body
+    /** Refuse an invalid length before consuming or allocating the payload. */
+    fun readTcp(input: BufferedSource): ByteArray {
+        val size = input.readInt()
+        if (size !in 0..MAX_TCP_FRAME) throw IOException("frame length $size")
+        return input.readByteArray(size.toLong())
     }
 
     fun relayData(bytes: ByteArray): ByteArray = byteArrayOf(RELAY_DATA.toByte()) + bytes

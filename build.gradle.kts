@@ -82,7 +82,7 @@ val sharedUiSources by extra(
 )
 val sharedUiAppOnly by extra(
     listOf(
-        "CoopChannel", "CoopDirect", "CoopFrames", "CoopIdentity", "CoopIpHello", "CoopKeys", "CoopLan", "CoopNoise",
+        "CoopChannel", "CoopDirect", "CoopIdentity", "CoopIpHello", "CoopKeys", "CoopLan", "CoopNoise",
         "CoopSession", "OkHttpRelayConnector", "RelayCoopTransport", "lock/CoopLockStore",
     ).map { "com/pokedaisy/app/companion/coop/$it.kt" },
 )

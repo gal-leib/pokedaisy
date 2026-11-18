@@ -1,7 +1,5 @@
 package com.pokedaisy.app.companion.coop
 
-import java.io.BufferedInputStream
-import java.io.BufferedOutputStream
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -11,6 +9,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import okio.buffer
+import okio.sink
+import okio.source
 
 /**
  * The single writer of one pipe (a relay socket or a TCP socket): [offer] only enqueues, a pool thread
@@ -85,8 +86,8 @@ internal class DirectSocket(
     private val onMessage: (ByteArray) -> Unit,
     private val onClosed: () -> Unit,
 ) {
-    private val output = BufferedOutputStream(socket.getOutputStream())
-    private val input = BufferedInputStream(socket.getInputStream())
+    private val output = socket.sink().buffer()
+    private val input = socket.source().buffer()
 
     val writer = PipeWriter(
         pool,
