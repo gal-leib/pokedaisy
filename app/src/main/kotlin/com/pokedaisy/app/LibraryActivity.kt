@@ -2154,6 +2154,10 @@ class LibraryActivity : ComponentActivity() {
      * old file stays where it was.
      */
     private fun setGameSaveFolder(rom: File, path: String?) {
+        if (!SaveFileEdits.recover(this)) {
+            Toast.makeText(this, ClosedSaveEdits.recoveryError(), Toast.LENGTH_LONG).show()
+            return
+        }
         val before = SavesLocation.saveFor(this, prefs, rom)
         prefs.setRomSaveDir(rom, path)
         val after = SavesLocation.saveFor(this, prefs, rom)

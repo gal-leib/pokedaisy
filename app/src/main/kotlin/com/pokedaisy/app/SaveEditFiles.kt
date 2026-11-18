@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.readBytes
 import com.pokedaisy.app.companion.i18n.tr
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -22,7 +23,52 @@ class SaveEditFiles(
 
     class Edit(val path: Path, val expected: ByteArray, val updated: ByteArray)
 
-    fun write(edit: Edit): Result = synchronized(lock) { writeLocked(edit) }
+    fun write(edit: Edit, states: (() -> StateFiles)? = null): Result = synchronized(lock) {
+        var state: StateFiles? = null
+        var previousMarker: ByteArray? = null
+        val result = writeLocked(edit) {
+            if (states != null) {
+                val files = states()
+                val marker = files.freshBootFile
+                previousMarker = if (FileSystem.SYSTEM.exists(marker)) marker.readBytes() else null
+                replaceMarker(marker, FRESH)
+                state = files
+            }
+        }
+        state?.let { files ->
+            if (result is Result.Written) {
+                discardResume(files)
+            } else if (matches(edit.path, edit.expected)) {
+                runCatching {
+                    val old = previousMarker
+                    if (old == null) FileSystem.SYSTEM.delete(files.freshBootFile)
+                    else replaceMarker(files.freshBootFile, old)
+                }
+            }
+        }
+        result
+    }
+
+    /** Finalization can be repeated until the trade journal is removed. */
+    internal fun finishFresh(states: StateFiles) {
+        replaceMarker(states.freshBootFile, FRESH)
+        discardResume(states)
+    }
+
+    private fun discardResume(states: StateFiles) {
+        runCatching { states.removeState(states.resumeFile) }
+    }
+
+    private fun replaceMarker(path: Path, bytes: ByteArray) {
+        val tmp = stagedPath(path.parent!!, path.name)
+        try {
+            writeSynced(tmp, bytes)
+            check(matches(tmp, bytes))
+            FileSystem.SYSTEM.atomicMove(tmp, path)
+        } finally {
+            removeStaged(tmp)
+        }
+    }
 
     fun writeBoth(a: Edit, b: Edit): Result = synchronized(lock) {
         if (a.path == b.path) return@synchronized Result.Failed(tr("Both games use the same save file"))
@@ -43,7 +89,7 @@ class SaveEditFiles(
         second
     }
 
-    private fun writeLocked(edit: Edit): Result {
+    private fun writeLocked(edit: Edit, beforePublish: () -> Unit = {}): Result {
         val save = edit.path
         val dir = save.parent ?: return Result.Failed(tr("Can't write the save to {0}", save.toString()))
         val current = runCatching { save.readBytes() }.getOrNull()
@@ -58,6 +104,10 @@ class SaveEditFiles(
         try {
             val staged = runCatching { writeSynced(tmp, edit.updated) }.isSuccess
             if (!staged || !matches(tmp, edit.updated)) return Result.Failed(tr("Can't write the save to {0}", dir.toString()))
+            if (!matches(save, current)) return changed()
+            if (runCatching(beforePublish).isFailure) {
+                return Result.Failed(tr("Can't write the save to {0}", dir.toString()))
+            }
             if (!matches(save, current)) return changed()
             if (runCatching { publish(tmp, save) }.isFailure) {
                 return Result.Failed(tr("Can't write the save to {0}", dir.toString()))
@@ -95,5 +145,6 @@ class SaveEditFiles(
 
     private companion object {
         val lock = SynchronizedObject()
+        val FRESH = "fresh".encodeToByteArray()
     }
 }

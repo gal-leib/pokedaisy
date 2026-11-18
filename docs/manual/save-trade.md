@@ -80,7 +80,9 @@ The 3DS app has the same editor for FireRed, LeafGreen, Emerald, Ruby and Sapphi
 
 ## Trade between saves
 
-On iPhone and iPad, use `TRADE SAVES` for the supported GBA games. Each game needs a readable battery save. PokeDaisy keeps both original saves in the backup folder and recovers an interrupted write before opening a game.
+On iPhone and iPad, use `TRADE SAVES` for the supported GBA games. Each game needs a readable battery save.
+
+On Android, iPhone and iPad, PokeDaisy backs up both saves and recovers an interrupted write before opening a game. If one of your saves is on removable storage, reconnect it so PokeDaisy can finish recovering.
 
 Tap `TOOLS` in the library, then `TRADE SAVES`, and pick the game to trade from and then the one to trade with. `BACK` on the second pick lets you choose the first game again, and `BACK` from the trade takes you back to `TOOLS`. (In a game's `SAVE EDITOR`, `TRADE` starts a trade from that game, and `BACK` returns to its boxes.)
 

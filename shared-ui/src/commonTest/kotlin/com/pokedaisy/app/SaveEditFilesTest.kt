@@ -1,11 +1,13 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.readBytes
 import com.pokedaisy.app.companion.data.writeBytes
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import okio.FileSystem
@@ -75,6 +77,72 @@ class SaveEditFilesTest {
         assertContentEquals(external, a.readBytes())
         assertContentEquals(previous, b.readBytes())
         assertContentEquals(previous, backup.readBytes())
+    }
+
+    @Test fun aPublishedEditKeepsFreshBootIfTheResultIsInterrupted() = inTemp { dir ->
+        val save = dir / "game.sav"
+        val backup = dir / "backup.sav"
+        val states = StateFiles(dir / "states")
+        save.writeBytes(previous)
+        states.resumeFile.writeBytes(previous)
+        states.stateFile(4).writeBytes(previous)
+        val disk = SaveEditFiles(
+            backup = { fs.copy(it, backup); backup },
+            writeSynced = Path::writeBytes,
+            publish = { stage, target ->
+                assertTrue(fs.exists(states.freshBootFile))
+                fs.atomicMove(stage, target)
+                error("Interrupted after replacing the battery")
+            },
+        )
+
+        assertIs<SaveEditFiles.Result.Failed>(disk.write(SaveEditFiles.Edit(save, previous, updated)) { states })
+        assertContentEquals(updated, save.readBytes())
+        assertContentEquals(previous, backup.readBytes())
+        assertContentEquals(previous, states.stateFile(4).readBytes())
+        assertTrue(fs.exists(states.freshBootFile))
+    }
+
+    @Test fun aFailedReplacementRestoresAnExistingEmptyMarkerAndKeepsResume() = inTemp { dir ->
+        val save = dir / "game.srm"
+        val backup = dir / "backup.srm"
+        val states = StateFiles(dir / "states")
+        save.writeBytes(previous)
+        states.resumeFile.writeBytes(previous)
+        states.freshBootFile.writeBytes(byteArrayOf()) // Older Android editors used a zero-byte marker.
+        val disk = SaveEditFiles(
+            backup = { fs.copy(it, backup); backup },
+            writeSynced = Path::writeBytes,
+            publish = { _, _ -> error("Battery replacement failed") },
+        )
+
+        assertIs<SaveEditFiles.Result.Failed>(disk.write(SaveEditFiles.Edit(save, previous, updated)) { states })
+        assertContentEquals(previous, save.readBytes())
+        assertContentEquals(previous, states.resumeFile.readBytes())
+        assertContentEquals(byteArrayOf(), states.freshBootFile.readBytes())
+    }
+
+    @Test fun anUnwritableMarkerPreventsBatteryPublish() = inTemp { dir ->
+        val save = dir / "game.sav"
+        val backup = dir / "backup.sav"
+        val states = StateFiles(dir / "states")
+        save.writeBytes(previous)
+        states.resumeFile.writeBytes(previous)
+        var published = false
+        val disk = SaveEditFiles(
+            backup = { fs.copy(it, backup); backup },
+            writeSynced = { path, bytes ->
+                check(path.parent != states.directory)
+                path.writeBytes(bytes)
+            },
+            publish = { _, _ -> published = true },
+        )
+
+        assertIs<SaveEditFiles.Result.Failed>(disk.write(SaveEditFiles.Edit(save, previous, updated)) { states })
+        assertFalse(published)
+        assertFalse(fs.exists(states.freshBootFile))
+        assertContentEquals(previous, save.readBytes())
+        assertContentEquals(previous, states.resumeFile.readBytes())
     }
 
     private fun inTemp(test: (Path) -> Unit) {

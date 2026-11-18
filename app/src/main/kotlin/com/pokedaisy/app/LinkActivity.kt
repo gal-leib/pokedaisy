@@ -160,6 +160,10 @@ class LinkActivity : ComponentActivity() {
         phase = Phase.STARTING
         val picked = setup.slots.toList()
         thread(name = "pokedaisy-link-open") {
+            if (!SaveFileEdits.recover(this)) {
+                runOnUiThread { phase = Phase.SETUP; notice = ClosedSaveEdits.recoveryError() }
+                return@thread
+            }
             var refused: String? = null
             val saves = LinkSavePaths.forGames(picked.map { SavesLocation.saveFor(this, prefs, it).absoluteFile.toOkioPath(normalize = true) })
             val list = picked.zip(saves).map { (rom, path) ->

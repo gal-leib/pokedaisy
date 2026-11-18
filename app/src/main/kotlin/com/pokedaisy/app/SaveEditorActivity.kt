@@ -198,6 +198,7 @@ class SaveEditorActivity : ComponentActivity() {
 
     /** A Black / White save as an [OpenedGen5] (the cart's names and personal records read for it), or why there's none. Blocking. */
     private fun openGen5(rom: File): Any {
+        if (!SaveFileEdits.recover(this)) return ClosedSaveEdits.recoveryError()
         val save = SavesLocation.saveFor(this, prefs, rom)
         if (!save.isFile) return tr("No save yet - save once in the game first.")
         val bytes = runCatching { save.readBytes() }.getOrNull() ?: return tr("Can't read the save {0}", save.path)
@@ -539,6 +540,7 @@ class SaveEditorActivity : ComponentActivity() {
 
     /** [rom]'s save as an [Opened], or why there's none (a String). Blocking. */
     private fun open(rom: File): Any {
+        if (!SaveFileEdits.recover(this)) return ClosedSaveEdits.recoveryError()
         if (SaveFileEdits.isDsEditable(rom)) return openDs(rom)
         if (SaveFileEdits.isGen5(rom)) return openGen5Editor(rom)
         val format = SaveFileEdits.formatFor(rom)

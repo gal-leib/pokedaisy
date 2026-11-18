@@ -1,5 +1,7 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.StateFiles
+import com.pokedaisy.app.companion.data.StateResume
 import com.pokedaisy.app.companion.data.readBytes
 import com.pokedaisy.app.companion.data.writeBytes
 import kotlin.random.Random
@@ -7,6 +9,8 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import okio.FileSystem
 import okio.Path
@@ -63,6 +67,64 @@ class SaveTradeJournalTest {
         assertTrue(journal.recover({ true }) { error("Partial trade") })
         assertContentEquals(b.edit.expected, b.edit.path.readBytes())
         assertFalse(fs.exists(file))
+    }
+
+    @Test fun aDetachedSaveFolderDefersRecoveryUntilBothSavesAreVisible() = fixture { file, journal, a, b ->
+        journal.write(a, b)
+        b.edit.path.writeBytes(b.edit.updated)
+        fs.delete(a.edit.path)
+
+        assertFalse(journal.recover({ true }) { error("A save is unavailable") })
+        assertTrue(fs.exists(file))
+        assertContentEquals(b.edit.updated, b.edit.path.readBytes())
+
+        a.edit.path.writeBytes(a.edit.expected)
+        assertTrue(journal.recover({ true }) { error("Partial trade") })
+        assertContentEquals(b.edit.expected, b.edit.path.readBytes())
+        assertFalse(fs.exists(file))
+    }
+
+    @Test fun reopeningAfterAMarkerFailureFinishesBothSidesBeforeResume() = fixture { file, journal, a, b ->
+        val first = StateFiles(file.parent!! / a.stateKey)
+        val second = StateFiles(file.parent!! / b.stateKey)
+        val states = mapOf(a.stateKey to first, b.stateKey to second)
+        for (state in states.values) {
+            state.resumeFile.writeBytes(byteArrayOf(1))
+            state.stateFile(2).writeBytes(byteArrayOf(2))
+        }
+
+        fun host(sync: (Path, ByteArray) -> Unit) = ClosedSaveEdits(
+            files = SaveEditFiles(
+                backup = { StateFiles.backupBattery(it) },
+                writeSynced = sync,
+                publish = fs::atomicMove,
+            ),
+            journal = journal,
+            accept = { it.stateKey in states },
+            states = states::getValue,
+        )
+
+        var journalSeen = false
+        val crashed = host { path, bytes ->
+            if (path.parent == file.parent) journalSeen = fs.exists(file)
+            check(path.parent != second.directory)
+            path.writeBytes(bytes)
+        }
+        assertIs<SaveEditFiles.Result.Failed>(crashed.trade(a, b))
+        assertTrue(journalSeen)
+        assertTrue(fs.exists(file))
+        assertTrue(fs.exists(first.freshBootFile))
+        assertFalse(fs.exists(second.freshBootFile))
+
+        assertTrue(host(Path::writeBytes).recover())
+        assertFalse(fs.exists(file))
+        for (state in states.values) {
+            assertNull(StateResume.stage(state))
+            assertFalse(fs.exists(state.resumeFile))
+            assertContentEquals(byteArrayOf(2), state.stateFile(2).readBytes())
+        }
+        assertContentEquals(a.edit.updated, a.edit.path.readBytes())
+        assertContentEquals(b.edit.updated, b.edit.path.readBytes())
     }
 
     private fun fixture(action: (Path, SaveTradeJournal, SaveTradeJournal.Side, SaveTradeJournal.Side) -> Unit) {

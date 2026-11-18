@@ -1,5 +1,9 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.StateFiles
+import com.pokedaisy.app.companion.i18n.tr
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import okio.Buffer
 import okio.BufferedSource
 import okio.FileSystem
@@ -31,6 +35,7 @@ class SaveTradeJournal(
             data.writeField(side.edit.expected, GameSaves.MAX_BYTES)
             data.writeField(side.edit.updated, GameSaves.MAX_BYTES)
         }
+        fs.createDirectories(file.parent!!)
         replace(file, data.readByteArray())
     }
 
@@ -42,6 +47,9 @@ class SaveTradeJournal(
             List(2) { source.readSide() }.also { check(source.exhausted()) }
         }
         check(sides[0].edit.path != sides[1].edit.path && sides.all(accept))
+        // A detached SD card can make a published side temporarily disappear. Retry when both
+        // saves are visible before deciding whether to retain or roll back the trade.
+        check(sides.all { fs.metadataOrNull(it.edit.path)?.isRegularFile == true })
         if (sides.all { matches(it.edit.path, it.edit.updated) }) {
             sides.forEach(finishCommitted)
         } else {
@@ -54,6 +62,10 @@ class SaveTradeJournal(
         }
         fs.delete(file)
         true
+    }.getOrDefault(false)
+
+    internal fun unchanged(side: Side): Boolean = runCatching {
+        matches(side.edit.path, side.edit.expected)
     }.getOrDefault(false)
 
     private fun replace(target: Path, bytes: ByteArray, from: ByteArray? = null) {
@@ -98,5 +110,50 @@ class SaveTradeJournal(
     private companion object {
         const val MAGIC = "PKTRADE1"
         const val MAX_PATH_BYTES = 4096
+    }
+}
+
+
+/** Serializes closed-game edits and recovery for a host. The caller still owns the core's lifecycle. */
+class ClosedSaveEdits(
+    private val files: SaveEditFiles,
+    private val journal: SaveTradeJournal,
+    private val accept: (SaveTradeJournal.Side) -> Boolean,
+    private val states: (String) -> StateFiles,
+) {
+    fun recover(): Boolean = synchronized(lock) { recoverLocked() }
+
+    fun write(edit: SaveEditFiles.Edit, state: () -> StateFiles): SaveEditFiles.Result = synchronized(lock) {
+        if (!recoverLocked()) return@synchronized recoveryFailed()
+        files.write(edit, state)
+    }
+
+    fun trade(a: SaveTradeJournal.Side, b: SaveTradeJournal.Side): SaveEditFiles.Result = synchronized(lock) {
+        if (a.edit.path == b.edit.path) {
+            return@synchronized SaveEditFiles.Result.Failed(tr("Both games use the same save file"))
+        }
+        if (!recoverLocked()) return@synchronized recoveryFailed()
+        if (!journal.unchanged(a) || !journal.unchanged(b)) {
+            return@synchronized SaveEditFiles.Result.Failed(tr("The save changed since it was opened - open it again"))
+        }
+        if (!runCatching {
+                check(accept(a) && accept(b))
+                journal.write(a, b)
+            }.isSuccess) {
+            return@synchronized SaveEditFiles.Result.Failed(tr("Can't write the save"))
+        }
+        val result = files.writeBoth(a.edit, b.edit)
+        if (recoverLocked()) result else recoveryFailed()
+    }
+
+    private fun recoverLocked(): Boolean =
+        journal.recover(accept) { files.finishFresh(states(it.stateKey)) }
+
+    private fun recoveryFailed() = SaveEditFiles.Result.Failed(recoveryError())
+
+    companion object {
+        private val lock = SynchronizedObject()
+
+        fun recoveryError() = tr("Couldn't finish recovering the interrupted save trade. Open the app again to retry.")
     }
 }

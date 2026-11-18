@@ -2,10 +2,12 @@ package com.pokedaisy.app
 
 import android.content.Context
 import com.pokedaisy.app.companion.data.save.Gen3SaveReader
+import com.pokedaisy.app.companion.i18n.tr
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import okio.Path
 import okio.Path.Companion.toOkioPath
 
 /**
@@ -52,28 +54,50 @@ object SaveFileEdits {
     }
 
     /** Writes [edited] over [rom]'s save, which must still be [expected]. Blocking: off the UI thread. */
-    fun commit(context: Context, prefs: Prefs, rom: File, expected: ByteArray, edited: ByteArray): Result {
-        val save = SavesLocation.saveFor(context, prefs, rom)
-        val result = write(save, expected, edited) { SaveBackups.snapshot(it, force = true) }
-        if (result is Result.Written) runCatching {
-            SaveStates(context.getExternalFilesDir(null) ?: context.filesDir, SaveStates.crc32(rom)).freshBootFile.createNewFile()
+    fun commit(context: Context, prefs: Prefs, rom: File, expected: ByteArray, edited: ByteArray): Result =
+        runCatching {
+            val save = SavesLocation.saveFor(context, prefs, rom).canonicalFile.toOkioPath()
+            transactions(context).write(SaveEditFiles.Edit(save, expected, edited)) {
+                SaveStates(context.getExternalFilesDir(null) ?: context.filesDir, SaveStates.crc32(rom)).files
+            }.androidResult()
+        }.getOrElse { Result.Failed(tr("Can't write the save")) }
+
+    /** Trade, Pal Park and Poké Transfer all require both saves to commit together. Blocking. */
+    fun commitBoth(context: Context, prefs: Prefs, a: Edit, b: Edit): Result = runCatching {
+        fun side(edit: Edit): SaveTradeJournal.Side {
+            val save = SavesLocation.saveFor(context, prefs, edit.rom).canonicalFile.toOkioPath()
+            return SaveTradeJournal.Side(SaveEditFiles.Edit(save, edit.expected, edit.edited), stateKey(context, edit.rom))
         }
-        return result
+        transactions(context).trade(side(a), side(b)).androidResult()
+    }.getOrElse { Result.Failed(tr("Can't write the save")) }
+
+    fun recover(context: Context): Boolean = transactions(context).recover()
+
+    private fun stateKey(context: Context, rom: File): String {
+        val storage = if (context.getExternalFilesDir(null) == null) "internal" else "external"
+        return "$storage:${SaveStates.crc32(rom)}"
     }
 
-    /**
-     * A trade: [a]'s and [b]'s saves written together. [b] first; if [a] then fails, [b] is put back as it was (through the
-     * same checked write), so neither save ends up with a Pokémon twice or not at all. Blocking.
-     */
-    fun commitBoth(context: Context, prefs: Prefs, a: Edit, b: Edit): Result {
-        val saveA = SavesLocation.saveFor(context, prefs, a.rom)
-        val saveB = SavesLocation.saveFor(context, prefs, b.rom)
-        val result = writeBoth(saveA, a, saveB, b) { SaveBackups.snapshot(it, force = true) }
-        if (result is Result.Written) for (rom in listOf(a.rom, b.rom)) runCatching {
-            SaveStates(context.getExternalFilesDir(null) ?: context.filesDir, SaveStates.crc32(rom)).freshBootFile.createNewFile()
-        }
-        return result
-    }
+    private fun transactions(context: Context) = ClosedSaveEdits(
+        files = files { SaveBackups.snapshot(it, force = true) },
+        journal = SaveTradeJournal(context.filesDir.toOkioPath() / "save-trade.pending", ::sync),
+        accept = { side ->
+            // This app-private journal records the absolute location chosen by SavesLocation at
+            // commit time. A per-game override, an extra search folder, or a DS cart's folder can
+            // be anywhere on writable storage. Use the original location if settings change.
+            val path = side.edit.path
+            path.isAbsolute && path.parent != null &&
+                path.name.substringAfterLast('.', "").lowercase() in setOf("sav", "srm") &&
+                File(path.toString()).canonicalFile.toOkioPath() == path &&
+                stateKeyPattern.matches(side.stateKey)
+        },
+        states = { key ->
+            val root = if (key.startsWith("external:")) checkNotNull(context.getExternalFilesDir(null)) else context.filesDir
+            SaveStates(root, key.substringAfter(':')).files
+        },
+    )
+
+    private val stateKeyPattern = Regex("(external|internal):[0-9a-f]{8}")
 
     /** One save's part of [commitBoth]: the file as read and as edited. */
     class Edit(val rom: File, val expected: ByteArray, val edited: ByteArray)
@@ -93,9 +117,7 @@ object SaveFileEdits {
             val file = File(path.toString())
             (backup(file) ?: SaveBackups.list(file).firstOrNull())?.toOkioPath()
         },
-        writeSynced = { tmp, bytes ->
-            FileOutputStream(File(tmp.toString())).use { it.write(bytes); it.fd.sync() }
-        },
+        writeSynced = ::sync,
         publish = { tmp, save ->
             val source = File(tmp.toString()).toPath()
             val target = File(save.toString()).toPath()
@@ -106,6 +128,13 @@ object SaveFileEdits {
             }
         },
     )
+
+    private fun sync(path: Path, bytes: ByteArray) {
+        FileOutputStream(File(path.toString())).use {
+            it.write(bytes)
+            it.fd.sync()
+        }
+    }
 
     private fun SaveEditFiles.Result.androidResult(): Result = when (this) {
         is SaveEditFiles.Result.Written -> Result.Written(File(save.toString()), File(backup.toString()))
