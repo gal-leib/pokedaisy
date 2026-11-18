@@ -51,7 +51,7 @@ class CoopChannel(
 
     private val lock = Any()
     private val noise: CoopNoise =
-        if (initiator) CoopNoise.initiator(ownSecret, remoteStatic!!, prologue) else CoopNoise.responder(ownSecret, prologue)
+        if (initiator) CoopNoise.initiator(JvmCoopCrypto, ownSecret, remoteStatic!!, prologue) else CoopNoise.responder(JvmCoopCrypto, ownSecret, prologue)
     private val startedAt = clock()
     private var send: CoopCipher? = null
     private var receive: CoopCipher? = null

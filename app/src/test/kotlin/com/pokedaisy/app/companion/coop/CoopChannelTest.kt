@@ -99,7 +99,7 @@ class CoopChannelTest {
 
     @Test fun versionMismatchRefusedWithVersion() {
         val rig = Rig()
-        val noise = CoopNoise.initiator(rig.initSecret, CoopKeys.publicKey(rig.respSecret), PROLOGUE)
+        val noise = CoopNoise.initiator(JvmCoopCrypto, rig.initSecret, CoopKeys.publicKey(rig.respSecret), PROLOGUE)
         rig.resp.receive(noise.writeMessage(byteArrayOf(0, 2)))
         val msg2 = rig.toInit.removeFirst()
         assertEquals(CoopFrames.VERSION, noise.readMessage(msg2)!![0].toInt())
@@ -208,7 +208,7 @@ class CoopChannelTest {
             val log = Log()
             val out = ArrayDeque<ByteArray>()
             val ch = CoopChannel(false, respSecret, null, PROLOGUE, { out.addLast(it); true }, { 0L }, CoopTimings(), { 0 }, log)
-            val hand = CoopNoise.initiator(initSecret, CoopKeys.publicKey(respSecret), PROLOGUE)
+            val hand = CoopNoise.initiator(JvmCoopCrypto, initSecret, CoopKeys.publicKey(respSecret), PROLOGUE)
             ch.receive(hand.writeMessage(byteArrayOf(0, 1)))
             hand.readMessage(out.removeFirst())
             val (send, receive) = hand.split()
@@ -275,7 +275,7 @@ class CoopChannelTest {
             override fun frame(channel: CoopChannel, bytes: ByteArray) { calls += "frame" }
             override fun closed(channel: CoopChannel, code: Int, beforeOpen: Boolean) { calls += "closed" }
         })
-        val hand = CoopNoise.initiator(secretA, CoopKeys.publicKey(secretB), PROLOGUE)
+        val hand = CoopNoise.initiator(JvmCoopCrypto, secretA, CoopKeys.publicKey(secretB), PROLOGUE)
         ch.receive(hand.writeMessage(byteArrayOf(0, 1)))
         hand.readMessage(out.removeFirst())
         val (send, _) = hand.split()
