@@ -16,7 +16,7 @@ val cmp by extra("1.5.12")
 val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appIncludes = listOf(
     "companion/ui/**", "SettingsActivity.kt", "KeyEvents.kt", "CoopSettingsPages.kt", "AndroidCoopSettings.kt", "LibraryActivity.kt", "SavesLocation.kt",
-    "CoverArtSync.kt", "CoverSync.kt", "DocsApi.kt", "DocsCache.kt", "DocsStore.kt", "DocsSearch.kt", "RomFolder.kt", "StorageAccess.kt", "SetupScreen.kt", "AppUpdater.kt", "AppUpdate.kt", "GameSaves.kt", "GameSavesAndroid.kt", "RzipSave.kt", "SaveBackups.kt", "GameInfo.kt", "GameInfoDetails.kt", "AndroidGameInfo.kt", "LibraryOrder.kt", "RomSupportRequest.kt", "RomIntake.kt", "BestEffortShare.kt", "SaveStates.kt", "RomIdentity.kt", "RomArchive.kt", "CompanionSupport.kt", "CoverPicker.kt", "SteamGridDbGames.kt", "SteamGridDbClient.kt", "GameTitles.kt", "SaveEditorActivity.kt", "SaveFileEdits.kt", "SaveEditFiles.kt", "SaveTradeJournal.kt",
+    "CoverArtSync.kt", "CoverSync.kt", "DocsApi.kt", "DocsCache.kt", "DocsStore.kt", "DocsSearch.kt", "RomFolder.kt", "StorageAccess.kt", "SetupScreen.kt", "AppUpdater.kt", "AppUpdate.kt", "GameSavesAndroid.kt", "RzipSave.kt", "SaveBackups.kt", "GameInfo.kt", "GameInfoDetails.kt", "AndroidGameInfo.kt", "LibraryOrder.kt", "RomSupportRequest.kt", "RomIntake.kt", "BestEffortShare.kt", "SaveStates.kt", "RomIdentity.kt", "RomArchive.kt", "CompanionSupport.kt", "CoverPicker.kt", "SteamGridDbGames.kt", "SteamGridDbClient.kt", "GameTitles.kt", "SaveEditorActivity.kt", "SaveFileEdits.kt",
     "RomPatcher.kt", "AndroidRomPatches.kt", "RomCrcs.kt", "SpritePackFlow.kt", "n3ds/N3dsCart.kt",
     "ScreenScraperClient.kt", "ScreenScraperUi.kt", "GameMedia.kt", "LauncherScreen.kt",
     "achievements/**", "AndroidPictures.kt", "JvmDeviceDates.kt", "overlay/OverlayFiles.kt",
@@ -25,6 +25,9 @@ val appIncludes = listOf(
 // Copied (not referenced in place) so the few Android-only APIs desktop
 // Compose 1.5 lacks can be rewritten on the way.
 val prepSrc = tasks.register<Sync>("prepSrc") {
+    from(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app")) {
+        include("GameSaves.kt", "SaveEditFiles.kt", "SaveTradeJournal.kt")
+    }
     from(app) { appIncludes.forEach { include(it) } }
     // PC BOXES' demo save is built with the save tests' own writer.
     from(rootDir.resolve("../app/src/test/kotlin/com/pokedaisy/app/companion/data/save")) { include("SyntheticSave.kt", "SyntheticGen4.kt", "SyntheticGen5.kt"); into("synthetic") }
