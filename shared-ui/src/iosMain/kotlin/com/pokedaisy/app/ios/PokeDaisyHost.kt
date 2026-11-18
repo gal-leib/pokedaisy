@@ -93,6 +93,8 @@ object PokeDaisyHost {
 
     fun installCoopCrypto(primitives: IosCoopPrimitives) = IosCoopCrypto.install(primitives)
 
+    fun receiveCoopInvite(link: String) = IosCoopHost.receiveInvite(link)
+
     /** Sets the shared screens' hosts (fonts, pictures, settings, the manual). Safe to call more than once. */
     fun start() {
         if (started) return

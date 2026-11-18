@@ -28,6 +28,10 @@ targets:
       path: PokeDaisy/Info.plist
       properties:
         CFBundleDisplayName: PokeDaisy
+        CFBundleURLTypes:
+          - CFBundleURLName: PokeDaisy co-op invite
+            CFBundleURLSchemes: [pokedaisy]
+        PokeDaisyCoopRelayURL: "$(POKEDAISY_COOP_RELAY_URL)"
         # The app's Documents (roms/, saves/) show in Files, so saves can be copied out and in.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
