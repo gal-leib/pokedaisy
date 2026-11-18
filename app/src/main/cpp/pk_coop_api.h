@@ -60,4 +60,9 @@ void pk_api_coop_story_disarm(void);
 int pk_api_coop_link_caught(uint8_t* out, size_t capacity);
 void pk_api_coop_link_reset(void);
 
+enum { PK_API_PARTNER_SELF_SIZE = 8, PK_API_PARTNER_ART_SIZE = 42 * 512 + 32 };
+bool pk_api_partner_self(int32_t* out, size_t count);
+void pk_api_partner_set(const uint8_t* art, size_t length);
+void pk_api_partner_place(bool visible, int x, int y, int frame, bool mirrored, int blob_frame, int bob);
+
 #endif

@@ -246,30 +246,30 @@ Java_com_pokedaisy_app_MgbaCore_pkFollowerShow(JNIEnv* env, jobject thiz, jboole
 }
 
 // Co-op presence: the player's map, fine position, facing, mode and step count this frame (pk_partner_self's
-// PK_PARTNER_SELF_N ints), or null off a GBA game the field reads know. Emu thread, once a frame between frames.
+// PK_API_PARTNER_SELF_SIZE ints), or null off a GBA game the field reads know. Emu thread, once a frame between frames.
 JNIEXPORT jintArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkPartnerSelf(JNIEnv* env, jobject thiz) {
-    int32_t v[PK_PARTNER_SELF_N];
-    if (!g.core || !pk_is_gba(g.core) || !pk_partner_self(g.core, v)) return NULL;
-    jintArray out = (*env)->NewIntArray(env, PK_PARTNER_SELF_N);
-    if (out) (*env)->SetIntArrayRegion(env, out, 0, PK_PARTNER_SELF_N, (const jint*) v);
+    int32_t v[PK_API_PARTNER_SELF_SIZE];
+    if (!pk_api_partner_self(v, PK_API_PARTNER_SELF_SIZE)) return NULL;
+    jintArray out = (*env)->NewIntArray(env, PK_API_PARTNER_SELF_SIZE);
+    if (out) (*env)->SetIntArrayRegion(env, out, 0, PK_API_PARTNER_SELF_SIZE, (const jint*) v);
     return out;
 }
 
-// Co-op presence: the partner's art (PK_PARTNER_ART_BYTES: 42 32x32 frames + palette), or null / any other length = none
+// Co-op presence: the partner's art (PK_API_PARTNER_ART_SIZE: 42 32x32 frames + palette), or null / any other length = none
 // (a wrong-sized array is refused, never read past its end). Emu thread.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkPartnerSet(JNIEnv* env, jobject thiz, jbyteArray art) {
-    if (!art || (*env)->GetArrayLength(env, art) != PK_PARTNER_ART_BYTES) {
-        pk_partner_set(NULL);
+    if (!art || (*env)->GetArrayLength(env, art) != PK_API_PARTNER_ART_SIZE) {
+        pk_api_partner_set(NULL, 0);
         return;
     }
     jbyte* a = (*env)->GetByteArrayElements(env, art, NULL);
     if (!a) {
-        pk_partner_set(NULL);
+        pk_api_partner_set(NULL, 0);
         return;
     }
-    pk_partner_set((const uint8_t*) a);
+    pk_api_partner_set((const uint8_t*) a, PK_API_PARTNER_ART_SIZE);
     (*env)->ReleaseByteArrayElements(env, art, a, JNI_ABORT);
 }
 
@@ -277,7 +277,7 @@ Java_com_pokedaisy_app_MgbaCore_pkPartnerSet(JNIEnv* env, jobject thiz, jbyteArr
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkPartnerPlace(JNIEnv* env, jobject thiz, jboolean visible, jint fineX, jint fineY, jint frame,
                                                jboolean hflip, jint blobFrame, jint bob) {
-    if (g.core && pk_is_gba(g.core)) pk_partner_place(g.core, visible ? 1 : 0, fineX, fineY, frame, hflip ? 1 : 0, blobFrame, bob);
+    pk_api_partner_place(visible, fineX, fineY, frame, hflip, blobFrame, bob);
 }
 
 // DAY AND NIGHT: the map's and sprites' palettes tinted (256 = as is). Emu thread.

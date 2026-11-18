@@ -8,6 +8,7 @@
 #include "pk_coop_after.h"
 #include "pk_coop_field.h"
 #include "pk_session.h"
+#include "pk_wide.h"
 
 uint32_t pk_coop_game_call(struct mCore* core, uint32_t fn, const uint32_t args[4]) {
     uint32_t r0;
@@ -286,3 +287,27 @@ void pk_api_coop_link_reset(void) {
 }
 
 #undef COOP_LINK_CALL
+
+_Static_assert(PK_API_PARTNER_SELF_SIZE == PK_PARTNER_SELF_N, "partner status size");
+_Static_assert(PK_API_PARTNER_ART_SIZE == PK_PARTNER_ART_BYTES, "partner art size");
+
+bool pk_api_partner_self(int32_t* out, size_t count) {
+    if (!out || count < PK_API_PARTNER_SELF_SIZE) return false;
+    // A read advances the sprite's step counter, so serialize it with the frame.
+    pthread_rwlock_wrlock(&pk_coreLock);
+    bool valid = g.core && pk_is_gba(g.core) && pk_partner_self(g.core, out);
+    pthread_rwlock_unlock(&pk_coreLock);
+    return valid;
+}
+
+void pk_api_partner_set(const uint8_t* art, size_t length) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    pk_partner_set(length == PK_API_PARTNER_ART_SIZE ? art : NULL);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+void pk_api_partner_place(bool visible, int x, int y, int frame, bool mirrored, int blob_frame, int bob) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_partner_place(g.core, visible, x, y, frame, mirrored, blob_frame, bob);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
