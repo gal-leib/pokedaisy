@@ -3941,6 +3941,13 @@ work and delivery. Android retains achievements callbacks; native hosts retain f
 camera/render transport. Both use the same scenic speed and zoom policy. `pk_flight_api_test` and `PkApiCoreTest` check inert behavior without verified
 configuration, across GBA, GB and teardown, including unchanged diagnostic pictures.
 
+`pk_api_follower_set` / `pk_api_follower_show` share the existing visual follower transport with JNI and
+Kotlin/Native, on the game thread between frames. The original renderer copies six 32x32 4bpp frames
+(3072 bytes) and a 32-byte RGB555 palette; incorrect lengths or null clear the graphics. Showing affects
+GBA cores only. The existing field renderer owns drawing; callers must not add another follower tick.
+This transport alone does not expose follower settings or import graphics on iOS. Host/Native bridge
+tests check exact asset sizes, safe clear operations, unknown-game pictures and teardown isolation.
+
 Its host test runs it off Android on `linux/make_diagnostic.py`'s ROMs (CI's "Core C API (host)" job):
 
 ```bash

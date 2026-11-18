@@ -26,6 +26,10 @@ import com.pokedaisy.app.core.pkapi.pk_api_field_configure
 import com.pokedaisy.app.core.pkapi.pk_api_field_knows
 import com.pokedaisy.app.core.pkapi.pk_api_field_state
 import com.pokedaisy.app.core.pkapi.pk_api_set_tint
+import com.pokedaisy.app.core.pkapi.pk_api_follower_set
+import com.pokedaisy.app.core.pkapi.pk_api_follower_show
+import com.pokedaisy.app.core.pkapi.PK_API_FOLLOWER_FRAME_BYTES
+import com.pokedaisy.app.core.pkapi.PK_API_FOLLOWER_PALETTE_BYTES
 import com.pokedaisy.app.core.pkapi.pk_api_flight_configure
 import com.pokedaisy.app.core.pkapi.pk_api_flight_take_off
 import com.pokedaisy.app.core.pkapi.pk_api_flight_land
@@ -194,6 +198,15 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore {
     fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
     fun fieldState(): Int = pk_api_field_state()
     fun setTint(red: Int, green: Int, blue: Int) = pk_api_set_tint(red, green, blue)
+    fun setFollower(frames: ByteArray?, palette: ByteArray?) {
+        if (frames == null || palette == null || frames.size != PK_API_FOLLOWER_FRAME_BYTES.toInt() ||
+            palette.size != PK_API_FOLLOWER_PALETTE_BYTES.toInt())
+            pk_api_follower_set(null, 0, null, 0)
+        else frames.usePinned { f -> palette.usePinned { p ->
+            pk_api_follower_set(f.addressOf(0).reinterpret(), frames.size, p.addressOf(0).reinterpret(), palette.size)
+        } }
+    }
+    fun showFollower(on: Boolean) = pk_api_follower_show(on)
     override fun configureFlight(words: IntArray?) {
         if (words == null || words.isEmpty()) pk_api_flight_configure(null, 0)
         else words.usePinned { pk_api_flight_configure(it.addressOf(0).reinterpret(), words.size) }

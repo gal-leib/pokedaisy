@@ -450,6 +450,16 @@ void pk_api_set_tint(int red, int green, int blue) {
     pthread_rwlock_unlock(&pk_coreLock);
 }
 
+void pk_api_follower_set(const uint8_t* frames, int frameBytes, const uint8_t* palette, int paletteBytes) {
+    bool valid = frames && palette && frameBytes == PK_API_FOLLOWER_FRAME_BYTES &&
+                 paletteBytes == PK_API_FOLLOWER_PALETTE_BYTES;
+    pk_follower_set(valid ? frames : NULL, valid ? palette : NULL);
+}
+
+void pk_api_follower_show(bool on) {
+    if (g.core && pk_is_gba(g.core)) pk_follower_show(g.core, on);
+}
+
 void pk_api_set_keys(uint32_t keys) {
     if (g.core) {
         g.core->setKeys(g.core, keys);
