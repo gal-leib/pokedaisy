@@ -456,7 +456,7 @@ class RelayCoopTransport(
         val writer = attempt.writer
         chan.outbox = writer
         chan.channel = CoopChannel(
-            initiator, secret, if (initiator) room.partner!!.bytes() else null, CoopChannel.prologue(kind, room.id),
+            JvmCoopCrypto, initiator, secret, if (initiator) room.partner!!.bytes() else null, CoopChannel.prologue(kind, room.id),
             { writer.offer(CoopFrames.relayData(it)) }, clock, timings, { decide(chan, it) }, ChanListener(chan),
         )
         chans.add(chan)
@@ -646,7 +646,7 @@ class RelayCoopTransport(
         chan.tcp = ds
         chan.outbox = ds.writer
         chan.channel = CoopChannel(
-            target != null, secret, target?.bytes(), CoopChannel.prologue(CoopChannel.PATH_TCP, null),
+            JvmCoopCrypto, target != null, secret, target?.bytes(), CoopChannel.prologue(CoopChannel.PATH_TCP, null),
             { ds.writer.offer(it) }, clock, timings, { decide(chan, it) }, ChanListener(chan),
         )
         chans.add(chan)
