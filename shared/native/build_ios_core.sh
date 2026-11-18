@@ -2,7 +2,7 @@
 # Builds the emulator core (pk_api.h: mGBA + the portable pk_*.c) for iOS, on a Mac with Xcode:
 #   <out>/ios-arm64/libpkcore.a            the iPad
 #   <out>/ios-arm64-simulator/libpkcore.a  the iPad simulator (Apple silicon)
-#   <out>/include/pk_api.h
+#   <out>/include/pk_api.h and pk_link_api.h
 #   <out>/PkCore.xcframework               both, for an Xcode project
 # shared/build.gradle.kts runs it before the iOS cinterop; by hand: shared/native/build_ios_core.sh [out dir].
 # GPL-3.0 (see NOTICE).
@@ -33,7 +33,7 @@ for slice in "ios-arm64 iphoneos" "ios-arm64-simulator iphonesimulator"; do
 done
 
 mkdir -p "$out/include"
-cp "$root/app/src/main/cpp/pk_api.h" "$out/include/"
+cp "$root/app/src/main/cpp/pk_api.h" "$root/app/src/main/cpp/pk_link_api.h" "$out/include/"
 rm -rf "$out/PkCore.xcframework"
 xcodebuild -create-xcframework \
     -library "$out/ios-arm64/libpkcore.a" -headers "$out/include" \
