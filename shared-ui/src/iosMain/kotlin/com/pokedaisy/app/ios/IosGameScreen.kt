@@ -81,10 +81,12 @@ internal class IosGameScreen(
     private var frames by mutableStateOf<GameScreenFrames?>(null)
     private var rewindUnavailable by mutableStateOf(false)
     private var itemNotice by mutableStateOf<ItemNotice?>(null)
+    private var itemNoticeMillis = ITEM_NOTICE_MILLIS
     private var quickNotice by mutableStateOf<String?>(null)
     val quickMenu = QuickMenuState().also { it.onClose = ::syncInputCapture }
     var canOpenQuickMenu: () -> Boolean = { false }
-    fun showItemNotice(item: Int, message: String) {
+    fun showItemNotice(item: Int, message: String, millis: Long = ITEM_NOTICE_MILLIS) {
+        itemNoticeMillis = millis
         itemNotice = ItemNotice(item, message)
     }
     fun showQuickNotice(message: String) {
@@ -202,7 +204,7 @@ internal class IosGameScreen(
                 pictureOverlay = {
                     Box(Modifier.fillMaxSize()) {
                         ItemNoticeHost(itemNotice, rememberGbaTextMetrics(),
-                            Modifier.align(Alignment.TopCenter).padding(8.dp)) { itemNotice = null }
+                            Modifier.align(Alignment.TopCenter).padding(8.dp), millis = itemNoticeMillis) { itemNotice = null }
                     }
                     game?.keyCapture?.let { KeyCapturePopup(it) }
                     if (rewindUnavailable) {

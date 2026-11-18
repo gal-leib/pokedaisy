@@ -51,6 +51,8 @@ On iPhone and iPad, open `SETTINGS` > `MAKEOVER` > `FOLLOWER` while playing a su
 
 ## From controls.md
 
+In a supported GBA game on iPhone or iPad, turn on `SETTINGS` > `GAMEPLAY` > `SHINY ALERT` to start a hunt. The row counts wild battles for the current game. A shiny foe stops fast-forward and held turbo, shows its name and the count over the game, then resets the count. The alert uses your touch vibration setting for haptic feedback.
+
 #### iPhone and iPad bindings
 
 On iPhone and iPad, `GAME BUTTONS` uses the same binding rows and button capture. Connect a controller or hardware keyboard, tap a row, press its new key, then release it. `CANCEL` or Escape leaves the binding alone. The D-pad and left stick always move. You can bind another key to a D-pad row, `TURBO A`, `TURBO B`, `START 2` or `SELECT 2`.

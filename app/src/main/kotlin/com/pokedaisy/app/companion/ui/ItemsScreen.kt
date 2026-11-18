@@ -1746,13 +1746,14 @@ fun itemUseMessage(o: ItemUseOutcome, mon: String = "", item: String = "", held:
 /** What a USE / GIVE did, popped up over the bag ([ItemNoticeWindow]). */
 data class ItemNotice(val itemId: Int, val text: String, val ok: Boolean = true)
 
-private const val ITEM_NOTICE_MILLIS = 2600L
+internal const val ITEM_NOTICE_MILLIS = 2600L
 
 /** [notice] (if any) in an [ItemNoticeWindow], gone after a moment or on a tap ([onGone]); a newer one starts its own time. */
 @Composable
-internal fun ItemNoticeHost(notice: ItemNotice?, m: GbaTextMetrics, modifier: Modifier, onGone: () -> Unit) {
+internal fun ItemNoticeHost(notice: ItemNotice?, m: GbaTextMetrics, modifier: Modifier,
+                            millis: Long = ITEM_NOTICE_MILLIS, onGone: () -> Unit) {
     val n = notice ?: return
-    LaunchedEffect(n) { kotlinx.coroutines.delay(ITEM_NOTICE_MILLIS); onGone() }
+    LaunchedEffect(n, millis) { kotlinx.coroutines.delay(millis); onGone() }
     ItemNoticeWindow(n, m, modifier, onGone)
 }
 

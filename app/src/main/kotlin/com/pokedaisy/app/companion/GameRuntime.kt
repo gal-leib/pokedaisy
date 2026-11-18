@@ -140,6 +140,7 @@ class GameRuntime(
     }
 
     val autoRefill = GameAutoRefill(prefs, session)
+    val shinyAlert = GameShinyAlert(prefs)
 
     /** Between frames, while the old state still exists: native save/load/rewind adapters share this cleanup. */
     fun cancelFieldActions() {
@@ -164,7 +165,8 @@ class GameRuntime(
 
     /** Configure once per loaded game. Capture/delivery use [game]; decode remains on the sampler worker. */
     fun startSampling(gameBoy: Boolean, nds: Boolean = false, game: CoroutineDispatcher,
-                      current: () -> Boolean, after: (SnapshotView) -> Unit = {}, periodMillis: Long? = null) {
+                      current: () -> Boolean, after: (SnapshotView) -> Unit = {}, periodMillis: Long? = null,
+                      onShinyFound: (GameShinyAlert.Alert) -> Unit = {}) {
         if (closed.value) return
         check(sampler == null) { "Sampling is already configured for this game" }
         require(periodMillis == null || periodMillis > 0)
@@ -172,6 +174,7 @@ class GameRuntime(
             current = { !closed.value && current() }, after = { snapshot ->
                 sampled()
                 battle.sampled()
+                shinyAlert.observe(snapshot, shiny?.supported == true)?.let(onShinyFound)
                 after(snapshot)
             }).also { if (periodMillis != null) it.startPeriodic(periodMillis) }
         battle.changed = ::sample
@@ -233,6 +236,7 @@ class GameRuntime(
         session.reset()
         settledOnField = false
         val romKey = crc.toString(16).padStart(8, '0')
+        shinyAlert.start(romKey)
         blocked = BlockedGames.forCrc(romKey) != null
         activeAreaMapCrc = if (gba && !blocked) areaMapCrc else 0L
         AreaMaps.romChanged()

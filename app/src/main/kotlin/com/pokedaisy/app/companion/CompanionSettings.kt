@@ -95,6 +95,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val shinyHuntCount: Int get() = 0
     /** Battles read a foe's shininess here (the games SHINY ODDS works in). */
     val shinyAlertSupported: Boolean get() = false
+    val shinyAlertBadge: String? get() = null
     /** LOW HP BEEP / FIELD POISON - see [com.pokedaisy.app.Prefs.lowHpBeep]; supported = the ROM's code is known
      * ([com.pokedaisy.app.companion.data.QuietPatches]). */
     val lowHpBeep: Boolean get() = true

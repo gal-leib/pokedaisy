@@ -185,9 +185,11 @@ fun CompanionSettingsScreen(
             val lookOptions = settings?.takeIf { page == Page.HOME && it.playerLookSupported }?.playerLooks
             val selectedLook = if (page == Page.HOME) settings?.playerLook else null
             val textOptions = if (page == Page.HOME) settings?.textLooks else null
+            val shinyAlertSupported = if (page == Page.HOME) settings?.shinyAlertSupported else null
+            val shinyHuntCount = if (page == Page.HOME && settings?.shinyAlert == true) settings.shinyHuntCount else null
             val refillSupported = if (page == Page.HOME) settings?.repelRefillSupported else null
             val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision,
-                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions, refillSupported) {
+                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions, refillSupported, shinyAlertSupported, shinyHuntCount) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
@@ -835,7 +837,7 @@ private fun homeRows(
         // A shiny wild foe said out loud, FF and turbo stopped (ShinyHunt.kt); the subtitle counts the hunt's wild battles.
         SettingRow(
             tk("SHINY ALERT"), if (s.shinyAlertSupported) onOff(s.shinyAlert) else tk("N/A"),
-            enabled = s.shinyAlertSupported, labelBadge = NewFeatures.badge(NewFeatures.SHINY_ALERT),
+            enabled = s.shinyAlertSupported, labelBadge = s.shinyAlertBadge ?: NewFeatures.badge(NewFeatures.SHINY_ALERT),
             subtitle = if (s.shinyAlertSupported && s.shinyAlert) tr("{0} wild battles since the last shiny", s.shinyHuntCount)
                 else "Stops FF when a shiny shows up",
         ) {

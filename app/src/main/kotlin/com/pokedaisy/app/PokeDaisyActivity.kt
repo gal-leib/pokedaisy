@@ -254,35 +254,6 @@ class PokeDaisyActivity : Activity() {
         return com.pokedaisy.app.companion.data.BattleBall.pick(snap.items, lastBallId)
     }
 
-    /** SHINY ALERT ([com.pokedaisy.app.companion.data.ShinyHunt]): the option (cached for the emu thread), the battle
-     * follower and this game's count of wild battles (Compose state: the row shows it). */
-    @Volatile private var shinyAlertOn = false
-    private val shinyHunt = com.pokedaisy.app.companion.data.ShinyHunt()
-    private val shinyHuntState = androidx.compose.runtime.mutableIntStateOf(0)
-
-    /** Each sample (emu thread): a wild battle counted, and a shiny foe announced, with FF and turbo stopped. */
-    private fun updateShinyHunt(snap: com.pokedaisy.app.companion.data.SnapshotView) {
-        if (!snap.connected || !shinyAlertOn || !(::engine.isInitialized && engine.shiny.supported)) return
-        val step = shinyHunt.sample(snap.inBattle, com.pokedaisy.app.companion.data.ShinyHunt.wild(snap), snap.battleOpponent)
-        val key = romKey
-        if (step.counted) {
-            val n = shinyHuntState.intValue + 1
-            shinyHuntState.intValue = n
-            Prefs(this).setShinyHuntFor(key, n)
-        }
-        val shiny = step.shiny ?: return
-        val after = shinyHuntState.intValue
-        Log.i("pokedaisy", "shiny alert: ${shiny.name} after $after wild battles")
-        shinyHuntState.intValue = 0
-        Prefs(this).setShinyHuntFor(key, 0)
-        runOnUiThread {
-            if (::engine.isInitialized) engine.setFastForwardToggled(false)
-            input.releaseAll()
-            unlockSound?.play()
-            showHud(com.pokedaisy.app.companion.i18n.tr("SHINY {0}! After {1} wild battles", shiny.shownName, after), SHINY_ALERT_MS)
-        }
-    }
-
     /** Whether this game can take a REPEL from the companion: what AUTO REFILL needs (the quick menu's REPEL rule). */
     private fun repelRefillSupported(): Boolean =
         dsRepelKnown() || fieldItemSupport()?.let { s -> s.fns.repelItems.any { s.canUse(it) } } == true
@@ -1223,13 +1194,10 @@ class PokeDaisyActivity : Activity() {
         override val repelRefillSupported get() = repelRefillSupported()
         override val shinyAlert get() = Prefs(this@PokeDaisyActivity).shinyAlert
         override fun setShinyAlert(on: Boolean) {
-            val p = Prefs(this@PokeDaisyActivity)
-            p.shinyAlert = on
-            // Turning it on starts a hunt: the count from 0.
-            if (on) { p.setShinyHuntFor(romKey, 0); shinyHuntState.intValue = 0 }
-            shinyAlertOn = on
+            if (::engine.isInitialized) engine.playback.shinyAlert.set(on)
+            else Prefs(this@PokeDaisyActivity).shinyAlert = on
         }
-        override val shinyHuntCount get() = shinyHuntState.intValue
+        override val shinyHuntCount get() = if (::engine.isInitialized) engine.playback.shinyAlert.count else 0
         override val shinyAlertSupported get() = (::engine.isInitialized && engine.shiny.supported)
         override val battleRetry get() = Prefs(this@PokeDaisyActivity).battleRetry
         override fun setBattleRetry(on: Boolean) {
@@ -1970,7 +1938,6 @@ class PokeDaisyActivity : Activity() {
         quietFound = null
         syncQuietPatches()
         syncLevelCap()
-        shinyAlertOn = Prefs(this).shinyAlert
         lastBallOn = Prefs(this).lastBallButton
         battleRetryOn = Prefs(this).battleRetry
         retryTaken = false
@@ -1980,7 +1947,6 @@ class PokeDaisyActivity : Activity() {
         ballFns = null
         ballFnsFor = null
         ballItemsBefore = emptyList()
-        shinyHuntState.intValue = Prefs(this).shinyHuntFor(crc)
         if (::engine.isInitialized) engine.shiny.observe(null)
         syncShinyAchievements()
         // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
@@ -2125,8 +2091,6 @@ class PokeDaisyActivity : Activity() {
                 }
                 // AUTO REFILL: another REPEL on before the one working runs out.
                 updateRepelRefill(snap)
-                // SHINY ALERT: the hunt's count, and a shiny foe said out loud.
-                updateShinyHunt(snap)
                 // LAST BALL: its functions once the game is known, and the ball a battle used.
                 updateLastBall(snap)
                 // BOSS RETRY: a state as a trainer battle starts, and the question after a loss.
@@ -2148,7 +2112,19 @@ class PokeDaisyActivity : Activity() {
             playback.startSampling(romIsGameBoy, romIsNds,
                 game = object : kotlinx.coroutines.CoroutineDispatcher() {
                     override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) = postToEmu(block::run)
-                }, current = { ::engine.isInitialized && engine === this && running }, after = afterSample)
+                }, current = { ::engine.isInitialized && engine === this && running }, after = afterSample,
+                onShinyFound = { alert ->
+                    val current = this
+                    runOnUiThread {
+                        if (!::engine.isInitialized || engine !== current || !current.running) return@runOnUiThread
+                        current.setFastForwardToggled(false)
+                        gameActions.release(Hotkeys.Action.FF_HOLD)
+                        current.setFastForwardHeld(false)
+                        input.releaseAll()
+                        unlockSound?.play()
+                        showHud(alert.message(), com.pokedaisy.app.companion.GameShinyAlert.NOTICE_MILLIS)
+                    }
+                })
             onSample = { startSample(this) }   // runs on the emu thread
             onResumeResult = { loaded -> if (!loaded) { telemetry.dropCached(); runOnUiThread { waitForPlay() } } }
             ffMaxSpeed = Prefs(this@PokeDaisyActivity).ffMaxSpeed
@@ -5476,8 +5452,6 @@ class PokeDaisyActivity : Activity() {
          *  steps more. */
         private const val PLAY_POSITIONS = 5
         /** LEVEL CAP: how often a sample may work the cap out again (a badge moves it). */
-        /** How long SHINY ALERT's line stays on the game screen. */
-        private const val SHINY_ALERT_MS = 8000L
         /** How long a NUZLOCKE notice stays on the game screen: long enough to read in a battle's opening. */
         private const val NUZLOCKE_NOTICE_MS = 3500L
 

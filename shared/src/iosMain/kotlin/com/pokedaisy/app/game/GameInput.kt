@@ -88,6 +88,12 @@ class GameInput internal constructor(
         menuShortcut.quarantine(hardware.keys + touchButtonKeys)
     }
 
+    /** End a sustained game press. The player must release held hardware before it can act again. */
+    fun releaseManualInput() {
+        axesGate.quarantineUntilNeutral()
+        buttons.quarantine(hardware().keys + touchButtonKeys)
+    }
+
     fun reloadBindings() {
         buttons.quarantine(hardware().keys + touchButtonKeys)
         buttons.input.setControls(loadControls())
