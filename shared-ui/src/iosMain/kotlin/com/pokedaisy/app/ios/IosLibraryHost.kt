@@ -64,6 +64,8 @@ internal class IosLibraryHost(
     private var choosingSaveGame by mutableStateOf(false)
     private var restorePath by mutableStateOf<String?>(null)
 
+    private data class LinkRequest(val initial: String? = null)
+    private var link by mutableStateOf<LinkRequest?>(null)
     private var choosingEditSave by mutableStateOf(false)
     private var collection by mutableStateOf<CollectionState?>(null)
     private var collectionPick: MonRef? = null
@@ -140,7 +142,11 @@ internal class IosLibraryHost(
                         val flow = setup
                         val collectionScreen = collection
                         val trade = tradeRequest
-                        if (trade != null) {
+                        val linkRequest = link
+                        if (linkRequest != null) {
+                            IosLinkPlay(paths.filter { category(it) == RomCategory.GBA }, linkRequest.initial, ::label,
+                                onClose = { link = null }, onSaves = ::refreshGames)
+                        } else if (trade != null) {
                             IosSaveTrade(paths, trade, ::label, onClose = { tradeRequest = null }, onSaved = ::refreshGames)
                         } else if (edit != null) {
                             IosSaveEditor(edit, label(edit), paths, ::label,
@@ -208,6 +214,8 @@ internal class IosLibraryHost(
                 NewFeatures.badge(NewFeatures.IOS_SAVE_EDITOR), open = { choosingEditSave = true }),
             LibraryTool("TRADE", "TRADE SAVES", "Move Pokémon between your games' saves",
                 NewFeatures.badge(NewFeatures.IOS_SAVE_TRADE), open = { tradeRequest = IosTradeRequest() }),
+            LibraryTool("LINK", "LINK PLAY", "Play two to four GBA games with a link cable",
+                null, open = { link = LinkRequest() }),
             LibraryTool("COLLECTION", "COLLECTION", "Every Pokémon in all your saves, in one list",
                 NewFeatures.badge(NewFeatures.IOS_SAVE_COLLECTION), open = { collection = CollectionState() }),
         )
@@ -239,6 +247,9 @@ internal class IosLibraryHost(
                 LibraryMenuItem("RENAME", Icons.Filled.Edit, opens = true) { renaming = game.id },
                 LibraryMenuItem("LOAD SAVE", LibraryIcons.FileOpen, opens = true) { pickSave(game.id) },
                 LibraryMenuItem("RESTORE BACKUP", LibraryIcons.History, opens = true) { restorePath = game.id },
+                if (category(game.id) == RomCategory.GBA)
+                    LibraryMenuItem("LINK PLAY", LibraryIcons.Link, opens = true) { link = LinkRequest(game.id) }
+                else null,
                 if (category(game.id) == RomCategory.GBA)
                     LibraryMenuItem("SAVE EDITOR", LibraryIcons.Inventory2, opens = true) { editingSave = game.id }
                 else null)

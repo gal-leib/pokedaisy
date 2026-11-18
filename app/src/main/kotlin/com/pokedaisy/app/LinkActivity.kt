@@ -20,38 +20,31 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.LinkSetupFlow
-import com.pokedaisy.app.companion.ui.AppBackdrop
 import com.pokedaisy.app.companion.ui.LinkSetupScreen
-import com.pokedaisy.app.companion.ui.GbaText
+import com.pokedaisy.app.companion.ui.LinkPlayChrome
+import com.pokedaisy.app.companion.ui.LinkPlayMessage
+import com.pokedaisy.app.companion.ui.LinkLeaveConfirmation
+import com.pokedaisy.app.companion.ui.linkGridShape
 import com.pokedaisy.app.companion.ui.GbaTextMetrics
-import com.pokedaisy.app.companion.ui.OptionButton
 import com.pokedaisy.app.companion.ui.OptionColors
 import com.pokedaisy.app.companion.ui.OptionConfirm
-import com.pokedaisy.app.companion.ui.OptionListWindow
-import com.pokedaisy.app.companion.ui.OptionTitleWindow
 import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
 import com.pokedaisy.app.companion.ui.theme.AppColors
 import com.pokedaisy.app.companion.ui.theme.AppTheme
+import com.pokedaisy.app.game.LinkFramePump
 import kotlinx.coroutines.delay
 import java.io.File
 import java.nio.ByteBuffer
@@ -255,8 +248,7 @@ class LinkActivity : ComponentActivity() {
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
         track.play()
-        val audio = ShortArray(8192)
-        var heard = -1
+        val pump = LinkFramePump(games.size, LinkCore::pkLinkSetKeys, LinkCore::pkLinkReadAudio)
         var frames = 0L
         var fast = false
         var next = System.nanoTime()
@@ -272,13 +264,7 @@ class LinkActivity : ComponentActivity() {
                     if (fast) { track.pause(); track.flush() } else track.play()
                     next = System.nanoTime()
                 }
-                val f = focused
-                if (f != heard) {
-                    for (i in games.indices) LinkCore.pkLinkSetKeys(i, 0)
-                    LinkCore.pkLinkReadAudio(f, audio)   // what it made unheard
-                    heard = f
-                }
-                LinkCore.pkLinkSetKeys(f, input.mask)
+                pump.prepare(focused, input.mask)
                 val t0 = System.nanoTime()
                 if (!LinkCore.pkLinkRunFrame()) {
                     Log.w(TAG, "link fault: ${LinkCore.pkLinkStatus()}")
@@ -287,13 +273,13 @@ class LinkActivity : ComponentActivity() {
                 }
                 val t1 = System.nanoTime()
                 views.forEachIndexed { i, v -> v.publish { LinkCore.pkLinkCopyVideo(i, it) } }
-                val n = LinkCore.pkLinkReadAudio(f, audio)
+                val n = pump.readFocusedAudio()
                 if (fast) {
                     // Paced by the clock; behind (a slow frame), it doesn't race to catch up.
                     next += FF_FRAME_NANOS
                     val wait = next - System.nanoTime()
                     if (wait > 0) Thread.sleep(wait / 1_000_000, (wait % 1_000_000).toInt()) else next = System.nanoTime()
-                } else if (n > 0) track.write(audio, 0, n * 2) else Thread.sleep(16)
+                } else if (n > 0) track.write(pump.audio, 0, n * 2) else Thread.sleep(16)
                 runNanos += t1 - t0
                 writeNanos += System.nanoTime() - t1
                 statFrames++
@@ -365,7 +351,10 @@ class LinkActivity : ComponentActivity() {
         when (phase) {
             Phase.SETUP, Phase.STARTING -> Setup(m)
             Phase.PLAYING -> Playing(m)
-            Phase.CLOSING -> Message(tr("Finishing the games' saves…"), m)
+            Phase.CLOSING -> {
+                BackHandler { }
+                LinkPlayMessage(tr("Finishing the games' saves…"), m)
+            }
         }
         notice?.let { text ->
             OptionConfirm(tk("LINK PLAY"), text, tk("OK"), m, onConfirm = { notice = null }, onDismiss = { notice = null }, cancelLabel = null)
@@ -381,48 +370,15 @@ class LinkActivity : ComponentActivity() {
 
     @Composable
     private fun Playing(m: GbaTextMetrics) {
+        BackHandler { confirmLeave = !confirmLeave }
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(
                 factory = { ctx -> LinkGrid(ctx).apply { views.take(mainCount).forEach { (it.parent as? ViewGroup)?.removeView(it); addView(it) } } },
                 modifier = Modifier.fillMaxSize(),
             )
-            if (hint) {
-                LaunchedEffect(Unit) { delay(6000); hint = false }
-                Box(Modifier.align(Alignment.TopCenter).padding(top = 12.dp)) {
-                    OptionListWindow(m) {
-                        GbaText(
-                            tr("Tap a game to play it, or L2 / R2. BACK leaves."), OptionColors.label, OptionColors.labelShadow, m,
-                            modifier = Modifier.padding(horizontal = m.u * 6, vertical = m.u * 3),
-                        )
-                    }
-                }
-            }
-            // FF: a toggle in the corner (lit red while on), over whichever game sits there.
-            OptionButton(
-                tk("FF"), m, onClick = { setFf(!ffState) }, emphasis = ffState,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
-            )
-            if (confirmLeave) {
-                OptionConfirm(
-                    tk("LEAVE LINK PLAY?"), tr("Save in each game first: what you did since a game's last save is lost."), tk("LEAVE"), m,
-                    onConfirm = { leave() }, onDismiss = { confirmLeave = false },
-                )
-            }
-        }
-    }
-
-    @Composable
-    private fun Message(text: String, m: GbaTextMetrics) {
-        BackHandler { }
-        Box(Modifier.fillMaxSize()) {
-            AppBackdrop()
-            Column(Modifier.fillMaxSize().padding(16.dp)) {
-                OptionTitleWindow(tk("LINK PLAY"), m)
-                Spacer(Modifier.height(m.u * 4))
-                OptionListWindow(m, Modifier.fillMaxWidth()) {
-                    GbaText(text, OptionColors.label, OptionColors.labelShadow, m, maxLines = Int.MAX_VALUE, modifier = Modifier.padding(m.u * 4))
-                }
-            }
+            if (hint) LaunchedEffect(Unit) { delay(6000); hint = false }
+            LinkPlayChrome(m, hint, ffState, onFast = { setFf(!ffState) })
+            if (confirmLeave) LinkLeaveConfirmation(m, onLeave = ::leave, onDismiss = { confirmLeave = false })
         }
     }
 
@@ -444,16 +400,10 @@ class LinkGrid(context: Context) : ViewGroup(context) {
         setBackgroundColor(android.graphics.Color.BLACK)
     }
 
-    private fun cells(w: Int, h: Int): Pair<Int, Int> = when {
-        childCount <= 1 -> 1 to 1
-        childCount == 2 -> if (w >= h) 2 to 1 else 1 to 2
-        else -> 2 to 2
-    }
-
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
         val h = MeasureSpec.getSize(heightMeasureSpec)
-        val (cols, rows) = cells(w, h)
+        val (cols, rows) = linkGridShape(childCount, w >= h)
         for (i in 0 until childCount) {
             getChildAt(i).measure(MeasureSpec.makeMeasureSpec(w / cols, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h / rows, MeasureSpec.EXACTLY))
         }
@@ -463,7 +413,7 @@ class LinkGrid(context: Context) : ViewGroup(context) {
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         val w = r - l
         val h = b - t
-        val (cols, rows) = cells(w, h)
+        val (cols, rows) = linkGridShape(childCount, w >= h)
         for (i in 0 until childCount) {
             val x = (i % cols) * (w / cols)
             val y = (i / cols) * (h / rows)
