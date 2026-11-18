@@ -1,4 +1,5 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class,
+    kotlin.experimental.ExperimentalNativeApi::class)
 
 package com.pokedaisy.app.ios
 
@@ -284,6 +285,7 @@ object PokeDaisyHost {
             telemetry, iosPreferences, battle!!, PkApiCore, { code != null }, { PkApiCore.configureField(fieldTablesCrc) }, { PkApiCore.configureField(0) },
             applyTint = PkApiCore::setTint).also { p ->
             currentRuntime = p
+            p.bindShiny(PkApiCore, kotlin.native.Platform.isDebugBinary)
             val currentSettings = settings!!
             currentSettings.playbackChanged = { p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld) }
             p.settingsChanged(currentSettings, currentSettings.ffActive, currentSettings.slowmoHeld)

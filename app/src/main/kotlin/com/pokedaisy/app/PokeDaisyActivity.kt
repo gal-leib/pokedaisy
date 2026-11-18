@@ -165,18 +165,9 @@ class PokeDaisyActivity : Activity() {
     private var fieldGame = WideScreen.OFF
     /** WILD ENCOUNTERS: the game's own switch, found in the ROM after it loads ([WildEncounters.find]; 0 = none). */
     @Volatile private var wildFlag = 0L
-    /** SHINY ODDS: the detected game's foe party and player ID ([com.pokedaisy.app.companion.data.ShinyOdds]), null = a
-     * game it doesn't know (the row shows N/A). Set once the game is detected. */
-    @Volatile private var shinyTarget: com.pokedaisy.app.companion.data.ShinyOdds.Target? = null
-
-    /** SHINY ODDS as saved, if this build offers it (a debug build's 1 in 4 / 1 in 1 are NORMAL in a release build). */
-    private fun shinyOddsPref(): Int = Prefs(this).shinyOdds
-        .takeIf { it in com.pokedaisy.app.companion.data.ShinyOdds.choices(BuildConfig.DEBUG) }
-        ?: com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
-
     /** RetroAchievements pause while SHINY ODDS is raised on a game it works in ("catch a shiny" sets). */
     private fun syncShinyAchievements() {
-        val raised = shinyTarget != null && shinyOddsPref() < com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
+        val raised = ::engine.isInitialized && engine.shiny.active
         runCatching { com.pokedaisy.app.achievements.RetroAchievements.setShinyOddsActive(raised) }
     }
 
@@ -1532,14 +1523,12 @@ class PokeDaisyActivity : Activity() {
         override val nuzlockeSupported get() = telemetry.snapshot.value.let { !it.unsupported && com.pokedaisy.app.companion.Nuzlocke.supports(it.game) }
         override val nuzlocke get() = com.pokedaisy.app.companion.Nuzlocke.on
         override fun setNuzlocke(on: Boolean) = com.pokedaisy.app.companion.Nuzlocke.setOn(on)
-        override val shinyOdds get() = shinyOddsPref()
+        override val shinyOdds get() = if (::engine.isInitialized) engine.shiny.odds else com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
         override fun setShinyOdds(odds: Int) {
-            Prefs(this@PokeDaisyActivity).shinyOdds = odds
-            if (::engine.isInitialized) engine.shinyOdds = odds
-            syncShinyAchievements()
+            if (::engine.isInitialized) engine.shiny.setOdds(odds)
         }
         override val shinyOddsChoices get() = com.pokedaisy.app.companion.data.ShinyOdds.choices(BuildConfig.DEBUG)
-        override val shinyOddsSupported get() = shinyTarget != null
+        override val shinyOddsSupported get() = ::engine.isInitialized && engine.shiny.supported
         override val playerLookSupported get() = lookRunner.supported.value
         override val playerLooks get() = lookRunner.offered.value.map { it.name } + lookRunner.offeredMons.value.map { "MON:$it" }
         override val playerLook get() = lookRunner.picked.value?.name ?: lookRunner.pickedMon.value?.let { "MON:$it" }
@@ -2261,8 +2250,7 @@ class PokeDaisyActivity : Activity() {
         shinyHuntState.intValue = Prefs(this).shinyHuntFor(crc)
         repelPrev = 0
         repelKind = null
-        shinyTarget = null
-        if (::engine.isInitialized) engine.setShinyTarget(null)
+        if (::engine.isInitialized) engine.shiny.observe(null)
         syncShinyAchievements()
         // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
         // GameOptions' discovery).
@@ -2322,6 +2310,8 @@ class PokeDaisyActivity : Activity() {
             caller = { fn, a0, a1, a2, a3 -> if (MgbaCore.pkCallSafe()) MgbaCore.pkCall(fn, a0, a1, a2, a3) else BattleInputController.CALL_NOT_NOW },
             retryUnshownBattle = true)
         engine = EmulatorEngine(input, states!!, ffMusicCache, battleSession, Prefs(this), telemetry).apply {
+            onShinyChanged = ::syncShinyAchievements
+            shiny
             hudEngine.value = this
             lateFramesSource = { view.lateFrames }
             // The game screen's fastest mode, which no tick that waits for the refresh can outrun (VsyncCheck, GitHub #350).
@@ -2401,6 +2391,7 @@ class PokeDaisyActivity : Activity() {
                         nowPlaying()
                     }
                 }
+<<<<<<< HEAD
                 // AUTO REFILL: another REPEL on before the one working runs out.
                 updateRepelRefill(snap)
                 // SHINY ALERT: the hunt's count, and a shiny foe said out loud.
@@ -2417,6 +2408,8 @@ class PokeDaisyActivity : Activity() {
                         syncShinyAchievements()
                     }
                 }
+=======
+>>>>>>> 38c6fa79 (Share shiny odds ownership and enable it on iOS)
                 // WILD ENCOUNTERS on a Game Boy game is held by the engine, frame by frame.
                 if (snap.connected && romIsGameBoy) gameBoyFields()
                 // party.isNotEmpty(), not just connected: `connected` flips true as
@@ -2594,9 +2587,12 @@ class PokeDaisyActivity : Activity() {
         e.setHmFree(hmPatch, p.hmFree)
         e.setExpShare(expShareFound, if (expShareFound != null) com.pokedaisy.app.companion.data.ExpShare.Mode.of(p.expShare) else com.pokedaisy.app.companion.data.ExpShare.Mode.OFF)
         e.setLevelCap(levelCapFound, if (levelCapFound != null && p.levelCap) levelCapNow?.level ?: 0 else 0)
+<<<<<<< HEAD
         e.setQuietPatches(quietFound, !p.lowHpBeep, !p.fieldPoison)
         e.setShinyTarget(shinyTarget)
         e.shinyOdds = shinyOddsPref()
+=======
+>>>>>>> 38c6fa79 (Share shiny odds ownership and enable it on iOS)
     }
 
     override fun onNewIntent(intent: Intent) {
