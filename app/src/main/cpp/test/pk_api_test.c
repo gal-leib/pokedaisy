@@ -255,6 +255,37 @@ static void soundIsolation(const char* dir) {
     closed();
 }
 
+static void achievementMemory(const char* dir) {
+    char rom[1024];
+    uint8_t bytes[4] = {0};
+    CHECK(pk_api_ra_read_memory(0, bytes, sizeof bytes) == 0, "no game read");
+    path(rom, sizeof rom, dir, "diagnostic.gba");
+    CHECK(pk_api_init(rom, NULL), "GBA achievement memory init");
+    struct mCore* core = pkMainCore();
+    core->busWrite8(core, 0x03007FFF, 0x21);
+    core->busWrite8(core, 0x02000000, 0x43);
+    CHECK(pk_api_ra_read_memory(0x7FFF, bytes, 2) == 2 && bytes[0] == 0x21 && bytes[1] == 0x43,
+          "GBA achievement memory map did not cross IWRAM to EWRAM");
+    CHECK(pk_api_ra_read_memory(0x58000, bytes, sizeof bytes) == 0, "GBA mapped past SRAM");
+    CHECK(pk_api_ra_read_memory(0, NULL, 1) == 0, "null GBA output accepted");
+    pk_api_deinit();
+
+    path(rom, sizeof rom, dir, "diagnostic.gb");
+    CHECK(pk_api_init(rom, NULL), "GB achievement memory init");
+    core = pkMainCore();
+    const uint8_t first = 0x56, second = 0x78, last = 0xAB;
+    core->busWrite8(core, 0xC020, 0x12);
+    CHECK(pk_api_write(0x1D000, &first, 1) && pk_api_write(0x2D000, &second, 1) &&
+          pk_api_write(0x7DFFF, &last, 1), "GB WRAM setup");
+    CHECK(pk_api_ra_read_memory(0xC020, bytes, 1) == 1 && bytes[0] == 0x12, "GB CPU bus");
+    CHECK(pk_api_ra_read_memory(0xD000, bytes, 1) == 1 && bytes[0] == first, "GB fixed WRAM bank 1");
+    CHECK(pk_api_ra_read_memory(0x10000, bytes, 1) == 1 && bytes[0] == second, "GBC extended WRAM bank 2");
+    CHECK(pk_api_ra_read_memory(0x15FFF, bytes, 2) == 1 && bytes[0] == last,
+          "GBC bank 7 stops at the last mapped byte");
+    CHECK(pk_api_ra_read_memory(UINT32_MAX, bytes, sizeof bytes) == 0, "GB address wrapped");
+    pk_api_deinit();
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         fprintf(stderr, "usage: %s <dir with diagnostic.gb / .gba>\n", argv[0]);
@@ -265,6 +296,7 @@ int main(int argc, char** argv) {
     gba(argv[1]);
     tint(argv[1]);
     soundIsolation(argv[1]);
+    achievementMemory(argv[1]);
     if (failures) fprintf(stderr, "%d failed\n", failures);
     else puts("pk_api: all passed");
     return failures != 0;

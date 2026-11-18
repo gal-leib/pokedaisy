@@ -9,7 +9,7 @@
 // thread pumps between frames, the same as every other core memory read here.
 // With no game running Kotlin pumps from its HTTP thread (login only).
 //
-// Only ever reads the player's core (pkMainCore) — never the FF-music render core.
+// Only ever reads the player's core — never the FF-music render core.
 
 #include <jni.h>
 #include <android/log.h>
@@ -20,11 +20,7 @@
 #include <string.h>
 #include <time.h>
 
-#include <mgba/core/core.h>
-#include <mgba/internal/gba/gba.h>
-#include <mgba/internal/gba/memory.h>
-#include <mgba/internal/gb/gb.h>
-#include <mgba/internal/gb/memory.h>
+#include "pk_api.h"
 
 #include "rc_client.h"
 #include "rc_consoles.h"
@@ -34,8 +30,6 @@
 #define LOG_TAG "pokedaisy/ra"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  LOG_TAG, __VA_ARGS__)
-
-struct mCore* pkMainCore(void);         // pokedaisy_jni.c
 
 static JavaVM* ra_vm;
 static jclass ra_class;                 // com.pokedaisy.app.achievements.RaNative
@@ -112,7 +106,6 @@ static void raDeleteLocal(JNIEnv* env, jobject o) {
 // Debug counters for raDebugStatus: reads that came back short, and the last such address.
 static volatile uint32_t ra_shortReads, ra_lastShortAddr, ra_reads;
 
-// RA's GBA map (rcheevos consoleinfo.c): $000000 IWRAM, $008000 EWRAM, $048000 cart save RAM.
 static uint32_t raReadMemoryImpl(uint32_t address, uint8_t* buffer, uint32_t num_bytes);
 
 static uint32_t raReadMemory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client) {
@@ -124,26 +117,6 @@ static uint32_t raReadMemory(uint32_t address, uint8_t* buffer, uint32_t num_byt
         ra_lastShortAddr = address;
     }
     return n;
-}
-
-// RA's Game Boy / Color map: $0000-$FFFF the CPU bus (WRAM bank 1 fixed at $D000),
-// then $10000-$15FFF the Color's WRAM banks 2-7.
-static uint32_t raReadMemoryGb(struct mCore* core, uint32_t address, uint8_t* buffer, uint32_t num_bytes) {
-    struct GB* gb = core->board;
-    uint32_t done = 0;
-    for (; done < num_bytes; done++) {
-        uint32_t a = address + done;
-        if (a >= 0xD000 && a < 0xE000) {
-            buffer[done] = gb->memory.wram[0x1000 + (a - 0xD000)];
-        } else if (a < 0x10000) {
-            buffer[done] = (uint8_t) core->busRead8(core, a);
-        } else if (a < 0x16000) {
-            buffer[done] = gb->memory.wram[0x2000 + (a - 0x10000)];
-        } else {
-            break;
-        }
-    }
-    return done;
 }
 
 // RA's DS map (rcheevos consoleinfo.c): $0000000-$03FFFFF main RAM (0x02000000), $0400000-$0FFFFFF the DSi's
@@ -187,40 +160,7 @@ static uint32_t raReadMemoryImpl(uint32_t address, uint8_t* buffer, uint32_t num
     if (pk_nds_active()) {
         return raReadMemoryNds(address, buffer, num_bytes);
     }
-    struct mCore* core = pkMainCore();
-    if (!core) {
-        return 0;
-    }
-    if (core->platform(core) == mPLATFORM_GB) {
-        return raReadMemoryGb(core, address, buffer, num_bytes);
-    }
-    uint32_t done = 0;
-    while (done < num_bytes) {
-        uint32_t a = address + done;
-        size_t id, base;
-        if (a < 0x8000) {
-            id = REGION_WORKING_IRAM; base = 0;
-        } else if (a < 0x48000) {
-            id = REGION_WORKING_RAM; base = 0x8000;
-        } else if (a < 0x58000) {
-            id = REGION_CART_SRAM; base = 0x48000;
-        } else {
-            break;
-        }
-        size_t size = 0;
-        const uint8_t* block = core->getMemoryBlock(core, id, &size);
-        size_t off = a - base;
-        if (!block || off >= size) {
-            break;
-        }
-        size_t n = size - off;
-        if (n > num_bytes - done) {
-            n = num_bytes - done;
-        }
-        memcpy(buffer + done, block + off, n);
-        done += (uint32_t) n;
-    }
-    return done;
+    return pk_api_ra_read_memory(address, buffer, num_bytes);
 }
 
 static void raServerCall(const rc_api_request_t* request, rc_client_server_callback_t callback,

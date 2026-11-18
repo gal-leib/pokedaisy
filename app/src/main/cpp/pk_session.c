@@ -23,6 +23,7 @@
 #include "pk_core_access.h"
 #include "pk_flight.h"
 #include "pk_host.h"
+#include "pk_ra_memory.h"
 #include "pk_gb_field.h"
 #include "pk_rewind.h"
 #include "pk_savevf.h"
@@ -220,7 +221,7 @@ void pk_api_deinit(void) {
     pthread_rwlock_unlock(&pk_coreLock);
 }
 
-// The player's core, for pokedaisy_ra.c (RetroAchievements' memory reads and ROM hash).
+// Internal access for the Android co-op bridge and native tests.
 struct mCore* pkMainCore(void) {
     return g.core;
 }
@@ -744,6 +745,13 @@ bool pk_api_read(uint32_t addr, uint8_t* dst, int len) {
     }
     pthread_rwlock_unlock(&pk_coreLock);
     return ok;
+}
+
+uint32_t pk_api_ra_read_memory(uint32_t address, uint8_t* out, uint32_t bytes) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    uint32_t done = pk_ra_read_memory(g.core, address, out, bytes);
+    pthread_rwlock_unlock(&pk_coreLock);
+    return done;
 }
 
 bool pk_api_rom_code(char out[5]) {

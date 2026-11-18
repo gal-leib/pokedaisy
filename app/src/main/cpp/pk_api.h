@@ -195,6 +195,10 @@ int pk_api_state_matches_save(const char* path);
 /** [len] bytes of the game's memory at [addr] into [dst]: the GBA's bus, a GBA cart's ROM from its file, a Game Boy
  * Color's WRAM bank B as (B << 16) | D000-DFFF. False (and [dst] untouched) with no game up. Any thread. */
 bool pk_api_read(uint32_t addr, uint8_t* dst, int len);
+
+/** RetroAchievements' GB/GBC or GBA address space for the player's core. Game thread between frames.
+ * Returns the bytes copied, stopping at the first unmapped byte (or zero when no game is running). */
+uint32_t pk_api_ra_read_memory(uint32_t address, uint8_t* out, uint32_t bytes);
 /** The GBA header's 4-letter game code into [out] (NUL-terminated; "" for a Game Boy game). False with no game. */
 bool pk_api_rom_code(char out[5]);
 /** The loaded ROM's size in bytes, 0 with no game. */
