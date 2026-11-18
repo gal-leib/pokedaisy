@@ -2460,7 +2460,9 @@ class PokeDaisyActivity : Activity() {
         { eventId -> CoopBattles.storyPending(eventId) },
     )
 
-    private fun coopStart(r: File, save: File) {
+    private fun prepareCoopStart(r: File, save: File) {
+        CoopGuards.reset()
+        coopLost = false
         if (!FeatureFlags.coop(this)) return
         val prefs = Prefs(this)
         val code = romCode
@@ -2527,9 +2529,7 @@ class PokeDaisyActivity : Activity() {
             st.files.removeState(st.files.resumeFile)
             return true
         }
-        CoopGuards.reset()   // a new game starts with nothing held or blocked by the last one
-        coopLost = false
-        coopStart(r, save)
+        prepareCoopStart(r, save)
         // Auto-resume from wherever was written most recently: normally that's
         // the auto-suspend snapshot from the last close, but if that session
         // ended in a crash instead of a clean close (stale/missing resumeFile),
@@ -5073,6 +5073,7 @@ class PokeDaisyActivity : Activity() {
         // this and it's a use-after-free race that crashes the process. See
         // EmulatorView.unbindCoreBlocking().
         view.unbindCoreBlocking()
+        if (coopEndpoint != null) coopStop()
         engine.stop()
         states?.let { com.pokedaisy.app.companion.data.StateResume.startFresh(it.files) }
         val save = SavesLocation.saveFor(this, Prefs(this), r)
@@ -5084,6 +5085,7 @@ class PokeDaisyActivity : Activity() {
             pickDsCore()
             if (was != dsperate) syncGameScreen()
         }
+        prepareCoopStart(r, save)
         engine.start(romData ?: r, save, null)
         showHud(com.pokedaisy.app.companion.i18n.tr("Game restarted"))
     }
