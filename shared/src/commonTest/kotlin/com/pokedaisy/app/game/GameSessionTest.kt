@@ -51,6 +51,20 @@ class GameSessionTest {
         assertEquals(listOf("delayed"), events)
     }
 
+    @Test fun flightPostsWaitThroughRewindAndHoldWithoutBlockingLifecycleCallbacks() {
+        val s = session()
+        s.postForward { events += "configure flight" }
+        s.post { events += "detach"; s.post { events += "next lifecycle pass" } }
+        s.postForward { events += "land" }
+
+        s.servicePending(GameSession.FrameWork.REWINDING, true, { true })
+        assertEquals(listOf("detach"), events)
+        s.servicePending(GameSession.FrameWork.HELD, true, { true }) { events += "held patches" }
+        assertEquals(listOf("detach", "next lifecycle pass", "held patches"), events)
+        s.servicePending(GameSession.FrameWork.ADVANCING, true, { true })
+        assertEquals(listOf("detach", "next lifecycle pass", "held patches", "configure flight", "land"), events)
+    }
+
     @Test fun becomingSafeRunsOnTheNextFrameAndFailuresDoNotDropOtherJobs() {
         val s = session(); safe = false
         s.post { error("broken sample") }; s.post { events += "sample survived" }

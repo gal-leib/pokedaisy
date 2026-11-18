@@ -83,7 +83,7 @@ class GameFlight(
         if (askAt?.let { time >= it } == true && standing()) { askAt = null; askStyle() }
         val fields = support() ?: return
         val words = fields.fns.flight!!.words(vehicle)
-        session.post { if (!closed.value && support() != null) core.configureFlight(words) }
+        session.postForward { if (!closed.value && support() != null) core.configureFlight(words) }
         if (!areaQueued.compareAndSet(false, true)) return
         val onGround = standing() && !inBattle()
         session.requestField(false) { calls, busy ->
@@ -150,7 +150,7 @@ class GameFlight(
         if (closed.value) return
         val version = generation.value
         if (state != FlightCore.IDLE) {
-            session.post { if (live(version)) core.flightLand() }
+            session.postForward { if (live(version)) core.flightLand() }
             done(null, false)
             return
         }
