@@ -2,11 +2,11 @@ package com.pokedaisy.app
 
 import android.content.Context
 import com.pokedaisy.app.companion.data.save.Gen3SaveReader
-import com.pokedaisy.app.companion.i18n.tr
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import okio.Path.Companion.toOkioPath
 
 /**
  * Writing an edited save back (the library's PC BOXES page). Only while the game is closed - a
@@ -78,49 +78,37 @@ object SaveFileEdits {
     /** One save's part of [commitBoth]: the file as read and as edited. */
     class Edit(val rom: File, val expected: ByteArray, val edited: ByteArray)
 
-    internal fun writeBoth(saveA: File, a: Edit, saveB: File, b: Edit, backup: (File) -> File?): Result {
-        if (saveA.absoluteFile == saveB.absoluteFile) return Result.Failed(tr("Both games use the same save file"))
-        val first = write(saveB, b.expected, b.edited, backup)
-        if (first !is Result.Written) return first
-        val second = write(saveA, a.expected, a.edited, backup)
-        if (second !is Result.Written) {
-            // Put B back; if even that fails, its backup (first.backup) holds it.
-            write(saveB, b.edited, b.expected, backup)
-            return second
-        }
-        return second
-    }
+    internal fun writeBoth(saveA: File, a: Edit, saveB: File, b: Edit, backup: (File) -> File?): Result =
+        files(backup).writeBoth(
+            SaveEditFiles.Edit(saveA.absoluteFile.toOkioPath(), a.expected, a.edited),
+            SaveEditFiles.Edit(saveB.absoluteFile.toOkioPath(), b.expected, b.edited),
+        ).androidResult()
 
     /** [commit]'s file work, apart from Android for the tests. [backup] takes a copy and returns it, or null if it didn't. */
-    internal fun write(save: File, expected: ByteArray, edited: ByteArray, backup: (File) -> File?): Result {
-        val dir = save.parentFile ?: return Result.Failed(tr("Can't write the save to {0}", save.path))
-        val current = runCatching { save.readBytes() }.getOrNull()
-            ?: return Result.Failed(tr("Can't read the save {0}", save.path))
-        if (!current.contentEquals(expected)) return Result.Failed(tr("The save changed since it was opened - open it again"))
+    internal fun write(save: File, expected: ByteArray, edited: ByteArray, backup: (File) -> File?): Result =
+        files(backup).write(SaveEditFiles.Edit(save.absoluteFile.toOkioPath(), expected, edited)).androidResult()
 
-        // A copy that holds the save as it is now: a new one, or the newest one already is it.
-        val copy = backup(save) ?: SaveBackups.list(save).firstOrNull()
-        if (copy == null || !runCatching { copy.readBytes().contentEquals(current) }.getOrDefault(false)) {
-            return Result.Failed(tr("Can't back up the save in {0} - nothing was changed", dir.absolutePath))
-        }
-
-        val tmp = File(dir, "${save.name}.edit.tmp")
-        val moved = runCatching {
-            FileOutputStream(tmp).use { it.write(edited); it.fd.sync() }
+    private fun files(backup: (File) -> File?) = SaveEditFiles(
+        backup = { path ->
+            val file = File(path.toString())
+            (backup(file) ?: SaveBackups.list(file).firstOrNull())?.toOkioPath()
+        },
+        writeSynced = { tmp, bytes ->
+            FileOutputStream(File(tmp.toString())).use { it.write(bytes); it.fd.sync() }
+        },
+        publish = { tmp, save ->
+            val source = File(tmp.toString()).toPath()
+            val target = File(save.toString()).toPath()
             try {
-                Files.move(tmp.toPath(), save.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            } catch (_: Exception) {
-                Files.move(tmp.toPath(), save.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING)
             }
-        }.isSuccess
-        if (!moved) {
-            tmp.delete()
-            return Result.Failed(tr("Can't write the save to {0}", dir.absolutePath))
-        }
-        if (!runCatching { save.readBytes().contentEquals(edited) }.getOrDefault(false)) {
-            runCatching { copy.copyTo(save, overwrite = true) }
-            return Result.Failed(tr("The save didn't read back as written - the backup was put back"))
-        }
-        return Result.Written(save, copy)
+        },
+    )
+
+    private fun SaveEditFiles.Result.androidResult(): Result = when (this) {
+        is SaveEditFiles.Result.Written -> Result.Written(File(save.toString()), File(backup.toString()))
+        is SaveEditFiles.Result.Failed -> Result.Failed(reason)
     }
 }
