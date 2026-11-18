@@ -318,10 +318,6 @@ class EmulatorEngine(
     val battleSwitchAddrs: BattleInputController.SwitchAddrs?
         get() = battleInput.switchAddrs
 
-    /** LAST BALL: [itemId] thrown from the action menu without the bag ([BattleInputController.throwBall]). UI thread. */
-    fun battleThrowBall(fns: com.pokedaisy.app.companion.data.BattleBall.Fns, itemId: Int, removeBagItem: Long) =
-        battleInput.throwBall(fns, itemId, removeBagItem)
-
     /** Switch to the party mon with this personality. Call from the UI thread. */
     fun battleSwitchTo(personality: Long) = battleInput.switchTo(personality)
 

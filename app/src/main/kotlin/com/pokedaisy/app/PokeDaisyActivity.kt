@@ -217,43 +217,6 @@ class PokeDaisyActivity : Activity() {
         if (retry && ::engine.isInitialized && !coopRefuses()) engine.requestRetryLoad()
     }
 
-    /** LAST BALL ([com.pokedaisy.app.companion.data.BattleBall]): the game's functions (null = none, or not found yet), the
-     * config they were looked up for, the option (cached), the ball thrown last (per ROM) and the bag of the last sample. */
-    private val ballThread by lazy { java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "last-ball") } }
-    @Volatile private var ballFns: com.pokedaisy.app.companion.data.BattleBall.Fns? = null
-    private var ballFnsFor: com.pokedaisy.app.companion.data.NativeConfig? = null
-    @Volatile private var lastBallOn = true
-    @Volatile private var lastBallId: Int? = null
-    private var ballItemsBefore: List<com.pokedaisy.app.companion.data.ItemView> = emptyList()
-
-    /** Each sample (emu thread): the throw's functions looked up once the game's config is known, and the ball a battle used. */
-    private fun updateLastBall(snap: com.pokedaisy.app.companion.data.SnapshotView) {
-        if (!snap.connected) return
-        val cfg = com.pokedaisy.app.companion.data.activeNativeConfig
-        val rom = romData
-        if (cfg != null && cfg !== ballFnsFor && rom != null && romBlocked == null) {
-            ballFnsFor = cfg
-            ballThread.execute {
-                val f = com.pokedaisy.app.companion.data.BattleBall.find(rom.toOkioPath(), cfg.completeWhenChoseItem, cfg.battlerControllerFuncs)
-                Log.i("pokedaisy", "last ball: ${if (f != null) "found" else "not found"}")
-                if (romData == rom) ballFns = f
-            }
-        }
-        if (snap.inBattle) com.pokedaisy.app.companion.data.BattleBall.thrown(ballItemsBefore, snap.items)?.let { id ->
-            if (id != lastBallId) { lastBallId = id; Prefs(this).setLastBallFor(romKey, id) }
-        }
-        ballItemsBefore = snap.items
-    }
-
-    /** The ball the BATTLE tab's button throws now, or null for no button ([com.pokedaisy.app.companion.data.BattleBall.canThrow]). */
-    private fun lastBallNow(): com.pokedaisy.app.companion.data.ItemView? {
-        if (!lastBallOn || ballFns == null || !::engine.isInitialized || n3ds != null) return null
-        if ((fieldItemSupport()?.fns?.removeBagItem ?: 0L) == 0L) return null
-        val snap = telemetry.snapshot.value
-        if (!com.pokedaisy.app.companion.data.BattleBall.canThrow(snap)) return null
-        return com.pokedaisy.app.companion.data.BattleBall.pick(snap.items, lastBallId)
-    }
-
     /** Whether this game can take a REPEL from the companion: what AUTO REFILL needs (the quick menu's REPEL rule). */
     private fun repelRefillSupported(): Boolean =
         dsRepelKnown() || fieldItemSupport()?.let { s -> s.fns.repelItems.any { s.canUse(it) } } == true
@@ -510,15 +473,8 @@ class PokeDaisyActivity : Activity() {
             if (::engine.isInitialized) engine.battleBack()
         }
         override val canSwitch get() = ::engine.isInitialized && engine.battleSwitchAddrs != null
-        override val lastBall get() = lastBallNow()
-        override fun throwBall() {
-            val ball = lastBallNow() ?: return
-            val fns = ballFns ?: return
-            val remove = fieldItemSupport()?.fns?.removeBagItem?.takeIf { it != 0L } ?: return
-            closeCompanionWindow()
-            lastBallId = ball.itemId
-            engine.battleThrowBall(fns, ball.itemId, remove)
-        }
+        override val lastBall get() = if (::engine.isInitialized) engine.playback.lastBall?.current else null
+        override fun throwBall() { if (::engine.isInitialized) engine.playback.lastBall?.throwBall() }
         override fun switchTo(personality: Long) {
             closeCompanionWindow()
             if (::engine.isInitialized) engine.battleSwitchTo(personality)
@@ -1207,8 +1163,8 @@ class PokeDaisyActivity : Activity() {
         override fun answerBattleRetry(retry: Boolean) = this@PokeDaisyActivity.answerBattleRetry(retry)
         override val lastBallButton get() = Prefs(this@PokeDaisyActivity).lastBallButton
         override fun setLastBallButton(on: Boolean) {
-            Prefs(this@PokeDaisyActivity).lastBallButton = on
-            lastBallOn = on
+            val ball = if (::engine.isInitialized) engine.playback.lastBall else null
+            if (ball != null) ball.set(on) else Prefs(this@PokeDaisyActivity).lastBallButton = on
         }
         override val dsResolution get() = if (romIsNds) Prefs(this@PokeDaisyActivity).dsResolution else null
         override val dsGpuAvailable get() = GlCaps.gles32(this@PokeDaisyActivity) && MgbaCore.pkNdsGpuSupported() != 0
@@ -1938,15 +1894,10 @@ class PokeDaisyActivity : Activity() {
         quietFound = null
         syncQuietPatches()
         syncLevelCap()
-        lastBallOn = Prefs(this).lastBallButton
         battleRetryOn = Prefs(this).battleRetry
         retryTaken = false
         retryLost = false
         retryInBattle = false
-        lastBallId = Prefs(this).lastBallFor(crc)
-        ballFns = null
-        ballFnsFor = null
-        ballItemsBefore = emptyList()
         if (::engine.isInitialized) engine.shiny.observe(null)
         syncShinyAchievements()
         // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
@@ -2016,6 +1967,8 @@ class PokeDaisyActivity : Activity() {
             drawStatsSource = { view.repeatedDraws to view.unshownFrames }
             if (BuildConfig.DEBUG) audioTapDir = getExternalFilesDir("debug")
             this.gba = gba
+            if (gba) playback.bindLastBall(
+                { fieldItemSupport()?.fns?.removeBagItem ?: 0L }, ::closeCompanionWindow)
             playback.bindFollower(followerCore, this@PokeDaisyActivity.filesDir.toOkioPath())
             this.nds = nds
             ndsGameCode = ndsCode
@@ -2091,8 +2044,6 @@ class PokeDaisyActivity : Activity() {
                 }
                 // AUTO REFILL: another REPEL on before the one working runs out.
                 updateRepelRefill(snap)
-                // LAST BALL: its functions once the game is known, and the ball a battle used.
-                updateLastBall(snap)
                 // BOSS RETRY: a state as a trainer battle starts, and the question after a loss.
                 updateBattleRetry(snap)
                 // WILD ENCOUNTERS on a Game Boy game is held by the engine, frame by frame.

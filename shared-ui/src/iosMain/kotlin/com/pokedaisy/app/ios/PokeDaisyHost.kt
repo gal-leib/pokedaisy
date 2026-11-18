@@ -290,7 +290,11 @@ object PokeDaisyHost {
                 s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
                 s.rewindChanged()
             }
-        battle = com.pokedaisy.app.companion.GameBattleInput(telemetry, code, revision, changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 }).also { b ->
+        battle = com.pokedaisy.app.companion.GameBattleInput(telemetry, code, revision,
+            changed = { sample() }, silent = { g.muted || g.volume == 0f || g.speed == 0.0 },
+            caller = { fn, a0, a1, a2, a3 ->
+                if (PkApiCore.callSafe()) PkApiCore.call(fn, a0, a1, a2, a3) else com.pokedaisy.app.BattleInputController.CALL_NOT_NOW
+            }, ballWriter = PkApiCore::write).also { b ->
             g.frameKeys = b::keys
             g.holdPicture = { b.holdPicture }
             g.quietPress = { b.quietPress }
@@ -343,6 +347,9 @@ object PokeDaisyHost {
         val readSupport = {
             val snapshot = telemetry.snapshot.value
             if (live()) fields.get(snapshot, code.orEmpty(), revision, telemetry.knownFieldItems()) else null
+        }
+        p.bindLastBall({ readSupport()?.fns?.removeBagItem ?: 0L }) {
+            if (screen?.state?.side?.windowOpen == true) screen?.state?.hide()
         }
         val currentSession = { p.session.takeIf { live() } }
         settings?.canAutoRefill = { readSupport()?.let { fields -> fields.fns.repelItems.any(fields::canUse) } == true }

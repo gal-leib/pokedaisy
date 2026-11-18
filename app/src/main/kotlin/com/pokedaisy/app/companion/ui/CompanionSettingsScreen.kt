@@ -1057,7 +1057,7 @@ private fun homeRows(
         // A ball button on the battle menu: the last ball thrown, in one tap, without the bag (BattleBall.kt).
         SettingRow(
             tk("LAST BALL"), onOff(s.lastBallButton), subtitle = "Throw your last ball in one tap",
-            labelBadge = NewFeatures.badge(NewFeatures.LAST_BALL),
+            labelBadge = s.lastBallBadge ?: NewFeatures.badge(NewFeatures.LAST_BALL),
         ) { s.setLastBallButton(!s.lastBallButton); changed() },
         // The battle buttons' look: GEN 4 (coloured buttons) or GEN 5 (dark plates round a red and white ball).
         SettingRow(

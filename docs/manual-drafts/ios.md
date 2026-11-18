@@ -49,6 +49,10 @@ In supported GBA games, `SETTINGS` > `GAMEPLAY` > `AUTO REFILL` uses another Rep
 
 On iPhone and iPad, open `SETTINGS` > `MAKEOVER` > `FOLLOWER` while playing a supported GBA game. The first Pokémon in your party that isn't an Egg follows you on foot and waits while you surf. To supply its sprite, import a compatible game with its own followers, such as Emerald Seaglass, into your library. The row can show `N/A` while PokeDaisy scans your games.
 
+## From battle.md
+
+On iPhone and iPad, `LAST BALL` is available in supported FireRed, LeafGreen and Emerald games and compatible GBA hacks. In the `GEN 4` battle style, the shared ball button throws the last ball you used, or the first ball in your bag if that kind is gone. It appears in eligible wild battles. Turn it off under `SETTINGS` > `COMPANION` > `LAST BALL`.
+
 ## From controls.md
 
 In a supported GBA game on iPhone or iPad, turn on `SETTINGS` > `GAMEPLAY` > `SHINY ALERT` to start a hunt. The row counts wild battles for the current game. A shiny foe stops fast-forward and held turbo, shows its name and the count over the game, then resets the count. The alert uses your touch vibration setting for haptic feedback.

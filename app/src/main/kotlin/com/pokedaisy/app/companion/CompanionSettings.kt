@@ -323,6 +323,7 @@ interface CompanionSettings : StoredCompanionSettings {
 
     /** LAST BALL - see [com.pokedaisy.app.Prefs.lastBallButton]. */
     val lastBallButton: Boolean get() = true
+    val lastBallBadge: String? get() = null
     fun setLastBallButton(on: Boolean) {}
 
 

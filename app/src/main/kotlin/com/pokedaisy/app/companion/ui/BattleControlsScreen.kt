@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -487,8 +489,10 @@ private fun ActionButtons(
 /** LAST BALL's button: [ball]'s own icon on a white face, how many are left in its corner. Throws it without the bag. */
 @Composable
 private fun LastBallButton(ball: com.pokedaisy.app.companion.data.ItemView, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val label = tr("LAST BALL")
     PlatinumButton(
-        fill = LastBallFace, frame = LastBallFrame, modifier = modifier, enabled = enabled, battleButton = true,
+        fill = LastBallFace, frame = LastBallFrame,
+        modifier = modifier.semantics { contentDescription = label }, enabled = enabled, battleButton = true,
         contentPadding = PaddingValues(2.dp), pressesGame = true, onClick = onClick,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {

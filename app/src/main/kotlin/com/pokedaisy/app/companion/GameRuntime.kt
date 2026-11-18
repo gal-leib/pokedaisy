@@ -142,9 +142,17 @@ class GameRuntime(
     val autoRefill = GameAutoRefill(prefs, session)
     val shinyAlert = GameShinyAlert(prefs)
 
+    val lastBall get() = battle.ball
+
+    fun bindLastBall(removeBagItem: () -> Long, handOver: () -> Unit) {
+        if (closed.value || battle.ball != null) return
+        battle.ball = GameLastBall(prefs, { telemetry.snapshot.value }, removeBagItem, handOver, battle.controller::throwBall)
+    }
+
     /** Between frames, while the old state still exists: native save/load/rewind adapters share this cleanup. */
     fun cancelFieldActions() {
         autoRefill.reset()
+        battle.ball?.resetSample()
         flight?.cancelActions()
         try { registeredItems?.cancel() } finally { gameBoyFields?.cancel() }
     }
@@ -238,6 +246,7 @@ class GameRuntime(
         val romKey = crc.toString(16).padStart(8, '0')
         shinyAlert.start(romKey)
         blocked = BlockedGames.forCrc(romKey) != null
+        if (gba && !blocked) battle.ball?.start(romPath, romKey)
         activeAreaMapCrc = if (gba && !blocked) areaMapCrc else 0L
         AreaMaps.romChanged()
         val learned = prefs.ffMenuCallbacks(romKey)
@@ -264,6 +273,7 @@ class GameRuntime(
         }
         if (!gba) return
         if (snapshot.connected) shiny?.observe(telemetry.knownShinyTarget())
+        battle.ball?.observe(snapshot, activeNativeConfig)
         desiredTint = DayNight.desired(prefs.dayNight, dayNightSupported, snapshot.mapType)
         options.observe(snapshot)
         telemetry.knownGMain()?.let { (addr, offset) -> FfMenuWatch.useKnownGMain(addr, offset) }
@@ -328,6 +338,7 @@ class GameRuntime(
         release { shiny?.close() }
         release { flight?.close() }
         release { follower?.close() }
+        release { battle.ball?.close() }
         release { stateSlots.value?.close() }
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }
