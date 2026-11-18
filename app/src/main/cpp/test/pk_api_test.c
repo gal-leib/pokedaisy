@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "pk_api.h"
+#include "pk_coop_api.h"
 #include "pk_core_access.h"
 #include "pk_wide.h"
 #include <mgba/core/core.h>
@@ -286,6 +287,35 @@ static void achievementMemory(const char* dir) {
     pk_api_deinit();
 }
 
+static void coopControl(const char* dir) {
+    char rom[1024];
+    char reason[80];
+    int trainers[] = {-1, -1};
+    CHECK(!pk_api_coop_enable() && !pk_api_coop_link_enable(), "co-op opened without a game");
+    pk_api_coop_join_trainers(trainers);
+    CHECK(trainers[0] == 0 && trainers[1] == 0, "co-op returned trainers without a game");
+
+    path(rom, sizeof rom, dir, "diagnostic.gb");
+    CHECK(pk_api_init(rom, NULL), "co-op Game Boy fixture");
+    CHECK(!pk_api_coop_enable() && !pk_api_coop_link_enable(), "co-op accepted Game Boy");
+    CHECK(!pk_api_coop_battle_starting() && !pk_api_coop_partner_free() && !pk_api_coop_on_free_field(),
+          "co-op state present for Game Boy");
+    pk_api_coop_disable();
+    pk_api_deinit();
+
+    path(rom, sizeof rom, dir, "diagnostic.gba");
+    CHECK(pk_api_init(rom, NULL), "co-op GBA fixture");
+    CHECK(!pk_api_coop_enable() && !pk_api_coop_link_enable(), "co-op accepted an unrecognized GBA ROM");
+    pk_api_coop_refusal(false, reason, sizeof reason);
+    CHECK(reason[0], "co-op did not diagnose the unsupported ROM");
+    char bounded[3] = {'?', '?', '!'};
+    pk_api_coop_refusal(true, bounded, 2);
+    CHECK(bounded[0] != '?' && bounded[1] == '\0' && bounded[2] == '!', "co-op refusal exceeded the requested buffer");
+    CHECK(pk_api_coop_join_kind() == 0, "unrecognized GBA ROM exposed a join");
+    pk_api_coop_disable();
+    pk_api_deinit();
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         fprintf(stderr, "usage: %s <dir with diagnostic.gb / .gba>\n", argv[0]);
@@ -297,6 +327,7 @@ int main(int argc, char** argv) {
     tint(argv[1]);
     soundIsolation(argv[1]);
     achievementMemory(argv[1]);
+    coopControl(argv[1]);
     if (failures) fprintf(stderr, "%d failed\n", failures);
     else puts("pk_api: all passed");
     return failures != 0;

@@ -29,6 +29,7 @@
 #include "pk_call.h"
 #include "pk_cheats.h"
 #include "pk_coop.h"
+#include "pk_coop_api.h"
 #include "pk_coop_after.h"
 #include "pk_coop_field.h"
 #include "pk_coop_lock.h"   // coop-lock (plan 5 Task 5)
@@ -829,62 +830,39 @@ Java_com_pokedaisy_app_MgbaCore_pkRomUnblock(JNIEnv* env, jobject thiz) {
 // Emu thread, like pkCall. The bridge's install / begin change the ROM overlay and so take the core lock alone (like
 // pkRomPatch); the rest only read or write RAM and share it.
 
-// pk_coop's pk_coop_call_fn over the file's pk_call: r0, or 0xFFFFFFFF when the call couldn't run or never returned.
-static uint32_t pk_coop_call(struct mCore* core, uint32_t fn, const uint32_t args[4]) {
-    uint32_t r0;
-    return pk_call(core, fn, args, &r0) ? r0 : 0xFFFFFFFFu;
-}
-
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopInstall(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_install(g.core) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_enable() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jstring JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopRefused(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    const char* r = pk_coop_refused();
-    jstring s = (*env)->NewStringUTF(env, r ? r : "");
-    pthread_rwlock_unlock(&pk_coreLock);
-    return s;
+    char reason[160];
+    pk_api_coop_refusal(false, reason, sizeof(reason));
+    return (*env)->NewStringUTF(env, reason);
 }
 
 JNIEXPORT jstring JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkRefused(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    const char* r = pk_coop_link_refused();
-    jstring s = (*env)->NewStringUTF(env, r ? r : "");
-    pthread_rwlock_unlock(&pk_coreLock);
-    return s;
+    char reason[160];
+    pk_api_coop_refusal(true, reason, sizeof(reason));
+    return (*env)->NewStringUTF(env, reason);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopUninstall(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core) {
-        pk_coop_uninstall(g.core);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
+    pk_api_coop_disable();
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopBattleStarting(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    int r = g.core && pk_is_gba(g.core) ? pk_coop_battle_starting(g.core) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_battle_starting() ? JNI_TRUE : JNI_FALSE;
 }
 
 // --- plan 6: the link bridge (pk_coop_link.c). Main core only, never the render core. ---
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopLinkInstall(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_install(g.core, pk_coop_call) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_link_enable() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -1056,7 +1034,7 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopStoryArm(JNIEnv* env, jobject thiz, jint t
         return JNI_FALSE;
     }
     pthread_rwlock_wrlock(&pk_coreLock);
-    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_arm(g.core, pk_coop_call, (uint16_t) trainerId) : 0;
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_arm(g.core, pk_coop_game_call, (uint16_t) trainerId) : 0;
     pthread_rwlock_unlock(&pk_coreLock);
     return ok ? JNI_TRUE : JNI_FALSE;
 }
@@ -1130,7 +1108,7 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopReleaseScript(JNIEnv* env, jobject thiz) {
     pthread_rwlock_wrlock(&pk_coreLock);
     int r = -1;
     if (g.core && pk_is_gba(g.core)) {
-        pk_coop_after_set_call(pk_coop_call);
+        pk_coop_after_set_call(pk_coop_game_call);
         r = pk_coop_release_script(g.core);
     }
     pthread_rwlock_unlock(&pk_coreLock);
@@ -1151,28 +1129,20 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopLinkReset(JNIEnv* env, jobject thiz) {
 // Emu thread: 1 while the game stands free on the field (pk_coop_on_free_field).
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopOnFreeField(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    int r = g.core && pk_is_gba(g.core) ? pk_coop_on_free_field(g.core) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_on_free_field() ? JNI_TRUE : JNI_FALSE;
 }
 
 // Emu thread: 0 not joinable, 1 wild, 2 two trainers (while Task_BattleStart runs; pk_coop_join_kind).
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopJoinKind(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    int r = g.core && pk_is_gba(g.core) ? pk_coop_join_kind(g.core) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r;
+    return pk_api_coop_join_kind();
 }
 
 // Emu thread: [trainerA, trainerB] of a two-trainer battle, zeros otherwise.
 JNIEXPORT jintArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopJoinTrainers(JNIEnv* env, jobject thiz) {
-    int ids[2] = {0, 0};
-    pthread_rwlock_rdlock(&pk_coreLock);
-    if (g.core && pk_is_gba(g.core)) pk_coop_join_trainers(g.core, ids);
-    pthread_rwlock_unlock(&pk_coreLock);
+    int ids[2];
+    pk_api_coop_join_trainers(ids);
     jintArray out = (*env)->NewIntArray(env, 2);
     if (out) (*env)->SetIntArrayRegion(env, out, 0, 2, (const jint*) ids);
     return out;
@@ -1181,10 +1151,7 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopJoinTrainers(JNIEnv* env, jobject thiz) {
 // Emu thread: free on the field, or on the START menu's top level.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCoopPartnerFree(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_rdlock(&pk_coreLock);
-    int r = g.core && pk_is_gba(g.core) ? pk_coop_partner_free(g.core) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
-    return r ? JNI_TRUE : JNI_FALSE;
+    return pk_api_coop_partner_free() ? JNI_TRUE : JNI_FALSE;
 }
 
 // coop-field (plan 4 Task 7)
@@ -1198,7 +1165,7 @@ static void pk_coop_cap(long steps) {   // the step cap of pk_call: the game's s
     pthread_rwlock_rdlock(&pk_coreLock);                                        \
     int r = -1;                                                                 \
     if (g.core && pk_is_gba(g.core)) {                                          \
-        pk_coop_after_set_call(pk_coop_call);                                   \
+        pk_coop_after_set_call(pk_coop_game_call);                                   \
         pk_coop_after_set_cap(pk_coop_cap);                                     \
         r = (expr);                                                             \
     }                                                                           \
