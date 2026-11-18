@@ -13,7 +13,6 @@
 
 #include <jni.h>
 #include <android/log.h>
-#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +20,7 @@
 #include <time.h>
 
 #include "pk_api.h"
+#include "pk_ra_requests.h"
 
 #include "rc_client.h"
 #include "rc_consoles.h"
@@ -38,25 +38,6 @@ static jclass ra_stringClass;
 static jmethodID ra_stringFromBytes;    // String(byte[], String charsetName)
 static jstring ra_utf8;
 static rc_client_t* ra_client;
-
-// --- pending server calls ----------------------------------------------------
-
-#define RA_MAX_CALLS 64
-
-static struct {
-    int id;                             // 0 = free slot
-    rc_client_server_callback_t callback;
-    void* callback_data;
-    int ready;                          // response arrived, waiting for raPump
-    int status;
-    char* body;
-    size_t bodyLen;
-} ra_calls[RA_MAX_CALLS];
-static int ra_nextId = 1;
-static volatile int ra_readyCount;
-static pthread_mutex_t ra_callsLock = PTHREAD_MUTEX_INITIALIZER;
-// raPump runs on whichever thread owns delivery right now; never two at once.
-static pthread_mutex_t ra_pumpLock = PTHREAD_MUTEX_INITIALIZER;
 
 static JNIEnv* raEnv(void) {
     JNIEnv* env = NULL;
@@ -166,26 +147,7 @@ static uint32_t raReadMemoryImpl(uint32_t address, uint8_t* buffer, uint32_t num
 static void raServerCall(const rc_api_request_t* request, rc_client_server_callback_t callback,
                          void* callback_data, rc_client_t* client) {
     (void) client;
-    pthread_mutex_lock(&ra_callsLock);
-    int slot = -1;
-    for (int i = 0; i < RA_MAX_CALLS; i++) {
-        if (!ra_calls[i].id) {
-            slot = i;
-            break;
-        }
-    }
-    int id = 0;
-    if (slot >= 0) {
-        id = ra_nextId++;
-        if (ra_nextId <= 0) {
-            ra_nextId = 1;
-        }
-        ra_calls[slot].id = id;
-        ra_calls[slot].callback = callback;
-        ra_calls[slot].callback_data = callback_data;
-        ra_calls[slot].ready = 0;
-    }
-    pthread_mutex_unlock(&ra_callsLock);
+    int id = pk_ra_requests_begin(callback, callback_data);
 
     if (!id) {
         // Out of slots: fail it now (retryable, so rc_client tries again later).
@@ -367,64 +329,16 @@ RA_FN(raUserAgentClause)(JNIEnv* env, jobject thiz) {
 
 JNIEXPORT void JNICALL
 RA_FN(raQueueResponse)(JNIEnv* env, jobject thiz, jint id, jint status, jbyteArray jBody) {
-    char* body = NULL;
-    size_t len = 0;
-    if (jBody) {
-        len = (size_t) (*env)->GetArrayLength(env, jBody);
-        body = malloc(len + 1);
-        (*env)->GetByteArrayRegion(env, jBody, 0, (jsize) len, (jbyte*) body);
-        body[len] = '\0';
-    }
-    pthread_mutex_lock(&ra_callsLock);
-    for (int i = 0; i < RA_MAX_CALLS; i++) {
-        if (ra_calls[i].id == id && !ra_calls[i].ready) {
-            ra_calls[i].ready = 1;
-            ra_calls[i].status = status;
-            ra_calls[i].body = body;
-            ra_calls[i].bodyLen = len;
-            body = NULL;
-            ra_readyCount++;
-            break;
-        }
-    }
-    pthread_mutex_unlock(&ra_callsLock);
-    free(body);                         // unknown id (aborted): drop it
+    jsize len = jBody ? (*env)->GetArrayLength(env, jBody) : 0;
+    jbyte* bytes = len ? (*env)->GetByteArrayElements(env, jBody, NULL) : NULL;
+    pk_ra_requests_respond(id, bytes || !len ? status : RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR,
+                           (const char*) bytes, bytes ? (size_t) len : 0);
+    if (bytes) (*env)->ReleaseByteArrayElements(env, jBody, bytes, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL
 RA_FN(raPump)(JNIEnv* env, jobject thiz) {
-    if (!ra_readyCount) {
-        return;
-    }
-    pthread_mutex_lock(&ra_pumpLock);
-    for (;;) {
-        rc_client_server_callback_t callback = NULL;
-        void* data = NULL;
-        rc_api_server_response_t r;
-        char* body = NULL;
-        pthread_mutex_lock(&ra_callsLock);
-        for (int i = 0; i < RA_MAX_CALLS; i++) {
-            if (ra_calls[i].id && ra_calls[i].ready) {
-                callback = ra_calls[i].callback;
-                data = ra_calls[i].callback_data;
-                body = ra_calls[i].body;
-                r.body = body;
-                r.body_length = ra_calls[i].bodyLen;
-                r.http_status_code = ra_calls[i].status;
-                memset(&ra_calls[i], 0, sizeof(ra_calls[i]));
-                ra_readyCount--;
-                break;
-            }
-        }
-        pthread_mutex_unlock(&ra_callsLock);
-        if (!callback) {
-            break;
-        }
-        // Outside the lock: the callback may start the next request (raServerCall).
-        callback(&r, data);
-        free(body);
-    }
-    pthread_mutex_unlock(&ra_pumpLock);
+    pk_ra_requests_pump();
 }
 
 JNIEXPORT void JNICALL

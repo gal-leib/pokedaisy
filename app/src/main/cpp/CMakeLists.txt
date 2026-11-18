@@ -7,29 +7,7 @@ project(pokedaisy C CXX)
 # ---------------------------------------------------------------------------
 include("${CMAKE_CURRENT_SOURCE_DIR}/pk_api.cmake")
 
-# ---------------------------------------------------------------------------
-# Vendored rcheevos (git submodule, pinned to v12.5.0) — RetroAchievements'
-# own client library. GBA ROM hashing only: no disc, encrypted or zip hashing.
-# ---------------------------------------------------------------------------
-get_filename_component(RCHEEVOS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/rcheevos" ABSOLUTE)
-
-if(NOT EXISTS "${RCHEEVOS_DIR}/include/rc_client.h")
-    message(FATAL_ERROR "rcheevos submodule missing at ${RCHEEVOS_DIR} — run: git submodule update --init third_party/rcheevos")
-endif()
-
-file(GLOB RCHEEVOS_SOURCES
-    "${RCHEEVOS_DIR}/src/*.c"
-    "${RCHEEVOS_DIR}/src/rapi/*.c"
-    "${RCHEEVOS_DIR}/src/rcheevos/*.c"
-    "${RCHEEVOS_DIR}/src/rhash/hash.c"
-    "${RCHEEVOS_DIR}/src/rhash/hash_rom.c"
-    "${RCHEEVOS_DIR}/src/rhash/md5.c")
-list(FILTER RCHEEVOS_SOURCES EXCLUDE REGEX "rc_libretro\\.c$|rc_client_external\\.c$|rc_client_raintegration\\.c$")
-
-add_library(rcheevos STATIC ${RCHEEVOS_SOURCES})
-target_include_directories(rcheevos PUBLIC "${RCHEEVOS_DIR}/include")
-target_compile_definitions(rcheevos PUBLIC
-    RC_CLIENT_SUPPORTS_HASH RC_HASH_NO_DISC RC_HASH_NO_ENCRYPTED RC_HASH_NO_ZIP)
+include("${CMAKE_CURRENT_SOURCE_DIR}/pk_ra.cmake")
 
 # ---------------------------------------------------------------------------
 # Vendored melonDS (git submodule, pinned to 1.1) — its core library only, for
@@ -80,6 +58,7 @@ endif()
 target_link_libraries(pokedaisy
     pk_api
     rcheevos
+    pk_ra_requests
     core
     dsperate_core
     z
