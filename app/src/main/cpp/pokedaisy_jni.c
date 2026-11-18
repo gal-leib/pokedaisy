@@ -275,21 +275,18 @@ Java_com_pokedaisy_app_MgbaCore_pkFollowerSet(JNIEnv* env, jobject thiz, jbyteAr
 // RIDE ON: the vehicle's views + palette (null = none) and whether it's drawn. Emu thread.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRideSet(JNIEnv* env, jobject thiz, jbyteArray frames, jbyteArray pal, jint width) {
-    if (!frames || !pal || (width != 32 && width != 64) || (*env)->GetArrayLength(env, frames) != PK_RIDE_BYTES ||
-        (*env)->GetArrayLength(env, pal) != 32) {
-        pk_ride_set(NULL, NULL, 32);
-        return;
-    }
-    jbyte* f = (*env)->GetByteArrayElements(env, frames, NULL);
-    jbyte* p = (*env)->GetByteArrayElements(env, pal, NULL);
-    pk_ride_set((const uint8_t*) f, (const uint8_t*) p, width);
-    (*env)->ReleaseByteArrayElements(env, frames, f, JNI_ABORT);
-    (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
+    jsize nf = frames ? (*env)->GetArrayLength(env, frames) : 0;
+    jsize np = pal ? (*env)->GetArrayLength(env, pal) : 0;
+    jbyte* f = nf == PK_API_RIDE_FRAME_BYTES ? (*env)->GetByteArrayElements(env, frames, NULL) : NULL;
+    jbyte* p = np == 32 ? (*env)->GetByteArrayElements(env, pal, NULL) : NULL;
+    pk_api_ride_set((const uint8_t*) f, nf, (const uint8_t*) p, np, width);
+    if (f) (*env)->ReleaseByteArrayElements(env, frames, f, JNI_ABORT);
+    if (p) (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRideShow(JNIEnv* env, jobject thiz, jboolean on) {
-    if (g.core && pk_is_gba(g.core)) pk_ride_show(g.core, on);
+    pk_api_ride_show(on == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL

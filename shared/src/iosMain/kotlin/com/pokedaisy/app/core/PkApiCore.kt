@@ -5,6 +5,7 @@ package com.pokedaisy.app.core
 import com.pokedaisy.app.game.FlightCore
 import com.pokedaisy.app.game.FollowerCore
 import com.pokedaisy.app.game.PlayerLookCore
+import com.pokedaisy.app.game.RideCore
 
 import com.pokedaisy.app.companion.data.GameCalls
 import com.pokedaisy.app.companion.data.InProcessReader
@@ -14,6 +15,9 @@ import com.pokedaisy.app.core.pkapi.pk_api_call
 import com.pokedaisy.app.core.pkapi.pk_api_look_blocks
 import com.pokedaisy.app.core.pkapi.pk_api_look_repalette
 import com.pokedaisy.app.core.pkapi.pk_api_look_refresh
+import com.pokedaisy.app.core.pkapi.pk_api_ride_set
+import com.pokedaisy.app.core.pkapi.pk_api_ride_show
+import com.pokedaisy.app.core.pkapi.PK_API_RIDE_FRAME_BYTES
 import com.pokedaisy.app.core.pkapi.pk_api_call_safe
 import com.pokedaisy.app.core.pkapi.pk_api_write
 import com.pokedaisy.app.core.pkapi.pk_api_gb_call_at
@@ -94,7 +98,7 @@ import kotlinx.cinterop.value
  *
  * Threads, as pk_api.h says: one thread (the game's) starts, runs and stops it; the reads may come from any thread.
  */
-object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore, FollowerCore, PlayerLookCore {
+object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore, FollowerCore, PlayerLookCore, RideCore {
     /** Existing field actions use this same interface on Android. Game thread between frames only. */
     fun callSafe(): Boolean = pk_api_call_safe()
     override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int): Long =
@@ -223,6 +227,19 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls, FlightCore, Follow
     override fun refreshLook(palette: ByteArray?): Boolean =
         if (palette?.size == 32) palette.usePinned { pk_api_look_refresh(it.addressOf(0).reinterpret(), palette.size) }
         else pk_api_look_refresh(null, 0)
+
+    override fun setRide(frames: ByteArray?, palette: ByteArray?, width: Int) {
+        if (frames == null || palette == null ||
+            frames.size != PK_API_RIDE_FRAME_BYTES.toInt() || palette.size != 32) {
+            pk_api_ride_set(null, 0, null, 0, width)
+            return
+        }
+        frames.usePinned { f -> palette.usePinned { p ->
+            pk_api_ride_set(f.addressOf(0).reinterpret(), frames.size, p.addressOf(0).reinterpret(), palette.size, width)
+        } }
+    }
+
+    override fun showRide(on: Boolean) = pk_api_ride_show(on)
 
     override fun setFollower(frames: ByteArray?, palette: ByteArray?) {
         if (frames == null || palette == null || frames.size != PK_API_FOLLOWER_FRAME_BYTES.toInt() ||

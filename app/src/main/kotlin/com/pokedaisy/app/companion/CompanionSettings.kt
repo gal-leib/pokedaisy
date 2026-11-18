@@ -160,6 +160,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val playerLookSupported: Boolean get() = false
     val playerLookBadge: String? get() = null
     val rideVehicleSupported: Boolean get() = playerLookSupported
+    val rideVehicleBadge: String? get() = null
     val playerLooks: List<String> get() = emptyList()
     val playerLook: String? get() = null
     /** The player's own hero here, by name (the picker's OFF tile); null before the save has a gender. */

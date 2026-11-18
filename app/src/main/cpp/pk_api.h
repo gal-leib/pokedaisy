@@ -99,6 +99,11 @@ bool pk_api_look_refresh(const uint8_t* palette, int paletteBytes);
 enum { PK_API_FOLLOWER_FRAME_BYTES = 3072, PK_API_FOLLOWER_PALETTE_BYTES = 32 };
 void pk_api_follower_set(const uint8_t* frames, int frameBytes, const uint8_t* palette, int paletteBytes);
 void pk_api_follower_show(bool on);
+/** Vehicle sprite transport for the GBA field renderer. Invalid assets clear the sprite. Game thread only. */
+enum { PK_API_RIDE_FRAME_BYTES = 3848 };
+void pk_api_ride_set(const uint8_t* frames, int frameBytes, const uint8_t* palette, int paletteBytes, int width);
+void pk_api_ride_show(bool on);
+
 /** Bind the verified EWRAM encounter-switch address after field_configure; zero disables it.
  * wasOff restores ownership when resuming a state saved while encounters were off. Game thread only. */
 bool pk_api_field_wild(uint32_t addr, bool wasOff);

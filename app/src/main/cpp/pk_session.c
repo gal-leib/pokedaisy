@@ -504,6 +504,18 @@ void pk_api_follower_show(bool on) {
     if (g.core && pk_is_gba(g.core)) pk_follower_show(g.core, on);
 }
 
+_Static_assert(PK_API_RIDE_FRAME_BYTES == PK_RIDE_BYTES, "ride sprite bytes");
+
+void pk_api_ride_set(const uint8_t* frames, int frameBytes, const uint8_t* palette, int paletteBytes, int width) {
+    bool valid = frames && palette && frameBytes == PK_API_RIDE_FRAME_BYTES &&
+                 paletteBytes == 32 && (width == 32 || width == 64);
+    pk_ride_set(valid ? frames : NULL, valid ? palette : NULL, width);
+}
+
+void pk_api_ride_show(bool on) {
+    if (g.core && pk_is_gba(g.core)) pk_ride_show(g.core, on);
+}
+
 void pk_api_set_keys(uint32_t keys) {
     if (g.core) {
         g.core->setKeys(g.core, keys);

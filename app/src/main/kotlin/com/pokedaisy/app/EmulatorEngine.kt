@@ -500,26 +500,10 @@ class EmulatorEngine(
      * is on) and when AUTO-RUN becomes ready or blocked, and why - so SCENE SPEEDS, TEXT SPEED and AUTO-RUN's bike /
      * script / battle checks can be read off `adb logcat -s pokedaisy` after a test on a device.
      */
-    /** RIDE ON's vehicle as the look patch now in brings it (emu thread; null = none), sent to the core when it changed. */
-    private var rideSent: com.pokedaisy.app.companion.data.RideOn.Sprite? = null
-    private var rideShown = false
-    private var rideFrames = 0
-
-    /** RIDE ON, once a frame (emu thread): the vehicle's sprite to the core when it changed, and shown or not (the core
-     * draws it only while the player is on a bike, behind them). */
-    private fun stepRide(field: Boolean) {
-        val r = playerLook.ride
-        if (r !== rideSent) {
-            MgbaCore.pkRideSet(r?.frames, r?.pal, r?.width ?: 32)
-            rideSent = r
-        }
-        val show = field && r != null
-        if (show != rideShown || (show && ++rideFrames % 60 == 0)) {
-            MgbaCore.pkRideShow(show)
-            rideShown = show
-        }
-    }
-
+    private val ride = com.pokedaisy.app.companion.GameRide(object : com.pokedaisy.app.game.RideCore {
+        override fun setRide(frames: ByteArray?, palette: ByteArray?, width: Int) = MgbaCore.pkRideSet(frames, palette, width)
+        override fun showRide(on: Boolean) = MgbaCore.pkRideShow(on)
+    })
 
     /**
      * HIDE BATTLE MENU ([Prefs.hideBattleMenu]): what the activity wants - 0 = the game's battle menus shown, 1 = hidden
@@ -957,6 +941,7 @@ class EmulatorEngine(
         videoBuf = MgbaCore.pkVideoBuffer()
         // The core starts with no follower and no tint (pk_wide_extras_reset): so do what this engine last sent.
         playback.follower?.reset()
+        ride.reset()
         battleMenuHideSent = -1
         playback.resetTint()
         playback.flight?.reset()
@@ -1500,8 +1485,8 @@ class EmulatorEngine(
             val battleState = battleInput.gameState
             scene = PlaybackPolicy.scene(battleState, menuOpen, mapOpen, FfMenuWatch.battling, fieldState)
             if (gba && fieldScreen && !mapOpen && !FfMenuWatch.battling) playerLook.fieldFrame()
-            if (gba) stepRide(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
-                battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
+            if (gba) ride.step(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
+                battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE, playerLook.ride)
             if (gba) playback.stepFollower()
             if (gba) coopLock?.onFrame()
             if (gba) coopPresence?.onFrame(fieldScreen && !mapOpen && !FfMenuWatch.battling &&

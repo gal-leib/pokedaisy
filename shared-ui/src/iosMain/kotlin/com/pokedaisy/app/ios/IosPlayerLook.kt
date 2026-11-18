@@ -5,12 +5,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.GamePlayerLook
+import com.pokedaisy.app.companion.GameRide
 import com.pokedaisy.app.companion.data.AppearanceAssets
 import com.pokedaisy.app.companion.data.Logs
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.PlayerLook
 import com.pokedaisy.app.companion.data.PlayerLookAssets
 import com.pokedaisy.app.companion.data.TextLook
+import com.pokedaisy.app.companion.data.RideOn
+import com.pokedaisy.app.companion.data.RideVehicle
 import com.pokedaisy.app.companion.data.RETAIL_LOOK_TITLES
 import com.pokedaisy.app.companion.data.RETAIL_PORT_TITLES
 import com.pokedaisy.app.core.PkApiCore
@@ -29,6 +32,8 @@ import okio.Path
 internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val renderer = GamePlayerLook(PkApiCore)
+    val ride = GameRide(PkApiCore)
+    val vehicle get() = RideVehicle.of(prefs.rideVehicleId)
     private var catalog by mutableStateOf<PlayerLookAssets.Catalog?>(null)
     private var key: String? = null
     private var female by mutableStateOf<Boolean?>(null)
@@ -85,6 +90,12 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
         apply()
     }
 
+    fun selectRide(vehicle: RideVehicle) {
+        if (!supported) return
+        prefs.rideVehicleId = vehicle.id
+        apply()
+    }
+
     fun apply() {
         val current = catalog ?: return
         val currentKey = key ?: return
@@ -96,7 +107,10 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
         PlayerLook.worn.value = pick.takeIf { patch?.blocks?.isNotEmpty() == true }
         val style = current.text.keys.firstOrNull { it.name == prefs.textLookFor(currentKey) }
         pickedText = style?.name
-        renderer.select(TextLook.withAppearance(patch, style?.let { current.text[it] }.orEmpty()))
+        val mounted = female?.let { gender ->
+            RideOn.withAppearance(current.scan, LookChar.of(current.engine, gender), patch, vehicle)
+        } ?: patch
+        renderer.select(TextLook.withAppearance(mounted, style?.let { current.text[it] }.orEmpty()))
     }
 
     fun close() {

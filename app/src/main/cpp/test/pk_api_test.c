@@ -8,6 +8,7 @@
 
 #include "pk_api.h"
 #include "pk_core_access.h"
+#include "pk_wide.h"
 #include <mgba/core/core.h>
 
 static int failures;
@@ -87,6 +88,16 @@ static void gba(const char* dir) {
     path(rom, sizeof rom, dir, "diagnostic.gba");
     CHECK(pk_api_init(rom, NULL), "init %s", rom);
     CHECK(pk_api_platform() == PK_API_PLATFORM_GBA, "platform %d", pk_api_platform());
+    uint8_t rideFrames[PK_API_RIDE_FRAME_BYTES] = {0}, ridePalette[32] = {0};
+    char rideInfo[160];
+    pk_api_ride_set(rideFrames, sizeof rideFrames, ridePalette, sizeof ridePalette, 64);
+    pk_api_ride_show(true);
+    pk_ride_info(rideInfo, sizeof rideInfo);
+    CHECK(strstr(rideInfo, "on 1 have 1 w 64"), "valid ride assets were rejected: %s", rideInfo);
+    pk_api_ride_set(rideFrames, sizeof rideFrames - 1, ridePalette, sizeof ridePalette, 64);
+    pk_ride_info(rideInfo, sizeof rideInfo);
+    CHECK(strstr(rideInfo, "have 0"), "short ride frame data did not clear assets: %s", rideInfo);
+    pk_api_ride_show(false);
     struct mCore* core = pkMainCore();
     uint8_t original = core->busRead8(core, 0x080000A0), replacement = original ^ 0xFF, visible = 0;
     const int32_t addresses[] = {0x080000A0, 0x080000A1};

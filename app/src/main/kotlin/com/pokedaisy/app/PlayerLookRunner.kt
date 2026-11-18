@@ -177,20 +177,10 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
         worn.value = pick
         picked.value = pick
         val rival = prefs.rivalLook && PlayerLook.hasRival(me.engine)
-        val look = ride(me, patches[Triple(f, pick, rival)] ?: patches[Triple(f, pick, false)], RideVehicle.of(prefs.rideVehicleId))
+        val hero = patches[Triple(f, pick, rival)] ?: patches[Triple(f, pick, false)]
+        val vehicle = RideVehicle.of(prefs.rideVehicleId)
+        val look = keptScan?.let { RideOn.withAppearance(it, me, hero, vehicle) } ?: hero
         onPatch(TextLook.withAppearance(look, textBlocks))
-    }
-
-    /** RIDE ON: [look]'s patch with [vehicle] written over [me]'s bike sheets as worn (RideOn), in the worn palette. */
-    private fun ride(me: LookChar, look: PlayerLook.Patch?, vehicle: RideVehicle): PlayerLook.Patch? {
-        val scan = keptScan ?: return look
-        if (vehicle == RideVehicle.BIKE) return look
-        val pal = look?.playerPal ?: scan.data(me, LookPart.OW_PAL) ?: return look
-        val under = look?.blocks.orEmpty().map { it.off to it.data }
-        val rides = runCatching { RideOn.writes(scan, me, under, pal, vehicle) }
-            .onFailure { Log.w("pokedaisy", "ride on", it) }.getOrNull().orEmpty()
-        if (rides.isEmpty()) return look
-        return PlayerLook.Patch(PlayerLook.merge(scan.rom, under + rides), look?.palettes.orEmpty(), look?.playerPal, RideOn.sprite(vehicle))
     }
 
     /** The Pokémon picked (a national number; null: a hero or the game's own). */

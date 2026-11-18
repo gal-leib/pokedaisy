@@ -4,6 +4,7 @@
 package com.pokedaisy.app.ios
 
 import com.pokedaisy.app.companion.data.FfMenuWatch
+import com.pokedaisy.app.companion.data.GameField
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -326,7 +327,11 @@ object PokeDaisyHost {
             g.afterFrame = {
                 p.flight?.afterFrame()
                 p.tick(wideScene = if (g.expanded) PkApiCore.wideScene else -1)
-                if (p.onField && !p.session.mapOpen && !FfMenuWatch.battling) currentLook.renderer.fieldFrame()
+                val field = p.onField && !p.session.mapOpen && !FfMenuWatch.battling
+                if (field) currentLook.renderer.fieldFrame()
+                // The core reports the mounted bike even while the callback watcher is learning this field.
+                val gameOwnsScreen = p.fieldState and (GameField.LOCKED or GameField.BATTLE or GameField.WINDOW) != 0
+                currentLook.ride.step(p.riding && !p.session.mapOpen && !gameOwnsScreen, currentLook.renderer.ride)
                 gameOptions.tick()
                 gameOptions.markExp(PkApiCore::read, PkApiCore::write)
             }
@@ -447,6 +452,7 @@ object PokeDaisyHost {
                 g.camera.level = iosPreferences.zoomLevelFor(key)
                 g.setExpandedTables(tables)
                 p.start(romPath.toPath(), code, crc, areaMapCrc = tables)
+                currentLook.ride.reset()
                 if (code != null && !blocked) {
                     currentLook.load(romPath.toPath(), code, key) { games().map { it.toPath() } }
                     if (currentLook.supported) currentLook.renderer.service(force = true)

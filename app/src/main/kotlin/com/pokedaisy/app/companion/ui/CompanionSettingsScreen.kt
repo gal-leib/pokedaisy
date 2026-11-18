@@ -642,7 +642,7 @@ private fun homeRows(
         } else null,
         // What the player rides in place of the bike (RideOn.kt: our own pixel art in the hero's bike sheets).
         if (s.rideVehicleSupported) {
-            SettingRow(tk("RIDE ON"), s.rideVehicle.label, labelBadge = NewFeatures.badge(NewFeatures.RIDE_ON)) {
+            SettingRow(tk("RIDE ON"), s.rideVehicle.label, labelBadge = s.rideVehicleBadge ?: NewFeatures.badge(NewFeatures.RIDE_ON)) {
                 val all = com.pokedaisy.app.companion.data.RideVehicle.entries
                 select(Selector(tk("RIDE ON"), all.map { it.label }, s.rideVehicle.label) { l ->
                     all.firstOrNull { it.label == l }?.let(s::setRideVehicle)
