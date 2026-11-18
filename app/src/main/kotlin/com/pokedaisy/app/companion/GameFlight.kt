@@ -35,6 +35,7 @@ class GameFlight(
     private val closed = atomic(false)
     private val generation = atomic(0)
     private val areaQueued = atomic(false)
+    private val configurationQueued = atomic<Any?>(null)
     private val scenicRun = atomic(false)
     private val observedState = atomic(FlightCore.IDLE)
     private var stateRevision by mutableIntStateOf(0)
@@ -82,8 +83,16 @@ class GameFlight(
         }
         if (askAt?.let { time >= it } == true && standing()) { askAt = null; askStyle() }
         val fields = support() ?: return
-        val words = fields.fns.flight!!.words(vehicle)
-        session.postForward { if (!closed.value && support() != null) core.configureFlight(words) }
+        if (configurationQueued.value == null) {
+            val request = Any()
+            if (configurationQueued.compareAndSet(null, request)) {
+                session.postForward {
+                    if (configurationQueued.compareAndSet(request, null)) {
+                        support()?.fns?.flight?.let { core.configureFlight(it.words(vehicle)) }
+                    }
+                }
+            }
+        }
         if (!areaQueued.compareAndSet(false, true)) return
         val onGround = standing() && !inBattle()
         session.requestField(false) { calls, busy ->
@@ -114,6 +123,7 @@ class GameFlight(
     /** A new native core for the same loaded ROM needs its seen-area bits again. */
     fun reset() {
         cancelActions(); keeper.resend(); anywhereSent = false
+        configurationQueued.value = null
         observedState.value = FlightCore.IDLE; stateRevision++; scenicRun.value = false
     }
 

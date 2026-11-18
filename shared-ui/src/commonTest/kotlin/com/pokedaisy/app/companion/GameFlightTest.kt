@@ -42,6 +42,7 @@ class GameFlightTest {
         var takesOff = 0
         var lands = 0
         var configured = 0
+        var configuration: IntArray? = null
         var areaWrites = 0
         var nativeState = 0
         var turned = false
@@ -62,7 +63,7 @@ class GameFlightTest {
             }
         }
         val core = object : FlightCore {
-            override fun configureFlight(words: IntArray?) { configured++ }
+            override fun configureFlight(words: IntArray?) { configured++; configuration = words }
             override fun flightTakeOff(): Int { takesOff++; if (takeOffCode == 0) nativeState = 1; return takeOffCode }
             override fun flightLand() { lands++ }
             override fun setFlightRoute(directions: ByteArray) = 0
@@ -116,6 +117,29 @@ class GameFlightTest {
         val pending = Harness()
         pending.owner.toggle { _, _ -> delivered++ }; pending.frame(); pending.owner.close(); pending.deliver()
         assertEquals(0, delivered); assertEquals(0, pending.handoffs)
+    }
+
+    @Test fun configurationCoalescesDuringAHoldAndReadsTheLatestVehicle() {
+        val h = Harness()
+        repeat(20) {
+            h.owner.sync()
+            h.session.servicePending(GameSession.FrameWork.HELD, true, { true })
+        }
+        h.owner.setVehicle(FlightVehicle.BALLOON)
+        h.owner.cancelActions()
+        h.session.servicePending(GameSession.FrameWork.REWINDING, true, { true })
+        assertEquals(0, h.configured)
+        h.frame()
+        assertEquals(1, h.configured)
+        assertContentEquals(h.fns.flight!!.words(FlightVehicle.BALLOON), h.configuration)
+
+        h.owner.sync()
+        h.owner.reset()
+        h.owner.setVehicle(FlightVehicle.BIRD)
+        h.frame()
+        assertEquals(2, h.configured)
+        assertContentEquals(h.fns.flight!!.words(FlightVehicle.BIRD), h.configuration)
+        h.owner.close()
     }
 
     @Test fun transportRejectsWaterAndAreaSamplingIsCoalescedAndConsumesTheTurnNotice() {
