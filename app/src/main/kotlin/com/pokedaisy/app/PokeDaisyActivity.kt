@@ -2536,7 +2536,7 @@ class PokeDaisyActivity : Activity() {
         val pair = com.pokedaisy.app.companion.coop.CoopSession.pairsList(this).firstOrNull { it.ownSave.key == id.key } ?: return
         val link = com.pokedaisy.app.companion.coop.CoopSession.link
         val lock = CoopLock(
-            link, com.pokedaisy.app.companion.coop.lock.CoopLockStore(File(File(filesDir, "coop"), "locks.json")),
+            link, com.pokedaisy.app.companion.coop.lock.CoopLockStore(filesDir.toOkioPath() / "coop" / "locks.json"),
             id.key, pair.partner.save.key, MgbaLockNative,
             {
                 val b = MgbaCore.pkReadBytes(com.pokedaisy.app.companion.data.coop.COOP_PLAYER_PARTY_COUNT, 1)

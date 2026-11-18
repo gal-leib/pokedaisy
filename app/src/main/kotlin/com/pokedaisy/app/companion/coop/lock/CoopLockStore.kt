@@ -1,34 +1,42 @@
 package com.pokedaisy.app.companion.coop.lock
 
-import java.io.File
-import java.io.IOException
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
-import org.json.JSONArray
-import org.json.JSONException
-import org.json.JSONObject
+import com.pokedaisy.app.companion.coop.replaceFile
+import com.pokedaisy.app.companion.coop.writeDurably
+import kotlin.time.Clock
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.put
+import okio.FileSystem
+import okio.IOException
+import okio.Path
+import okio.Path.Companion.toPath
 
-/** Which saves are locked to a partner, in `filesDir/coop/locks.json` (array of {own, partner, since}, temp file + rename). */
-class CoopLockStore(private val file: File) {
+/** Keeps the existing array of {own, partner, since} in coop/locks.json. */
+class CoopLockStore(private val file: Path) {
     private data class Entry(val own: String, val partner: String, val since: Long)
 
+    private val lock = SynchronizedObject()
+    private val fs = FileSystem.SYSTEM
     private var blocked = false
 
-    @Synchronized
-    fun isLocked(own: String, partner: String): Boolean = load().any { it.own == own && it.partner == partner }
-
-    @Synchronized
-    fun lock(own: String, partner: String) {
-        val list = loadForWrite().filterNot { it.own == own }
-        store(list + Entry(own, partner, System.currentTimeMillis()))
+    fun isLocked(own: String, partner: String): Boolean = synchronized(lock) {
+        load().any { it.own == own && it.partner == partner }
     }
 
-    @Synchronized
-    fun unlock(own: String) {
+    fun lock(own: String, partner: String): Unit = synchronized(lock) {
+        store(loadForWrite().filterNot { it.own == own } + Entry(own, partner, Clock.System.now().toEpochMilliseconds()))
+    }
+
+    fun unlock(own: String): Unit = synchronized(lock) {
         val list = loadForWrite()
-        if (list.none { it.own == own }) return
-        store(list.filterNot { it.own == own })
+        if (list.any { it.own == own }) store(list.filterNot { it.own == own })
     }
 
     private fun loadForWrite(): List<Entry> {
@@ -39,35 +47,49 @@ class CoopLockStore(private val file: File) {
 
     private fun load(): List<Entry> {
         blocked = false
-        if (!file.isFile) return emptyList()
-        val text = try { file.readText(Charsets.UTF_8) } catch (e: IOException) { blocked = true; return emptyList() }
+        val text = try {
+            if (fs.metadataOrNull(file)?.isRegularFile != true) return emptyList()
+            fs.read(file) { readUtf8() }
+        } catch (_: IOException) {
+            blocked = true
+            return emptyList()
+        }
         return try {
-            val a = JSONArray(text)
-            List(a.length()) { val o = a.getJSONObject(it); Entry(o.getString("own"), o.getString("partner"), o.getLong("since")) }
-        } catch (e: JSONException) {
+            Json.parseToJsonElement(text).jsonArray.map {
+                val row = it.jsonObject
+                Entry(row.getValue("own").jsonPrimitive.content, row.getValue("partner").jsonPrimitive.content,
+                    row.getValue("since").jsonPrimitive.long)
+            }
+        } catch (_: IllegalArgumentException) {
+            keepAside()
+        } catch (_: NoSuchElementException) {
             keepAside()
         }
     }
 
+    private fun sibling(suffix: String): Path = file.parent?.div(file.name + suffix) ?: (file.name + suffix).toPath()
+
     private fun keepAside(): List<Entry> {
-        val dir = file.parentFile
-        var bad = File(dir, file.name + ".bad")
-        var n = 1
-        while (bad.exists()) bad = File(dir, file.name + ".bad." + n++)
-        if (!runCatching { file.renameTo(bad) }.getOrDefault(false)) blocked = true
+        blocked = !runCatching {
+            var bad = sibling(".bad")
+            var n = 1
+            while (fs.exists(bad)) bad = sibling(".bad." + n++)
+            replaceFile(file, bad)
+        }.isSuccess
         return emptyList()
     }
 
     private fun store(list: List<Entry>) {
-        file.parentFile?.mkdirs()
-        val a = JSONArray()
-        list.forEach { a.put(JSONObject().put("own", it.own).put("partner", it.partner).put("since", it.since)) }
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        java.io.FileOutputStream(tmp).use { it.write(a.toString().toByteArray(Charsets.UTF_8)); it.flush(); it.fd.sync() }
-        try {
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (e: AtomicMoveNotSupportedException) {
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
+        file.parent?.let { fs.createDirectories(it) }
+        val json = JsonArray(list.map { row ->
+            buildJsonObject {
+                put("own", row.own)
+                put("partner", row.partner)
+                put("since", row.since)
+            }
+        })
+        val tmp = sibling(".tmp")
+        writeDurably(tmp, json.toString().encodeToByteArray())
+        replaceFile(tmp, file)
     }
 }

@@ -7,6 +7,7 @@
 #include "pk_coop.h"
 #include "pk_coop_after.h"
 #include "pk_coop_field.h"
+#include "pk_coop_lock.h"
 #include "pk_session.h"
 #include "pk_wide.h"
 
@@ -309,5 +310,45 @@ void pk_api_partner_set(const uint8_t* art, size_t length) {
 void pk_api_partner_place(bool visible, int x, int y, int frame, bool mirrored, int blob_frame, int bob) {
     pthread_rwlock_wrlock(&pk_coreLock);
     if (g.core && pk_is_gba(g.core)) pk_partner_place(g.core, visible, x, y, frame, mirrored, blob_frame, bob);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+bool pk_api_coop_lock_install(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    bool ok = g.core && pk_is_gba(g.core) && pk_coop_lock_install(g.core, pk_coop_game_call);
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok;
+}
+
+void pk_api_coop_lock_uninstall(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core) pk_coop_lock_uninstall(g.core);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+void pk_api_coop_lock_set_active(bool on) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_coop_lock_set_active(g.core, on);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+void pk_api_coop_lock_held(int out[2]) {
+    if (!out) return;
+    out[0] = out[1] = 0;
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) out[0] = pk_coop_lock_held(g.core, &out[1]);
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+int pk_api_coop_lock_go(int id) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int result = g.core && pk_is_gba(g.core) ? pk_coop_lock_go(g.core, id) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return result;
+}
+
+void pk_api_coop_lock_cancel(void) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_coop_lock_cancel(g.core);
     pthread_rwlock_unlock(&pk_coreLock);
 }
