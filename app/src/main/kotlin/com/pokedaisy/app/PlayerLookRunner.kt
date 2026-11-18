@@ -4,24 +4,20 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import com.pokedaisy.app.companion.data.AppearanceAssets
-import com.pokedaisy.app.companion.data.LookArt
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.LookEngine
 import com.pokedaisy.app.companion.data.LookPart
 import com.pokedaisy.app.companion.data.MonArt
 import com.pokedaisy.app.companion.data.PlayerLook
-import com.pokedaisy.app.companion.data.RetailDumps
+import com.pokedaisy.app.companion.data.PlayerLookAssets
 import com.pokedaisy.app.companion.data.RideOn
 import com.pokedaisy.app.companion.data.RideVehicle
-import com.pokedaisy.app.companion.data.TextArt
-import com.pokedaisy.app.companion.data.TextBlob
-import com.pokedaisy.app.companion.data.TextLook
 import java.io.File
 import okio.Path.Companion.toOkioPath
 
 /**
  * PLAYER LOOK for the game running ([PlayerLook]): one background pass when a ROM loads scans it (keeping its own
- * heroes' graphics for the other games, [LookArt]), looks through the library's other FireRed / LeafGreen / Ruby /
+ * heroes' graphics for the other games, [com.pokedaisy.app.companion.data.LookArt]), looks through the library's other FireRed / LeafGreen / Ruby /
  * Sapphire / Emerald ROMs for heroes not kept yet (once per file: `rom-art/look/scanned.txt`), and builds the patch for every hero
  * either gender of player could wear - then lets go of the ROM's bytes. [apply] hands the engine the one for the
  * save's gender ([female]: read from the save file at load, then followed in the game's own RAM) and the player's
@@ -46,7 +42,7 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
     /** The player's own hero (the picker's OFF tile); null before the game has a gender. */
     val own = mutableStateOf<LookChar?>(null)
 
-    /** TEXT LOOK: the other games' text looks this one can take ([TextLook]; empty: none kept, or not a game of ours). */
+    /** TEXT LOOK: the other games' text looks this one can take ([com.pokedaisy.app.companion.data.TextLook]; empty: none kept, or not a game of ours). */
     val textOffered = mutableStateOf<List<LookEngine>>(emptyList())
 
     /** The text look on now (null = the game's own). */
@@ -110,49 +106,20 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
         }
         Thread({
             try {
-                val t0 = System.nanoTime()
-                val bytes = rom.readBytes()
-                val scan = PlayerLook.scan(bytes, TextBlob.entries)
                 val filesDir = context.filesDir.toOkioPath()
-                AppearanceAssets(filesDir).keep(bytes, scan)
-                // Only retail carts (a collection dump of one too, or one randomized: the randomizer leaves the hero's
-                // pictures alone) and the hacks played dressed up headless ([PlayerLook.HACKS]) wear another look: a hack
-                // may load its hero's pictures or palettes its own way. Every ROM's heroes are still kept for the other games.
-                val sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
-                val rev = bytes.getOrNull(0xBC)?.toInt()?.and(0xFF)
-                val retail = GameTitles.isRetail(sha1) || sha1 in PlayerLook.HACKS ||
-                    RetailDumps.matchStream(code, rev, bytes.size.toLong()) { okio.Buffer().write(bytes) } != null ||
-                    com.pokedaisy.app.companion.data.RandomizedRetail.matchStream(code, rev, bytes.size.toLong()) { okio.Buffer().write(bytes) } != null
-                if (!retail) {
-                    Log.i("pokedaisy", "player look: not a retail cart or a known hack, none offered")
-                    android.os.Handler(android.os.Looper.getMainLooper()).post { if (gen == generation) supported.value = false }
-                    return@Thread
-                }
-                if (LookArt.available(filesDir).size < LookChar.entries.size || TextLook.STYLES.any { TextArt.load(filesDir, it) == null } ||
-                    MonArt.sources(filesDir).size < MonArt.Source.entries.size) scanLibrary(rom)
-                val known = LookChar.entries.mapNotNull { c -> LookArt.load(filesDir, c)?.let { c to it } }.toMap()
-                val built = HashMap<Triple<Boolean, LookChar?, Boolean>, PlayerLook.Patch?>()
-                val rivals = if (PlayerLook.hasRival(engine)) listOf(false, true) else listOf(false)
-                for (f in listOf(false, true)) {
-                    val me = LookChar.of(engine, f)
-                    for ((look, art) in known) if (look != me) for (r in rivals) built[Triple(f, look, r)] = PlayerLook.build(scan, me, look, art, known, r)
-                    // The game's own: no blocks, any palette a state left from another look put back.
-                    val off = PlayerLook.Patch(emptyList(), PlayerLook.settleBoth(scan, me, null, null, known), scan.data(me, LookPart.OW_PAL))
-                    for (r in rivals) built[Triple(f, null, r)] = off
-                }
-                val host = TextLook.styleOf(engine)
-                val texts = if (host == null) emptyMap() else TextLook.STYLES.filter { it != host }.mapNotNull { st ->
-                    TextArt.load(filesDir, st)?.let { art -> TextLook.build(scan, host, st, art).takeIf { it.isNotEmpty() }?.let { st to it } }
-                }.toMap()
-                Log.i("pokedaisy", "player look: ${scan.chars} in this ROM, kept ${known.keys}, text looks ${texts.keys}, " +
-                    "${built.count { it.value?.blocks?.isNotEmpty() == true }} patches in ${(System.nanoTime() - t0) / 1_000_000} ms")
+                val catalog = PlayerLookAssets(filesDir, GameTitles::isRetail).prepare(
+                    AppearanceAssets.file(rom.toOkioPath()), engine, code, ::librarySources, { gen == generation },
+                )
+                val mons = MonArt.available(filesDir)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     if (gen != generation) return@post
-                    patches = built
-                    textPatches = texts
-                    keptScan = scan
-                    keptKnown = known
-                    offeredMons.value = party.filter { it in MonArt.available(filesDir) }
+                    supported.value = catalog != null
+                    if (catalog == null) return@post
+                    patches = catalog.heroes
+                    textPatches = catalog.text
+                    keptScan = catalog.scan
+                    keptKnown = catalog.known
+                    offeredMons.value = party.filter { it in mons }
                     apply()
                 }
             } catch (t: Throwable) {
@@ -270,10 +237,6 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
             AppearanceAssets.Source(f.canonicalPath, "${f.absolutePath}|${f.length()}|${f.lastModified()}", f.name,
                 { RomIdentity.gameCode(f) }) { RomArchive.open(f).use { it.readBytes() } }
         }
-
-    private fun scanLibrary(running: File) {
-        AppearanceAssets(context.filesDir.toOkioPath()).scanMissing(running.canonicalPath, librarySources())
-    }
 
     companion object {
         /**
