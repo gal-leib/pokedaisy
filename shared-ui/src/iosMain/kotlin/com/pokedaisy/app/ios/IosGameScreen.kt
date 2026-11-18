@@ -3,6 +3,7 @@ package com.pokedaisy.app.ios
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -10,6 +11,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -78,9 +80,13 @@ internal class IosGameScreen(
     private val aspect = if (gameBoy) 160f / 144 else 1.5f
     private var frames by mutableStateOf<GameScreenFrames?>(null)
     private var rewindUnavailable by mutableStateOf(false)
+    private var itemNotice by mutableStateOf<ItemNotice?>(null)
     private var quickNotice by mutableStateOf<String?>(null)
     val quickMenu = QuickMenuState().also { it.onClose = ::syncInputCapture }
     var canOpenQuickMenu: () -> Boolean = { false }
+    fun showItemNotice(item: Int, message: String) {
+        itemNotice = ItemNotice(item, message)
+    }
     fun showQuickNotice(message: String) {
         captureButtons()
         quickNotice = message
@@ -194,6 +200,10 @@ internal class IosGameScreen(
                     }
                 },
                 pictureOverlay = {
+                    Box(Modifier.fillMaxSize()) {
+                        ItemNoticeHost(itemNotice, rememberGbaTextMetrics(),
+                            Modifier.align(Alignment.TopCenter).padding(8.dp)) { itemNotice = null }
+                    }
                     game?.keyCapture?.let { KeyCapturePopup(it) }
                     if (rewindUnavailable) {
                         val dismiss = {

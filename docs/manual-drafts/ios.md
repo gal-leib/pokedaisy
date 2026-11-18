@@ -45,6 +45,8 @@ In Ruby, Sapphire and Emerald, `RIVAL LOOK` starts on. Pick a `PLAYER LOOK` to d
 
 On supported GBA carts, `RIDE ON` replaces the bike's look with a `MOTORCYCLE` or `SCOOTER`. Get on your bike as usual. Choose `BIKE` to restore the original look.
 
+In supported GBA games, `SETTINGS` > `GAMEPLAY` > `AUTO REFILL` uses another Repel from your bag before the current one runs out. It adds the new Repel's steps to the steps you had left.
+
 On iPhone and iPad, open `SETTINGS` > `MAKEOVER` > `FOLLOWER` while playing a supported GBA game. The first Pokémon in your party that isn't an Egg follows you on foot and waits while you surf. To supply its sprite, import a compatible game with its own followers, such as Emerald Seaglass, into your library. The row can show `N/A` while PokeDaisy scans your games.
 
 ## From controls.md

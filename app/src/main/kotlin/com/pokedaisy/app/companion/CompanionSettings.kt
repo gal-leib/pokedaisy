@@ -108,6 +108,7 @@ interface CompanionSettings : StoredCompanionSettings {
     val repelRefill: Boolean get() = false
     fun setRepelRefill(on: Boolean) {}
     val repelRefillSupported: Boolean get() = false
+    val repelRefillBadge: String? get() = null
     /** NO HMS NEEDED - see [com.pokedaisy.app.Prefs.hmFree]; [hmFreeSupported]: the ROM's field move check is known
      * ([com.pokedaisy.app.companion.data.HmFree]). */
     val hmFreeSupported: Boolean get() = false

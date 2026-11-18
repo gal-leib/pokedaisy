@@ -139,8 +139,11 @@ class GameRuntime(
         return owner
     }
 
+    val autoRefill = GameAutoRefill(prefs, session)
+
     /** Between frames, while the old state still exists: native save/load/rewind adapters share this cleanup. */
     fun cancelFieldActions() {
+        autoRefill.reset()
         flight?.cancelActions()
         try { registeredItems?.cancel() } finally { gameBoyFields?.cancel() }
     }
@@ -226,6 +229,7 @@ class GameRuntime(
         resetTint()
         flight?.reset()
         follower?.reset()
+        autoRefill.reset()
         session.reset()
         settledOnField = false
         val romKey = crc.toString(16).padStart(8, '0')
@@ -323,7 +327,7 @@ class GameRuntime(
         release { stateSlots.value?.close() }
         release { options.close(restoreOptionPatchesOnClose) }
         release { battle.cancel() }
-        release { session.close() }
+        release { autoRefill.reset(); session.close() }
         release {
             if (learnedCallback != null && FfMenuWatch.onLearned === learnedCallback) {
                 FfMenuWatch.onLearned = null

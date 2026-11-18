@@ -185,8 +185,9 @@ fun CompanionSettingsScreen(
             val lookOptions = settings?.takeIf { page == Page.HOME && it.playerLookSupported }?.playerLooks
             val selectedLook = if (page == Page.HOME) settings?.playerLook else null
             val textOptions = if (page == Page.HOME) settings?.textLooks else null
+            val refillSupported = if (page == Page.HOME) settings?.repelRefillSupported else null
             val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision,
-                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions) {
+                overlayRevision, removingCheats, removingOverlays, lookOptions, selectedLook, textOptions, refillSupported) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
@@ -741,7 +742,7 @@ private fun homeRows(
         // A REPEL running low gets another of its kind on top, from the bag (RepelRefill.kt). Two values: a tap flips it.
         SettingRow(
             tk("AUTO REFILL"), if (s.repelRefillSupported) onOff(s.repelRefill) else tk("N/A"),
-            enabled = s.repelRefillSupported, labelBadge = NewFeatures.badge(NewFeatures.REPEL_REFILL),
+            enabled = s.repelRefillSupported, labelBadge = s.repelRefillBadge ?: NewFeatures.badge(NewFeatures.REPEL_REFILL),
             subtitle = "Another REPEL goes on before one runs out",
         ) {
             if (s.repelRefillSupported) { s.setRepelRefill(!s.repelRefill); changed() }

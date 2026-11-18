@@ -345,6 +345,8 @@ object PokeDaisyHost {
             if (live()) fields.get(snapshot, code.orEmpty(), revision, telemetry.knownFieldItems()) else null
         }
         val currentSession = { p.session.takeIf { live() } }
+        settings?.canAutoRefill = { readSupport()?.let { fields -> fields.fns.repelItems.any(fields::canUse) } == true }
+
         val gbFields = p.bindGameBoyFields(
             enabled = { game === g && g.isRunning && code == null && !p.blocked && telemetry.snapshot.value.blocked == null },
             rom = PkApiCore::rom, deliver = { it() }, handedOver = {
@@ -499,6 +501,21 @@ object PokeDaisyHost {
             current = { game === g && g.isRunning }, after = {
                 currentOptions.settingsChanged(currentSettings)
                 p.flight?.sync()
+                if (live()) {
+                    val steps = sharedItems.repelVar?.let { varId ->
+                        it.progress?.variable(varId)?.let(sharedItems::repelSteps)
+                    } ?: 0
+                    p.autoRefill.observe(it, steps, prepare = { (item, _) ->
+                        readSupport()?.takeIf { fields -> fields.canUse(item) }?.let { fields ->
+                            { calls, busy -> com.pokedaisy.app.companion.data.refillRepel(fields.fns, item, busy, calls) }
+                        }
+                    }) { item ->
+                        if (live()) {
+                            screen?.showItemNotice(item, tr("Another {0} went on", com.pokedaisy.app.companion.data.itemName(item)))
+                            sample()
+                        }
+                    }
+                }
                 if (it.blocked == null) currentLook.observe(it) else currentLook.close()
                 if (it.blocked != null && g.wideSupported) g.setExpandedTables(0)
             }, periodMillis = SAMPLE_MILLIS)

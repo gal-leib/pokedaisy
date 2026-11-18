@@ -283,48 +283,33 @@ class PokeDaisyActivity : Activity() {
         }
     }
 
-    /** AUTO REFILL ([com.pokedaisy.app.companion.data.RepelRefill]): the option (cached for the emu thread), the count the last
-     * sample read, the kind working (null = not known) and the one refill in flight. */
-    @Volatile private var repelRefillOn = false
-    private var repelPrev = 0
-    @Volatile private var repelKind: Int? = null
-    private val repelRefillBusy = java.util.concurrent.atomic.AtomicBoolean(false)
-
     /** Whether this game can take a REPEL from the companion: what AUTO REFILL needs (the quick menu's REPEL rule). */
     private fun repelRefillSupported(): Boolean =
         dsRepelKnown() || fieldItemSupport()?.let { s -> s.fns.repelItems.any { s.canUse(it) } } == true
 
-    /** Each sample (emu thread): the kind working followed, and one more of it put on while 1..REFILL_AT steps are left. */
     private fun updateRepelRefill(snap: com.pokedaisy.app.companion.data.SnapshotView) {
-        if (!snap.connected) return
+        if (!snap.connected || !::engine.isInitialized) return
+        val current = engine
         val steps = snap.repelSteps ?: itemUse.repelVar?.let { snap.progress?.variable(it) }?.let(itemUse::repelSteps) ?: 0
-        val kinds = com.pokedaisy.app.companion.REPEL_KINDS
-        if (steps == 0) repelKind = null
-        else if (repelPrev == 0) repelKind = com.pokedaisy.app.companion.data.RepelRefill.kindOf(kinds, steps)
-        repelPrev = steps
-        if (!repelRefillOn || snap.inBattle || steps !in 1..com.pokedaisy.app.companion.data.RepelRefill.REFILL_AT) return
-        val kind = com.pokedaisy.app.companion.data.RepelRefill.pick(kinds, { id -> snap.items.any { it.itemId == id && it.quantity > 0 } }, repelKind)
-            ?: return
-        if (!::engine.isInitialized || !repelRefillBusy.compareAndSet(false, true)) return
-        val dsCfg = if (dsRepelKnown()) snap.game else null
-        val support = if (dsCfg == null) fieldItemSupport()?.takeIf { it.canUse(kind.first) } else null
-        if (dsCfg == null && support == null) { repelRefillBusy.set(false); return }
-        engine.requestFieldItemJob(false) { calls, busy ->
-            val out = runCatching {
-                if (dsCfg != null) {
-                    val f = engine.fieldState
-                    val free = f and MgbaCore.FIELD_SCREEN != 0 && f and (MgbaCore.FIELD_LOCKED or MgbaCore.FIELD_MENU or MgbaCore.FIELD_BATTLE) == 0
-                    com.pokedaisy.app.companion.data.gen5ConfigFor(dsCfg)?.let { com.pokedaisy.app.companion.data.useGen5Repel(it, calls, kind.first, kind.second, free, topUp = true) }
-                        ?: com.pokedaisy.app.companion.data.useGen4Repel(com.pokedaisy.app.companion.data.gen4ConfigFor(dsCfg)!!, calls, kind.first, kind.second, free, topUp = true)
-                } else com.pokedaisy.app.companion.data.refillRepel(support!!.fns, kind.first, busy, calls)
-            }.getOrElse { Log.e("pokedaisy", "repel refill failed", it); null }
-            Log.i("pokedaisy", "repel refill: ${kind.first} -> $out")
-            if (out?.result == com.pokedaisy.app.companion.data.ItemUseResult.USED) {
-                repelKind = kind.first
-                val name = com.pokedaisy.app.companion.data.itemName(kind.first)
-                runOnUiThread { showHud(com.pokedaisy.app.companion.i18n.tr("Another {0} went on", name)) }
+        current.playback.autoRefill.observe(snap, steps, prepare = { (item, added) ->
+            val ds = if (dsRepelKnown()) snap.game else null
+            val support = if (ds == null) fieldItemSupport()?.takeIf { it.canUse(item) } else null
+            when {
+                ds != null -> { calls, _ ->
+                    val f = current.fieldState
+                    val free = f and MgbaCore.FIELD_SCREEN != 0 &&
+                        f and (MgbaCore.FIELD_LOCKED or MgbaCore.FIELD_MENU or MgbaCore.FIELD_BATTLE) == 0
+                    com.pokedaisy.app.companion.data.gen5ConfigFor(ds)?.let {
+                        com.pokedaisy.app.companion.data.useGen5Repel(it, calls, item, added, free, topUp = true)
+                    } ?: com.pokedaisy.app.companion.data.useGen4Repel(
+                        com.pokedaisy.app.companion.data.gen4ConfigFor(ds)!!, calls, item, added, free, topUp = true)
+                }
+                support != null -> { calls, busy -> com.pokedaisy.app.companion.data.refillRepel(support.fns, item, busy, calls) }
+                else -> null
             }
-            repelRefillBusy.set(false)
+        }) { item ->
+            val name = com.pokedaisy.app.companion.data.itemName(item)
+            runOnUiThread { if (engine === current) showHud(com.pokedaisy.app.companion.i18n.tr("Another {0} went on", name)) }
         }
     }
 
@@ -1232,8 +1217,8 @@ class PokeDaisyActivity : Activity() {
         override val levelCapLevel get() = levelCapNow?.level
         override val repelRefill get() = Prefs(this@PokeDaisyActivity).repelRefill
         override fun setRepelRefill(on: Boolean) {
-            Prefs(this@PokeDaisyActivity).repelRefill = on
-            repelRefillOn = on
+            if (::engine.isInitialized) engine.playback.autoRefill.set(on)
+            else Prefs(this@PokeDaisyActivity).repelRefill = on
         }
         override val repelRefillSupported get() = repelRefillSupported()
         override val shinyAlert get() = Prefs(this@PokeDaisyActivity).shinyAlert
@@ -1985,7 +1970,6 @@ class PokeDaisyActivity : Activity() {
         quietFound = null
         syncQuietPatches()
         syncLevelCap()
-        repelRefillOn = Prefs(this).repelRefill
         shinyAlertOn = Prefs(this).shinyAlert
         lastBallOn = Prefs(this).lastBallButton
         battleRetryOn = Prefs(this).battleRetry
@@ -1997,8 +1981,6 @@ class PokeDaisyActivity : Activity() {
         ballFnsFor = null
         ballItemsBefore = emptyList()
         shinyHuntState.intValue = Prefs(this).shinyHuntFor(crc)
-        repelPrev = 0
-        repelKind = null
         if (::engine.isInitialized) engine.shiny.observe(null)
         syncShinyAchievements()
         // LOW HP BEEP / FIELD POISON: the beep's call and the field poison's, by their code (the other options are
