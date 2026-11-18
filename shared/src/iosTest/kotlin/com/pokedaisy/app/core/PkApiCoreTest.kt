@@ -32,6 +32,33 @@ class PkApiCoreTest {
     fun close() = PkApiCore.stop()
 
     @Test
+    fun flightTransportWithoutVerifiedConfigurationIsInertOnBothPlatforms() {
+        fun idle() {
+            PkApiCore.configureFlight(intArrayOf(1, 2, 3))
+            assertEquals(0, PkApiCore.flightState)
+            assertEquals(-1, PkApiCore.flightTakeOff())
+            assertEquals(-3, PkApiCore.setFlightRoute(byteArrayOf(1, 4)))
+            assertEquals(-3, PkApiCore.setFlightRoute(byteArrayOf()))
+            assertEquals(-1, PkApiCore.flightRouteDone)
+            assertTrue(!PkApiCore.flightAreaTurned)
+            PkApiCore.setFlightArea(byteArrayOf(0))
+            PkApiCore.setFlightArea(null)
+            PkApiCore.flightLand()
+            PkApiCore.configureFlight(null)
+        }
+        idle()
+        for (cart in listOf("diagnostic.gb", "diagnostic.gba")) {
+            assertTrue(PkApiCore.start("$dir/$cart", null))
+            repeat(30) { PkApiCore.runFrame() }
+            val frame = assertNotNull(PkApiCore.stateThumbnail())
+            idle()
+            repeat(3) { PkApiCore.runFrame() }
+            assertContentEquals(frame, PkApiCore.stateThumbnail())
+            PkApiCore.stop(); idle()
+        }
+    }
+
+    @Test
     fun expandedRendererBridgeKeepsUnknownGamesOnTheirOriginalPicture() {
         assertTrue(PkApiCore.fieldKnows(0x1F1C08FB))
         assertTrue(!PkApiCore.fieldKnows(0))

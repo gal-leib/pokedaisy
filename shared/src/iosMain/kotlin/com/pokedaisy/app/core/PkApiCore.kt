@@ -24,6 +24,14 @@ import com.pokedaisy.app.core.pkapi.pk_api_field_configure
 import com.pokedaisy.app.core.pkapi.pk_api_field_knows
 import com.pokedaisy.app.core.pkapi.pk_api_field_state
 import com.pokedaisy.app.core.pkapi.pk_api_set_tint
+import com.pokedaisy.app.core.pkapi.pk_api_flight_configure
+import com.pokedaisy.app.core.pkapi.pk_api_flight_take_off
+import com.pokedaisy.app.core.pkapi.pk_api_flight_land
+import com.pokedaisy.app.core.pkapi.pk_api_flight_route
+import com.pokedaisy.app.core.pkapi.pk_api_flight_area
+import com.pokedaisy.app.core.pkapi.pk_api_flight_area_turned
+import com.pokedaisy.app.core.pkapi.pk_api_flight_state
+import com.pokedaisy.app.core.pkapi.pk_api_flight_route_done
 import com.pokedaisy.app.core.pkapi.pk_api_audio
 import com.pokedaisy.app.core.pkapi.pk_api_deinit
 import com.pokedaisy.app.core.pkapi.pk_api_finish_save
@@ -184,6 +192,21 @@ object PkApiCore : EmulatorCore, RomOptionPatcher, GameCalls {
     fun configureField(crc: Long): Boolean = pk_api_field_configure(crc.toUInt())
     fun fieldState(): Int = pk_api_field_state()
     fun setTint(red: Int, green: Int, blue: Int) = pk_api_set_tint(red, green, blue)
+    fun configureFlight(words: IntArray?) {
+        if (words == null || words.isEmpty()) pk_api_flight_configure(null, 0)
+        else words.usePinned { pk_api_flight_configure(it.addressOf(0).reinterpret(), words.size) }
+    }
+    fun flightTakeOff(): Int = pk_api_flight_take_off()
+    fun flightLand() = pk_api_flight_land()
+    fun setFlightRoute(directions: ByteArray): Int = if (directions.isEmpty()) pk_api_flight_route(null, 0)
+        else directions.usePinned { pk_api_flight_route(it.addressOf(0).reinterpret(), directions.size) }
+    fun setFlightArea(bits: ByteArray?) {
+        if (bits == null || bits.isEmpty()) pk_api_flight_area(null, 0)
+        else bits.usePinned { pk_api_flight_area(it.addressOf(0).reinterpret(), bits.size) }
+    }
+    val flightAreaTurned get() = pk_api_flight_area_turned()
+    val flightState get() = pk_api_flight_state()
+    val flightRouteDone get() = pk_api_flight_route_done()
     fun configureWild(addr: Long, wasOff: Boolean): Boolean =
         addr in 0L..0xFFFFFFFFL && pk_api_field_wild(addr.toUInt(), wasOff)
     fun stepField(runIndoors: Boolean, wildKeep: Int): Int = pk_api_field_step(runIndoors, wildKeep)

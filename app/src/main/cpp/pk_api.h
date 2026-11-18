@@ -121,6 +121,27 @@ int pk_api_wide_fault(void);
 bool pk_api_wide_wants_close(void);
 int pk_api_wide_scene(void);
 
+/** Free/scenic flight uses the existing portable flight implementation and frame rendering.
+ * Game thread between frames. Configure with verified FlightFns.words(); NULL/short input disables.
+ * A GB game or no core cannot take off. No ROM-file edits. */
+void pk_api_flight_configure(const uint32_t* words, int count);
+int pk_api_flight_take_off(void);
+void pk_api_flight_land(void);
+int pk_api_flight_route(const uint8_t* directions, int count);
+void pk_api_flight_area(const uint8_t* bits, int count);
+bool pk_api_flight_area_turned(void);
+int pk_api_flight_state(void);
+int pk_api_flight_route_done(void);
+
+enum {
+    PK_API_FLIGHT_IDLE, PK_API_FLIGHT_TAKING_OFF, PK_API_FLIGHT_FLYING,
+    PK_API_FLIGHT_LANDING, PK_API_FLIGHT_DISMOUNT
+};
+enum {
+    PK_API_FLIGHT_OK = 0, PK_API_FLIGHT_NOT_CONFIGURED = -1, PK_API_FLIGHT_BUSY = -2,
+    PK_API_FLIGHT_NOT_NOW = -3, PK_API_FLIGHT_NOT_ON_FOOT = -4
+};
+
 /** Runs one frame: the picture into pk_api_video, its sound into pk_api_audio. */
 void pk_api_run_frame(void);
 /** The keys held from the next frame on (PK_API_KEY_* bits). */
