@@ -35,6 +35,11 @@ target_link_libraries(pk_calls_api_test PRIVATE pk_api)
 add_test(NAME pk_calls_api COMMAND pk_calls_api_test "${CMAKE_CURRENT_BINARY_DIR}")
 set_tests_properties(pk_calls_api PROPERTIES FIXTURES_REQUIRED diagnostics TIMEOUT 60)
 
+add_executable(pk_flight_api_test pk_flight_api_test.c)
+target_link_libraries(pk_flight_api_test PRIVATE pk_api)
+add_test(NAME pk_flight_api COMMAND pk_flight_api_test "${CMAKE_CURRENT_BINARY_DIR}")
+set_tests_properties(pk_flight_api PROPERTIES FIXTURES_REQUIRED diagnostics TIMEOUT 60)
+
 add_executable(pk_wide_api_test pk_wide_api_test.c)
 target_link_libraries(pk_wide_api_test PRIVATE pk_api)
 add_test(NAME pk_wide_api COMMAND pk_wide_api_test "${CMAKE_CURRENT_BINARY_DIR}")

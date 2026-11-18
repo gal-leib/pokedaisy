@@ -500,6 +500,30 @@ int pk_api_wide_fault(void) { return g.core ? pk_wide_fault() : 0; }
 bool pk_api_wide_wants_close(void) { return !g.wideW || pk_wide_wants_close(); }
 int pk_api_wide_scene(void) { return g.wideW ? pk_wide_scene() : PK_WIDE_SCENE_OFF; }
 
+static int apiFlightCall(struct mCore* core, uint32_t fn, const uint32_t args[4], uint32_t* r0) {
+    return pk_call(core, fn, args, r0);
+}
+
+void pk_api_flight_configure(const uint32_t* words, int count) {
+    pk_flight_set_call(apiFlightCall);
+    pk_flight_configure(words && count >= PK_FLIGHT_WORDS ? words : NULL,
+                        words && count >= PK_FLIGHT_WORDS ? PK_FLIGHT_WORDS : 0);
+}
+
+int pk_api_flight_take_off(void) {
+    return g.core && pk_is_gba(g.core) ? pk_flight_take_off(g.core) : PK_FLIGHT_NOT_CONFIGURED;
+}
+void pk_api_flight_land(void) { pk_flight_land(); }
+int pk_api_flight_route(const uint8_t* directions, int count) {
+    static const uint8_t empty = 0;
+    if (!directions && count > 0) return PK_FLIGHT_NOT_NOW;
+    return pk_flight_route(directions ? directions : &empty, count);
+}
+void pk_api_flight_area(const uint8_t* bits, int count) { pk_flight_set_area(bits, count); }
+bool pk_api_flight_area_turned(void) { return pk_flight_area_turned() != 0; }
+int pk_api_flight_state(void) { return pk_flight_state(); }
+int pk_api_flight_route_done(void) { return pk_flight_route_done(); }
+
 // WIDE: the core's frame is the size the configured game's rebuild expects (the GBA's 240 x 160, a Game Boy's 160 x 144).
 static bool pkWideFrameFits(void) {
     return (int) g.vw == pk_wide_frame_w() && (int) g.vh == pk_wide_frame_h();

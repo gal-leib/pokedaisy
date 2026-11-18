@@ -3731,6 +3731,14 @@ CGB banks), never ROM, I/O or battery RAM. GBA calls preserve CPU context and re
 (`-1` means failure); GB calls return when scheduled. `pk_calls_api_test` covers real diagnostic calls,
 argument passing, unsigned results, timeout recovery and rejected ranges; `PkApiCoreTest` checks cinterop.
 
+`pk_api_flight_*` exposes the existing free/scenic flight implementation to JNI and Kotlin/Native.
+Configure with the verified `FlightFns.words()` on the game thread between frames; null or short
+configuration disables it. Route directions and seen-area bits are copied by the original flight code.
+The area-turned query consumes its pending notification. The portable frame loop already ticks and
+draws flight, including EXPAND; hosts must not tick it again. This transport does not itself enable
+flight controls on iOS. `pk_flight_api_test` and `PkApiCoreTest` check inert behavior without verified
+configuration, across GBA, GB and teardown, including unchanged diagnostic pictures.
+
 Its host test runs it off Android on `linux/make_diagnostic.py`'s ROMs (CI's "Core C API (host)" job):
 
 ```bash
