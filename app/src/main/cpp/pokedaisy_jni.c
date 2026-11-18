@@ -250,9 +250,8 @@ Java_com_pokedaisy_app_MgbaCore_pkFieldState(JNIEnv* env, jobject thiz, jboolean
 // PLAYER LOOK: the player's sprite set up again from its graphics record (after the look changed, or a state loaded).
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkLookRefresh(JNIEnv* env, jobject thiz, jbyteArray pal) {
-    if (!g.core || !pk_is_gba(g.core)) return JNI_FALSE;
     jbyte* p = pal && (*env)->GetArrayLength(env, pal) == 32 ? (*env)->GetByteArrayElements(env, pal, NULL) : NULL;
-    int ok = pk_look_refresh(g.core, (const uint8_t*) p);
+    bool ok = pk_api_look_refresh((const uint8_t*) p, p ? 32 : 0);
     if (p) (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
     return ok ? JNI_TRUE : JNI_FALSE;
 }
@@ -1014,42 +1013,19 @@ Java_com_pokedaisy_app_MgbaCore_pkRomBlocks(JNIEnv* env, jobject thiz, jintArray
     jint* crcs = (*env)->GetIntArrayElements(env, jCrcs, NULL);
     jsize size = (*env)->GetArrayLength(env, jData);
     jbyte* data = (*env)->GetByteArrayElements(env, jData, NULL);
-    int done = 0;
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core) {
-        pk_coop_uninstall(g.core);   // its block is in the ROM overlay this replaces (and may overlap a new one)
-        pk_coop_lock_uninstall(g.core);   // coop-lock (plan 5 Task 5)
-        pk_cheats_unblock(g.core);
-        jsize at = 0;
-        for (; done < n; done++) {
-            if (lens[done] < 1 || at + lens[done] > size ||
-                !pk_cheats_block(g.core, (uint32_t) addrs[done], (const uint8_t*) data + at, lens[done], (uint32_t) crcs[done])) {
-                break;
-            }
-            at += lens[done];
-        }
-        if (done < n) {
-            pk_cheats_unblock(g.core);
-        }
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
-    (*env)->ReleaseByteArrayElements(env, jData, data, JNI_ABORT);
-    (*env)->ReleaseIntArrayElements(env, jCrcs, crcs, JNI_ABORT);
-    (*env)->ReleaseIntArrayElements(env, jLens, lens, JNI_ABORT);
-    (*env)->ReleaseIntArrayElements(env, jAddrs, addrs, JNI_ABORT);
-    return done == n ? n : -1;
+    int done = addrs && lens && crcs && data ?
+        pk_api_look_blocks(addrs, lens, crcs, n, (const uint8_t*) data, size) : -1;
+    if (data) (*env)->ReleaseByteArrayElements(env, jData, data, JNI_ABORT);
+    if (crcs) (*env)->ReleaseIntArrayElements(env, jCrcs, crcs, JNI_ABORT);
+    if (lens) (*env)->ReleaseIntArrayElements(env, jLens, lens, JNI_ABORT);
+    if (addrs) (*env)->ReleaseIntArrayElements(env, jAddrs, addrs, JNI_ABORT);
+    return done;
 }
 
 // Emu thread: every PLAYER LOOK block out again.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRomUnblock(JNIEnv* env, jobject thiz) {
-    pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core) {
-        pk_coop_uninstall(g.core);
-        pk_coop_lock_uninstall(g.core);   // coop-lock (plan 5 Task 5)
-        pk_cheats_unblock(g.core);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
+    pk_api_look_blocks(NULL, NULL, NULL, 0, NULL, 0);
 }
 
 // --- co-op (pk_coop.c's retail check, the link bridge, the after-battle steps; Emerald, GBA only) ---------
@@ -1493,16 +1469,13 @@ Java_com_pokedaisy_app_MgbaCore_pkCoopSaveGame(JNIEnv* env, jobject thiz) {
 // game has one loaded (pk_cheats_repalette). Returns how many.
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRepalette(JNIEnv* env, jobject thiz, jbyteArray jFrom, jbyteArray jTo) {
-    jsize n = (*env)->GetArrayLength(env, jFrom) / 32;
-    if (n < 1 || (*env)->GetArrayLength(env, jTo) != 32) {
-        return 0;
-    }
+    jsize size = (*env)->GetArrayLength(env, jFrom);
+    if (size < 32 || size % 32 || (*env)->GetArrayLength(env, jTo) != 32) return 0;
     jbyte* from = (*env)->GetByteArrayElements(env, jFrom, NULL);
+    if (!from) return 0;
     uint8_t to[32];
     (*env)->GetByteArrayRegion(env, jTo, 0, 32, (jbyte*) to);
-    pthread_rwlock_wrlock(&pk_coreLock);
-    int swapped = g.core ? pk_cheats_repalette(g.core, (const uint8_t*) from, n, to) : 0;
-    pthread_rwlock_unlock(&pk_coreLock);
+    int swapped = pk_api_look_repalette((const uint8_t*) from, size, to, sizeof to);
     (*env)->ReleaseByteArrayElements(env, jFrom, from, JNI_ABORT);
     return swapped;
 }

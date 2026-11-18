@@ -450,6 +450,50 @@ void pk_api_set_tint(int red, int green, int blue) {
     pthread_rwlock_unlock(&pk_coreLock);
 }
 
+int pk_api_look_blocks(const int32_t* addrs, const int32_t* lengths, const int32_t* crcs,
+                       int count, const uint8_t* data, int size) {
+    if (count < 0 || size < 0 || (count && (!addrs || !lengths || !crcs || !data))) return -1;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int result = -1;
+    if (g.core && pk_is_gba(g.core)) {
+        // Co-op shares the overlay store. Remove its hooks before replacing any blocks.
+        pk_coop_uninstall(g.core);
+        pk_coop_lock_uninstall(g.core);
+        pk_cheats_unblock(g.core);
+        int offset = 0;
+        int i = 0;
+        for (; i < count; i++) {
+            uint32_t address = (uint32_t) addrs[i];
+            int length = lengths[i];
+            if (length < 1 || length > size - offset || address < 0x08000000u ||
+                address >= 0x0E000000u || (uint32_t) length > 0x02000000u - (address & 0x01FFFFFFu) ||
+                !pk_cheats_block(g.core, address, data + offset, length, (uint32_t) crcs[i])) break;
+            offset += length;
+        }
+        if (i == count && offset == size) result = count;
+        else pk_cheats_unblock(g.core);
+    } else if (!count && !size) {
+        result = 0;
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+    return result;
+}
+
+int pk_api_look_repalette(const uint8_t* from, int fromBytes, const uint8_t* to, int toBytes) {
+    if (!from || !to || fromBytes < 32 || fromBytes % 32 || toBytes != 32) return 0;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int swapped = g.core && pk_is_gba(g.core) ? pk_cheats_repalette(g.core, from, fromBytes / 32, to) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return swapped;
+}
+
+bool pk_api_look_refresh(const uint8_t* palette, int paletteBytes) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    bool done = g.core && pk_is_gba(g.core) && pk_look_refresh(g.core, paletteBytes == 32 ? palette : NULL);
+    pthread_rwlock_unlock(&pk_coreLock);
+    return done;
+}
+
 void pk_api_follower_set(const uint8_t* frames, int frameBytes, const uint8_t* palette, int paletteBytes) {
     bool valid = frames && palette && frameBytes == PK_API_FOLLOWER_FRAME_BYTES &&
                  paletteBytes == PK_API_FOLLOWER_PALETTE_BYTES;

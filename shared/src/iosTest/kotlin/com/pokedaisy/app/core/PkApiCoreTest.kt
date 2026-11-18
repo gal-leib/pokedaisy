@@ -32,6 +32,24 @@ class PkApiCoreTest {
     fun close() = PkApiCore.stop()
 
     @Test
+    fun appearanceBlocksAcceptTheSignedCrcAndRejectAMismatchedBatch() {
+        val addresses = intArrayOf(0x080000A0, 0x080000A1)
+        val lengths = intArrayOf(1, 1)
+        val crcs = intArrayOf(0xB969BE79u.toInt(), 0)
+        val bytes = byteArrayOf(0x11, 0x22)
+        assertEquals(-1, PkApiCore.replaceLookBlocks(addresses, lengths, crcs, bytes))
+        assertTrue(PkApiCore.start("$dir/diagnostic.gba", null))
+        assertEquals(-1, PkApiCore.replaceLookBlocks(addresses, lengths, crcs, bytes))
+        assertEquals(1, PkApiCore.replaceLookBlocks(
+            addresses.copyOf(1), lengths.copyOf(1), crcs.copyOf(1), bytes.copyOf(1)))
+        assertEquals(0, PkApiCore.replaceLookBlocks(intArrayOf(), intArrayOf(), intArrayOf(), byteArrayOf()))
+        assertEquals(1, PkApiCore.replaceLookBlocks(
+            addresses.copyOf(1), lengths.copyOf(1), crcs.copyOf(1), bytes.copyOf(1)))
+        assertTrue(!PkApiCore.refreshLook(null))
+        assertEquals(0, PkApiCore.repaletteLook(byteArrayOf(), ByteArray(32)))
+    }
+
+    @Test
     fun followerAssetsCannotEnableAnUnknownGameOrLeakAcrossCoreTeardown() {
         val frames = ByteArray(3072) { 0x11 }
         val palette = ByteArray(32) { 0xFF.toByte() }

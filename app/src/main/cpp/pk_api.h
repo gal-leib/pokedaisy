@@ -84,6 +84,15 @@ int pk_api_field_state(void);
  * Game thread between frames; takes the core lock. GB and no game are no-ops. */
 void pk_api_set_tint(int red, int green, int blue);
 
+/** Replace the appearance overlay atomically on the game thread. The CRCs are bit patterns.
+ * Each block consumes its length from data. Returns the count, or -1 after rolling back a failed replacement.
+ * Zero blocks and zero bytes remove the overlay. The cart file is never written. */
+int pk_api_look_blocks(const int32_t* addrs, const int32_t* lengths, const int32_t* crcs,
+                       int count, const uint8_t* data, int size);
+int pk_api_look_repalette(const uint8_t* from, int fromBytes, const uint8_t* to, int toBytes);
+/** Rebuild the field sprite, optionally with a 32-byte palette. Invalid palette inputs act like no palette. */
+bool pk_api_look_refresh(const uint8_t* palette, int paletteBytes);
+
 /** Visual follower transport, game thread between frames. Six 32x32 4bpp frames and one RGB555 palette
  * are copied by the existing renderer; null or incorrect lengths clear the graphics. Showing is GBA-only.
  * The existing field renderer owns drawing and temporary sprite state; no ROM-file edits. */

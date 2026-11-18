@@ -89,6 +89,20 @@ static void gba(const char* dir) {
     CHECK(pk_api_platform() == PK_API_PLATFORM_GBA, "platform %d", pk_api_platform());
     struct mCore* core = pkMainCore();
     uint8_t original = core->busRead8(core, 0x080000A0), replacement = original ^ 0xFF, visible = 0;
+    const int32_t addresses[] = {0x080000A0, 0x080000A1};
+    const int32_t lengths[] = {1, 1};
+    const int32_t crcs[] = {(int32_t) 0xB969BE79u, 0};  // CRC of "P", then an intentional mismatch
+    const uint8_t bytes[] = {replacement, replacement};
+    CHECK(pk_api_look_blocks(addresses, lengths, crcs, 1, bytes, 1) == 1, "look block refused");
+    CHECK(core->busRead8(core, addresses[0]) == replacement, "look did not change live ROM");
+    CHECK(pk_api_look_blocks(NULL, NULL, NULL, 0, NULL, 0) == 0, "look clear refused");
+    CHECK(core->busRead8(core, addresses[0]) == original, "look clear did not restore ROM");
+    CHECK(pk_api_look_blocks(addresses, lengths, crcs, 2, bytes, 2) == -1, "look mismatch accepted");
+    CHECK(core->busRead8(core, addresses[0]) == original, "failed look was partially applied");
+    CHECK(pk_api_look_blocks(addresses, lengths, crcs, 1, bytes, 2) == -1, "trailing bytes accepted");
+    CHECK(core->busRead8(core, addresses[0]) == original, "malformed look changed live ROM");
+    CHECK(!pk_api_look_refresh(NULL, 0), "unknown field refreshed");
+    CHECK(pk_api_look_repalette(bytes, sizeof bytes, bytes, sizeof bytes) == 0, "short palette accepted");
     CHECK(!pk_api_rom_patch(0x080000A0, NULL, 1, 0x080000A0, &replacement, 1), "null expected bytes accepted");
     CHECK(!pk_api_rom_patch(0x080000A0, &original, 1, 0x080000A0, NULL, 1), "null replacement accepted");
     CHECK(!pk_api_rom_patch(0x080000A0, &original, 65, 0x080000A0, &replacement, 1), "oversized expected bytes accepted");
