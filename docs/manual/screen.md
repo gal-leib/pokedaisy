@@ -107,11 +107,13 @@ On a device that can't run a DS game at full speed, PokeDaisy keeps the game at 
 
 `STATUS BAR` adds a thin strip with the game's name, where you are, your money, the time and the battery. It's handy when the game is full screen and you can't see the device's own clock.
 
+On iPhone and iPad, go to `SCREEN` > `DISPLAY OPTIONS` to choose where the strip appears.
+
 | Choice | Where it goes |
 | --- | --- |
 | `OFF` | No bar (the default). |
 | `GAME` | Across the top of the game, exactly as wide as it. The game shrinks a little to make room. |
-| `COMPANION` | Over the companion's tabs on the bottom screen, so the game keeps its full size. |
+| `COMPANION` | Over the companion's tabs, so the game keeps its full size. |
 
 The clock follows your device's 12 or 24 hour setting. Money shows for the games where PokeDaisy can read it.
 

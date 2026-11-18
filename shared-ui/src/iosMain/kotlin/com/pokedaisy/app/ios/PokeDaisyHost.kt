@@ -33,6 +33,7 @@ import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.OptionConfirm
+import com.pokedaisy.app.companion.ui.RunningGameStatusBar
 import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
 import com.pokedaisy.app.companion.data.Gen1Art
 import com.pokedaisy.app.companion.data.Gen2Art
@@ -105,6 +106,11 @@ object PokeDaisyHost {
         val currentSettings = settings
         val currentSlots = slots
         val currentRuntime = playback
+        val title = iosRomTitle(romPath)
+        val statusBar: @Composable () -> Unit = {
+            val snapshot by telemetry.snapshot.collectAsState()
+            RunningGameStatusBar(title, snapshot, FoundationDates::shortTime)
+        }
         var quickActions: com.pokedaisy.app.companion.ui.GameQuickActions? = null
         if (currentSettings != null && currentSlots != null && currentRuntime != null) {
             currentSettings.rewindUnavailable = panels::showRewindUnavailable
@@ -156,7 +162,8 @@ object PokeDaisyHost {
                     panels.Content(
                         gameContent = { UIKitViewController(factory = { current }, modifier = Modifier.fillMaxSize(),
                             properties = UIKitInteropProperties(interactionMode = null)) },
-                        companion = { Companion(panels) },
+                        companion = { Companion(panels, statusBar.takeIf { currentSettings?.statusBar == true && currentSettings.statusBarOnCompanion }) },
+                        statusBar = statusBar.takeIf { currentSettings?.statusBar == true && !currentSettings.statusBarOnCompanion },
                         gameOverlay = {
                             val snapshot by telemetry.snapshot.collectAsState()
                             currentSettings?.let { hudSettings ->
@@ -207,11 +214,11 @@ object PokeDaisyHost {
     }
 
     @Composable
-    private fun Companion(panels: IosGameScreen) {
+    private fun Companion(panels: IosGameScreen, statusBar: (@Composable () -> Unit)?) {
         val snapshot by telemetry.snapshot.collectAsState()
         Box(Modifier.fillMaxSize()) {
             CompanionScreen(snapshot, slots = slots, settings = settings, battleInput = battle, gamePick = telemetry.gamePick,
-                back = panels.back, keys = panels.keys, itemUse = items, fly = fly)
+                back = panels.back, keys = panels.keys, statusBar = statusBar, itemUse = items, fly = fly)
             stateError?.let { message ->
                 OptionConfirm(tr("SAVE STATES"), message, tr("OK"), rememberGbaTextMetrics(),
                     onConfirm = { stateError = null }, onDismiss = { stateError = null }, cancelLabel = null)

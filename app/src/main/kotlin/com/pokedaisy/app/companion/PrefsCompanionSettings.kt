@@ -52,8 +52,11 @@ class PrefsCompanionSettings(
     override fun setHotkeysEnabled(on: Boolean) { prefs.hotkeysEnabled = on }
     override val clickSound get() = prefs.clickSound
     override fun setClickSound(on: Boolean) { prefs.clickSound = on }
-    override val statusBar get() = prefs.statusBar
-    override fun setStatusBar(on: Boolean) { prefs.statusBar = on }
+    private var statusBarRevision by mutableIntStateOf(0)
+    override val statusBar get() = statusBarRevision.let { prefs.statusBar }
+    override fun setStatusBar(on: Boolean) { prefs.statusBar = on; statusBarRevision++ }
+    override val statusBarOnCompanion get() = statusBarRevision.let { prefs.statusBarOnCompanion }
+    override fun setStatusBarOnCompanion(on: Boolean) { prefs.statusBarOnCompanion = on; statusBarRevision++ }
     override val gbaColors get() = prefs.gbaColors
     override fun setGbaColors(on: Boolean) { prefs.gbaColors = on }
     override val companionShaders get() = prefs.companionShaders

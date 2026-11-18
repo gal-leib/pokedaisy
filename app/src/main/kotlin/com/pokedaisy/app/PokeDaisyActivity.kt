@@ -70,7 +70,7 @@ import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.RomRegionMap
 import com.pokedaisy.app.companion.data.displayName
 import com.pokedaisy.app.companion.ui.CompanionScreen
-import com.pokedaisy.app.companion.ui.GameStatusBar
+import com.pokedaisy.app.companion.ui.RunningGameStatusBar
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -1354,9 +1354,8 @@ class PokeDaisyActivity : Activity() {
         override fun setRaPopups(on: Boolean) { Prefs(this@PokeDaisyActivity).raPopups = on }
         override val raProgressPopups get() = Prefs(this@PokeDaisyActivity).raProgressPopups
         override fun setRaProgressPopups(on: Boolean) { Prefs(this@PokeDaisyActivity).raProgressPopups = on }
-        override val statusBarOnCompanion get() = Prefs(this@PokeDaisyActivity).statusBarOnCompanion
         override fun setStatusBarOnCompanion(on: Boolean) {
-            Prefs(this@PokeDaisyActivity).statusBarOnCompanion = on
+            stored.setStatusBarOnCompanion(on)
             runOnUiThread { syncGameScreen() }
         }
         override fun setGameAspect(aspect: com.pokedaisy.app.companion.GameAspect) {
@@ -3174,7 +3173,7 @@ class PokeDaisyActivity : Activity() {
         battleStyle.value = com.pokedaisy.app.companion.BattleStyle.of(prefs.battleStyle)
         com.pokedaisy.app.companion.ui.AchievementIcons.shown = prefs.raIcons
         hudUpright.value = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-        com.pokedaisy.app.companion.ui.CompanionStatusBar.shown = prefs.statusBar && prefs.statusBarOnCompanion
+        companionStatusBarVisible = prefs.statusBar && prefs.statusBarOnCompanion
         val stageLayout = stage.viewport
         // WIDE on a game it doesn't know is ORIGINAL; otherwise the game takes the whole area and
         // the core draws the overworld into the room beside it.
@@ -4149,35 +4148,25 @@ class PokeDaisyActivity : Activity() {
     }
 
     /** The same status bar over the companion's tabs (SETTINGS > STATUS BAR > COMPANION). */
-    private val companionStatusBar: @androidx.compose.runtime.Composable () -> Unit = { StatusBarContent() }
+    private var companionStatusBarVisible by androidx.compose.runtime.mutableStateOf(false)
+    private val statusBarContent: @androidx.compose.runtime.Composable () -> Unit = { StatusBarContent() }
+    private val companionStatusBar get() = statusBarContent.takeIf { companionStatusBarVisible }
 
     @androidx.compose.runtime.Composable
     private fun StatusBarContent() {
-            val snap by telemetry.snapshot.collectAsState()
-            val time by produceState(clockText()) {
-                while (true) {
-                    delay(60_000L - System.currentTimeMillis() % 60_000L)
-                    value = clockText()
-                }
+        val snap by telemetry.snapshot.collectAsState()
+        // The Library's name; a ROM the library hasn't named yet (a frontend launch) is
+        // recognised here, off the main thread.
+        val name by produceKeyedState(rom?.let { GameTitles.label(this@PokeDaisyActivity, Prefs(this@PokeDaisyActivity), it) }.orEmpty(), rom) {
+            val r = rom ?: return@produceKeyedState
+            if (withContext(Dispatchers.IO) { GameTitles.identify(this@PokeDaisyActivity, listOf(r)) }) {
+                value = GameTitles.label(this@PokeDaisyActivity, Prefs(this@PokeDaisyActivity), r)
             }
-            // The Library's name; a ROM the library hasn't named yet (a frontend launch) is
-            // recognised here, off the main thread.
-            val name by produceKeyedState(rom?.let { GameTitles.label(this@PokeDaisyActivity, Prefs(this@PokeDaisyActivity), it) }.orEmpty(), rom) {
-                val r = rom ?: return@produceKeyedState
-                if (withContext(Dispatchers.IO) { GameTitles.identify(this@PokeDaisyActivity, listOf(r)) }) {
-                    value = GameTitles.label(this@PokeDaisyActivity, Prefs(this@PokeDaisyActivity), r)
-                }
-            }
-            GameStatusBar(
-                gameName = name,
-                location = snap.location.mapSecName.takeIf { snap.connected },
-                money = snap.money.takeIf { snap.connected },
-                time = time,
-            )
+        }
+        RunningGameStatusBar(name, snap) { millis ->
+            android.text.format.DateFormat.getTimeFormat(this).format(java.util.Date(millis))
+        }
     }
-
-    private fun clockText(): String =
-        android.text.format.DateFormat.getTimeFormat(this).format(java.util.Date())
 
     /** Show the on-screen controls per SETTINGS > TOUCH CONTROLS > SHOW (AUTO: only with no controller), in its style. */
     private fun syncTouchControls() {

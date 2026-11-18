@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,6 +57,7 @@ internal class IosGameScreen(
     private var menuSuppressed = 0
     private var nextRepeat = 0.0
     private var portraitGripHeight = 0
+    private var gameStatusBarHeight by mutableIntStateOf(0)
     private var density = 1f
     private var pictureAspect by mutableStateOf(prefs.gameAspect)
     private val gameOverlays = GameOverlays(IosOverlays.store).apply { key = prefs.overlay }
@@ -151,7 +153,7 @@ internal class IosGameScreen(
 
     @Composable
     fun Content(gameContent: @Composable () -> Unit, companion: @Composable () -> Unit,
-                gameOverlay: @Composable () -> Unit = {}) {
+                gameOverlay: @Composable () -> Unit = {}, statusBar: (@Composable () -> Unit)? = null) {
         val focus = LocalFocusManager.current
         DisposableEffect(focus) {
             releaseFocus = { focus.clearFocus(force = true) }
@@ -166,15 +168,17 @@ internal class IosGameScreen(
             val chrome = Modifier.graphicsLayer { renderEffect = effect }
             val compactText = minOf(maxWidth, maxHeight) >= 600.dp
             val visible = IosTouchPreferences.visible
+            val barHeight = if (statusBar == null) 0 else with(LocalDensity.current) { statusBarHeight().roundToPx() }
             val strip = if (visible && IosTouchPreferences.underGame)
                 TouchGeometry.naturalHeight(IosTouchPreferences.style, constraints.maxWidth.toFloat(), density, gameBoy) else 0
             SideEffect {
+                gameStatusBarHeight = barHeight
                 game?.stretch = stretched || skinViewport(constraints.maxWidth, constraints.maxHeight, upright) != null ||
                     (!upright && !expanded && gameOverlays.key.isNotEmpty())
                 state.setSide(state.side.withEnabled(!upright))
                 state.setPortrait(state.portrait.copy(enabled = upright, underGame = IosTouchPreferences.underGame, padStrip = strip, expand = expanded))
             }
-            GameScreen(state, gameHeight = { (it / aspect).roundToInt() },
+            GameScreen(state, gameHeight = { (it / aspect).roundToInt() + barHeight },
                 game = {
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val w = constraints.maxWidth; val h = constraints.maxHeight
@@ -182,7 +186,8 @@ internal class IosGameScreen(
                         val border = if (!upright && !expanded && skinViewport(w, h, upright) == null)
                             gameOverlays.placement(w, h, gameBoy, stretched) else null
                         GamePicture(aspect, upright, Modifier.fillMaxSize(), fill = expanded || stretched,
-                            viewport = { pw, ph -> pictureViewport(pw, ph, upright) }, content = gameContent)
+                            viewport = { pw, ph -> pictureViewport(pw, ph, upright) }, topStripHeight = barHeight,
+                            topStrip = statusBar?.let { bar -> { Box(chrome) { bar() } } }, content = gameContent)
                         if (border != null) gameOverlays.Artwork(w, h, gameBoy, stretched, Modifier.fillMaxSize())
                     }
                 },
@@ -236,14 +241,13 @@ internal class IosGameScreen(
             TouchGeometry.naturalHeight(IosTouchPreferences.style, w.toFloat(), density, gameBoy) else 0
         val p = state.portrait.copy(enabled = upright, padStrip = strip, underGame = IosTouchPreferences.underGame)
         val side = state.side.withEnabled(!upright)
-        val measured = gameScreenFrames(w, h, (w / aspect).roundToInt(), if (upright) portraitGripHeight else 0, side, p)
+        val measured = gameScreenFrames(w, h, (w / aspect).roundToInt() + gameStatusBarHeight, if (upright) portraitGripHeight else 0, side, p)
         return stage(measured, true, w, h, upright)
     }
 
     private fun stage(f: GameScreenFrames, visible: Boolean, w: Int = state.width, h: Int = state.height,
                       upright: Boolean = state.portrait.enabled): TouchStage {
-        val picture = (pictureViewport(f.game.width.toInt(), f.game.height.toInt(), upright, f.controls.width)
-            ?: fittedGamePicture(f.game.width, f.game.height, aspect, upright, fill = expanded || stretched)).translate(f.game.left, f.game.top)
+        val picture = pictureFrame(f, upright).translate(f.game.left, f.game.top)
         val area = if (visible) f.controls else Rect(0f, h.toFloat(), w.toFloat(), h.toFloat())
         val companion = f.companion.takeIf { f.companionShown && (upright || !state.side.isWindow) }
         return TouchStage(w.toFloat(), h.toFloat(), density, upright, picture, area, companion, aspect, gameBoy)
@@ -267,11 +271,16 @@ internal class IosGameScreen(
         return gameOverlays.picture(w, h, gameBoy, stretched)
     }
 
+    private fun pictureFrame(f: GameScreenFrames, upright: Boolean): Rect {
+        val viewport = pictureViewport(f.game.width.toInt(), f.game.height.toInt(), upright, f.controls.width)
+        return fittedGamePicture(f.game.width, f.game.height, aspect, upright, fill = expanded || stretched,
+            viewport = viewport, topStripHeight = gameStatusBarHeight)
+    }
+
     fun coreFrame(): Rect? = frames?.let { f ->
-        val skin = pictureViewport(f.game.width.toInt(), f.game.height.toInt(), state.portrait.enabled, f.controls.width)
-        if (skin != null && !expanded) skin else if (skin != null)
-            fittedGamePicture(skin.width, skin.height, aspect).translate(skin.left, skin.top)
-        else fittedGamePicture(f.game.width, f.game.height, aspect, state.portrait.enabled && !expanded, fill = stretched)
+        val picture = pictureFrame(f, state.portrait.enabled)
+        if (expanded) fittedGamePicture(picture.width, picture.height, aspect).translate(picture.left, picture.top)
+        else picture
     }
 
     fun hudClear(): Pair<Int, Int> {

@@ -66,6 +66,21 @@ class PrefsCompanionSettingsTest {
         assertTrue(p.reusableTms); assertEquals(listOf(true), s.fieldOptions)
     }
 
+    @Test fun statusBarUsesTheExistingKeysAndRecoversItsPlacement() {
+        val store = Store()
+        val settings = Settings(Prefs(store))
+        assertFalse(settings.statusBar)
+        settings.setStatusBarOnCompanion(true)
+        settings.setStatusBar(true)
+        val reopened = Settings(Prefs(store))
+        assertTrue(reopened.statusBar)
+        assertTrue(reopened.statusBarOnCompanion)
+        reopened.setStatusBarOnCompanion(false)
+        assertEquals(false, store.data["status_bar_on_companion"])
+        reopened.setStatusBar(false)
+        assertEquals(false, store.data["status_bar"])
+    }
+
     @Test fun bothInstalledBattleStyleFormatsKeepTheirRepresentation() {
         val androidStore = Store().apply { data["battle_style"] = BattleStyle.GEN4.id }
         val iosStore = Store().apply { data["battle_style"] = BattleStyle.GEN4.name }

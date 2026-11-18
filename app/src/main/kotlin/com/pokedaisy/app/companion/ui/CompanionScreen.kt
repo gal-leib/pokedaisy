@@ -127,7 +127,7 @@ fun CompanionScreen(
     achievements: com.pokedaisy.app.companion.CompanionAchievements? = null,
     /** A popup shown from the start, without timers - for screenshot tests. */
     initialPopup: com.pokedaisy.app.companion.AchievementPopup? = null,
-    /** The game's status bar ([GameStatusBar]), drawn over the tabs while [CompanionStatusBar.shown]. */
+    /** The game's status bar ([GameStatusBar]), drawn over the tabs when supplied. */
     statusBar: (@Composable () -> Unit)? = null,
     /** Always over the tabs, above [statusBar]. */
     topStrip: (@Composable () -> Unit)? = null,
@@ -502,14 +502,14 @@ fun CompanionScreen(
             val margin = if (LocalShortCompanion.current) 8.dp else 12.dp
             val dock by androidx.compose.animation.core.animateFloatAsState(if (gen5Full) 1f else 0f, tween(220), label = "gen5-dock")
             // Nothing over the tab area: the controls spill over the top margin too.
-            val nothingAbove = topStrip == null && !(statusBar != null && CompanionStatusBar.shown) && !(loaded && !snapshot.connected)
+            val nothingAbove = topStrip == null && statusBar == null && !(loaded && !snapshot.connected)
             Column(modifier = Modifier.fillMaxSize().padding(top = topInset).padding(margin)) {
                 if (topStrip != null) {
                     Box { topStrip() }
                     Spacer(Modifier.height(8.dp))
                 }
                 // SETTINGS > STATUS BAR on the companion: the game's strip over the tabs.
-                if (statusBar != null && CompanionStatusBar.shown) {
+                if (statusBar != null) {
                     Box { statusBar() }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -754,7 +754,7 @@ fun CompanionScreen(
                                 onTabsChanged = { chosenTabs = it },
                                 initialPage = initialSettingsPage,
                                 ui = settingsUi,
-                                statusBarShown = statusBar != null && CompanionStatusBar.shown,
+                                statusBarShown = statusBar != null,
                                 playsAs = snapshot.gamePicker?.takeIf { gamePick != null }?.let { p ->
                                     p.options.firstOrNull { it.id == p.current }?.title?.let(::shortGameTitle) ?: tk("NOT SET")
                                 },
@@ -972,15 +972,6 @@ fun CompanionScreen(
             }
         }
     } } } }
-}
-
-/**
- * SETTINGS > STATUS BAR > COMPANION: the game's status bar over the companion's tabs instead
- * of over the game - [Prefs.statusBarOnCompanion], set by the activity at start and by SETTINGS.
- * Compose state, so a change moves it at once.
- */
-object CompanionStatusBar {
-    var shown by androidx.compose.runtime.mutableStateOf(false)
 }
 
 /**

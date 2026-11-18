@@ -248,21 +248,13 @@ open class CompanionScreenshotTest {
     }
 
     /** SETTINGS > STATUS BAR > COMPANION: the game's status bar over the tabs. */
-    @Test fun partyStatusBar() {
-        CompanionStatusBar.shown = true
-        try {
-            snapshot {
-                CompanionScreen(SampleCompanion.snapshot, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "PARTY", statusBar = {
-                    GameStatusBar("Pokémon FireRed", "PALLET TOWN", 3000, "12:34")
-                })
-            }
-        } finally { CompanionStatusBar.shown = false }
+    @Test fun partyStatusBar() = snapshot {
+        CompanionScreen(SampleCompanion.snapshot, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "PARTY", statusBar = {
+            GameStatusBar("Pokémon FireRed", "PALLET TOWN", 3000, "12:34")
+        })
     }
 
-    @Test fun yellowSettingsStatusBar() {
-        CompanionStatusBar.shown = true
-        try { yellow("yellow", "SETTINGS", statusBar = true) } finally { CompanionStatusBar.shown = false }
-    }
+    @Test fun yellowSettingsStatusBar() = yellow("yellow", "SETTINGS", statusBar = true)
 
     /** The TRAINER CARD, front and back, from the retail ROM and the FireRed fixture save. */
     @Test fun card() = cardShot(back = false)
@@ -1491,10 +1483,7 @@ open class CompanionScreenshotTest {
     @Test fun polishedGuideTips() =
         crystal("polished_crystal", "GUIDE", polished = true, guidePage = "TIPS", guideOpen = "TIPS/WILD POKéMON/Why did the POKéMON on this route change?/null" to 2)
     @Test fun prismDexEntryOwn() = crystal("prism", "DEX", dexEntry = 239, prism = true)  // PHANCERO, one of its own
-    @Test fun crystalStatusBar() {
-        CompanionStatusBar.shown = true
-        try { crystal("crystal", "PARTY", statusBar = true) } finally { CompanionStatusBar.shown = false }
-    }
+    @Test fun crystalStatusBar() = crystal("crystal", "PARTY", statusBar = true)
     @Test fun soulGoldV12Party() = retail("soulgold_v12_battle", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "PARTY", art = true)
     @Test fun soulGoldV12Items() = retail("soulgold_v12", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "ITEMS", art = true)
     @Test fun soulGoldV12Battle() = retail("soulgold_v12_battle", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "BATTLE", art = true)

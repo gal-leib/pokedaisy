@@ -35,6 +35,8 @@ import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 import platform.UIKit.UIViewController
 
+internal fun iosRomTitle(path: String) = path.substringAfterLast('/').substringBeforeLast('.')
+
 /** Files, persistence and launching for shared library/setup/settings presenters. There is no second native screen. */
 internal class IosLibraryHost(
     private val touch: IosTouchControls,
@@ -116,7 +118,7 @@ internal class IosLibraryHost(
     }
 
     private fun key(path: String) = path.substringAfterLast('/')
-    private fun label(path: String) = key(path).substringBeforeLast('.')
+    private fun label(path: String) = iosRomTitle(path)
     private fun category(path: String): RomCategory = when (path.substringAfterLast('.').lowercase()) {
         "gb" -> RomCategory.GB; "gbc" -> RomCategory.GBC; else -> RomCategory.GBA
     }

@@ -1239,7 +1239,8 @@ private fun speedRows(s: CompanionSettings, changed: () -> Unit, select: (Select
 private fun displayRows(s: CompanionSettings, changed: () -> Unit, navigate: (Page) -> Unit, select: (Selector) -> Unit): List<SettingRow> =
     listOfNotNull(
         // Game, location, money, clock and battery: OFF, over the game, or over these tabs.
-        SettingRow(tk("STATUS BAR"), statusBarLabel(s.statusBar, s.statusBarOnCompanion), subtitle = "Place, money, clock and battery") {
+        SettingRow(tk("STATUS BAR"), statusBarLabel(s.statusBar, s.statusBarOnCompanion),
+            labelBadge = s.statusBarBadge, subtitle = "Place, money, clock and battery") {
             select(Selector(tk("STATUS BAR"), STATUS_BAR_PLACES, statusBarLabel(s.statusBar, s.statusBarOnCompanion)) {
                 val i = STATUS_BAR_PLACES.indexOf(it)
                 if (i > 0) s.setStatusBarOnCompanion(i == 2)

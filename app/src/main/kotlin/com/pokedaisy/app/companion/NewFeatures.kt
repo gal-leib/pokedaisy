@@ -24,6 +24,7 @@ object NewFeatures {
     const val IOS_TOUCH_SKINS = "ios_touch_skins"
     const val IOS_SCREEN_BORDERS = "ios_screen_borders"
     const val IOS_OVERLAY_IMPORTS = "ios_overlay_imports"
+    const val IOS_STATUS_BAR = "ios_status_bar"
     const val IOS_SCALEFX_SMOOTHING = "ios_scalefx_smoothing"
     const val IOS_DAY_NIGHT = "ios_day_night"
     const val IOS_SHINY_ODDS = "ios_shiny_odds"
@@ -315,6 +316,7 @@ object NewFeatures {
         IOS_TOUCH_SKINS,
         IOS_SCREEN_BORDERS,
         IOS_OVERLAY_IMPORTS,
+        IOS_STATUS_BAR,
         IOS_SCREEN_EFFECTS, IOS_COMPANION_EFFECTS, IOS_GAME_SMOOTHING, IOS_XBR_SMOOTHING, IOS_SCALEFX_SMOOTHING, IOS_DAY_NIGHT, IOS_SHINY_ODDS, IOS_FLIGHT, IOS_FOLLOWER, IOS_PLAYER_LOOK, IOS_RIVAL_LOOK, IOS_TEXT_LOOK, IOS_RIDE_ON, IOS_POKEMON_COSTUMES, IOS_AUTO_REFILL, IOS_SHINY_ALERT, IOS_LAST_BALL, IOS_BOSS_RETRY, IOS_LOW_HP_BEEP, IOS_FIELD_POISON, IOS_NUZLOCKE,
         IOS_CHEATS,
         IOS_FIELD_ITEMS,

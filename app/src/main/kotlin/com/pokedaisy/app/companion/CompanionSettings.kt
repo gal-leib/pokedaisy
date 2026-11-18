@@ -339,9 +339,7 @@ interface CompanionSettings : StoredCompanionSettings {
 
 
 
-    /** The status bar over the companion's tabs instead of over the game - see [Prefs.statusBarOnCompanion]. */
-    val statusBarOnCompanion: Boolean get() = false
-    fun setStatusBarOnCompanion(on: Boolean) {}
+    val statusBarBadge: String? get() = null
 
     /** SETTINGS > HIDE BATTLE MENU: two screens, the game's own battle menus off its screen - see
      * [com.pokedaisy.app.Prefs.hideBattleMenu]. Null = no row (one screen, or a game it doesn't work in). */
