@@ -37,8 +37,8 @@ class GameSession(
 
     /** Service worker callbacks and patches between frames. Field delays count only forward frames. */
     fun servicePending(work: FrameWork, gba: Boolean, gbOnField: () -> Boolean, applyPatches: () -> Unit = {}) {
-        if (work == FrameWork.REWINDING) return
         servicePosted()
+        if (work == FrameWork.REWINDING) return
         applyPatches()
         if (work == FrameWork.ADVANCING) serviceField(gba, gbOnField())
     }

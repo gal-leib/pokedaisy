@@ -36,10 +36,11 @@ class GameSessionTest {
                 error("applied patches while rewinding")
             }
         }
-        assertTrue(events.isEmpty())
+        assertEquals(listOf("posted"), events)
+        s.post { events += "held callback" }
         s.servicePending(GameSession.FrameWork.HELD, true, { error("read scene while held") }) { events += "patches" }
         repeat(19) { s.servicePending(GameSession.FrameWork.HELD, true, { true }) }
-        assertEquals(listOf("posted", "patches"), events)
+        assertEquals(listOf("posted", "held callback", "patches"), events)
         events.clear()
         repeat(2) { s.servicePending(GameSession.FrameWork.ADVANCING, true, { true }) }
         assertTrue(events.isEmpty())

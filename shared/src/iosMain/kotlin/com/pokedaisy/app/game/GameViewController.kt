@@ -196,7 +196,7 @@ class GameViewController(
     /** Shared battle automation runs once per emulated frame, on every input source. */
     var frameKeys: (Int) -> Int = { it }
     var frameSpeed: () -> Double = { speed }
-    var beforeFrame: () -> Unit = {}
+    var beforeFrame: (GameSession.FrameWork) -> Unit = {}
     /** May replace input or hold the core while the main-thread game loop continues polling. */
     var frameGate: ((Int) -> Int?)? = null
     var afterFrame: () -> Unit = {}
@@ -366,14 +366,17 @@ class GameViewController(
             val gate = frameGate
             val held = if (gate == null) {
                 if (rewindFramesEnabled != rewindEnabled) updateRewindCapacity()
-                if (!rewinding) beforeFrame()
+                beforeFrame(if (rewinding) GameSession.FrameWork.REWINDING else GameSession.FrameWork.ADVANCING)
                 input.keys()
             } else {
                 val allowed = gate(input.keys())
                 // Do not retain frames from a linked battle or a story-locked save in the rewind ring.
                 updateRewindCapacity()
-                if (allowed == null) break
-                if (!rewinding) beforeFrame()
+                if (allowed == null) {
+                    beforeFrame(GameSession.FrameWork.HELD)
+                    break
+                }
+                beforeFrame(if (rewinding) GameSession.FrameWork.REWINDING else GameSession.FrameWork.ADVANCING)
                 allowed
             }
             if (!running || !active || uiPaused) break

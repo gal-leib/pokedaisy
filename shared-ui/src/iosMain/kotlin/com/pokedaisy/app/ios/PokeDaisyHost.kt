@@ -405,8 +405,8 @@ object PokeDaisyHost {
                     bKeys(o.keys(held, p.fieldState, p.onField, builtIn))
                 }
             }
-            g.beforeFrame = {
-                p.beforeFrame {
+            g.beforeFrame = { work ->
+                p.beforeFrame(work) {
                     if (!currentCoop.battleActive) {
                         if (gameOptions.dirty) {
                             gameOptions.tick()
@@ -415,9 +415,11 @@ object PokeDaisyHost {
                         if (currentLook.renderer.service()) currentCoop.storyLock?.requestReinstall()
                     }
                 }
-                g.camera.flying = p.flight?.state?.let { it != 0 } == true
-                g.camera.flightZoom = p.flight?.scenicAirborne == true
-                p.gameBoyFields?.keepEncounters(PkApiCore, p.options.wildEncounters == 0)
+                if (work == com.pokedaisy.app.game.GameSession.FrameWork.ADVANCING) {
+                    g.camera.flying = p.flight?.state?.let { it != 0 } == true
+                    g.camera.flightZoom = p.flight?.scenicAirborne == true
+                    p.gameBoyFields?.keepEncounters(PkApiCore, p.options.wildEncounters == 0)
+                }
             }
             g.afterFrame = {
                 p.flight?.afterFrame()
