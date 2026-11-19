@@ -22,7 +22,7 @@ val desktopTarget = System.getProperty("os.name").lowercase().let { os ->
 
 val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appSrc = fileTree(app) {
-    listOf("companion/data/**", "companion/*.kt", "companion/i18n/**", "companion/coop/**", "FeatureFlags.kt", "MgbaCore.kt", "Prefs.kt", "PrefsAndroid.kt", "cheats/Cheats.kt", "BpsPatch.kt", "RomPatchFiles.kt", "BattleInputController.kt", "InputBadges.kt", "GameVolume.kt", "ScreenShaders.kt", "CompanionShaders.kt", "overlay/Overlays.kt", "overlay/OverlayGeometry.kt", "overlay/OverlayLabels.kt")
+    listOf("companion/data/**", "companion/*.kt", "companion/i18n/**", "companion/coop/**", "FeatureFlags.kt", "MgbaCore.kt", "Prefs.kt", "PrefsAndroid.kt", "cheats/Cheats.kt", "BpsPatch.kt", "RomPatchFiles.kt", "BattleInputController.kt", "GameVolume.kt", "ScreenShaders.kt", "CompanionShaders.kt", "overlay/Overlays.kt", "overlay/OverlayGeometry.kt", "overlay/OverlayLabels.kt")
         .forEach { include(it) }
     exclude("**/*.java")   // compiled by javac below (companion/coop/x25519)
 }
@@ -92,7 +92,7 @@ object ExportCore {
 }
 tasks.withType<KotlinCompile>().configureEach {
     source(sharedInput)
-    source(rootDir.resolve("../shared-ui/src/commonMain/kotlin/com/pokedaisy/app/companion"))
+    source(rootDir.resolve("../shared-ui/src/commonMain/kotlin"))
     // FieldItemUse reaches the shared frame-work queue; compile that same source here too.
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/GameSession.kt"))
     source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/FlightCore.kt"))
