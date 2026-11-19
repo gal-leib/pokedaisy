@@ -14,7 +14,7 @@ class PlayerLookAssets(private val files: Path, private val isRetail: (String) -
     ) {
         fun availableHeroes(female: Boolean?): List<LookChar> = LookChar.entries.filter { look ->
             if (female == null) listOf(false, true).any { heroes[Triple(it, look, false)]?.blocks?.isNotEmpty() == true }
-            else heroes[Triple(female, look, false)]?.blocks?.isNotEmpty() == true
+            else look != LookChar.of(engine, female) && heroes[Triple(female, look, false)]?.blocks?.isNotEmpty() == true
         }
     }
 

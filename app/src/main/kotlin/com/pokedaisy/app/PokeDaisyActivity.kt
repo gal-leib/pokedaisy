@@ -1571,9 +1571,8 @@ class PokeDaisyActivity : Activity() {
         lookGender.launch {
             telemetry.snapshot.map { it.party.map { m -> m.species } to it.pokedex }
                 .distinctUntilChanged().collect { (species, dex) ->
-                val tables = dex?.tables ?: return@collect
                 val named = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    com.pokedaisy.app.companion.data.PokemonCostumes.party(tables, species)
+                    dex?.tables?.let { com.pokedaisy.app.companion.data.PokemonCostumes.party(it, species) }.orEmpty()
                 }
                 lookRunner.onParty(named.keys.toList(), named)
             }

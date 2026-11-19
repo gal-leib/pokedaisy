@@ -6,13 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import com.pokedaisy.app.companion.data.AppearanceAssets
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.LookEngine
-import com.pokedaisy.app.companion.data.LookPart
 import com.pokedaisy.app.companion.data.MonArt
+import com.pokedaisy.app.companion.data.PlayerAppearance
 import com.pokedaisy.app.companion.data.PlayerLook
 import com.pokedaisy.app.companion.data.PlayerLookAssets
-import com.pokedaisy.app.companion.data.PokemonCostumes
-import com.pokedaisy.app.companion.data.RideOn
-import com.pokedaisy.app.companion.data.TextLook
 import com.pokedaisy.app.companion.data.RideVehicle
 import java.io.File
 import okio.Path.Companion.toOkioPath
@@ -56,18 +53,10 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
     @Volatile var monNames: Map<Int, String> = emptyMap()
         private set
     @Volatile private var party: List<Int> = emptyList()
-    /** The running ROM's scan, kept for the Pokémon's patches (built when one is picked, [monPatch]). */
-    @Volatile private var keptScan: PlayerLook.Scan? = null
-    @Volatile private var keptKnown: Map<LookChar, Map<LookPart, ByteArray>> = emptyMap()
-    private val monPatches = java.util.concurrent.ConcurrentHashMap<Pair<Boolean, Int>, PlayerLook.Patch>()
-    private val building = java.util.concurrent.ConcurrentHashMap.newKeySet<Pair<Boolean, Int>>()
+    private var appearance: PlayerAppearance? = null
 
     @Volatile private var romKey: String? = null
     @Volatile private var engine: LookEngine? = null
-    /** By (female, look, rival dressed too). */
-    @Volatile private var patches: Map<Triple<Boolean, LookChar?, Boolean>, PlayerLook.Patch?> = emptyMap()
-    /** TEXT LOOK's blocks by style. */
-    @Volatile private var textPatches: Map<LookEngine, List<PlayerLook.Block>> = emptyMap()
     @Volatile var female: Boolean? = null
         private set
     @Volatile private var generation = 0
@@ -77,15 +66,14 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
         val gen = ++generation
         romKey = key
         engine = PlayerLook.engineFor(code)
-        patches = emptyMap()
-        textPatches = emptyMap()
-        keptScan = null
-        monPatches.clear()
+        appearance = null
         textOffered.value = emptyList()
         textPicked.value = null
         offered.value = emptyList()
+        offeredMons.value = emptyList()
         worn.value = null
         picked.value = null
+        pickedMon.value = null
         own.value = null
         supported.value = engine != null
         female = save?.let { runCatching { genderInSave(it.readBytes()) }.getOrNull() }
@@ -117,10 +105,7 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
                     if (gen != generation) return@post
                     supported.value = catalog != null
                     if (catalog == null) return@post
-                    patches = catalog.heroes
-                    textPatches = catalog.text
-                    keptScan = catalog.scan
-                    keptKnown = catalog.known
+                    appearance = PlayerAppearance(catalog)
                     offeredMons.value = party.filter { it in mons }
                     apply()
                 }
@@ -143,45 +128,21 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
      * patch now wanted. */
     fun apply() {
         val key = romKey ?: return
-        if (patches.isEmpty()) return
+        val appearance = appearance ?: return
         val prefs = Prefs(context)
-        textOffered.value = textPatches.keys.toList()
-        val text = textPatches.keys.firstOrNull { it.name == prefs.textLookFor(key) }
-        textPicked.value = text
-        val textBlocks = text?.let { textPatches[it] }.orEmpty()
-        val f = female
-        if (f == null) {
-            // No gender yet (a new game, before the intro asks): every hero either player could wear; the pick goes
-            // on once the game has one.
-            offered.value = LookChar.entries.filter { c -> listOf(false, true).any { patches[Triple(it, c, false)]?.blocks?.isNotEmpty() == true } }
-            worn.value = null
-            own.value = null
-            picked.value = LookChar.byName(prefs.playerLookFor(key))?.takeIf { it in offered.value }
-            onPatch(TextLook.withAppearance(null, textBlocks))
-            return
-        }
-        val me = LookChar.of(engine ?: return, f)
-        own.value = me
-        offered.value = LookChar.entries.filter { it != me && patches[Triple(f, it, false)]?.blocks?.isNotEmpty() == true }
-        val saved = prefs.playerLookFor(key)
-        // A Pokémon: its patch built off the UI thread the first time, then this again.
-        MonArt.monOf(saved)?.takeIf { it in offeredMons.value }?.let { n ->
-            pickedMon.value = n
-            worn.value = null
-            picked.value = null
-            val patch = monPatch(f, me, n) ?: return
-            onPatch(TextLook.withAppearance(patch, textBlocks))
-            return
-        }
-        pickedMon.value = null
-        val pick = LookChar.byName(saved)?.takeIf { it in offered.value }
-        worn.value = pick
-        picked.value = pick
-        val rival = prefs.rivalLook && PlayerLook.hasRival(me.engine)
-        val hero = patches[Triple(f, pick, rival)] ?: patches[Triple(f, pick, false)]
-        val vehicle = RideVehicle.of(prefs.rideVehicleId)
-        val look = keptScan?.let { RideOn.withAppearance(it, me, hero, vehicle) } ?: hero
-        onPatch(TextLook.withAppearance(look, textBlocks))
+        val selection = appearance.select(
+            female, prefs.playerLookFor(key), offeredMons.value, prefs.rivalLook,
+            RideVehicle.of(prefs.rideVehicleId), prefs.textLookFor(key),
+        )
+        offered.value = selection.heroes
+        own.value = selection.own
+        picked.value = selection.pickedHero
+        pickedMon.value = selection.pickedCostume
+        worn.value = selection.wornHero
+        textOffered.value = appearance.textStyles
+        textPicked.value = selection.textStyle
+        onPatch(selection.patch)
+        selection.costumeToPrepare?.let { prepareCostume(appearance, it) }
     }
 
     /** The Pokémon picked (a national number; null: a hero or the game's own). */
@@ -189,35 +150,27 @@ class PlayerLookRunner(private val context: Context, private val onPatch: (Playe
 
     /** The party changed: its species (national numbers, with their names in the game) are the Pokémon offered. */
     fun onParty(nationals: List<Int>, names: Map<Int, String>) {
+        monNames = names
         if (nationals == party) return
         party = nationals
-        monNames = names
-        if (keptScan == null) return
-        offeredMons.value = nationals.filter { it in MonArt.available(context.filesDir.toOkioPath()) }
+        if (appearance == null) return
+        val available = MonArt.available(context.filesDir.toOkioPath())
+        offeredMons.value = nationals.filter { it in available }
         apply()
     }
 
-    /** [n]'s patch for the player ([female], [me]), or null while it's built (on its own thread, then [apply] again). */
-    private fun monPatch(female: Boolean, me: LookChar, n: Int): PlayerLook.Patch? {
-        monPatches[female to n]?.let { return it }
-        val scan = keptScan ?: return null
-        if (!building.add(female to n)) return null
-        val gen = generation
-        val available = offeredMons.value
-        val known = keptKnown
+    private fun prepareCostume(appearance: PlayerAppearance, request: PlayerAppearance.CostumeRequest) {
         Thread({
-            try {
-                val patch = PokemonCostumes.build(context.filesDir.toOkioPath(), scan, me, n, available, known)
-                if (patch != null && gen == generation) monPatches[female to n] = patch
-                Log.i("pokedaisy", "player look: ${if (patch == null) "no" else patch.blocks.size} blocks for Pokémon $n")
-            } catch (t: Throwable) {
-                Log.w("pokedaisy", "player look: Pokémon $n failed", t)
-            } finally {
-                building.remove(female to n)
-                android.os.Handler(android.os.Looper.getMainLooper()).post { if (gen == generation && monPatches.containsKey(female to n)) apply() }
+            val patch = try {
+                appearance.prepareCostume(context.filesDir.toOkioPath(), request)
+            } catch (error: Throwable) {
+                Log.w("pokedaisy", "player look: costume patch failed", error)
+                null
+            }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                if (this.appearance === appearance && appearance.completeCostume(request, patch)) apply()
             }
         }, "player-look-mon").apply { isDaemon = true; start() }
-        return null
     }
 
     /** Heroes, text looks and following Pokémon still missing are looked for in the library's other FireRed / LeafGreen

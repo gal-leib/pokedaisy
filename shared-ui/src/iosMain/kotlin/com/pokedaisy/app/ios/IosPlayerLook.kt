@@ -8,18 +8,16 @@ import com.pokedaisy.app.companion.GamePlayerLook
 import com.pokedaisy.app.companion.GameRide
 import com.pokedaisy.app.companion.data.AppearanceAssets
 import com.pokedaisy.app.companion.data.Logs
-import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.MonArt
-import com.pokedaisy.app.companion.data.PokedexTables
-import com.pokedaisy.app.companion.data.PokemonCostumes
-import com.pokedaisy.app.companion.data.SnapshotView
+import com.pokedaisy.app.companion.data.PlayerAppearance
 import com.pokedaisy.app.companion.data.PlayerLook
 import com.pokedaisy.app.companion.data.PlayerLookAssets
-import com.pokedaisy.app.companion.data.TextLook
-import com.pokedaisy.app.companion.data.RideOn
-import com.pokedaisy.app.companion.data.RideVehicle
+import com.pokedaisy.app.companion.data.PokedexTables
+import com.pokedaisy.app.companion.data.PokemonCostumes
 import com.pokedaisy.app.companion.data.RETAIL_LOOK_TITLES
 import com.pokedaisy.app.companion.data.RETAIL_PORT_TITLES
+import com.pokedaisy.app.companion.data.RideVehicle
+import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.core.PkApiCore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -39,30 +37,24 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
     val renderer = GamePlayerLook(PkApiCore)
     val ride = GameRide(PkApiCore)
     val vehicle get() = RideVehicle.of(prefs.rideVehicleId)
-    private var catalog by mutableStateOf<PlayerLookAssets.Catalog?>(null)
+    private var appearance by mutableStateOf<PlayerAppearance?>(null)
     private var key: String? = null
     private var female by mutableStateOf<Boolean?>(null)
-    private var pick by mutableStateOf<LookChar?>(null)
-    val supported get() = catalog != null
+    private var selection by mutableStateOf<PlayerAppearance.Selection?>(null)
+    val supported get() = appearance != null
     val isFemale get() = female == true
-    val rivalSupported get() = catalog?.engine?.let(PlayerLook::hasRival) == true
+    val rivalSupported get() = appearance?.rivalSupported == true
     private var party: Pair<PokedexTables, List<Int>>? = null
     private var partyJob: Job? = null
     private var costumeChoices by mutableStateOf<Map<Int, String>>(emptyMap())
-    private data class Costume(val hero: LookChar, val national: Int, val party: Set<Int>)
-    private var costume: Costume? = null
     private var costumeJob: Job? = null
-    private var costumePatch: PlayerLook.Patch? = null
-    private var pickedCostume by mutableStateOf<Int?>(null)
 
-    val choices get() = catalog?.availableHeroes(female).orEmpty().map { it.name } +
-        costumeChoices.keys.map { "MON:$it" }
-    val selected get() = pickedCostume?.let { "MON:$it" } ?: pick?.name
+    val choices get() = selection?.heroes.orEmpty().map { it.name } + costumeChoices.keys.map { "MON:$it" }
+    val selected get() = selection?.let { it.pickedCostume?.let { national -> "MON:$national" } ?: it.pickedHero?.name }
     fun costumeLabel(name: String): String? = MonArt.monOf(name)?.let { costumeChoices[it] ?: "#$it" }
-    val textChoices get() = catalog?.text?.keys.orEmpty().map { it.name }
-    private var pickedText by mutableStateOf<String?>(null)
-    val textSelected get() = pickedText
-    val own get() = catalog?.let { current -> female?.let { LookChar.of(current.engine, it).name } }
+    val textChoices get() = appearance?.textStyles.orEmpty().map { it.name }
+    val textSelected get() = selection?.textStyle?.name
+    val own get() = selection?.own?.name
 
     fun load(rom: Path, code: String, romKey: String, library: () -> List<Path>) {
         val engine = PlayerLook.engineFor(code) ?: return
@@ -70,7 +62,7 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
         key = romKey
         scope.launch {
             try {
-                catalog = withContext(Dispatchers.Default) {
+                val catalog = withContext(Dispatchers.Default) {
                     val worker = currentCoroutineContext()
                     PlayerLookAssets(files) { it in RETAIL_LOOK_TITLES || it in RETAIL_PORT_TITLES }.prepare(
                         AppearanceAssets.file(rom), engine, code,
@@ -78,6 +70,7 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
                         { worker.isActive },
                     )
                 }
+                appearance = catalog?.let(::PlayerAppearance)
                 refreshParty()
                 apply()
             } catch (cancelled: CancellationException) {
@@ -104,7 +97,7 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
 
     private fun refreshParty() {
         partyJob?.cancel()
-        if (catalog == null) return
+        if (appearance == null) return
         val input = party
         if (input == null) {
             if (costumeChoices.isNotEmpty()) {
@@ -152,57 +145,39 @@ internal class IosPlayerLook(private val prefs: Prefs, private val files: Path) 
     }
 
     fun apply() {
-        val current = catalog ?: return
+        val current = appearance ?: return
         val currentKey = key ?: return
-        val saved = prefs.playerLookFor(currentKey)
-        val own = female?.let { LookChar.of(current.engine, it) }
-        val national = MonArt.monOf(saved)?.takeIf { it in costumeChoices }
-        val request = if (own != null && national != null) Costume(own, national, costumeChoices.keys.toSet()) else null
-        if (request != costume) prepareCostume(current, request)
-
-        pickedCostume = national.takeIf { costumePatch != null }
-        pick = LookChar.byName(saved)?.takeIf { it.name in choices }
-        val rival = rivalSupported && prefs.rivalLook
-        val hero = female?.let { gender ->
-            current.heroes[Triple(gender, pick, rival)] ?: current.heroes[Triple(gender, pick, false)]
-        }
-        PlayerLook.worn.value = pick.takeIf { hero?.blocks?.isNotEmpty() == true }
-        val style = current.text.keys.firstOrNull { it.name == prefs.textLookFor(currentKey) }
-        pickedText = style?.name
-        // As on Android, a costume has its own mounted frames.
-        val appearance = costumePatch ?: own?.let {
-            RideOn.withAppearance(current.scan, it, hero, vehicle)
-        } ?: hero
-        renderer.select(TextLook.withAppearance(appearance, style?.let { current.text[it] }.orEmpty()))
+        val next = current.select(
+            female, prefs.playerLookFor(currentKey), costumeChoices.keys, prefs.rivalLook,
+            vehicle, prefs.textLookFor(currentKey),
+        )
+        selection = next
+        PlayerLook.worn.value = next.wornHero
+        renderer.select(next.patch)
+        if (next.pickedCostume == null) costumeJob?.cancel()
+        next.costumeToPrepare?.let { prepareCostume(current, it) }
     }
 
-    private fun prepareCostume(current: PlayerLookAssets.Catalog, request: Costume?) {
+    private fun prepareCostume(current: PlayerAppearance, request: PlayerAppearance.CostumeRequest) {
         costumeJob?.cancel()
-        costume = request
-        costumePatch = null
-        if (request == null) return
         costumeJob = scope.launch {
-            try {
-                val patch = withContext(Dispatchers.Default) {
-                    PokemonCostumes.build(files, current.scan, request.hero, request.national, request.party, current.known)
-                }
-                if (catalog === current && costume == request) {
-                    costumePatch = patch
-                    apply()
-                }
+            val patch = try {
+                withContext(Dispatchers.Default) { current.prepareCostume(files, request) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
                 Logs.w("player look: costume patch failed", error)
+                null
             }
+            if (appearance === current && current.completeCostume(request, patch)) apply()
         }
     }
 
     fun close() {
         scope.cancel()
-        catalog = null
+        appearance = null
         costumeChoices = emptyMap()
-        costumePatch = null
+        selection = null
         renderer.select(null)
         PlayerLook.worn.value = null
     }
