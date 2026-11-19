@@ -15,6 +15,7 @@ import com.pokedaisy.app.CoopPresence
 import com.pokedaisy.app.CoopPresenceChannel
 import com.pokedaisy.app.LockNative
 import com.pokedaisy.app.PartnerCore
+import com.pokedaisy.app.companion.PlayerLookSession
 import com.pokedaisy.app.companion.coop.CoopEndpointSession
 import com.pokedaisy.app.companion.coop.CoopGameStartup
 import com.pokedaisy.app.companion.coop.CoopGameShutdown
@@ -27,7 +28,6 @@ import com.pokedaisy.app.companion.coop.coopRetailSha1
 import com.pokedaisy.app.companion.coop.lock.CoopLockStore
 import com.pokedaisy.app.companion.coop.lock.LockWait
 import com.pokedaisy.app.companion.data.LookChar
-import com.pokedaisy.app.companion.data.PlayerLook
 import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.coop.CoopIdentity
@@ -60,7 +60,7 @@ internal class IosCoopGame(
     private val rom: Path,
     private val save: Path,
     private val files: Path,
-    private val look: IosPlayerLook,
+    private val look: PlayerLookSession,
     private val setFrameGate: (((Int) -> Int?)?) -> Unit,
 ) {
     private val endpoint = IosCoopHost.session
@@ -224,7 +224,7 @@ internal class IosCoopGame(
     fun afterFrame(field: Boolean) {
         hook?.afterFrame()
         presence?.let {
-            it.myLook = PlayerLook.worn.value
+            it.myLook = look.wornHero
             it.myFemale = look.isFemale
             it.onFrame(field)
         }

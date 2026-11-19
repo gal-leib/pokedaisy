@@ -1,6 +1,9 @@
 package com.pokedaisy.app
 
 import com.pokedaisy.app.companion.DsCore
+import com.pokedaisy.app.companion.PlayerLookSession
+import com.pokedaisy.app.companion.data.AppearanceAssets
+import com.pokedaisy.app.companion.data.save.Gen3SaveFile
 import com.pokedaisy.app.companion.data.CoreKey
 import com.pokedaisy.app.companion.ui.produceKeyedState
 import android.app.ActivityManager
@@ -83,8 +86,6 @@ import com.pokedaisy.app.companion.coop.coopRetailSha1
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.pokedaisy.app.companion.data.delete
@@ -243,14 +244,11 @@ class PokeDaisyActivity : Activity() {
     private val telemetry = TelemetryStore()
 
     /** PLAYER LOOK for the running game: its patches built off the UI thread, the pick handed to the engine. */
-    private var lookPatch: com.pokedaisy.app.companion.data.PlayerLook.Patch? = null
-    private val lookRunner by lazy {
-        PlayerLookRunner(applicationContext) { p ->
-            lookPatch = p
-            if (::engine.isInitialized) engine.setPlayerLook(p)
+    private val lookSession by lazy {
+        PlayerLookSession(Prefs(applicationContext), filesDir.toOkioPath()) { patch ->
+            if (::engine.isInitialized) engine.setPlayerLook(patch)
         }
     }
-    /** Follows the game's own player gender (a new game picks one) for PLAYER LOOK. */
     private val lookGender = kotlinx.coroutines.CoroutineScope(androidx.compose.ui.platform.AndroidUiDispatcher.Main)
     private lateinit var displayManager: DisplayManager
     private var presentation: DualScreenPresentation? = null
@@ -1171,23 +1169,21 @@ class PokeDaisyActivity : Activity() {
         }
         override val shinyOddsChoices get() = com.pokedaisy.app.companion.data.ShinyOdds.choices(BuildConfig.DEBUG)
         override val shinyOddsSupported get() = ::engine.isInitialized && engine.shiny.supported
-        override val playerLookSupported get() = lookRunner.supported.value
-        override val playerLooks get() = lookRunner.offered.value.map { it.name } + lookRunner.offeredMons.value.map { "MON:$it" }
-        override val playerLook get() = lookRunner.picked.value?.name ?: lookRunner.pickedMon.value?.let { "MON:$it" }
-        override fun playerLookLabel(name: String) = com.pokedaisy.app.companion.data.MonArt.monOf(name)?.let { lookRunner.monNames[it] ?: "#$it" }
+        override val playerLookSupported get() = lookSession.supported
+        override val playerLooks get() = lookSession.choices
+        override val playerLook get() = lookSession.selected
+        override fun playerLookLabel(name: String) = lookSession.costumeLabel(name)
             ?: com.pokedaisy.app.companion.data.LookChar.byName(name)?.label ?: name
-        override val playerLookOwn get() = lookRunner.own.value?.name
+        override val playerLookOwn get() = lookSession.own
         override fun setPlayerLook(look: String?) {
             if (coopRefuses()) return
-            Prefs(this@PokeDaisyActivity).setPlayerLookFor(romKey, look)
-            lookRunner.apply()
+            lookSession.select(look)
         }
-        override val textLooks get() = lookRunner.textOffered.value.map { it.name }
-        override val textLook get() = lookRunner.textPicked.value?.name
+        override val textLooks get() = lookSession.textChoices
+        override val textLook get() = lookSession.textSelected
         override fun setTextLook(style: String?) {
             if (coopRefuses()) return
-            Prefs(this@PokeDaisyActivity).setTextLookFor(romKey, style)
-            lookRunner.apply()
+            lookSession.selectText(style)
         }
         override val followerSupported get() = followerSupported()
         override val followerReady get() = ::engine.isInitialized && engine.playback.follower?.ready == true
@@ -1195,16 +1191,15 @@ class PokeDaisyActivity : Activity() {
             if (::engine.isInitialized) engine.playback.follower?.set(on)
         }
         override val dayNightSupported get() = dayNightSupported()
-        override val rivalLookSupported get() = lookRunner.rivalSupported
-        override val rideVehicle get() = com.pokedaisy.app.companion.data.RideVehicle.of(Prefs(this@PokeDaisyActivity).rideVehicleId)
+        override val rivalLookSupported get() = lookSession.rivalSupported
+        override val rideVehicle get() = lookSession.vehicle
         override fun setRideVehicle(v: com.pokedaisy.app.companion.data.RideVehicle) {
-            Prefs(this@PokeDaisyActivity).rideVehicleId = v.id
-            lookRunner.apply()   // the bike sheets rewritten: the next frame the bike shows is the new ride
+            lookSession.selectRide(v)
         }
         override fun setRivalLook(on: Boolean) {
             if (coopRefuses()) return
             stored.setRivalLook(on)
-            lookRunner.apply()
+            lookSession.apply()
         }
         override val autoRunBuiltIn get() =
             com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
@@ -1564,19 +1559,7 @@ class PokeDaisyActivity : Activity() {
             val v = androidx.compose.ui.platform.LocalView.current
             remember(v) { { v.isShown } }
         }
-        lookGender.launch {
-            telemetry.snapshot.map { it.playerGender }.distinctUntilChanged().collect { lookRunner.onGender(it) }
-        }
-        // PLAYER LOOK's Pokémon: the party's species (national numbers) with their names in the game.
-        lookGender.launch {
-            telemetry.snapshot.map { it.party.map { m -> m.species } to it.pokedex }
-                .distinctUntilChanged().collect { (species, dex) ->
-                val named = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    dex?.tables?.let { com.pokedaisy.app.companion.data.PokemonCostumes.party(it, species) }.orEmpty()
-                }
-                lookRunner.onParty(named.keys.toList(), named)
-            }
-        }
+        lookGender.launch { telemetry.snapshot.collect { lookSession.observe(it) } }
         // HIDE BATTLE MENU follows the game being detected, the companion and the second screen.
         lookGender.launch {
             while (true) {
@@ -1746,6 +1729,7 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized) engine.playback.close()
         endN3ds()
         if (com.pokedaisy.app.n3ds.N3dsCart.EXTENSIONS.contains(romFile.extension.lowercase()) && FeatureFlags.n3ds()) {
+            lookSession.clear()
             load3ds(romFile)
             return
         }
@@ -2047,8 +2031,21 @@ class PokeDaisyActivity : Activity() {
             })
         }
         // PLAYER LOOK: this ROM's scan and patches, in the background; the engine gets the pick once they're in.
-        lookPatch = null
-        lookRunner.load(r, crc, if (gba && romBlocked == null) gameCode else "", if (gba) SavesLocation.saveFor(this, Prefs(this), romFile) else null)
+        val initialFemale = if (gba) {
+            val save = SavesLocation.saveFor(this, Prefs(this), romFile)
+            runCatching { Gen3SaveFile.playerFemale(save.readBytes()) }.getOrNull()
+        } else null
+        lookSession.load(r.toOkioPath(), if (gba && romBlocked == null) gameCode else "", crc,
+            initialFemale = initialFemale, prepareFollowers = true, library = ::appearanceLibrary)
+    }
+
+    /** The library may contain archives. Read each source through the same ROM entry used for play. */
+    private fun appearanceLibrary(): List<AppearanceAssets.Source> {
+        val context = applicationContext
+        return runCatching { RomFolder.libraryRoms(context, Prefs(context)) }.getOrDefault(emptyList()).map { file ->
+            AppearanceAssets.Source(file.canonicalPath, "${file.absolutePath}|${file.length()}|${file.lastModified()}", file.name,
+                { RomIdentity.gameCode(file) }) { RomArchive.open(file).use { it.readBytes() } }
+        }
     }
 
     // The confirmed paired game owns this presence and its link receiver.
@@ -2079,8 +2076,8 @@ class PokeDaisyActivity : Activity() {
         coopReceive = lookGender.launch { link.received.collect(presence::onReceived) }
         lookGender.launch {
             while (coopPresence === presence) {
-                presence.myLook = lookRunner.worn.value
-                presence.myFemale = lookRunner.female ?: false
+                presence.myLook = lookSession.wornHero
+                presence.myFemale = lookSession.isFemale
                 kotlinx.coroutines.delay(500)
             }
         }
@@ -2358,7 +2355,7 @@ class PokeDaisyActivity : Activity() {
             }
             override fun identity(): com.pokedaisy.app.companion.data.coop.CoopIdentity {
                 val id = currentCoopPair?.ownSave ?: return com.pokedaisy.app.companion.data.coop.CoopIdentity(ByteArray(8) { 0xFF.toByte() }, 0, 0)
-                return com.pokedaisy.app.companion.data.coop.CoopIdentity(id.name, if (lookRunner.female == true) 1 else 0, (id.secretId shl 16) or id.trainerId)
+                return com.pokedaisy.app.companion.data.coop.CoopIdentity(id.name, if (lookSession.isFemale) 1 else 0, (id.secretId shl 16) or id.trainerId)
             }
             override fun beforeSave(): Boolean {
                 val r = rom ?: return false
@@ -2624,6 +2621,7 @@ class PokeDaisyActivity : Activity() {
         stageRecomposing.cancel()
         stopCoopPresence()
         lookGender.cancel()
+        lookSession.close()
         playScope.cancel()
         com.pokedaisy.app.companion.ui.GameStart.waiting = false
         if (::engine.isInitialized) engine.playback.close()

@@ -25,6 +25,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
+import com.pokedaisy.app.companion.GamePlayerLook
+import com.pokedaisy.app.companion.GameRide
+import com.pokedaisy.app.companion.PlayerLookSession
+import com.pokedaisy.app.companion.data.AppearanceAssets
 import com.pokedaisy.app.companion.FeatureTips
 import com.pokedaisy.app.companion.TipId
 import com.pokedaisy.app.companion.TelemetryStore
@@ -277,6 +281,10 @@ object PokeDaisyHost {
             .map { "$dir/$it" }
     }
 
+    private fun appearanceLibrary() = games().mapNotNull { path ->
+        runCatching { AppearanceAssets.file(path.toPath()) }.getOrNull()
+    }
+
     /** Files' picker over [from]; [onAdded] gets the games it copied in (none if cancelled). */
     fun addGames(from: UIViewController, onAdded: (List<String>) -> Unit) = RomPicker.pick(from, onAdded)
 
@@ -324,7 +332,9 @@ object PokeDaisyHost {
         }.getOrElse { onFailed(); return UIViewController() }
         val g = GameViewController(romPath, savePath, onFailed)
         game = g
-        val currentLook = IosPlayerLook(iosPreferences, appFilesDir()).also { playerLook = it }
+        val lookRenderer = GamePlayerLook(PkApiCore)
+        val ride = GameRide(PkApiCore)
+        val currentLook = PlayerLookSession(iosPreferences, appFilesDir(), lookRenderer::select).also { playerLook = it }
         val currentCoop = IosCoopGame(romPath.toPath(), savePath.toPath(), appFilesDir(), currentLook) { g.frameGate = it }
             .also { coopGame = it }
         g.onForeground = currentCoop::resumeGame
@@ -338,7 +348,7 @@ object PokeDaisyHost {
         fun stateLoaded(runtime: com.pokedaisy.app.companion.GameRuntime, state: Path, applyProgress: (ByteArray?) -> Unit) {
             runtime.afterStateLoad(
                 restoreProgress = { applyProgress(StateFiles.readAchievementProgress(state)) },
-                settleAppearance = { if (currentLook.supported) currentLook.renderer.settle() },
+                settleAppearance = { if (currentLook.supported) lookRenderer.settle() },
                 reinstallStoryLock = { currentCoop.storyLock?.requestReinstall() },
                 companionState = state,
             )
@@ -409,7 +419,7 @@ object PokeDaisyHost {
             }
             g.beforeFrame = { work ->
                 p.beforeFrame(work) {
-                    p.serviceFramePatches(currentCoop.battleActive, { currentLook.renderer.service() }) {
+                    p.serviceFramePatches(currentCoop.battleActive, { lookRenderer.service() }) {
                         currentCoop.storyLock?.requestReinstall()
                     }
                 }
@@ -428,8 +438,8 @@ object PokeDaisyHost {
                 val field = !p.session.mapOpen && !gameOwnsScreen &&
                     (p.fieldState and GameField.KNOWN != 0 || p.onField && !FfMenuWatch.battling)
                 if (g.playingForward) currentCoop.afterFrame(field)
-                if (field) currentLook.renderer.fieldFrame()
-                currentLook.ride.step(p.riding && !p.session.mapOpen && !gameOwnsScreen, currentLook.renderer.ride)
+                if (field) lookRenderer.fieldFrame()
+                ride.step(p.riding && !p.session.mapOpen && !gameOwnsScreen, lookRenderer.ride)
                 gameOptions.markExp(PkApiCore::read, PkApiCore::write)
             }
         }
@@ -537,6 +547,7 @@ object PokeDaisyHost {
         val currentBattle = battle!!
         g.beforeRewind = { p.battleRetry.reset(); p.cancelFieldActions(); currentBattle.cancel() }
         val currentOptions = p.options
+        var lookScanStarted = false
         g.onCoreStarted = {
             if (game === g) {
                 val crc = runCatching { com.pokedaisy.app.companion.data.romCrc32(romPath.toPath()) }.getOrDefault(0L)
@@ -559,17 +570,18 @@ object PokeDaisyHost {
                         g.onMusicPause = it::pause
                     }
                 }
-                currentLook.ride.reset()
+                ride.reset()
                 if (code != null && !blocked) {
-                    currentLook.load(romPath.toPath(), code, key) { games().map { it.toPath() } }
-                    if (currentLook.supported) currentLook.renderer.service(force = true)
+                    if (!lookScanStarted) {
+                        lookScanStarted = true
+                        currentLook.load(romPath.toPath(), code, key, library = ::appearanceLibrary)
+                    }
+                    if (currentLook.supported) lookRenderer.service(force = true)
                 }
                 if (code != null) p.bindFollower(PkApiCore, appFilesDir()) { current ->
-                    val assets = com.pokedaisy.app.companion.data.AppearanceAssets(appFilesDir())
-                    assets.prepareFollowers(com.pokedaisy.app.companion.data.AppearanceAssets.file(romPath.toPath()),
-                        { games().mapNotNull { path -> runCatching {
-                            com.pokedaisy.app.companion.data.AppearanceAssets.file(path.toPath())
-                        }.getOrNull() } }, current)
+                    AppearanceAssets(appFilesDir()).prepareFollowers(
+                        AppearanceAssets.file(romPath.toPath()), ::appearanceLibrary, current,
+                    )
                 }
                 p.bindFlight {
                     com.pokedaisy.app.companion.GameFlight(p.session, PkApiCore, iosPreferences, readSupport,
@@ -689,7 +701,7 @@ object PokeDaisyHost {
         platform.Foundation.NSLog("PokeDaisy: couldn't update resume data")
     }
 
-    private var playerLook: IosPlayerLook? = null
+    private var playerLook: PlayerLookSession? = null
     private var coopGame: IosCoopGame? = null
     private var steadyMusic: IosSteadyMusic? = null
     private var gameClick: IosGameClickSound? = null

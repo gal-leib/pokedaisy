@@ -10,6 +10,7 @@ import com.pokedaisy.app.Hotkeys
 import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.GameAspect
+import com.pokedaisy.app.companion.PlayerLookSession
 import com.pokedaisy.app.companion.GridStrength
 import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.Smoothing
@@ -41,7 +42,7 @@ internal class IosCompanionSettings(
     private val gameScreen: () -> IosGameScreen? = { null },
     private val playback: () -> com.pokedaisy.app.companion.GameRuntime? = { null },
     private val presentFrom: () -> platform.UIKit.UIViewController? = { game?.view?.window?.rootViewController },
-    private val looks: IosPlayerLook? = null,
+    private val looks: PlayerLookSession? = null,
     private val tradeSupported: () -> Boolean = { false },
     private val coop: IosCoopGame? = null,
     private val stored: com.pokedaisy.app.companion.PrefsCompanionSettings =
