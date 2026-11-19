@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion
 
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.ui.battleButtonsColumnWidth
@@ -39,14 +40,24 @@ class BattleOverlayStateTest {
     }
 
     @Test fun actionLaneMovesOffShouldersAndFaceButtonsAndDeclinesAnObstructedScreen() {
-        val box = androidx.compose.ui.geometry.Rect(0f, 0f, 1000f, 500f)
-        val controls = listOf(androidx.compose.ui.geometry.Rect(880f, 10f, 970f, 60f),
-            androidx.compose.ui.geometry.Rect(850f, 200f, 990f, 330f))
-        assertEquals(androidx.compose.ui.geometry.Rect(750f, 0f, 850f, 500f), battleButtonsLane(box, 100f, controls))
-        assertEquals(androidx.compose.ui.geometry.Rect(900f, 0f, 1000f, 500f), battleButtonsLane(box, 100f, emptyList()))
+        val box = Rect(0f, 0f, 1000f, 500f)
+        val controls = listOf(Rect(880f, 10f, 970f, 60f),
+            Rect(850f, 200f, 990f, 330f))
+        assertEquals(Rect(750f, 0f, 850f, 500f), battleButtonsLane(box, 100f, controls))
+        assertEquals(Rect(900f, 0f, 1000f, 500f), battleButtonsLane(box, 100f, emptyList()))
         assertNull(battleButtonsLane(box, 100f, listOf(box)))
         assertEquals(battleButtonsLane(box, 100f, emptyList()), battleButtonsLane(box, 100f,
-            listOf(androidx.compose.ui.geometry.Rect(0f, 600f, 1000f, 700f))))
+            listOf(Rect(0f, 600f, 1000f, 700f))))
+    }
+
+    @Test fun actionLaneStaysAtTheEdgeBetweenShoulderAndFaceButtons() {
+        val rows = Rect(0f, 96f, 1272f, 392f)
+        val shoulder = Rect(1168f, 52f, 1264f, 90f)
+        val faceButtons = Rect(1116f, 644f, 1264f, 788f)
+        assertEquals(Rect(1148f, 96f, 1272f, 392f), battleButtonsLane(rows, 124f, listOf(shoulder, faceButtons)))
+
+        val raisedButton = Rect(1170f, 214f, 1238f, 272f)
+        assertEquals(Rect(1046f, 96f, 1170f, 392f), battleButtonsLane(rows, 124f, listOf(shoulder, faceButtons, raisedButton)))
     }
 
     @Test fun settingsSurviveHostRecreationWithoutChangingHudChoices() {
