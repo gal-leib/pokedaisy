@@ -352,7 +352,7 @@ object PokeDaisyHost {
             com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)
         g.beforeSuspend = {
             FeatureTips.scheduler?.save()
-            val saved = currentCoop.suspendGame() && g.withState { resume.save() }
+            val saved = currentCoop.saveForSuspend { g.withState { resume.save() } }
             if (!saved) resumeFailed()
             saved
         }

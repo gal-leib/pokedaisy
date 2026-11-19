@@ -75,6 +75,7 @@ import com.pokedaisy.app.companion.ui.PerformanceCounters
 import java.io.File
 import com.pokedaisy.app.companion.coop.CoopEndpointSession
 import com.pokedaisy.app.companion.coop.CoopGameStartup
+import com.pokedaisy.app.companion.coop.CoopGameShutdown
 import com.pokedaisy.app.companion.coop.CoopGameSettings
 import com.pokedaisy.app.companion.coop.CoopPair
 import com.pokedaisy.app.companion.coop.CoopSession
@@ -2154,7 +2155,6 @@ class PokeDaisyActivity : Activity() {
                 val running = ::engine.isInitialized && engine.running
                 if (running) {
                     view.unbindCoreBlocking()   // see restartGame
-                    coopStop()
                     stopEngineWithResume()
                 }
                 rom = next
@@ -2270,28 +2270,23 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized) engine.coopStartupPending = pending
     }
 
-    private val coopSettings = CoopGameSettings(
-        startup = coopStartup,
-        ownSave = { currentCoopPair?.ownSave },
-        refuseBattle = ::coopRefuses,
-        pauseBattles = CoopBattles::stopNow,
-        resumeBattles = { if (engine.running && !engine.sleeping) CoopBattles.resume() },
-        detach = ::detachCoop,
-    )
+    private var coopSettings: CoopGameSettings? = null
+    private var coopShutdown = newCoopShutdown()
 
-    private fun coopStop() {
-        // Restore a joined battle before the engine can write a suspend state.
-        if (!CoopBattles.stopNow()) coopLost = true
-        coopEndpoint?.stopGame()
-        detachCoop()
-    }
+    private fun newCoopShutdown() = CoopGameShutdown(
+        restoreBattle = { CoopBattles.stopNow() },
+        resumeBattles = { CoopBattles.resume() },
+        stopEndpoint = { coopEndpoint?.stopGame() },
+        detachGame = ::detachCoop,
+    )
 
     private fun detachCoop() {
         CoopBattles.detach(coopApp)
         stopCoopPresence()
         stopCoopLock()
         currentCoopPair = null
-        coopEndpoint?.unbindGameSettings(coopSettings)
+        coopSettings?.let { coopEndpoint?.unbindGameSettings(it) }
+        coopSettings = null
         coopEndpoint = null
         coopStartup.cancel()
     }
@@ -2397,13 +2392,9 @@ class PokeDaisyActivity : Activity() {
         return runCatching { newest != null && SaveBackups.sameSave(newest.readBytes(), save.readBytes()) }.getOrDefault(false)
     }
 
-    /** A co-op stop could not be confirmed (the emu thread did not answer): from then on nothing - no resume state, no sleep state -
-     * is written from what is in the engine, so the next launch boots from the save file. Cleared when a game starts. */
-    @Volatile private var coopLost = false
-
-    /** The engine stopped with its resume state, as a close always did - except after [coopLost]: then with none at all. */
+    /** Stop with a suspend state if the co-op battle was restored. Otherwise boot from the battery save next time. */
     private fun stopEngineWithResume() {
-        if (coopLost) {
+        if (!coopShutdown.terminate()) {
             dropResumeState()
             engine.stop()
             return
@@ -2481,14 +2472,23 @@ class PokeDaisyActivity : Activity() {
 
     private fun prepareCoopStart(r: File, save: File) {
         CoopGuards.reset()
-        coopLost = false
+        val shutdown = newCoopShutdown().also { coopShutdown = it }
         if (!FeatureFlags.coop(this)) return
         val prefs = Prefs(this)
         val code = romCode
         val rev = romRev
         val endpoint = CoopSession.bind(applicationContext, prefs)
         coopEndpoint = endpoint
-        endpoint.bindGameSettings(coopSettings)
+        val settings = CoopGameSettings(
+            startup = coopStartup,
+            ownSave = { currentCoopPair?.ownSave },
+            refuseBattle = ::coopRefuses,
+            pauseBattles = shutdown::stopBattle,
+            resumeBattles = { if (engine.running && !engine.sleeping) shutdown.resume() },
+            detach = shutdown::detachAfterEndpointStop,
+        )
+        coopSettings = settings
+        endpoint.bindGameSettings(settings)
         if (!CoopEndpointSession.mayBeRetailEmerald(code, r.takeUnless(RomArchive::isArchive)?.length() ?: 0L)) {
             endpoint.startUnsupportedGame()
             return
@@ -2544,7 +2544,7 @@ class PokeDaisyActivity : Activity() {
         // Back from sleep: the game held on its frame (onPause) and goes on from it. The state written as it went to
         // sleep is used up, as a resume's is once loaded.
         if (engine.sleeping) {
-            CoopBattles.resume()   // [pauseGame] ended any joined battle before the sleep: battles may start again
+            coopShutdown.resume()   // [pauseGame] ended any joined battle before the sleep: battles may start again
             engine.wake()
             st.files.removeState(st.files.resumeFile)
             return true
@@ -2612,9 +2612,8 @@ class PokeDaisyActivity : Activity() {
         // Gone while the game slept (onPause held it): stop it now, as a close would have.
         if (::engine.isInitialized && engine.running) {
             view.unbindCoreBlocking()
-            coopStop()
             stopEngineWithResume()
-        } else if (coopEndpoint != null) coopStop()
+        } else if (coopEndpoint != null) coopShutdown.terminate()
         ffMusicRenderer?.stop()
         ffMusicRenderer = null
         clickSound?.release()
@@ -2702,17 +2701,15 @@ class PokeDaisyActivity : Activity() {
         }
         // The screen went off: the game holds on its frame with the core up and goes on from there on wake
         // (EmulatorEngine.sleep; startGame wakes it). HOME, another app or closing the game stop it as before.
-        // A joined battle's games back (the partner's own game first) before any state is written; if that can't be confirmed,
-        // nothing is written at all (coopLost: no sleep, no resume state - the next launch boots from the save file).
-        if (!CoopBattles.stopNow()) coopLost = true
-        val asleep = !(getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isInteractive
-        val held = asleep && !coopLost && states?.let { engine.sleep(it.resumeFile) } == true
+        // Restore a joined battle before sleeping, or before tearing down a game that won't stay asleep.
+        val held = coopShutdown.saveIfRestored {
+            val asleep = !(getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isInteractive
+            asleep && states?.let { engine.sleep(it.resumeFile) } == true
+        }
         if (!held) {
             // Before the engine frees the frame buffer the GL thread draws from.
             view.unbindCoreBlocking()
-            coopStop()
-            // (as stopEngineWithResume: no resume state after a co-op battle lost the own game)
-            if (coopLost) { dropResumeState(); engine.stop() } else states?.let { engine.stopWithSuspend(it.resumeFile) } ?: engine.stop()
+            stopEngineWithResume()
         }
         view.onPause()
     }
@@ -5093,7 +5090,7 @@ class PokeDaisyActivity : Activity() {
         // this and it's a use-after-free race that crashes the process. See
         // EmulatorView.unbindCoreBlocking().
         view.unbindCoreBlocking()
-        if (coopEndpoint != null) coopStop()
+        if (coopEndpoint != null) coopShutdown.terminate()
         engine.stop()
         states?.let { com.pokedaisy.app.companion.data.StateResume.startFresh(it.files) }
         val save = SavesLocation.saveFor(this, Prefs(this), r)

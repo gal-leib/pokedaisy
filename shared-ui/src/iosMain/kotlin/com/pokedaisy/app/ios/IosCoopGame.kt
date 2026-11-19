@@ -17,6 +17,7 @@ import com.pokedaisy.app.LockNative
 import com.pokedaisy.app.PartnerCore
 import com.pokedaisy.app.companion.coop.CoopEndpointSession
 import com.pokedaisy.app.companion.coop.CoopGameStartup
+import com.pokedaisy.app.companion.coop.CoopGameShutdown
 import com.pokedaisy.app.companion.coop.CoopGameSettings
 import com.pokedaisy.app.companion.coop.CoopPair
 import com.pokedaisy.app.companion.coop.CoopSaveId
@@ -75,16 +76,21 @@ internal class IosCoopGame(
         startupPending = pending
         setFrameGate(if (pending) ({ _: Int -> null }) else if (engaged) ::beforeFrame else null)
     }
+    private val shutdown = CoopGameShutdown(
+        restoreBattle = battle::stopNow,
+        resumeBattles = battle::resume,
+        stopEndpoint = { if (started) endpoint.stopGame() },
+        detachGame = ::detach,
+    )
     private val settings = CoopGameSettings(
         startup = startup,
         ownSave = { pair?.ownSave },
         refuseBattle = ::refuseBattle,
-        pauseBattles = battle::stopNow,
-        resumeBattles = battle::resume,
-        detach = ::detach,
+        pauseBattles = shutdown::stopBattle,
+        resumeBattles = shutdown::resume,
+        detach = shutdown::detachAfterEndpointStop,
     )
     private var started = false
-    private var closed = false
     private var pair by mutableStateOf<CoopPair?>(null)
     var storyLock by mutableStateOf<CoopLock?>(null)
         private set
@@ -105,7 +111,7 @@ internal class IosCoopGame(
     }
 
     fun start(code: String?, revision: Int, cheatsLoaded: () -> Boolean) {
-        if (started || closed) return
+        if (started || shutdown.detached) return
         started = true
         endpoint.bindGameSettings(settings)
         val fs = FileSystem.SYSTEM
@@ -245,18 +251,14 @@ internal class IosCoopGame(
     }
 
     fun key(key: MenuKey): Boolean = battle.takeKey(key)
-    fun suspendGame(): Boolean = battle.stopNow()
-    fun resumeGame() { battle.resume() }
+    fun saveForSuspend(save: () -> Boolean): Boolean = shutdown.saveIfRestored(save)
+    fun resumeGame() = shutdown.resume()
 
     fun close() {
-        if (closed) return
-        battle.stopNow()
-        if (started) endpoint.stopGame()
-        detach()
+        shutdown.terminate()
     }
 
     private fun detach() {
-        closed = true
         battle.detach()
         hook = null
         setFrameGate(null)
