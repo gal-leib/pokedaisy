@@ -18,7 +18,7 @@ class LinkSetupFlowTest {
             assertTrue(setup.ready(scan, listOf("Emerald")))
             setup.choose(assertNotNull(setup.choice), "Emerald")
         }
-        assertEquals(listOf("Emerald", "Emerald", "Emerald", "Emerald"), setup.slots)
+        assertEquals(listOf("Emerald", "Emerald", "Emerald", "Emerald"), setup.slots.toList())
         assertEquals("Emerald, save 4", setup.rowLabel(3, { it }, { it }))
         assertNull(setup.begin(4))
         assertTrue(setup.ready(assertNotNull(setup.begin(1)), listOf("Emerald")))
@@ -36,7 +36,7 @@ class LinkSetupFlowTest {
         val choice = assertNotNull(setup.choice)
         setup.dismiss(choice)
         setup.choose(choice, "Emerald")
-        assertEquals(listOf("Ruby"), setup.slots)
+        assertEquals(listOf("Ruby"), setup.slots.toList())
         val pending = assertNotNull(setup.begin(1))
         setup.clearPicker()
         assertFalse(setup.ready(pending, listOf("Emerald")))
