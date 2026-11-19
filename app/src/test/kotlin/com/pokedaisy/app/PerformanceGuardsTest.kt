@@ -71,8 +71,8 @@ class PerformanceGuardsTest {
     @Test
     fun `nothing on the emu loop's per-frame path can end the game by throwing`() {
         val engine = read("EmulatorEngine.kt")
-        val frame = engine.substring(engine.indexOf("MgbaCore.pkRunFrame()")).take(600)
-        assertTrue("RetroAchievements.onFrame must be inside a try", Regex("""try \{\s+RetroAchievements\.onFrame\(\)""") in frame)
+        val frame = lambda(engine, "fun runCore() {")
+        assertTrue("RetroAchievements.onFrame must be inside a try", Regex("""try \{\s+RetroAchievements\.onFrame\(frameWork\)""") in frame)
         assertTrue("the AudioTrack is built inside runCatching", "runCatching { buildAudioTrack(" in engine)
     }
 
