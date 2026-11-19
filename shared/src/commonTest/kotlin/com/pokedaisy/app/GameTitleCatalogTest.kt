@@ -13,8 +13,8 @@ class GameTitleCatalogTest {
         assertEquals("raw_name [!]", GameTitleCatalog.label({ "raw_name [!]" }, preferFileName = { true }, recognized = unavailable))
         assertEquals("Catalog title", GameTitleCatalog.label(unavailable, recognized = { "Catalog title" }))
         assertEquals("raw name", GameTitleCatalog.label({ "raw_name [!]" }))
-        assertEquals("A.B (Rev 1)", GameTitleCatalog.fileStem("A.B (Rev 1).gb"))
-        assertEquals("No extension", GameTitleCatalog.fileStem("No extension"))
+        assertEquals("A.B (Rev 1)", romFileStem("A.B (Rev 1).gb"))
+        assertEquals("No extension", romFileStem("No extension"))
     }
 
     @Test fun catalogPreservesRetailHackAndHashAdmissionRules() {

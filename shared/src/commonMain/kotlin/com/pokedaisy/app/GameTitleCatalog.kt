@@ -231,8 +231,6 @@ object GameTitleCatalog {
         recognized: () -> String? = { null },
     ): String = rename ?: if (preferFileName()) fileName() else recognized() ?: tidy(fileName())
 
-    fun fileStem(fileName: String): String = fileName.substringBeforeLast('.')
-
     private val TAGS = Regex("""\s*[(\[][^)\]]*[)\]]""")
     private val NUMBERING = Regex("""^\d{1,5}\s*-\s+""")
 
@@ -249,3 +247,6 @@ object GameTitleCatalog {
             .trim().trimEnd('-', ' ')
             .ifEmpty { name }
 }
+
+/** The cartridge filename without its last extension. */
+fun romFileStem(fileName: String): String = fileName.substringBeforeLast('.')

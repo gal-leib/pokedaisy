@@ -2,7 +2,7 @@
 
 package com.pokedaisy.app.ios
 
-import com.pokedaisy.app.GameTitleCatalog
+import com.pokedaisy.app.romFileStem
 import com.pokedaisy.app.companion.ui.LibraryIcons
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -46,7 +46,7 @@ import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 import platform.UIKit.UIViewController
 
-internal fun iosRomTitle(path: String) = GameTitleCatalog.fileStem(path.substringAfterLast('/'))
+internal fun iosRomTitle(path: String) = romFileStem(path.substringAfterLast('/'))
 
 /** Files, persistence and launching for shared library/setup/settings presenters. There is no second native screen. */
 internal class IosLibraryHost(
