@@ -18,7 +18,7 @@ class LinkPlayFlow<T : Any> {
     private var exitAfterClose = false
 
     fun beginStart(): List<T>? {
-        if (phase != Phase.SETUP || setup.slots.size < LinkSetupFlow.MIN_GAMES) return null
+        if (phase != Phase.SETUP || !setup.canStart) return null
         setup.clearPicker()
         phase = Phase.STARTING
         return setup.slots.toList()

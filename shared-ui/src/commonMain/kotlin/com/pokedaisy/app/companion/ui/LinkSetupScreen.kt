@@ -46,7 +46,7 @@ fun <T : Any> LinkSetupScreen(
             OptionButton(
                 if (starting) tr("STARTING…") else tr("START LINK"), m,
                 modifier = Modifier.align(Alignment.End), emphasis = true,
-                enabled = slots.size >= LinkSetupFlow.MIN_GAMES && !starting, onClick = onStart,
+                enabled = flow.canStart && !starting, onClick = onStart,
             )
         }
         flow.choice?.takeUnless { starting }?.let { pick ->

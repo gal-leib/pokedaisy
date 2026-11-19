@@ -14,6 +14,7 @@ class LinkSetupFlow<T : Any> {
     private var request: Request? = null
     private val selected = mutableStateListOf<T>()
     val slots: List<T> get() = selected
+    val canStart: Boolean get() = slots.size >= MIN_GAMES
     var choice by mutableStateOf<Choice<T>?>(null)
         private set
 
