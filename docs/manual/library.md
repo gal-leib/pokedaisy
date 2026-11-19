@@ -216,7 +216,7 @@ Prefer the library without the cursor and legend? Turn off `DUAL-SCREEN LAUNCHER
 
 ## Game info
 
-On iPhone and iPad, touch and hold a game and choose `INFO` to see its ROM header and fingerprints, battery save and backups, and occupied save-state slots. In list view you can also open `INFO` from the game’s menu button.
+On iPhone and iPad, touch and hold a game and choose `INFO` to see its ROM header and fingerprints, battery save and backups, and occupied save-state slots. For a cartridge PokeDaisy recognizes by its fingerprint, the game details can show its catalog name. In list view you can also open `INFO` from the game’s menu button.
 
 `INFO` in a game's menu shows what PokeDaisy knows about it, in sections:
 

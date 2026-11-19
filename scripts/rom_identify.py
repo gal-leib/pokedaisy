@@ -92,7 +92,7 @@ def repo_titles() -> dict[str, str]:
         titles.update(json.loads(compat.read_text()).get("titles", {}))
     consts = dict(re.findall(r'val\s+(\w+)\s*=\s*"([0-9a-f]{40})"', git("grep", "-hE", r'val\s+\w+\s*=\s*"[0-9a-f]{40}"',
                                                                             "--", "app/src/main")))
-    text = (REPO / "app/src/main/kotlin/com/pokedaisy/app/GameTitles.kt").read_text()
+    text = (REPO / "shared/src/commonMain/kotlin/com/pokedaisy/app/GameTitleCatalog.kt").read_text()
     for key, title in re.findall(r'([\w.]+|"[0-9a-f]{40}")\s+to\s+"([^"]+)"', text):
         sha = key.strip('"') if key.startswith('"') else consts.get(key.split(".")[-1])
         if sha:

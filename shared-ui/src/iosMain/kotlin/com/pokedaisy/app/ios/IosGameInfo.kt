@@ -2,6 +2,7 @@ package com.pokedaisy.app.ios
 
 import com.pokedaisy.app.GameInfo
 import com.pokedaisy.app.GameInfoDetails
+import com.pokedaisy.app.GameTitleCatalog
 import com.pokedaisy.app.companion.data.BlockedGames
 import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
@@ -25,7 +26,7 @@ internal fun readIosGameInfo(path: String, title: String, recent: Int): GameInfo
     val crc = runCatching { romCrc32(rom).toString(16).padStart(8, '0') }.getOrNull()
     val blocked = BlockedGames.forSha1(sha1) ?: BlockedGames.forCrc(crc)
     val states = runCatching { RomPicker.statesDir.toPath() / StateFiles.romKey(rom) }.getOrNull()
-    val game = GameInfoDetails.baseGame(code) ?: headerTitle
+    val game = GameInfoDetails.baseGame(code) ?: sha1?.let { GameTitleCatalog.BY_SHA1[it] } ?: headerTitle
     val backups = iosSaveBackups(save)
     val date = FoundationDates::shortDateTime
 
