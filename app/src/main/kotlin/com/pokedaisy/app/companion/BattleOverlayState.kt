@@ -21,7 +21,7 @@ fun battleButtonsWanted(enabled: Boolean, singleScreen: Boolean, portrait: Boole
     enabled && singleScreen && !portrait && snapshot.hasData && !snapshot.unsupported && snapshot.blocked == null &&
         snapshot.inBattle && !snapshot.isDoubleBattle
 
-/** Rightmost full-height lane that leaves custom touch controls reachable. */
+/** Rightmost lane in the supplied vertical band that leaves touch controls reachable. */
 fun battleButtonsLane(box: androidx.compose.ui.geometry.Rect, width: Float,
                       avoid: List<androidx.compose.ui.geometry.Rect>): androidx.compose.ui.geometry.Rect? {
     val obstacles = avoid.filter { it.bottom > box.top && it.top < box.bottom && it.right > box.left && it.left < box.right }
