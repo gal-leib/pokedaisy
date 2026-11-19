@@ -27,6 +27,7 @@ class PrefsCompanionSettingsTest {
             stored.changed = { change -> when (change) {
                 PrefsCompanionSettings.Change.PLAYBACK -> speeds += ffMaxSpeed
                 PrefsCompanionSettings.Change.FIELD_OPTIONS -> fieldOptions += reusableTms
+                PrefsCompanionSettings.Change.PICTURE -> Unit
             } }
         }
         override fun setReusableTms(on: Boolean) { if (!blocked) stored.setReusableTms(on) }
@@ -64,6 +65,29 @@ class PrefsCompanionSettingsTest {
         assertFalse(p.reusableTms); assertTrue(s.fieldOptions.isEmpty())
         s.blocked = false; s.setReusableTms(true)
         assertTrue(p.reusableTms); assertEquals(listOf(true), s.fieldOptions)
+    }
+
+    @Test fun pictureChangesRefreshAfterWritingThePreference() {
+        val prefs = Prefs(Store())
+        val stored = PrefsCompanionSettings(prefs)
+        val aspect = GameAspect.WIDE
+        val filter = ScreenFilter.entries.first { it != prefs.screenFilter }
+        val smoothing = Smoothing.entries.first { it != prefs.smoothing }
+        val changes = mutableListOf<Triple<GameAspect, ScreenFilter, Smoothing>>()
+        stored.changed = {
+            assertEquals(PrefsCompanionSettings.Change.PICTURE, it)
+            changes += Triple(prefs.gameAspect, prefs.screenFilter, prefs.smoothing)
+        }
+        val originalFilter = prefs.screenFilter
+        val originalSmoothing = prefs.smoothing
+        stored.setGameAspect(aspect)
+        stored.setScreenFilter(filter)
+        stored.setSmoothing(smoothing)
+        assertEquals(listOf(
+            Triple(aspect, originalFilter, originalSmoothing),
+            Triple(aspect, filter, originalSmoothing),
+            Triple(aspect, filter, smoothing),
+        ), changes)
     }
 
     @Test fun statusBarUsesTheExistingKeysAndRecoversItsPlacement() {

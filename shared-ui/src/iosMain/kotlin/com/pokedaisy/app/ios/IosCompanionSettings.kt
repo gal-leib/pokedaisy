@@ -11,8 +11,6 @@ import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.GameAspect
 import com.pokedaisy.app.companion.PlayerLookSession
-import com.pokedaisy.app.companion.GridStrength
-import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.Smoothing
 import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.data.activeGame
@@ -310,6 +308,7 @@ internal class IosCompanionSettings(
             when (change) {
                 com.pokedaisy.app.companion.PrefsCompanionSettings.Change.PLAYBACK -> applyPlayback()
                 com.pokedaisy.app.companion.PrefsCompanionSettings.Change.FIELD_OPTIONS -> optionsChanged()
+                com.pokedaisy.app.companion.PrefsCompanionSettings.Change.PICTURE -> gameScreen()?.refreshPicture()
             }
         }
         applyPlayback(); reloadBindings()
@@ -381,7 +380,6 @@ internal class IosCompanionSettings(
     override fun setGameAspect(aspect: GameAspect) {
         if (aspect == GameAspect.WIDE && wideSupported) com.pokedaisy.app.companion.FeatureTips.used(com.pokedaisy.app.companion.TipId.EXPAND)
         stored.setGameAspect(aspect)
-        gameScreen()?.refreshPicture()
     }
     override val wideSupported get() = game?.wideSupported == true && playback()?.blocked != true
     override val pictureBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_EXPAND)
@@ -424,12 +422,7 @@ internal class IosCompanionSettings(
     override fun deleteOverlay(id: String) { IosOverlays.delete(id).invokeOnCompletion { gameScreen()?.refreshPicture() } }
     override fun deleteAllOverlays() { IosOverlays.deleteAll().invokeOnCompletion { gameScreen()?.refreshPicture() } }
     override val shadersBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCREEN_EFFECTS)
-    override fun setGbaColors(on: Boolean) { stored.setGbaColors(on); gameScreen()?.refreshPicture() }
-    override fun setUnlitScreen(on: Boolean) { stored.setUnlitScreen(on); gameScreen()?.refreshPicture() }
-    override fun setScreenFilter(filter: ScreenFilter) { stored.setScreenFilter(filter); gameScreen()?.refreshPicture() }
-    override fun setGridStrength(strength: GridStrength) { stored.setGridStrength(strength); gameScreen()?.refreshPicture() }
     override val companionShadersBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_COMPANION_EFFECTS)
-    override fun setCompanionShaders(on: Boolean) { stored.setCompanionShaders(on); gameScreen()?.refreshPicture() }
     override val smoothingBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_SCALEFX_SMOOTHING)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_XBR_SMOOTHING)
         ?: com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_SMOOTHING)
@@ -437,6 +430,6 @@ internal class IosCompanionSettings(
     override val smoothingAvailable get() = smoothingModes.size > 1
     override val smoothing get() = stored.smoothing.takeIf { it in smoothingModes } ?: Smoothing.OFF
     override fun setSmoothing(mode: Smoothing) {
-        if (mode in smoothingModes) { stored.setSmoothing(mode); gameScreen()?.refreshPicture() }
+        if (mode in smoothingModes) stored.setSmoothing(mode)
     }
 }

@@ -56,9 +56,6 @@ import com.pokedaisy.app.companion.BatteryStatus
 import com.pokedaisy.app.companion.DeviceBattery
 import com.pokedaisy.app.companion.FfMode
 import com.pokedaisy.app.companion.GameAspect
-import com.pokedaisy.app.companion.GridStrength
-import com.pokedaisy.app.companion.ScreenFilter
-import com.pokedaisy.app.companion.Smoothing
 import com.pokedaisy.app.companion.ui.MenuKey
 import com.pokedaisy.app.overlay.OverlayChoice
 import com.pokedaisy.app.overlay.OverlayStore
@@ -994,7 +991,9 @@ class PokeDaisyActivity : Activity() {
      * already-running engine/touch controls since the game keeps running. */
     private val companionSettings by lazy { createCompanionSettings() }
     private fun createCompanionSettings(): com.pokedaisy.app.companion.CompanionSettings {
-        val stored = com.pokedaisy.app.companion.PrefsCompanionSettings(Prefs(this), languageRomCode = { romCode })
+        val stored = com.pokedaisy.app.companion.PrefsCompanionSettings(Prefs(this), languageRomCode = { romCode }).apply {
+            changed = { if (it == com.pokedaisy.app.companion.PrefsCompanionSettings.Change.PICTURE) runOnUiThread { syncGameScreen() } }
+        }
         return object : com.pokedaisy.app.companion.CompanionSettings,
             com.pokedaisy.app.companion.StoredCompanionSettings by stored {
         override fun setFfMaxSpeed(v: Float) {
@@ -1359,7 +1358,6 @@ class PokeDaisyActivity : Activity() {
         override fun setGameAspect(aspect: com.pokedaisy.app.companion.GameAspect) {
             if (aspect == com.pokedaisy.app.companion.GameAspect.WIDE) com.pokedaisy.app.companion.FeatureTips.used(TipId.EXPAND)
             stored.setGameAspect(aspect)
-            runOnUiThread { syncGameScreen() }
         }
         override val wideSupported get() = wideGame != WideScreen.OFF
         override val lookAround get() = Prefs(this@PokeDaisyActivity).lookAround
@@ -1394,34 +1392,10 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).overlay = key
             runOnUiThread { syncGameScreen() }
         }
-        override fun setGbaColors(on: Boolean) {
-            stored.setGbaColors(on)
-            runOnUiThread { syncGameScreen() }
-        }
-        override fun setUnlitScreen(on: Boolean) {
-            stored.setUnlitScreen(on)
-            runOnUiThread { syncGameScreen() }
-        }
-        override fun setScreenFilter(filter: ScreenFilter) {
-            stored.setScreenFilter(filter)
-            runOnUiThread { syncGameScreen() }
-        }
-        override fun setGridStrength(strength: GridStrength) {
-            stored.setGridStrength(strength)
-            runOnUiThread { syncGameScreen() }
-        }
-        override fun setSmoothing(mode: Smoothing) {
-            stored.setSmoothing(mode)
-            runOnUiThread { syncGameScreen() }
-        }
         override val smoothingAvailable get() = GlCaps.gles3(this@PokeDaisyActivity)
         override fun setLightCompanion(mode: com.pokedaisy.app.companion.LightCompanionMode) {
             com.pokedaisy.app.companion.LightCompanion.mode = mode
             Prefs(this@PokeDaisyActivity).lightCompanion = mode.id
-            runOnUiThread { syncGameScreen() }
-        }
-        override fun setCompanionShaders(on: Boolean) {
-            stored.setCompanionShaders(on)
             runOnUiThread { syncGameScreen() }
         }
         // The display itself, not `presentation != null`: a swap composes the companion
