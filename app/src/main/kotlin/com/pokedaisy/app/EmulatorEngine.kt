@@ -150,9 +150,7 @@ class EmulatorEngine(
         get() = playback.flight?.scenicAirborne == true
 
     /** AUTO-RUN: B held for the player while walking on the field (holding B walks); never on a bike or in a menu. */
-    var autoRun
-        get() = gameOptions.autoRun
-        set(v) { gameOptions.autoRun = v }
+    private val autoRun get() = gameOptions.autoRun
     /** The running game runs by itself ([com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN]): flipping B there walks. */
     private val ownAutoRun get() = com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
 
@@ -160,17 +158,10 @@ class EmulatorEngine(
     @Volatile var regionMapOpen = false
         private set
 
-    /** RUN INDOORS: the current map lets the player run (gMapHeader.allowRunning; FireRed / Emerald engines). */
-    var runIndoors
-        get() = gameOptions.runIndoors
-        set(v) { gameOptions.runIndoors = v }
-
     /** WILD ENCOUNTERS: the game's own switch ([WildEncounters.find]; 0 = not found) and the percent of wild
      * encounters left (100 = the game's own rate, 0 = none). */
     @Volatile var wildFlag = 0L
-    var wildEncounters
-        get() = gameOptions.wildEncounters
-        set(v) { gameOptions.wildEncounters = v }
+    private val wildEncounters get() = gameOptions.wildEncounters
 
     /** DS RESOLUTION ([Prefs.dsResolution]): a DS game's 3D scale, handed to the core before the next frame. */
     @Volatile var ndsScale = 1
@@ -178,18 +169,6 @@ class EmulatorEngine(
 
     /** Desired option state for the loaded game. */
     val gameOptions get() = playback.options
-    fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean) =
-        gameOptions.setReusableTms(sites, on)
-    fun setInstantText(patch: com.pokedaisy.app.companion.data.InstantText.Patch?, on: Boolean) =
-        gameOptions.setInstantText(patch, on)
-
-    fun setExpShare(found: com.pokedaisy.app.companion.data.ExpShare.Found?, mode: com.pokedaisy.app.companion.data.ExpShare.Mode) =
-        gameOptions.setExpShare(found, mode)
-    fun setLevelCap(found: com.pokedaisy.app.companion.data.LevelCap.Found?, level: Int) =
-        gameOptions.setLevelCap(found, level)
-    fun setHmFree(patch: com.pokedaisy.app.companion.data.HmFree.Patch?, on: Boolean) =
-        gameOptions.setHmFree(patch, on)
-
     @Volatile var onShinyChanged: () -> Unit = {}
     val shiny by lazy { playback.bindShiny(gameCalls, BuildConfig.DEBUG) { onShinyChanged() } }
 

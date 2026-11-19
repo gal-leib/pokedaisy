@@ -145,10 +145,16 @@ class GameOptions internal constructor(
         HmFree.active = false; revision++
     }
 
-    fun settingsChanged(s: CompanionSettings) {
-        autoRun = s.autoRun; runIndoors = s.runIndoors; wildEncounters = s.wildEncounters
+    fun settingsChanged(
+        s: CompanionSettings,
+        runIndoorsSupported: Boolean = true,
+        reusableTmsBuiltIn: Boolean = s.reusableTmsBuiltIn,
+    ) {
+        autoRun = s.autoRun
+        runIndoors = s.runIndoors && runIndoorsSupported
+        wildEncounters = s.wildEncounters
         val metadata = found.value
-        setReusableTms(metadata.sites, s.reusableTms && !s.reusableTmsBuiltIn)
+        setReusableTms(metadata.sites, s.reusableTms && !reusableTmsBuiltIn)
         setInstantText(metadata.text, s.instantText)
         setHmFree(metadata.hm, s.hmFree)
         setExpShare(metadata.exp, s.expShare)

@@ -64,6 +64,8 @@ import com.pokedaisy.app.companion.FoldMode
 import com.pokedaisy.app.companion.FoldPosture
 import com.pokedaisy.app.companion.data.FfMenuWatch
 import com.pokedaisy.app.companion.TelemetryStore
+import com.pokedaisy.app.companion.GameOptions
+import com.pokedaisy.app.companion.PrefsCompanionSettings
 import com.pokedaisy.app.companion.TipId
 import com.pokedaisy.app.companion.GameTipFrame
 import com.pokedaisy.app.companion.GameTipSession
@@ -172,27 +174,22 @@ class PokeDaisyActivity : Activity() {
     @Volatile private var romBlocked: com.pokedaisy.app.companion.data.BlockedGame? = null
     /** The field reads' game (SCENE SPEEDS' TEXT, AUTO-RUN, RUN INDOORS, WILD ENCOUNTERS): [WideScreen.fieldGameFor]. */
     private var fieldGame = WideScreen.OFF
-    /** WILD ENCOUNTERS: the game's own switch, found in the ROM after it loads ([WildEncounters.find]; 0 = none). */
-    @Volatile private var wildFlag = 0L
     /** RetroAchievements pause while SHINY ODDS is raised on a game it works in ("catch a shiny" sets). */
     private fun syncShinyAchievements() {
         val raised = ::engine.isInitialized && engine.shiny.active
         runCatching { com.pokedaisy.app.achievements.RetroAchievements.setShinyOddsActive(raised) }
     }
 
-    /** REUSABLE TMS: the ROM's spots that use a TM up ([com.pokedaisy.app.companion.data.ReusableTms]; empty = none). */
-    private var tmSites: List<com.pokedaisy.app.companion.data.ReusableTms.Site> = emptyList()
-    /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = the row shows N/A). */
-    private var textPatch: com.pokedaisy.app.companion.data.InstantText.Patch? = null
     private fun currentGameOptions() = if (::engine.isInitialized) engine.gameOptions else null
-    private val hmPatch get() = currentGameOptions()?.discovery?.hm
-    private val expShareFound get() = currentGameOptions()?.discovery?.exp
-    private val levelCapFound get() = currentGameOptions()?.discovery?.cap
-    private val levelCapNow get() = currentGameOptions()?.levelCapNow
-    private fun syncExpShare() {
-        val options = currentGameOptions()
-        options?.setExpShare(expShareFound, com.pokedaisy.app.companion.data.ExpShare.Mode.of(Prefs(this).expShare))
-        runCatching { com.pokedaisy.app.achievements.RetroAchievements.setExpShareActive(options?.expShareActive == true) }
+
+    private fun applyGameOptions(options: GameOptions) {
+        // Android has always honored discovered patch sites, even on games the UI labels built-in.
+        options.settingsChanged(companionSettings, runIndoorsSupported = companionSettings.runIndoorsSupported, reusableTmsBuiltIn = false)
+        syncExpShareAchievements(options.expShareActive)
+    }
+
+    private fun syncExpShareAchievements(active: Boolean) {
+        runCatching { RetroAchievements.setExpShareActive(active) }
     }
 
     private fun answerBattleRetry(retry: Boolean) {
@@ -235,8 +232,6 @@ class PokeDaisyActivity : Activity() {
      * edge tab ([SidePanel.openTabShown]) - shown at all (Compose state: the HUD reads it). */
     private val companionButtonShown = androidx.compose.runtime.mutableStateOf(true)
 
-    private fun syncLevelCap() { currentGameOptions()?.setLevelCapEnabled(Prefs(this).levelCap) }
-    private fun syncHmFree(on: Boolean = Prefs(this).hmFree) { currentGameOptions()?.setHmFree(hmPatch, on) }
     /** EXPAND's one-time offer is up on the companion ([CompanionSettings.expandOffer]). */
     private val expandOfferUp = androidx.compose.runtime.mutableStateOf(false)
     private var states: SaveStates? = null
@@ -993,8 +988,14 @@ class PokeDaisyActivity : Activity() {
      * already-running engine/touch controls since the game keeps running. */
     private val companionSettings by lazy { createCompanionSettings() }
     private fun createCompanionSettings(): com.pokedaisy.app.companion.CompanionSettings {
-        val stored = com.pokedaisy.app.companion.PrefsCompanionSettings(Prefs(this), languageRomCode = { romCode }).apply {
-            changed = { if (it == com.pokedaisy.app.companion.PrefsCompanionSettings.Change.PICTURE) runOnUiThread { syncGameScreen() } }
+        val stored = PrefsCompanionSettings(Prefs(this), languageRomCode = { romCode }).apply {
+            changed = { change ->
+                when (change) {
+                    PrefsCompanionSettings.Change.PICTURE -> runOnUiThread { syncGameScreen() }
+                    PrefsCompanionSettings.Change.FIELD_OPTIONS -> currentGameOptions()?.let(::applyGameOptions)
+                    PrefsCompanionSettings.Change.PLAYBACK -> Unit
+                }
+            }
         }
         return object : com.pokedaisy.app.companion.CompanionSettings,
             com.pokedaisy.app.companion.StoredCompanionSettings by stored {
@@ -1033,22 +1034,10 @@ class PokeDaisyActivity : Activity() {
         // A DS game: its own field read, known once it reports the cart (MgbaCore.FIELD_KNOWN).
         override val fieldReadable get() = fieldGame != WideScreen.OFF ||
             romIsNds && ::engine.isInitialized && engine.fieldState and MgbaCore.FIELD_KNOWN != 0
-        override fun setAutoRun(on: Boolean) {
-            stored.setAutoRun(on)
-            if (::engine.isInitialized) engine.autoRun = on
-        }
-        override fun setRunIndoors(on: Boolean) {
-            stored.setRunIndoors(on)
-            if (::engine.isInitialized) engine.runIndoors = on
-        }
-        // Ruby / Sapphire tell indoor maps by their type (flash, weather and the region map read it too): not theirs.
+        // Ruby / Sapphire tell indoor maps by their type, so they do not expose RUN INDOORS.
         override val runIndoorsSupported get() = fieldGame != WideScreen.OFF && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode)
-        override fun setWildEncounters(percent: Int) {
-            stored.setWildEncounters(percent)
-            if (::engine.isInitialized) engine.wildEncounters = percent
-        }
-        override val wildEncountersSupported get() = (fieldGame != WideScreen.OFF && wildFlag != 0L) || gbField() != null ||
-            romIsNds && ::engine.isInitialized && engine.fieldState and MgbaCore.FIELD_KNOWN != 0
+        override val wildEncountersSupported get() = (fieldGame != WideScreen.OFF && currentGameOptions()?.wildFlagFound == true) ||
+            gbField() != null || romIsNds && ::engine.isInitialized && engine.fieldState and MgbaCore.FIELD_KNOWN != 0
         override val tradeEvolutionsSupported get() = tradeEvoFns() != null
         override val flightArea get() = Prefs(this@PokeDaisyActivity).flightArea
         override fun setFlightArea(mode: com.pokedaisy.app.companion.FlightAreaMode) {
@@ -1067,50 +1056,31 @@ class PokeDaisyActivity : Activity() {
         override val flyStyleSupported get() = flightSupport() != null
         override fun answerFlyStyle(style: com.pokedaisy.app.companion.FlyStyle?) = this@PokeDaisyActivity.answerFlyStyle(style)
         override fun setReusableTms(on: Boolean) {
-            if (coopRefuses()) return
-            stored.setReusableTms(on)
-            if (::engine.isInitialized) engine.setReusableTms(tmSites, on)
+            if (!coopRefuses()) stored.setReusableTms(on)
         }
-        override val reusableTmsSupported get() = tmSites.isNotEmpty()
-        override fun setInstantText(on: Boolean) {
-            stored.setInstantText(on)
-            if (::engine.isInitialized) engine.setInstantText(textPatch, on)
-        }
-        override val instantTextSupported get() = textPatch != null
-        override val hmFree get() = Prefs(this@PokeDaisyActivity).hmFree
+        override val reusableTmsSupported get() = currentGameOptions()?.reusableTmsSupported == true
+        override val instantTextSupported get() = currentGameOptions()?.instantTextSupported == true
         override fun setHmFree(on: Boolean) {
-            if (coopRefuses()) return
-            stored.setHmFree(on)
-            syncHmFree(on)
+            if (!coopRefuses()) stored.setHmFree(on)
         }
-        override val hmFreeSupported get() = hmPatch != null
+        override val hmFreeSupported get() = currentGameOptions()?.hmFreeSupported == true
         override fun setLowHpBeep(on: Boolean) {
-            if (coopRefuses()) return
-            stored.setLowHpBeep(on)
-            currentGameOptions()?.setQuietOptions(on, stored.fieldPoison)
+            if (!coopRefuses()) stored.setLowHpBeep(on)
         }
         override val lowHpBeepSupported get() = currentGameOptions()?.lowHpBeepSupported == true
         override fun setFieldPoison(on: Boolean) {
-            if (coopRefuses()) return
-            stored.setFieldPoison(on)
-            currentGameOptions()?.setQuietOptions(stored.lowHpBeep, on)
+            if (!coopRefuses()) stored.setFieldPoison(on)
         }
         override val fieldPoisonSupported get() = currentGameOptions()?.fieldPoisonSupported == true
-        override val expShare get() = com.pokedaisy.app.companion.data.ExpShare.Mode.of(Prefs(this@PokeDaisyActivity).expShare)
         override fun setExpShare(mode: com.pokedaisy.app.companion.data.ExpShare.Mode) {
-            if (coopRefuses()) return
-            stored.setExpShare(mode)
-            syncExpShare()
+            if (!coopRefuses()) stored.setExpShare(mode)
         }
-        override val expShareSupported get() = expShareFound != null
-        override val levelCap get() = Prefs(this@PokeDaisyActivity).levelCap
+        override val expShareSupported get() = currentGameOptions()?.expShareSupported == true
         override fun setLevelCap(on: Boolean) {
-            if (coopRefuses()) return
-            stored.setLevelCap(on)
-                syncLevelCap()
+            if (!coopRefuses()) stored.setLevelCap(on)
         }
         override val levelCapSupported get() = currentGameOptions()?.levelCapSupported == true
-        override val levelCapLevel get() = levelCapNow?.level
+        override val levelCapLevel get() = currentGameOptions()?.levelCapNow?.level
         override val repelRefill get() = Prefs(this@PokeDaisyActivity).repelRefill
         override fun setRepelRefill(on: Boolean) {
             if (::engine.isInitialized) engine.playback.autoRefill.set(on)
@@ -1803,15 +1773,8 @@ class PokeDaisyActivity : Activity() {
         val tablesCrc = if (gba) WideScreen.tablesCrc(r, crc) else crc
         wideGame = if (nds || romBlocked != null) WideScreen.OFF else WideScreen.gameFor(tablesCrc)
         fieldGame = if (!gba || romBlocked != null) WideScreen.OFF else WideScreen.fieldGameFor(tablesCrc)
-        wildFlag = 0L
         currentGameOptions()?.resetMetadata()
-        tmSites = emptyList()
-        if (::engine.isInitialized) engine.setReusableTms(tmSites, false)
-        textPatch = null
-        if (::engine.isInitialized) engine.setInstantText(null, false)
-        syncHmFree(false)
-        syncExpShare()
-        syncLevelCap()
+        syncExpShareAchievements(false)
         if (::engine.isInitialized) engine.shiny.observe(null)
         syncShinyAchievements()
         Prefs(this).let { p ->
@@ -1987,18 +1950,11 @@ class PokeDaisyActivity : Activity() {
             val current = engine
             current.gameOptions.start(r.toOkioPath(), configureWild = { flag, _ ->
                 if (romData == r && engine === current) {
-                    wildFlag = flag; current.wildFlag = flag
+                    current.wildFlag = flag
                     flag != 0L
                 } else false
-            }, ready = { found ->
-                if (romData == r && engine === current) {
-                    tmSites = found.sites; textPatch = found.text
-                    syncHmFree(); syncExpShare(); syncLevelCap()
-                    current.setReusableTms(tmSites, Prefs(this).reusableTms)
-                    val preferences = Prefs(this)
-                    current.setInstantText(textPatch, preferences.instantText)
-                    current.gameOptions.setQuietOptions(preferences.lowHpBeep, preferences.fieldPoison)
-                }
+            }, ready = {
+                if (romData == r && engine === current) applyGameOptions(current.gameOptions)
             })
         }
         // PLAYER LOOK: this ROM's scan and patches, in the background; the engine gets the pick once they're in.
@@ -2078,18 +2034,9 @@ class PokeDaisyActivity : Activity() {
         e.menuSpeed = p.menuSpeed
         e.bikeSpeed = p.bikeSpeed
         e.surfSpeed = p.surfSpeed
-        e.autoRun = p.autoRun
-        e.runIndoors = p.runIndoors && companionSettings.runIndoorsSupported
-        e.wildFlag = wildFlag
-        e.wildEncounters = p.wildEncounters
         e.ndsScale = p.dsResolution
         e.ndsCpuBoost = p.dsCpuBoost
-        e.setReusableTms(tmSites, p.reusableTms)
-        e.setInstantText(textPatch, p.instantText)
-        e.setHmFree(hmPatch, p.hmFree)
-        e.setExpShare(expShareFound, if (expShareFound != null) com.pokedaisy.app.companion.data.ExpShare.Mode.of(p.expShare) else com.pokedaisy.app.companion.data.ExpShare.Mode.OFF)
-        e.setLevelCap(levelCapFound, if (levelCapFound != null && p.levelCap) levelCapNow?.level ?: 0 else 0)
-        e.gameOptions.setQuietOptions(p.lowHpBeep, p.fieldPoison)
+        applyGameOptions(e.gameOptions)
     }
 
     override fun onNewIntent(intent: Intent) {
