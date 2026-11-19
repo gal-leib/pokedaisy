@@ -22,7 +22,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -32,7 +31,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
-import com.pokedaisy.app.companion.LinkSetupFlow
+import com.pokedaisy.app.companion.LinkPlayFlow
+import com.pokedaisy.app.companion.LinkPlayFlow.Phase
 import com.pokedaisy.app.companion.ui.LinkSetupScreen
 import com.pokedaisy.app.companion.ui.LinkPlayChrome
 import com.pokedaisy.app.companion.ui.LinkPlayMessage
@@ -45,7 +45,6 @@ import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
 import com.pokedaisy.app.companion.ui.theme.AppColors
 import com.pokedaisy.app.companion.ui.theme.AppTheme
 import com.pokedaisy.app.game.LinkFramePump
-import kotlinx.coroutines.delay
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -66,17 +65,12 @@ import kotlin.concurrent.thread
  */
 class LinkActivity : ComponentActivity() {
 
-    private enum class Phase { SETUP, STARTING, PLAYING, CLOSING }
-
     private class Game(val rom: File, val playable: File, val save: File)
 
     private lateinit var prefs: Prefs
-    private val setup = LinkSetupFlow<File>()
+    private val play = LinkPlayFlow<File>()
+    private val setup = play.setup
     private val labels = ConcurrentHashMap<String, String>()
-    private var phase by mutableStateOf(Phase.SETUP)
-    private var notice by mutableStateOf<String?>(null)
-    private var confirmLeave by mutableStateOf(false)
-    private var hint by mutableStateOf(false)
     /** FF: every game runs up to [FF_SPEED]x, the focused one's sound off meanwhile (the FF button). */
     private var ffState by mutableStateOf(false)
     @Volatile private var ff = false
@@ -108,7 +102,7 @@ class LinkActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         OptionColors.inGame = false
-        if (phase == Phase.PLAYING) {
+        if (play.phase == Phase.PLAYING) {
             showSecondScreen()
             startLoop()
         }
@@ -129,7 +123,7 @@ class LinkActivity : ComponentActivity() {
         presentation?.dismiss()
         presentation = null
         // Closed from the recents list mid-game: still let a save in progress finish.
-        if (opened && phase != Phase.CLOSING) {
+        if (opened && play.phase != Phase.CLOSING) {
             opened = false
             thread(name = "pokedaisy-link-close") { LinkCore.pkLinkClose(CLOSE_FRAMES) }
         }
@@ -149,19 +143,16 @@ class LinkActivity : ComponentActivity() {
         thread {
             val list = gbaGames().onEach { label(it) }
             runOnUiThread {
-                if (setup.ready(scan, list) && list.isEmpty()) notice = tr("No GBA games in the library yet")
+                if (setup.ready(scan, list) && list.isEmpty()) play.notice = tr("No GBA games in the library yet")
             }
         }
     }
 
     private fun start() {
-        if (setup.slots.size < LinkSetupFlow.MIN_GAMES || phase != Phase.SETUP) return
-        setup.clearPicker()
-        phase = Phase.STARTING
-        val picked = setup.slots.toList()
+        val picked = play.beginStart() ?: return
         thread(name = "pokedaisy-link-open") {
             if (!SaveFileEdits.recover(this)) {
-                runOnUiThread { phase = Phase.SETUP; notice = ClosedSaveEdits.recoveryError() }
+                runOnUiThread { play.startFailed(ClosedSaveEdits.recoveryError()) }
                 return@thread
             }
             var refused: String? = null
@@ -173,15 +164,14 @@ class LinkActivity : ComponentActivity() {
                 Game(rom, RomArchive.playable(rom, cacheDir) ?: rom, save)
             }
             refused?.let { why ->
-                runOnUiThread { phase = Phase.SETUP; notice = why }
+                runOnUiThread { play.startFailed(why) }
                 return@thread
             }
             val ok = LinkCore.pkLinkOpen(list.map { it.playable.absolutePath }.toTypedArray(), list.map { it.save.absolutePath }.toTypedArray())
             Log.i(TAG, "open ${list.size} games: $ok (${list.joinToString { it.rom.name }})")
             runOnUiThread {
                 if (!ok) {
-                    phase = Phase.SETUP
-                    notice = tr("The games couldn't be started. Check that each one is a GBA game that opens on its own.")
+                    play.startFailed()
                     return@runOnUiThread
                 }
                 opened = true
@@ -190,8 +180,7 @@ class LinkActivity : ComponentActivity() {
                 mainCount = if (secondScreen() != null) (list.size + 1) / 2 else list.size
                 focused = 0
                 views.forEachIndexed { i, v -> v.focused = i == 0 }
-                phase = Phase.PLAYING
-                hint = true
+                play.opened()
                 showSecondScreen()
                 startLoop()
             }
@@ -273,7 +262,7 @@ class LinkActivity : ComponentActivity() {
                 val t0 = System.nanoTime()
                 if (!LinkCore.pkLinkRunFrame()) {
                     Log.w(TAG, "link fault: ${LinkCore.pkLinkStatus()}")
-                    runOnUiThread { notice = tr("The link stopped. Leave and start it again; your saves are safe.") }
+                    runOnUiThread { play.fault() }
                     break
                 }
                 val t1 = System.nanoTime()
@@ -301,26 +290,23 @@ class LinkActivity : ComponentActivity() {
         }
     }
 
-    private fun leave() {
-        confirmLeave = false
+    private fun leave() = play.leave {
         stopLoop()
         presentation?.dismiss()
         presentation = null
-        if (!opened) { finish(); return }
-        phase = Phase.CLOSING
         opened = false
         thread(name = "pokedaisy-link-close") {
             LinkCore.pkLinkClose(CLOSE_FRAMES)
-            runOnUiThread { finish() }
+            runOnUiThread { if (play.closed(savesFinished = true)) finish() }
         }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (phase != Phase.PLAYING || confirmLeave) return super.dispatchKeyEvent(event)
+        if (play.phase != Phase.PLAYING || play.confirmingLeave) return super.dispatchKeyEvent(event)
         val down = event.action == KeyEvent.ACTION_DOWN
         when (event.keyCode) {
             KeyEvent.KEYCODE_BACK -> {
-                if (!down) confirmLeave = true
+                if (!down) play.requestLeave()
                 return true
             }
             KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BUTTON_THUMBL -> {
@@ -338,7 +324,7 @@ class LinkActivity : ComponentActivity() {
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (phase != Phase.PLAYING || confirmLeave || !event.isFromSource(InputDevice.SOURCE_JOYSTICK)) return super.dispatchGenericMotionEvent(event)
+        if (play.phase != Phase.PLAYING || play.confirmingLeave || !event.isFromSource(InputDevice.SOURCE_JOYSTICK)) return super.dispatchGenericMotionEvent(event)
         // Analog L2 / R2 (Retroid's triggers send no keys): past half way, as their keys.
         val lt = maxOf(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE))
         val rt = maxOf(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS))
@@ -353,37 +339,34 @@ class LinkActivity : ComponentActivity() {
     @Composable
     private fun Root() {
         val m = rememberGbaTextMetrics()
-        when (phase) {
+        BackHandler { play.back(::finish) }
+        when (play.phase) {
             Phase.SETUP, Phase.STARTING -> Setup(m)
             Phase.PLAYING -> Playing(m)
             Phase.CLOSING -> {
-                BackHandler { }
                 LinkPlayMessage(tr("Finishing the games' saves…"), m)
             }
         }
-        notice?.let { text ->
-            OptionConfirm(tk("LINK PLAY"), text, tk("OK"), m, onConfirm = { notice = null }, onDismiss = { notice = null }, cancelLabel = null)
+        play.notice?.let { text ->
+            OptionConfirm(tk("LINK PLAY"), text, tk("OK"), m, onConfirm = { play.notice = null }, onDismiss = { play.notice = null }, cancelLabel = null)
         }
     }
 
     @Composable
     private fun Setup(m: GbaTextMetrics) {
-        BackHandler { if (phase == Phase.SETUP) finish() }
-        LinkSetupScreen(setup, m, phase == Phase.STARTING, ::label, { it.absolutePath },
+        LinkSetupScreen(setup, m, play.phase == Phase.STARTING, ::label, { it.absolutePath },
             onPick = ::pick, onStart = ::start, onClose = ::finish)
     }
 
     @Composable
     private fun Playing(m: GbaTextMetrics) {
-        BackHandler { confirmLeave = !confirmLeave }
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(
                 factory = { ctx -> LinkGrid(ctx).apply { views.take(mainCount).forEach { (it.parent as? ViewGroup)?.removeView(it); addView(it) } } },
                 modifier = Modifier.fillMaxSize(),
             )
-            if (hint) LaunchedEffect(Unit) { delay(6000); hint = false }
-            LinkPlayChrome(m, hint, ffState, onFast = { setFf(!ffState) })
-            if (confirmLeave) LinkLeaveConfirmation(m, onLeave = ::leave, onDismiss = { confirmLeave = false })
+            LinkPlayChrome(m, fast = ffState, onFast = { setFf(!ffState) })
+            if (play.confirmingLeave) LinkLeaveConfirmation(m, onLeave = ::leave, onDismiss = play::dismissLeave)
         }
     }
 

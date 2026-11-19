@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,9 +25,18 @@ fun linkGridShape(count: Int, wide: Boolean): Pair<Int, Int> = when {
 }
 
 @Composable
+private fun linkPlayHint(): Boolean {
+    val visible by produceState(true) {
+        delay(6000)
+        value = false
+    }
+    return visible
+}
+
+@Composable
 fun BoxScope.LinkPlayChrome(
     m: GbaTextMetrics,
-    hint: Boolean,
+    hint: Boolean = linkPlayHint(),
     fast: Boolean,
     onFast: () -> Unit,
     requestLeave: (() -> Unit)? = null,

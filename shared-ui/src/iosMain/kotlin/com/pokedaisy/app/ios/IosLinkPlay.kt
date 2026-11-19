@@ -17,7 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitView
 import com.pokedaisy.app.LinkSavePaths
-import com.pokedaisy.app.companion.LinkSetupFlow
+import com.pokedaisy.app.companion.LinkPlayFlow
+import com.pokedaisy.app.companion.LinkPlayFlow.Phase
 import com.pokedaisy.app.companion.TouchButton
 import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.StateResume
@@ -30,14 +31,11 @@ import com.pokedaisy.app.gameAudioGain
 import com.pokedaisy.app.game.LinkGameSession
 import com.pokedaisy.app.game.RomPicker
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
-
-private enum class LinkPhase { SETUP, STARTING, PLAYING, CLOSING }
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class, kotlinx.cinterop.ExperimentalForeignApi::class)
 @Composable
@@ -48,28 +46,20 @@ internal fun IosLinkPlay(
     onClose: () -> Unit,
     onSaves: () -> Unit,
 ) {
-    val setup = remember(initial) { LinkSetupFlow<String>().apply { initial?.let(::seed) } }
+    val play = remember(initial) { LinkPlayFlow<String>().apply { initial?.let(setup::seed) } }
+    val setup = play.setup
     val scope = rememberCoroutineScope()
     val m = rememberGbaTextMetrics()
-    var phase by remember { mutableStateOf(LinkPhase.SETUP) }
-    var notice by remember { mutableStateOf<String?>(null) }
     var session by remember { mutableStateOf<LinkGameSession?>(null) }
     var focused by remember { mutableIntStateOf(0) }
     var fast by remember { mutableStateOf(false) }
-    var hint by remember { mutableStateOf(false) }
-    var confirming by remember { mutableStateOf(false) }
-    var leaving by remember { mutableStateOf(false) }
 
     fun start() {
-        if (phase != LinkPhase.SETUP || setup.slots.size < LinkSetupFlow.MIN_GAMES) return
-        val picked = setup.slots.toList()
-        setup.clearPicker()
-        phase = LinkPhase.STARTING
+        val picked = play.beginStart() ?: return
         scope.launch {
             val prepared = withContext(Dispatchers.Default) { runCatching { IosLinkSaves.prepare(picked) } }
             val saves = prepared.getOrElse {
-                notice = it.message ?: tr("Can't read that file")
-                phase = LinkPhase.SETUP
+                play.startFailed(it.message ?: tr("Can't read that file"))
                 return@launch
             }
             focused = 0
@@ -77,25 +67,17 @@ internal fun IosLinkPlay(
             val game = LinkGameSession(
                 picked, saves.paths.map(Path::toString), gameAudioGain(iosPreferences.gameVolume, iosPreferences.gameMuted),
                 onOpen = { opened ->
-                    if (opened) {
-                        phase = LinkPhase.PLAYING
-                        hint = true
-                    } else {
-                        session?.close()
-                        phase = LinkPhase.CLOSING
-                        notice = tr("The games couldn't be started. Check that each one is a GBA game that opens on its own.")
-                    }
+                    if (opened) play.opened()
+                    else play.startFailed { session?.close() }
                 },
                 onFocus = { focused = it },
-                onFault = { notice = tr("The link stopped. Leave and start it again; your saves are safe.") },
+                onFault = { play.fault() },
                 finishSaves = saves::finish,
                 onClosed = { finished ->
                     session = null
-                    phase = LinkPhase.SETUP
+                    val exit = play.closed(finished)
                     onSaves()
-                    if (!finished) notice = tr("Couldn't finish updating the games' resume files.")
-                    else if (leaving) onClose()
-                    leaving = false
+                    if (exit) onClose()
                 },
             )
             session = game
@@ -103,39 +85,25 @@ internal fun IosLinkPlay(
         }
     }
 
-    fun leave() {
-        confirming = false
-        leaving = true
-        phase = LinkPhase.CLOSING
-        session?.close()
-    }
-
     DisposableEffect(setup) {
         onDispose { setup.clearPicker(); session?.close() }
     }
-    CompanionBackHandler {
-        when (phase) {
-            LinkPhase.SETUP -> onClose()
-            LinkPhase.PLAYING -> confirming = !confirming
-            LinkPhase.STARTING, LinkPhase.CLOSING -> Unit
-        }
-    }
-    LaunchedEffect(confirming, notice, session) { session?.blockInput(confirming || notice != null) }
-    if (hint) LaunchedEffect(Unit) { delay(6000); hint = false }
-    when (phase) {
-        LinkPhase.SETUP, LinkPhase.STARTING -> LinkSetupScreen(
-            setup, m, phase == LinkPhase.STARTING, label, { it },
+    CompanionBackHandler { play.back(onClose) }
+    LaunchedEffect(play.confirmingLeave, play.notice, session) { session?.blockInput(play.confirmingLeave || play.notice != null) }
+    when (play.phase) {
+        Phase.SETUP, Phase.STARTING -> LinkSetupScreen(
+            setup, m, play.phase == Phase.STARTING, label, { it },
             onPick = { slot ->
                 setup.begin(slot)?.let {
                     val cartridges = games.sortedBy { path -> label(path).lowercase() }
-                    if (setup.ready(it, cartridges) && cartridges.isEmpty()) notice = tr("No GBA games in the library yet")
+                    if (setup.ready(it, cartridges) && cartridges.isEmpty()) play.notice = tr("No GBA games in the library yet")
                 }
             },
             onStart = ::start, onClose = onClose,
         )
-        LinkPhase.PLAYING -> session?.let { game ->
+        Phase.PLAYING -> session?.let { game ->
             val picked = setup.slots
-            val shown = IosTouchPreferences.visible && !confirming && notice == null
+            val shown = IosTouchPreferences.visible && !play.confirmingLeave && play.notice == null
             Column(Modifier.fillMaxSize().background(Color.Black)) {
                 BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
                     IosLinkGrid(picked.size, wide = maxWidth >= maxHeight) { slot ->
@@ -155,9 +123,9 @@ internal fun IosLinkPlay(
                             }
                         }
                     }
-                    LinkPlayChrome(m, hint, fast, onFast = { fast = !fast; game.fast = fast },
-                        requestLeave = { confirming = true })
-                    if (confirming) LinkLeaveConfirmation(m, onLeave = ::leave, onDismiss = { confirming = false })
+                    LinkPlayChrome(m, fast = fast, onFast = { fast = !fast; game.fast = fast },
+                        requestLeave = play::requestLeave)
+                    if (play.confirmingLeave) LinkLeaveConfirmation(m, onLeave = { play.leave(game::close) }, onDismiss = play::dismissLeave)
                 }
                 if (shown) {
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -177,11 +145,11 @@ internal fun IosLinkPlay(
                 }
             }
         }
-        LinkPhase.CLOSING -> LinkPlayMessage(tr("Finishing the games' saves…"), m)
+        Phase.CLOSING -> LinkPlayMessage(tr("Finishing the games' saves…"), m)
     }
-    notice?.let {
+    play.notice?.let {
         OptionConfirm(tk("LINK PLAY"), it, tk("OK"), m,
-            onConfirm = { notice = null }, onDismiss = { notice = null }, cancelLabel = null)
+            onConfirm = { play.notice = null }, onDismiss = { play.notice = null }, cancelLabel = null)
     }
 }
 
