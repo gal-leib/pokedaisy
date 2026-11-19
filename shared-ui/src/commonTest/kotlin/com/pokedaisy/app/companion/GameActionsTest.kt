@@ -103,4 +103,28 @@ class GameActionsTest {
         assertEquals(listOf(Hotkeys.Action.FF_HOLD to true, Hotkeys.Action.FF_HOLD to false), holds)
         assertFalse(key(Hotkeys.Action.QUICK_MENU))
     }
+
+    @Test fun stoppingFastForwardClearsEveryOwnerAndCancelsThePendingTap() {
+        val ff = Hotkeys.Action.FF_HOLD
+        val slow = Hotkeys.Action.SLOWMO_HOLD
+        key(Hotkeys.Action.FF_TOGGLE)
+        key(slow)
+        key(ff)
+        actions.touch(TouchButton.FF, true)
+
+        actions.stopFastForward()
+        actions.stopFastForward()
+        assertFalse(settings.ffToggled)
+        assertEquals(listOf(slow to true, ff to true, ff to false), holds)
+
+        time += 100
+        actions.touch(TouchButton.FF, false)
+        key(ff, false)
+        assertFalse(settings.ffToggled)
+        assertEquals(3, holds.size)
+
+        key(ff)
+        assertEquals(ff to true, holds.last())
+        assertEquals(listOf(slow to true), holds.filter { it.first == slow })
+    }
 }

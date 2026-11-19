@@ -38,6 +38,13 @@ class GameActions(
         if (held.remove(action)?.isNotEmpty() == true) hold(action, false)
     }
 
+    /** End the toggle and every FF hold, including a touch that would otherwise toggle on release. */
+    fun stopFastForward() {
+        if (closed) return
+        if (settings.ffToggled) settings.setFfToggled(false)
+        release(Hotkeys.Action.FF_HOLD)
+    }
+
     fun clear() {
         ffDownAt = null
         for (action in held.keys.toList()) release(action)

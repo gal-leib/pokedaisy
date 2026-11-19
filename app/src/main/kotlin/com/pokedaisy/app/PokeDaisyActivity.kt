@@ -2006,9 +2006,7 @@ class PokeDaisyActivity : Activity() {
                     val current = this
                     runOnUiThread {
                         if (!::engine.isInitialized || engine !== current || !current.running) return@runOnUiThread
-                        current.setFastForwardToggled(false)
-                        gameActions.release(Hotkeys.Action.FF_HOLD)
-                        current.setFastForwardHeld(false)
+                        gameActions.stopFastForward()
                         input.releaseAll()
                         unlockSound?.play()
                         showHud(alert.message(), com.pokedaisy.app.companion.GameShinyAlert.NOTICE_MILLIS)

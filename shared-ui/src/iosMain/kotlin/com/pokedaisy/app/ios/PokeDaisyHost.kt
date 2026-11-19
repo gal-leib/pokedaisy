@@ -656,7 +656,7 @@ object PokeDaisyHost {
                 if (it.blocked != null && g.wideSupported) g.setExpandedTables(0)
             }, periodMillis = SAMPLE_MILLIS, onShinyFound = { alert ->
                 if (live()) {
-                    currentSettings.setFfToggled(false)
+                    p.actions?.stopFastForward() ?: currentSettings.setFfToggled(false)
                     touch.releaseKeys()
                     g.releaseManualInput()
                     IosTouchPreferences.feel(IosTouchPreferences.style.vibration)
