@@ -60,6 +60,18 @@ class BattleOverlayStateTest {
         assertEquals(Rect(1046f, 96f, 1170f, 392f), battleButtonsLane(rows, 124f, listOf(shoulder, faceButtons, raisedButton)))
     }
 
+    @Test fun compactActionRowFitsBetweenThePhoneSideControls() {
+        val area = Rect(0f, 12f, 2376f, 1068f)
+        val controls = listOf(
+            Rect(2090f, 38f, 2320f, 137f),
+            Rect(2118f, 263f, 2292f, 347f),
+            Rect(2031f, 474f, 2379f, 822f),
+            Rect(2107f, 958f, 2302f, 1042f),
+        )
+        assertEquals(Rect(1544f, 137f, 2376f, 263f), battleButtonsRow(area, 832f, 126f, controls))
+        assertNull(battleButtonsRow(area, 832f, 126f, controls + Rect(1544f, 0f, 2400f, 1080f)))
+    }
+
     @Test fun settingsSurviveHostRecreationWithoutChangingHudChoices() {
         val store = PrefsCompanionSettingsTest.Store()
         val settings = PrefsCompanionSettingsTest.Settings(Prefs(store))
