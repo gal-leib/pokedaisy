@@ -158,21 +158,23 @@ class LinkActivity : ComponentActivity() {
         }
         thread(name = "pokedaisy-link-open") {
             val list = try {
-                if (!SaveFileEdits.recover(this)) {
-                    reportOpenFailure(ClosedSaveEdits.recoveryError())
-                    return@thread
-                }
-                var refused: String? = null
-                val saves = LinkSavePaths.forGames(picked.map { SavesLocation.saveFor(this, prefs, it).absoluteFile.toOkioPath(normalize = true) })
-                val list = picked.zip(saves).map { (rom, path) ->
-                    val save = File(path.toString())
-                    SaveBackups.snapshot(save)
-                    RzipSave.unpackForPlay(save)?.let { refused = refused ?: it }
-                    Game(rom, RomArchive.playable(rom, cacheDir) ?: rom, save)
-                }
-                refused?.let {
-                    reportOpenFailure(it)
-                    return@thread
+                val prepared = LinkSavePaths.prepare(
+                    picked, recover = { SaveFileEdits.recover(this) },
+                    saveFor = { SavesLocation.saveFor(this, prefs, it).absoluteFile.toOkioPath(normalize = true) },
+                    prepareBattery = { path ->
+                        val save = File(path.toString())
+                        SaveBackups.snapshot(save)
+                        RzipSave.unpackForPlay(save)
+                    },
+                )
+                val list = when (prepared) {
+                    is LinkSavePaths.Preparation.Failed -> {
+                        reportOpenFailure(prepared.reason)
+                        return@thread
+                    }
+                    is LinkSavePaths.Preparation.Ready -> picked.zip(prepared.paths).map { (rom, path) ->
+                        Game(rom, RomArchive.playable(rom, cacheDir) ?: rom, File(path.toString()))
+                    }
                 }
                 val ok = LinkCore.pkLinkOpen(list.map { it.playable.absolutePath }.toTypedArray(), list.map { it.save.absolutePath }.toTypedArray())
                 Log.i(TAG, "open ${list.size} games: $ok (${list.joinToString { it.rom.name }})")

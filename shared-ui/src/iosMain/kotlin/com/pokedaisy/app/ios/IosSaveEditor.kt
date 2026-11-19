@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.SaveEditFiles
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.Gen3SaveFile
-import com.pokedaisy.app.companion.data.save.MissingDex
+import com.pokedaisy.app.companion.data.save.SaveLibrary
 import com.pokedaisy.app.companion.data.save.MissingTradeRoute
 import com.pokedaisy.app.companion.data.save.MonRef
 import com.pokedaisy.app.companion.data.save.TradeSide
@@ -37,12 +37,10 @@ import com.pokedaisy.app.companion.ui.PcBoxesScreen
 import com.pokedaisy.app.companion.ui.PcBoxesState
 import com.pokedaisy.app.companion.ui.SaveEditorText
 import com.pokedaisy.app.companion.ui.rememberGbaTextMetrics
-import com.pokedaisy.app.game.RomPicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okio.Path.Companion.toPath
 
 @Composable
 internal fun IosSaveEditorPicker(paths: List<String>, label: (String) -> String, onPick: (String) -> Unit, onClose: () -> Unit) {
@@ -112,17 +110,15 @@ internal fun IosSaveEditor(
             val gamePaths = paths.filter { it != path }
             val titles = gamePaths.associateWith(label)
             scope.launch {
-                val (sources, sides, missing) = withContext(Dispatchers.Default) {
-                    val read = editableIosGames(gamePaths).mapNotNull { candidate ->
+                val missing = withContext(Dispatchers.Default) {
+                    SaveLibrary.missing(target, editableIosGames(gamePaths), { candidate ->
                         val save = readIosGen3Save(candidate, titles.getValue(candidate)) as? IosGen3Save.Ready
                         if (save == null || save.path == edit.source.path) null else candidate to save
-                    }
-                    val sides = read.map { (candidate, save) -> save.tradeSide(titles.getValue(candidate)) }
-                    Triple(read.map { it.first }, sides, MissingDex.find(target, sides))
+                    }, { (candidate, save) -> save.tradeSide(titles.getValue(candidate)) })
                 }
                 if (state.missing === loading) {
-                    dexSources = sources
-                    state.missing = MissingView(missing, sides)
+                    dexSources = missing.sources.map { it.first }
+                    state.missing = MissingView(missing.entries, missing.sides)
                 }
             }
         }

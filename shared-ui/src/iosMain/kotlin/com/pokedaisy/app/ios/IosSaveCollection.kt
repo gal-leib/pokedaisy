@@ -7,7 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.companion.data.save.MonRef
-import com.pokedaisy.app.companion.data.save.SaveCollection
+import com.pokedaisy.app.companion.data.save.SaveLibrary
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CollectionScreen
 import com.pokedaisy.app.companion.ui.CollectionState
@@ -32,19 +32,17 @@ internal fun IosSaveCollection(
         val titles = paths.associateWith(label)
         val collection = withContext(Dispatchers.Default) {
             if (!recoverIosSaveTrades()) return@withContext null
-            val read = editableIosGames(paths).mapNotNull { path ->
+            SaveLibrary.collection(editableIosGames(paths), { path ->
                 val name = titles.getValue(path)
-                val save = readIosGen3Save(path, name) as? IosGen3Save.Ready ?: return@mapNotNull null
-                CollectedGame(path, name, save)
-            }
-            val sides = read.map { it.save.tradeSide(it.label) }
-            Triple(read, sides, SaveCollection.gather(sides))
+                (readIosGen3Save(path, name) as? IosGen3Save.Ready)?.let { CollectedGame(path, name, it) }
+            }, { it.save.tradeSide(it.label) })
         }
         if (collection == null) {
             error = iosSaveTradeRecoveryError()
         } else {
-            games = collection.first
-            state.load(collection.second, collection.third)
+            error = null
+            games = collection.sources
+            state.load(collection.sides, collection.items)
         }
     }
     CollectionScreen(state, m, onClose, icons = { games.getOrNull(it)?.save?.icons },

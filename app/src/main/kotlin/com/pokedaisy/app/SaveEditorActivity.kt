@@ -26,6 +26,7 @@ import com.pokedaisy.app.companion.data.save.Gen3SaveFile
 import com.pokedaisy.app.companion.data.save.MissingDex
 import com.pokedaisy.app.companion.data.save.MissingTradeRoute
 import com.pokedaisy.app.companion.data.save.RomMonIcons
+import com.pokedaisy.app.companion.data.save.SaveLibrary
 import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
@@ -63,6 +64,8 @@ class SaveEditorActivity : ComponentActivity() {
         val ds: Pair<com.pokedaisy.app.companion.data.save.Gen4SaveFile, com.pokedaisy.app.companion.data.save.Gen4GameData>? = null,
         val gen5: Pair<com.pokedaisy.app.companion.data.save.Gen5SaveFile, com.pokedaisy.app.companion.data.save.Gen5GameData>? = null,
     ) {
+        fun tradeSide() = TradeSide(name, editor(), gameCode)
+
         fun editor(): com.pokedaisy.app.companion.data.save.MonSaveEditor = file?.let { Gen3SaveEditor(it) }
             ?: ds?.let { (f, g) -> com.pokedaisy.app.companion.data.save.Gen4SaveEditor(f, g) }
             ?: gen5!!.let { (f, g) -> com.pokedaisy.app.companion.data.save.Gen5SaveEditor(f, g) }
@@ -269,10 +272,16 @@ class SaveEditorActivity : ComponentActivity() {
         palFrom = null
         palPick = null
         Thread {
-            val opened = readableGames(gen5 = true).mapNotNull { (f, _) -> open(f) as? Opened }
-            val sides = opened.map { TradeSide(it.name, it.editor(), it.gameCode) }
-            runOnUiThread { collectionOpened = opened; st.load(sides) }
-            opened.forEach { loadIcons(it.rom) }
+            val collection = SaveLibrary.collection(
+                readableGames(gen5 = true), { (file, _) -> open(file) as? Opened }, Opened::tradeSide,
+            )
+            runOnUiThread {
+                if ((page as? Page.Collection)?.state === st) {
+                    collectionOpened = collection.sources
+                    st.load(collection.sides, collection.items)
+                }
+            }
+            collection.sources.forEach { loadIcons(it.rom) }
         }.start()
     }
 
@@ -344,7 +353,7 @@ class SaveEditorActivity : ComponentActivity() {
             runOnUiThread {
                 page = if (a is Opened && b is Opened) {
                     tradeFrom = a
-                    Page.Trade(TradeState(TradeSide(a.name, a.editor(), a.gameCode), TradeSide(b.name, b.editor(), b.gameCode)), a, b)
+                    Page.Trade(TradeState(a.tradeSide(), b.tradeSide()), a, b)
                 } else Page.Message((a as? String) ?: (b as String))
             }
         }.start()
@@ -485,18 +494,16 @@ class SaveEditorActivity : ComponentActivity() {
         val gen5 = ready.opened.gen5 != null
         Thread {
             // A Black / White save: the HeartGold / SoulSilver / Platinum saves (Poké Transfer) and the other Gen 5 ones (trades).
-            val others = readableGames(except = rom, gen5 = gen5).map { it.first }
+            val candidates = readableGames(except = ready.opened.rom, gen5 = gen5).map { it.first }
                 .filter { if (gen5) SaveFileEdits.isDsEditable(it) || SaveFileEdits.isGen5(it) else if (ds) true else !SaveFileEdits.isDsEditable(it) }
-                .mapNotNull { f -> (open(f) as? Opened)?.let { f to it } }
-            val sides = others.map { (_, o) -> TradeSide(o.name, o.editor(), o.gameCode) }
-            val entries = runCatching { MissingDex.find(target, sides) }.getOrElse { emptyList() }
+            val missing = SaveLibrary.missing(target, candidates, { open(it) as? Opened }, Opened::tradeSide)
             runOnUiThread {
                 if (page === ready && s.missing === loading) {
-                    missingRoms = others.map { it.first }
-                    s.missing = com.pokedaisy.app.companion.ui.MissingView(entries, sides)
+                    missingRoms = missing.sources.map { it.rom }
+                    s.missing = com.pokedaisy.app.companion.ui.MissingView(missing.entries, missing.sides)
                 }
             }
-            others.forEach { loadIcons(it.first) }
+            missing.sources.forEach { loadIcons(it.rom) }
         }.start()
     }
 
@@ -653,7 +660,7 @@ class SaveEditorActivity : ComponentActivity() {
         Thread {
             val next = when (val o = open(partner)) {
                 is Opened -> {
-                    val st = TradeState(TradeSide(a.name, a.editor(), a.gameCode), TradeSide(o.name, o.editor(), o.gameCode))
+                    val st = TradeState(a.tradeSide(), o.tradeSide())
                     // From MISSING: the Pokémon to bring already picked on the other side.
                     pick?.let { st.focus(it, firstSide = false) }
                     pickA?.let { st.focus(it, firstSide = true) }

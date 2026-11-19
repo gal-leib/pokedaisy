@@ -184,13 +184,24 @@ private class IosLinkSaves private constructor(
 
     companion object {
         fun prepare(roms: List<String>): IosLinkSaves {
-            check(recoverIosSaveTrades()) { iosSaveTradeRecoveryError() }
-            val own = roms.map { RomPicker.savePathFor(it).toPath(normalize = true) }
-            val destinations = LinkSavePaths.forGames(own)
-            destinations.forEach { StateFiles.backupBattery(it) }
-            val previous = roms.indices.filter { own[it] == destinations[it] }
-                .map { Original(roms[it], own[it], stamp(own[it])) }
-            return IosLinkSaves(destinations, previous)
+            val prepared = LinkSavePaths.prepare(
+                roms, recover = ::recoverIosSaveTrades,
+                saveFor = { RomPicker.savePathFor(it).toPath(normalize = true) },
+                prepareBattery = {
+                    StateFiles.backupBattery(it)
+                    null
+                },
+            )
+            return when (prepared) {
+                is LinkSavePaths.Preparation.Failed -> error(prepared.reason)
+                is LinkSavePaths.Preparation.Ready -> {
+                    val previous = prepared.primarySlots.map { slot ->
+                        val save = prepared.paths[slot]
+                        Original(roms[slot], save, stamp(save))
+                    }
+                    IosLinkSaves(prepared.paths, previous)
+                }
+            }
         }
 
         private fun stamp(path: Path): Long? =
