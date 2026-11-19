@@ -712,8 +712,7 @@ object PokeDaisyHost {
 
     /** Writes the running game's save and closes it; the companion goes back to waiting. */
     fun closeGame() {
-        FeatureTips.available = { false }
-        FeatureTips.scheduler?.let { tips -> tips.current?.let(tips::timedOut); tips.save() }
+        FeatureTips.endGame()
         stateError = null
         steadyMusic?.close()
         steadyMusic = null

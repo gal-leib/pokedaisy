@@ -68,6 +68,9 @@ import com.pokedaisy.app.companion.FoldPosture
 import com.pokedaisy.app.companion.data.FfMenuWatch
 import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.TipId
+import com.pokedaisy.app.companion.ui.GameTipFrame
+import com.pokedaisy.app.companion.ui.GameTipSession
+import com.pokedaisy.app.companion.ui.controllerTipShortcut
 import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.RomRegionMap
@@ -1569,7 +1572,7 @@ class PokeDaisyActivity : Activity() {
             }
         }
         Prefs(this).let { com.pokedaisy.app.companion.FeatureTips.init(it.tipStore, it.tips) }
-        com.pokedaisy.app.companion.FeatureTips.available = ::tipAvailable
+        gameTips.attach()
 
         // Debug-only mirror of the companion UI onto the main display, for
         // Claude's own testing use (screenshotting/tapping over adb): the
@@ -2576,7 +2579,7 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized) engine.playback.quiesce()
         if (::touchControls.isInitialized) touchControls.releaseInputWindows()
         stopListeningForFold()
-        com.pokedaisy.app.companion.FeatureTips.available = { false }
+        gameTips.detach()
         Hotkeys.dsActive = { false }
         endN3ds()
         // Gone while the game slept (onPause held it): stop it now, as a close would have.
@@ -3979,16 +3982,12 @@ class PokeDaisyActivity : Activity() {
                 }
             }
         }
-        // Tips' clock: field play time, the moments, whether the field is calm ([tickTips]).
         androidx.compose.runtime.LaunchedEffect(Unit) {
-            var last = android.os.SystemClock.uptimeMillis()
-            while (true) {
-                kotlinx.coroutines.delay(500)
-                val now = android.os.SystemClock.uptimeMillis()
-                runCatching { tickTips((now - last).coerceAtMost(1000)) }.onFailure { Log.w("pokedaisy", "tips", it) }
-                runCatching { syncFlight() }.onFailure { Log.w("pokedaisy", "flight", it) }
-                last = now
-            }
+            gameTips.run(
+                nowMillis = android.os.SystemClock::uptimeMillis,
+                onFailure = { Log.w("pokedaisy", "tips", it) },
+                afterTick = { runCatching { syncFlight() }.onFailure { Log.w("pokedaisy", "flight", it) } },
+            )
         }
     }
 
@@ -4906,60 +4905,61 @@ class PokeDaisyActivity : Activity() {
 
     // --- feature tips ------------------------------------------------------------
 
-    /** Every 500 ms (the HUD's composition, main thread): field play time and calm for [com.pokedaisy.app.companion.TipScheduler],
-     *  and the moments that call a tip up - running everywhere, wild battle after wild battle, a TM used up, the game's
-     *  own region map closed. */
-    private fun tickTips(dt: Long) {
-        val tips = com.pokedaisy.app.companion.FeatureTips.scheduler ?: return
-        // Asleep (screen off) or in the background, nothing counts as play.
-        val e = hudEngine.value?.takeIf {
-            it.running && !it.sleeping && tipsResumed
-        }
-        val snap = telemetry.snapshot.value
-        tipsOnCompanion.value = presentation != null || mainCompanion != null
-        val field = e != null && playing && e.onField.value && snap.hasData && !snap.unsupported && !snap.inBattle && !hudUpright.value
+    private fun tipFrame(): GameTipFrame {
+        // Screen off or activity in the background: time and events stop counting.
+        val e = hudEngine.value?.takeIf { it.running && !it.sleeping && tipsResumed }
+        val onCompanion = presentation != null || mainCompanion != null
+        tipsOnCompanion.value = onCompanion
         val windowOpen = ::sidePanel.isInitialized && sidePanel.windowOpen
-        val calm = field && !quickMenu.open && !hudPanelOpen.value && !windowOpen && !expandOfferUp.value && !e!!.holdFrame
-        // Over the game, a card goes when the field does (a battle, a menu, the QUICK MENU); on the companion it stays.
-        tips.current?.let { if (!tipsOnCompanion.value && (!field || quickMenu.open || windowOpen)) tips.timedOut(it) }
-        if (e != null) {
-            e.playback.tipMoments.observe(snap, e.regionMapOpen, tips)
-            if (dsStageOn) tips.moment(TipId.DS_TRIGGERS)
-        }
-        tips.tick(dt, field, calm)
-    }
-
-    private val fieldTips by lazy {
-        com.pokedaisy.app.companion.ui.FieldTipActions(
-            companionSettings, { telemetry.snapshot.value }, { itemUse }, { flyAction },
-            { triggerQuickMenu(true) }, ::runQuickAction, { showHud(it) },
+        val dismissForOverlay = quickMenu.open || windowOpen
+        return GameTipFrame(
+            snapshot = telemetry.snapshot.value,
+            settledOnField = e != null && playing && e.onField.value && !hudUpright.value,
+            blocked = dismissForOverlay || hudPanelOpen.value || expandOfferUp.value || e?.holdFrame == true,
+            dismissForOverlay = dismissForOverlay,
+            cardOnCompanion = onCompanion,
+            moments = e?.playback?.tipMoments,
+            mapOpen = e?.regionMapOpen == true,
+            dsTriggers = e != null && dsStageOn,
         )
     }
 
-    /** A tip's feature is there to try here, and not on already. */
-    private fun tipAvailable(tip: TipId): Boolean {
-        if (!::engine.isInitialized || !engine.running) return false
-        val p = Prefs(this)
-        return when (tip) {
-            TipId.ZOOM -> view.wide && tipKey(Hotkeys.Action.ZOOM) != null
-            // ExpandIntro has offered it already: this is the one later reminder.
-            TipId.EXPAND -> wideGame != WideScreen.OFF && !view.wide && p.expandGameOfferSeen
-            TipId.QUICK_MENU -> tipKey(Hotkeys.Action.QUICK_MENU) != null && quickShown.value.any { quickActions.offered(it) }
-            TipId.HUD -> hudOn.value && !hudUpright.value
-            // A DS game on one screen with the triggers on a controller (the HUD's TOUCH stands in without one).
-            TipId.DS_TRIGGERS -> dsStageOn && tipKey(Hotkeys.Action.DS_LAYOUT) != null
-            else -> fieldTips.available(tip)
-        }
+    private val gameTips by lazy {
+        GameTipSession(
+            settings = companionSettings,
+            snapshot = { telemetry.snapshot.value },
+            items = { itemUse },
+            fly = { flyAction },
+            openQuickMenu = { triggerQuickMenu(true) },
+            quickAction = ::runQuickAction,
+            notice = { showHud(it) },
+            frame = ::tipFrame,
+            running = { ::engine.isInitialized && engine.running },
+            expanded = { view.wide },
+            // ExpandIntro offered it already. This is the later reminder.
+            expandOfferSeen = { Prefs(this).expandGameOfferSeen },
+            shortcut = ::tipKey,
+            quickMenuHasActions = { quickShown.value.any(quickActions::offered) },
+            hudAvailable = { hudOn.value && !hudUpright.value },
+            showLookAroundKey = true,
+            dsTriggers = { dsStageOn },
+            dsTouchFloats = { dsFloats.value },
+            cycleZoom = { zoomStep() },
+            openSummary = {
+                hudOpenPanel.value = com.pokedaisy.app.companion.ui.FieldHudPanel.SUMMARY to 0
+                hudOpenTick.intValue++
+            },
+            toggleDsTouch = { toggleDsTouch() },
+            nextDsLayout = { nextDsLayout() },
+        )
     }
 
     /** [action]'s key as a tip names it ("R3", "SELECT + R1"): a controller's binding, none without a controller. */
     private fun tipKey(action: Hotkeys.Action): String? {
         if (!Controllers.anyConnected() && !physicalPadUsed) return null
         if (!::hotkeys.isInitialized) return null
-        val chord = hotkeys.rawBindings[action].orEmpty()
-            .firstOrNull { c -> c.split('+').all { it.trim().startsWith("BUTTON_") } } ?: return null
-        return chord.split('+').joinToString(" + ") { k ->
-            when (val name = k.trim()) {
+        return controllerTipShortcut(hotkeys.rawBindings[action].orEmpty()) { name ->
+            when (name) {
                 "BUTTON_THUMBL" -> "L3"
                 "BUTTON_THUMBR" -> "R3"
                 else -> com.pokedaisy.app.companion.KeyCapture.label(name)
@@ -4967,36 +4967,9 @@ class PokeDaisyActivity : Activity() {
         }
     }
 
-    /** The keys a tip's card names. */
-    private fun tipKeys(tip: TipId): List<Pair<String, String>> = when (tip) {
-        TipId.ZOOM -> listOfNotNull(
-            tipKey(Hotkeys.Action.ZOOM)?.let { it to tr("ZOOM") }, tr("RIGHT STICK") to tr("LOOK AROUND"),
-        )
-        TipId.QUICK_MENU -> listOfNotNull(tipKey(Hotkeys.Action.QUICK_MENU)?.let { it to tr("QUICK MENU") })
-        // TOUCH SCREEN only where the touch screen floats in (ONE SCREEN, PICTURE IN PICTURE).
-        TipId.DS_TRIGGERS -> listOfNotNull(
-            tipKey(Hotkeys.Action.TOUCH_SCREEN)?.takeIf { dsFloats.value }?.let { it to tr("TOUCH SCREEN") },
-            tipKey(Hotkeys.Action.DS_LAYOUT)?.let { it to tr("NEXT LAYOUT") },
-        )
-        else -> emptyList()
-    }
+    private fun tipKeys(tip: TipId) = gameTips.keys(tip)
 
-    /** A tip's TRY IT: the feature itself, at once. */
-    private fun tryTip(tip: TipId) {
-        when (tip) {
-            TipId.ZOOM -> zoomStep()
-            TipId.EXPAND -> companionSettings.setGameAspect(GameAspect.WIDE)
-            TipId.QUICK_MENU -> triggerQuickMenu(true)
-            // The lead's summary: what a party icon opens.
-            TipId.HUD -> {
-                hudOpenPanel.value = com.pokedaisy.app.companion.ui.FieldHudPanel.SUMMARY to 0
-                hudOpenTick.intValue++
-            }
-            // L2's touch screen floated in, else (both screens on show) R2's next layout.
-            TipId.DS_TRIGGERS -> if (dsFloats.value) toggleDsTouch() else nextDsLayout()
-            else -> fieldTips.tryIt(tip)
-        }
-    }
+    private fun tryTip(tip: TipId) = gameTips.tryIt(tip)
 
     // --- helpers -----------------------------------------------------------------
 
