@@ -111,8 +111,8 @@ class CoopWireTest {
 
     /** A HELLO laid out by hand, so the decoder sees values the encoder would refuse. */
     private fun rebuild(version: String = "1.3.1", ticket: String = this.ticket, female: Int = 1): ByteArray {
-        val v = version.toByteArray(Charsets.UTF_8)
-        val t = ticket.toByteArray(Charsets.UTF_8)
+        val v = version.encodeToByteArray()
+        val t = ticket.encodeToByteArray()
         val sha = ByteArray(20) { EMERALD_COOP_SHA1.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
         return byteArrayOf(0, 1, v.size.toByte()) + v + sha +
             byteArrayOf(0x12, 0x34, 0xAB.toByte(), 0xCD.toByte()) + name + byteArrayOf(female.toByte()) +
