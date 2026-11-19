@@ -19,15 +19,9 @@ plugins {
 val sharedUiFiles: Set<String> = fileTree("src/main/kotlin") {
     include(rootProject.extra["sharedUiSources"] as List<String>)
     exclude(rootProject.extra["sharedUiAppOnly"] as List<String>)
-    exclude(rootProject.extra["sharedCoreSources"] as List<String>)
 }.map { it.relativeTo(file("src/main/kotlin")).invariantSeparatorsPath }
     // Kotlin only: shared-ui compiles no Java, so a .java under those folders (co-op's X25519 copy) stays the app's.
     .filter { it.endsWith(".kt") }.toSet()
-
-@Suppress("UNCHECKED_CAST")
-val sharedCoreFiles: Set<String> = fileTree("src/main/kotlin") {
-    include(rootProject.extra["sharedCoreSources"] as List<String>)
-}.map { it.relativeTo(file("src/main/kotlin")).invariantSeparatorsPath }.toSet()
 
 // Crash reports (Firebase Crashlytics, opt-in - CrashReports.kt): only with the project's
 // app/google-services.json, which stays out of this public repo (gitignored; the release
@@ -203,7 +197,6 @@ android {
     sourceSets["test"].java.srcDirs("src/test/kotlin", "../server/coop-relay/src/main/kotlin")
 
     // The shared modules' files are compiled there; lint reads them there too.
-    sourceSets["main"].java.filter.exclude(sharedCoreFiles)
     sourceSets["main"].java.filter.exclude(sharedUiFiles)
 
     testOptions {
@@ -230,7 +223,7 @@ tasks.withType<KotlinCompile>().configureEach {
         !e.isDirectory && sharedDirs.any { e.path.startsWith(it) } && !(tests && e.file.nameWithoutExtension in appOnlyTests + sharedTestHelpers)
     }
     // The companion's screens are compiled by shared-ui/; their tests stay here (Paparazzi).
-    if (!tests) exclude { e -> !e.isDirectory && (e.path in sharedUiFiles || e.path in sharedCoreFiles) }
+    if (!tests) exclude { e -> !e.isDirectory && e.path in sharedUiFiles }
 }
 
 // Settings > LICENSES: NOTICE, then the license text of everything the APK carries, as one asset

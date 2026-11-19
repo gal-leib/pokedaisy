@@ -4007,15 +4007,9 @@ checks round trips, invalid states, cross-platform refusal and detection of a ch
 Put portable game rules, save transactions and their tests under `shared/src/commonMain` and
 `shared/src/commonTest`. Common Compose screens and the actions they present belong under
 `shared-ui/src/commonMain`. Both modules compile their own directories for both mobile targets.
-The filename lists in the root build select older sources still under `app/src/main/kotlin`.
-A new file in a module-owned directory needs no entry in those lists.
-
-The companion's data and language code, `app/src/main/kotlin/com/pokedaisy/app/companion/data` and `companion/i18n`,
-is compiled by its own Kotlin Multiplatform module, `shared/` (Android and iOS), in place: the files stay where
-they are, the app depends on `:shared` and leaves those two folders out of its own compile. So nothing in them may use
-`java.*` or `android.*`: plain Kotlin first, then the Kotlin libraries (coroutines, atomicfu, kotlinx-datetime), then
-okio. What differs by platform comes in from outside: the emulator through `EmulatorCore` (the app sets it to
-`MgbaEmulatorCore` in `PokeDaisyApp`), logging through `Logs`' sink. Their tests stay in `app/src/test` too and run as
+The companion's data and language code lives under `shared/src/commonMain/kotlin/com/pokedaisy/app/companion`.
+Android and iOS supply the emulator through `EmulatorCore` and logging through the `Logs` sink.
+Their tests stay in `app/src/test` too and run as
 `:shared:testDebugUnitTest` (from `app/`, as before), except the few that also use the app's classes (the root
 build's `appOnlyTests`), which run with the app's. Something the app uses from those folders must be public, not
 `internal` (another module now). `./gradlew :shared:compileKotlinIosArm64` compiles it for an iPad; since the
@@ -4029,7 +4023,7 @@ ui-preview still compiles the same files straight into its desktop build.
 
 The input models `GbaControls`, `Hotkeys`, `GbaInput`, `ScriptInput` and `KeyCapture` live in
 `shared/src/commonMain/kotlin`. Both native hosts and the desktop preview use these sources for bindings, chord
-capture, deferred taps, turbo and script ownership. The canonical key codes compile in `shared/` from the app's data
+capture, deferred taps, turbo and script ownership. The canonical key codes compile in `shared/` alongside the companion's data
 sources. `AndroidGbaInput.kt` converts Android motion events to the common axis policy, and UI badges live in
 `shared-ui/`.
 

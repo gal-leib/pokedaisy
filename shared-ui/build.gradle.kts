@@ -24,7 +24,6 @@ val sharedUiAppOnly = rootProject.extra["sharedUiAppOnly"] as List<String>
 val legacyUiFiles = fileTree(app) {
     include(sharedUiSources)
     exclude(sharedUiAppOnly)
-    exclude(rootProject.extra["sharedCoreSources"] as List<String>)
 }.files
 
 kotlin {

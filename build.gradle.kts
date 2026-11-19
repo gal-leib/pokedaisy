@@ -25,26 +25,6 @@ val appOnlyTests by extra(
         "RenegadePlatinumTest", "ShinyOddsTest",
     ),
 )
-// Legacy app-tree sources compiled in place by shared/.
-val sharedCoreSources by extra(
-    listOf(
-        "com/pokedaisy/app/companion/data/**",
-        "com/pokedaisy/app/companion/i18n/**",
-        "com/pokedaisy/app/BpsPatch.kt",
-        "com/pokedaisy/app/RomPatchFiles.kt",
-        "com/pokedaisy/app/FlacWriter.kt",
-        "com/pokedaisy/app/FfMusicCache.kt",
-        "com/pokedaisy/app/FfMusicBudget.kt",
-        "com/pokedaisy/app/FfMusicRenderer.kt",
-        "com/pokedaisy/app/Gen1MusicRenderer.kt",
-        "com/pokedaisy/app/MusicRenderHost.kt",
-        "com/pokedaisy/app/SteadyMusic.kt",
-        "com/pokedaisy/app/GameSoundFiles.kt",
-        "com/pokedaisy/app/M4aLoop.kt",
-        "com/pokedaisy/app/Gen1Loop.kt",
-        "com/pokedaisy/app/WideCamera.kt",
-    ),
-)
 // The companion's screens and what they need (shared-ui/build.gradle.kts), as paths under app/src/main/kotlin: the
 // app leaves them out of its own compile and links shared-ui instead. The co-op transport stays the app's (sockets,
 // Android NSD, Bouncy Castle, OkHttp).
