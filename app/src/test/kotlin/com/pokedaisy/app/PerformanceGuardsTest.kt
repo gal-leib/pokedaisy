@@ -42,11 +42,14 @@ class PerformanceGuardsTest {
         )
         val activity = read("PokeDaisyActivity.kt")
         // onPause's work (pauseGame: onPause skips it only for the pause around a move to the other screen).
-        val onPause = activity.substring(activity.indexOf("private fun pauseGame()")).substringBefore("\n    }\n")
+        val onPause = lambda(activity, "private fun pauseGame() {")
         assertTrue(
             "onPause must unbind the view before stopping the engine",
-            onPause.indexOf("view.unbindCoreBlocking()") in 0 until onPause.indexOf("engine.stop"),
+            onPause.indexOf("view.unbindCoreBlocking()") in 0 until onPause.indexOf("stopEngineWithResume()"),
         )
+        val stop = lambda(activity, "private fun stopEngineWithResume() {")
+        assertTrue("the stop helper must reach both engine stop paths", "engine.stop()" in stop && "engine.stopWithSuspend(" in stop)
+        assertTrue("pauseGame must route every stop through that helper", "engine.stop" !in onPause)
         assertTrue("the activity must wire onCoreStopping to the view's unbind", "view.unbindCoreBlocking()" in lambda(activity, "onCoreStopping = {"))
     }
 
