@@ -9,6 +9,7 @@ import com.pokedaisy.app.companion.CompanionAchievements
 import com.pokedaisy.app.companion.LeaderboardPage
 import com.pokedaisy.app.companion.LeaderboardTracker
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.game.GameSession.FrameWork
 import com.pokedaisy.app.game.RaClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -302,7 +303,10 @@ class RaSession(
         if (!loadInFlight) _state.update { it.copy(game = AchievementGame(0, null, null, 0, 0, 0, 0)) }
     }
 
-    fun onFrame() {
+    /** Only forward gameplay may advance achievement evaluation. */
+    fun onFrame(work: FrameWork, updateSuppression: () -> Unit = {}) {
+        if (work != FrameWork.ADVANCING) return
+        updateSuppression()
         if (!ready || !coreAttached) return
         if (loadWanted) {
             loadWanted = false

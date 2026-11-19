@@ -216,7 +216,13 @@ class GameViewController(
 
     /** Whether a game is open and running in this controller. */
     val isRunning: Boolean get() = running
-    val playingForward: Boolean get() = running && active && !uiPaused && !stateChanging && !rewinding
+    /** Frame phase for effects attached to the native core callback. Held frames never reach afterFrame. */
+    val completedFrameWork: GameSession.FrameWork get() = when {
+        !running || !active || uiPaused || stateChanging -> GameSession.FrameWork.HELD
+        rewinding -> GameSession.FrameWork.REWINDING
+        else -> GameSession.FrameWork.ADVANCING
+    }
+    val playingForward: Boolean get() = completedFrameWork == GameSession.FrameWork.ADVANCING
 
     // Kept by the controller: MTKView holds its delegate weakly.
     private val drawer = object : NSObject(), MTKViewDelegateProtocol {

@@ -52,7 +52,7 @@ object RetroAchievements : CompanionAchievements by androidRa {
     fun setShinyOddsActive(active: Boolean) = androidRa.setShinyOddsActive(active)
     fun setExpShareActive(active: Boolean) = androidRa.setExpShareActive(active)
     fun setFlightAnywhere(active: Boolean) = androidRa.setFlightAnywhere(active)
-    fun onFrame() = androidRa.onFrame()
+    fun onFrame(work: com.pokedaisy.app.game.GameSession.FrameWork) = androidRa.onFrame(work)
     fun onCoreStopping() = androidRa.onCoreStopping()
     fun onCoreStopped() = androidRa.onCoreStopped()
 

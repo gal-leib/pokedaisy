@@ -621,14 +621,13 @@ object PokeDaisyHost {
         val previousAfterFrame = g.afterFrame
         g.afterFrame = {
             previousAfterFrame()
-            if (g.playingForward) {
+            ra.onFrame(g.completedFrameWork) {
                 ra.setShinyOddsActive(p.shiny?.active == true)
                 ra.setExpShareActive(currentOptions.expShareActive)
                 if (flewAnywhere && currentSettings.flightArea == com.pokedaisy.app.companion.FlightAreaMode.SEEN) {
                     flewAnywhere = false
                     ra.setFlightAnywhere(false)
                 }
-                ra.onFrame()
             }
         }
         prefetchArt(romPath)

@@ -1148,6 +1148,7 @@ class EmulatorEngine(
         // Read across a frame's stages (were the loop's locals).
         var frameStart = 0L
         var rewinding = false
+        val frameWork get() = if (rewinding) GameSession.FrameWork.REWINDING else GameSession.FrameWork.ADVANCING
         var probeOnly = false
         var frameCoop: CoopFrameHook? = null
         var speed = 1f
@@ -1307,7 +1308,7 @@ class EmulatorEngine(
             // Achievements never take the game down with them (a pending JNI
             // exception from a callback would otherwise end this loop).
             try {
-                RetroAchievements.onFrame()
+                RetroAchievements.onFrame(frameWork)
             } catch (t: Exception) {
                 if (!raFrameFailed) Log.e("pokedaisy", "achievements frame failed", t)
                 raFrameFailed = true
@@ -1327,7 +1328,7 @@ class EmulatorEngine(
 
         /** Jobs, sleep, EXPAND's fault check and the companion's samples. */
         fun afterCore() {
-            servicePending(if (rewinding) GameSession.FrameWork.REWINDING else GameSession.FrameWork.ADVANCING)
+            servicePending(frameWork)
             if (sleeping) {
                 runCatching { track?.pause(); track?.flush() }
                 val sleptAt = android.os.SystemClock.elapsedRealtime()
