@@ -2,7 +2,10 @@ package com.pokedaisy.app
 
 import okio.Path
 
-/** The on-device recording that follows the current song through fast-forward and SMART's 1× stretches. */
+/**
+ * The on-device recording that follows the current song through fast-forward and SMART's 1× stretches.
+ * [songStartedAt] is on the host's monotonic clock so playback can resume partway through the intro or loop.
+ */
 data class SteadyMusicClip(val loop: Path, val intro: Path?, val songStartedAt: Long)
 
 /** The same song, cache ownership and pending-vs-fallback decisions on both hosts. Frame thread only. */

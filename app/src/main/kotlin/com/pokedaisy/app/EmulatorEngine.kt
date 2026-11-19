@@ -25,6 +25,7 @@ import com.pokedaisy.app.companion.data.ShopWatch
 import java.io.File
 import java.nio.ByteBuffer
 import kotlin.math.roundToInt
+import com.pokedaisy.app.game.FramePacer
 import okio.Path.Companion.toOkioPath
 
 /**
@@ -56,6 +57,7 @@ class EmulatorEngine(
     private val battle: com.pokedaisy.app.companion.GameBattleInput,
     private val preferences: Prefs,
     private val telemetry: com.pokedaisy.app.companion.TelemetryStore,
+    private val musicSource: SteadyMusicSource? = null,
 ) {
     private var thread: Thread? = null
     @Volatile var running = false
@@ -250,8 +252,6 @@ class EmulatorEngine(
     /** The field screen is up, positively: FfMenuWatch's learned callback on a GBA game, the field map process on a DS. */
     private val fieldScreen get() = if (nds) fieldState and MgbaCore.FIELD_SCREEN != 0 else gba && FfMenuWatch.onField
 
-    /** A Game Boy game's music tables: its STEADY FF-music key comes from Gen1Music instead of the m4a engine. */
-    @Volatile var gen1Music: com.pokedaisy.app.companion.data.Gen1MusicTables? = null
     var onStateResult: ((action: Hotkeys.Action, slot: Int, ok: Boolean) -> Unit)? = null
     var onSlotChanged: ((slot: Int) -> Unit)? = null
     var onSpeedChanged: ((label: String) -> Unit)? = null
@@ -260,7 +260,7 @@ class EmulatorEngine(
      * actually changes — a cached clip (its loop, intro and when the song
      * started), or null to stop (nothing cached yet for this state, or FF
      * isn't active). Post the player's work to the UI thread yourself (see FfMusicPlayer). */
-    var onFfMusicChanged: ((clip: FfMusicPlayer.Clip?) -> Unit)? = null
+    var onFfMusicChanged: ((clip: SteadyMusicClip?) -> Unit)? = null
 
     /** Fired (emu thread) in STEADY when the game starts a song with no clip
      * yet ([FfMusicKey]) - hand it to [FfMusicRenderer.request]. */
@@ -1495,18 +1495,13 @@ class EmulatorEngine(
             val mode = ffMusicMode
             // The song the game is playing right now (FfMusicKey): read
             // every frame, so a clip starts and stops exactly with it.
-            val ffMusicKey = if (gba) FfMusicKey.current(InProcessReader)
-                else gen1Music?.let { com.pokedaisy.app.companion.data.Gen1Music.current(InProcessReader, it) }
+            val ffMusicKey = musicSource?.current(InProcessReader)
             steady.observe(ffMusicKey, mode == FfMusicMode.STEADY, ffWanted,
                 request = { key -> runCatching { onFfMusicWanted?.invoke(key) } },
                 willRender = { key -> ffMusicWillRender?.invoke(key) == true })
             val desired = steady.clip
-            val clip = desired?.loop?.toFile()
-            if (ffClipNotice.changed(clip)) {
-                onFfMusicChanged?.invoke(desired?.let {
-                    FfMusicPlayer.Clip(it.loop.toFile(), it.intro?.toFile(), it.songStartedAt)
-                })
-            }
+            val clip = desired?.loop
+            if (ffClipNotice.changed(clip)) onFfMusicChanged?.invoke(desired)
             val awaitingClip = steady.awaitingClip
             // A DS game: no clips, the copy (above). Like a clip it follows the FF the player asked for, so it
             // plays straight through SMART's 1x menus.
@@ -2099,7 +2094,7 @@ class EmulatorEngine(
         private const val SOFT_RESET_KEYS = CoreKey.A or CoreKey.B or CoreKey.SELECT or CoreKey.START
 
         /** The GBA's (and Game Boy's) frame rate: 16777216 Hz / 280896 cycles per frame. */
-        const val GBA_FPS = 16777216.0 / 280896.0
+        const val GBA_FPS = FramePacer.FPS
         /** A DS's: its 33.51 MHz bus over 263 lines of 355 dots, 6 cycles each. */
         const val NDS_FPS = 33513982.0 / 560190.0
         /** Late draws in a 120-frame window, in this many windows, that make a game's frames [slowFrames]. */

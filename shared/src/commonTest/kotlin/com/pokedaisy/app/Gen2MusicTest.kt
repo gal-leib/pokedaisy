@@ -29,6 +29,16 @@ class Gen2MusicTest {
         assertEquals(Gen1Music.key(0, 0x34), Gen1Music.current(r, GEN2_MUSIC_CRYSTAL_REV1))
     }
 
+    @Test fun steadyMusicSourcePairsAKnownCartridgeWithItsLiveSongKey() {
+        val source = assertNotNull(SteadyMusicSource.forCartridge(gba = false) { GEN2_MUSIC_CRYSTAL_REV1.sha1 })
+        val r = FakeWram()
+        r.channel(0, 0x34, on = true)
+        assertEquals(Gen1Music.key(0, 0x34), source.current(r))
+        assertNull(SteadyMusicSource.forCartridge(gba = false) { "unknown SHA-1" })
+        assertNull(SteadyMusicSource.forCartridge(gba = false) { null })
+        assertNotNull(SteadyMusicSource.forCartridge(gba = true) { error("GBA doesn't need the Game Boy hash") })
+    }
+
     @Test fun silenceIsNoSong() {
         val r = FakeWram()
         r.channel(0, 0x34, on = false)

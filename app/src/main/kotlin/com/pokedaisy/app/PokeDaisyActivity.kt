@@ -123,8 +123,6 @@ class PokeDaisyActivity : Activity() {
     private lateinit var inputManager: android.hardware.input.InputManager
     private val ffMusicPlayer = FfMusicPlayer()
     private var ffMusicRenderer: SongRenderer? = null
-    /** A Game Boy game's music tables (STEADY FF music), null for GBA / unknown carts. */
-    private var gen1Music: com.pokedaisy.app.companion.data.Gen1MusicTables? = null
     private var clickSound: GameClickSound? = null
     private var unlockSound: GameClickSound? = null
     /** The companion's button click (the game's own; see GameClickSound). */
@@ -1853,16 +1851,11 @@ class PokeDaisyActivity : Activity() {
         // A Game Boy cart's POKéDEX pages are read from its bytes (bank-switched: not on the bus whole); a few MB at most.
         val gbRom = if (gameBoy) runCatching { r.readBytes() }.getOrNull() else null
         com.pokedaisy.app.companion.data.Gen1Dex.rom = gbRom
-        // STEADY FF music: a Gen 1 cart's (and Crystal's) songs come from its own sound engine (Gen1MusicRenderer).
-        gen1Music = gbRom?.let {
-            val sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) }
-            com.pokedaisy.app.companion.data.Gen1Music.forSha1(sha1)
+        val musicSource = SteadyMusicSource.forCartridge(gba) {
+            gbRom?.let { java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) } }
         }
-        ffMusicRenderer = when {
-            gba -> FfMusicRenderer(r.toOkioPath(), crc, ffMusicCache, androidMusicRenderHost, clickSound, unlockSound).also { it.start() }
-            gen1Music != null -> Gen1MusicRenderer(r.toOkioPath(), gen1Music!!, ffMusicCache, androidMusicRenderHost).also { it.start() }
-            else -> null
-        }
+        ffMusicRenderer = musicSource?.renderer(r.toOkioPath(), crc, ffMusicCache, androidMusicRenderHost,
+            click = clickSound, fanfare = unlockSound)?.also { it.start() }
         // A FireRed-engine hack's own region map (Unbound, Odyssey, ...), read
         // from the ROM on every launch - a few KB of reads (see RomRegionMap).
         if (gba) RomRegionMap.load(filesDir.toOkioPath(), crc, r.toOkioPath()) else RomRegionMap.current = null   // not the last GBA game's
@@ -1886,7 +1879,7 @@ class PokeDaisyActivity : Activity() {
             input = input, writer = { a, b -> MgbaCore.pkWriteBytes(a, b) },
             caller = { fn, a0, a1, a2, a3 -> if (MgbaCore.pkCallSafe()) MgbaCore.pkCall(fn, a0, a1, a2, a3) else BattleInputController.CALL_NOT_NOW },
             retryUnshownBattle = true)
-        engine = EmulatorEngine(input, states!!, ffMusicCache, battleSession, Prefs(this), telemetry).apply {
+        engine = EmulatorEngine(input, states!!, ffMusicCache, battleSession, Prefs(this), telemetry, musicSource).apply {
             onShinyChanged = ::syncShinyAchievements
             shiny
             hudEngine.value = this
@@ -1906,7 +1899,6 @@ class PokeDaisyActivity : Activity() {
                 it.lookAround = Prefs(this@PokeDaisyActivity).lookAround
             }
             onWideOff = { runOnUiThread { showHud(com.pokedaisy.app.companion.i18n.tr("EXPAND hit a problem and is off for this game")) } }
-            gen1Music = this@PokeDaisyActivity.gen1Music
             onCoreReady = { w, h ->
                 // A DS game's bottom screen goes to the bottom display (NdsBottomFrame).
                 NdsBottomFrame.bind(if (romIsNds) MgbaCore.pkNdsBottomBuffer() else null)
