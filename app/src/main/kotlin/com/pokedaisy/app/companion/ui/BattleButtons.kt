@@ -105,7 +105,7 @@ fun BattleButtons(
     initialWindow: BattleButtonsWindow? = null,
     /** BATTLE STYLE: GEN 5 draws the buttons and lists in Black / White's look (Gen 1 / 2 keep their own). */
     style: com.pokedaisy.app.companion.BattleStyle = com.pokedaisy.app.companion.BattleStyle.GEN4,
-    /** Touch-control bounds in this overlay's pixels; the action column moves left to keep them reachable. */
+    /** Touch-control bounds in this overlay's pixels; only controls beside the button rows affect placement. */
     avoid: List<Rect> = emptyList(),
     allowPictureOverlap: Boolean = false,
 ) {
@@ -143,47 +143,55 @@ fun BattleButtons(
         val columnW = battleButtonsColumnWidth(room, u, allowPictureOverlap) ?: return@BoxWithConstraints
         val gap = u * 5
         val top = with(density) { clearTop.toDp() } + u * 3
+        val bottom = with(density) { clearBottom.toDp() } + u * 3
+        val buttonHeight = with(density) {
+            val available = constraints.maxHeight - top.roundToPx() - bottom.roundToPx() - 2 * gap.roundToPx()
+            minOf((u * MAX_BUTTON).roundToPx(), (available / 3).coerceAtLeast(0)).toDp()
+        }
         val actions = state == BATTLE_INPUT_ACTION_SELECT
         val enabled = battleInput != null && !busy
         val active = snapshot.battlePlayer.getOrNull(0)
         val moves = active?.moves.orEmpty().take(4)
         val wild = snapshot.enemyParty.isEmpty()
-        val edgePx = with(density) { (u * EDGE).toPx() }
-        val columnPx = with(density) { columnW.toPx() }
-        val lane = com.pokedaisy.app.companion.battleButtonsLane(Rect(0f, 0f, boxW + edgePx, boxH),
-            columnPx + edgePx, avoid)
-        if (lane == null && window == null) return@BoxWithConstraints
-        val shift = lane?.let { (boxW - columnPx - it.left).coerceAtLeast(0f) } ?: 0f
-
-        BoxWithConstraints(
-            // At least MIN_WIDTH: past a 16:9 screen's narrow margin into the picture's top-right corner, where a
-            // battle has only its background (the user's call: larger buttons over smaller room).
-            // Out of sight while FIGHT's / POKéMON's list is over them (a greyed-out row would show them through).
-            // Running off the screen's right edge ([EDGE] GBA pixels past it): no right border or corners, a tab coming out
-            // of the side.
-            Modifier.align(Alignment.TopEnd).offset(x = u * EDGE - with(density) { shift.toDp() }).width(columnW + u * EDGE).fillMaxHeight()
-                .graphicsLayer { translationX = slide * (size.width + shift) }
-                .padding(top = top, bottom = with(density) { clearBottom.toDp() } + u * 3)
-                .padding(start = u * 2),
-        ) {
-            val h = minOf(u * MAX_BUTTON, (maxHeight - gap * 2) / 3)
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                // FIGHT, with the battling Pokémon's icon (like the companion's): our move grid from the moves already
-                // read - none yet (a launch's first moments) = it waits, rather than pressing the game's FIGHT blind.
-                // Short buttons (a wide phone's, between the touch controls' rows): its icon the size of the others'.
-                val fightIcon = if (h >= u * (24 + WORD_ROOM)) u * 24 else u * 16
+        // Keep the full frame on tablets. Other hosts keep their side-tab treatment.
+        val edge = if (allowPictureOverlap) 0.dp else u * EDGE
+        val inset = if (allowPictureOverlap) 8.dp else 0.dp
+        val insetPx = with(density) { inset.roundToPx().toFloat() }
+        val columnWidth = columnW + edge
+        val columnPx = with(density) { columnWidth.roundToPx().toFloat() }
+        val columnRight = boxW + with(density) { edge.roundToPx() } - insetPx
+        val rows = with(density) {
+            val topPx = top.roundToPx().toFloat()
+            Rect(0f, topPx, columnRight, topPx + 3 * buttonHeight.roundToPx() + 2 * gap.roundToPx())
+        }
+        val lane = com.pokedaisy.app.companion.battleButtonsLane(rows, columnPx, avoid)
+        if (lane != null && buttonHeight > 0.dp) {
+            val shift = (columnRight - lane.right).coerceAtLeast(0f)
+            Column(
+                Modifier.align(Alignment.TopEnd)
+                    .offset(x = edge - inset - with(density) { shift.toDp() })
+                    .width(columnWidth).fillMaxHeight()
+                    .graphicsLayer { translationX = slide * (size.width + shift + insetPx) }
+                    .padding(top = top, bottom = bottom, start = u * 2),
+                verticalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                // FIGHT waits for the move read. On short buttons its icon is the same size as the others.
+                val fightIcon = if (buttonHeight >= u * (24 + WORD_ROOM)) u * 24 else u * 16
                 ActionButton(
-                    tr("FIGHT"), fightIcon, { HudSpecies(active?.iconAsset, fightIcon) }, FightRed, FightRedDark, m, h, gen5, Gen5Word.FIGHT,
-                    enabled = enabled && moves.isNotEmpty() && (actions || state == BATTLE_INPUT_MOVE_SELECT), pressesGame = false, edge = u * EDGE,
+                    tr("FIGHT"), fightIcon, { HudSpecies(active?.iconAsset, fightIcon) },
+                    FightRed, FightRedDark, m, buttonHeight, gen5, Gen5Word.FIGHT,
+                    enabled = enabled && moves.isNotEmpty() && (actions || state == BATTLE_INPUT_MOVE_SELECT), pressesGame = false, edge = edge,
                 ) { window = BattleButtonsWindow.MOVES }
                 ActionButton(
-                    tr("POKéMON"), u * 16, { PixelArt(PixelIcons.pokeBall, POKE_BALL, Modifier.size(u * 16)) }, MonGreen, MonGreenDark, m, h, gen5, Gen5Word.POKEMON,
+                    tr("POKéMON"), u * 16, { PixelArt(PixelIcons.pokeBall, POKE_BALL, Modifier.size(u * 16)) },
+                    MonGreen, MonGreenDark, m, buttonHeight, gen5, Gen5Word.POKEMON,
                     enabled = enabled && actions && battleInput?.canSwitch == true && snapshot.party.size > 1,
-                    pressesGame = false, edge = u * EDGE,
+                    pressesGame = false, edge = edge,
                 ) { window = BattleButtonsWindow.PARTY }
                 ActionButton(
-                    tr("RUN"), u * 16, { PixelArt(RUN_ICON, RUN_COLORS, Modifier.size(u * 16)) }, RunBlue, RunBlueDark, m, h, gen5, Gen5Word.RUN,
-                    enabled = enabled && actions && wild, edge = u * EDGE,
+                    tr("RUN"), u * 16, { PixelArt(RUN_ICON, RUN_COLORS, Modifier.size(u * 16)) },
+                    RunBlue, RunBlueDark, m, buttonHeight, gen5, Gen5Word.RUN,
+                    enabled = enabled && actions && wild, edge = edge,
                 ) { battleInput?.selectAction(3) }
             }
         }

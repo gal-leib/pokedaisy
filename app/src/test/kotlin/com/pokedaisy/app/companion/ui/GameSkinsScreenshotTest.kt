@@ -10,6 +10,7 @@ import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.ui.theme.DarkMode
 import androidx.compose.foundation.layout.fillMaxSize
 import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -21,6 +22,7 @@ import org.junit.Test
  *     ./gradlew :app:recordPaparazziDebug --tests '*GameSkinsScreenshotTest'
  */
 class GameSkinsScreenshotTest {
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 1240, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE),
@@ -63,6 +65,7 @@ class GameSkinsScreenshotTest {
 
 /** The HUD (LOOK GAME) in each skin over the top screen's 1920x1080, with its BAG and a summary open too. */
 class GameSkinsHudScreenshotTest {
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 1920, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE),
@@ -114,6 +117,7 @@ private object QuickAll : QuickActions {
 
 /** SETTINGS > HUD and > QUICK MENU with their SHOW rows' icons, on a screen tall enough for every row. */
 class SettingsRowIconsScreenshotTest {
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 1240, screenHeight = 2700, orientation = ScreenOrientation.PORTRAIT),
