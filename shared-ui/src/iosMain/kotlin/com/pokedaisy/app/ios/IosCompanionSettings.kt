@@ -207,7 +207,7 @@ internal class IosCompanionSettings(
     override val tradeEvolutionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_TRADE_EVOLUTION)
     override val gameOptionsBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_GAME_OPTIONS)
 
-    override val touchRevision get() = IosTouchPreferences.revision + IosTouchSkins.revision
+    override val touchRevision get() = IosTouchPreferences.revision
     override val touchStyle get() = IosTouchPreferences.style
     override fun setTouchStyle(style: TouchControlsStyle) { IosTouchPreferences.style = style }
     override val touchButtons get() = IosTouchPreferences.buttons

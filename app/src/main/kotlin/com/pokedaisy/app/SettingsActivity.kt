@@ -1,6 +1,9 @@
 package com.pokedaisy.app
 
 import com.pokedaisy.app.companion.DsCore
+import com.pokedaisy.app.companion.OverlayImport
+import com.pokedaisy.app.companion.OverlayImportSession
+import com.pokedaisy.app.companion.TouchSkinSession
 import com.pokedaisy.app.companion.ui.theme.DarkMode
 import com.pokedaisy.app.companion.i18n.L10n
 import com.pokedaisy.app.companion.i18n.tk
@@ -534,10 +537,10 @@ class SettingsActivity : ComponentActivity() {
             overlayNeeds?.let { need ->
                 OptionConfirm(
                     title = tk("PICK THE IMAGE"),
-                    message = com.pokedaisy.app.companion.OverlayImport.imagePrompt(need),
+                    message = OverlayImport.imagePrompt(need),
                     confirmLabel = tk("PICK"),
                     m = m,
-                    onDismiss = { overlayNeeds = null; overlayPending = null },
+                    onDismiss = { overlayNeeds = null; overlayImports.cancel() },
                     onConfirm = { overlayNeeds = null; pickOverlayImage.launch(arrayOf("image/*")) },
                 )
             }
@@ -551,8 +554,7 @@ class SettingsActivity : ComponentActivity() {
                     onDismiss = { removingAllOverlays = false },
                     onConfirm = {
                         removingAllOverlays = false
-                        overlayStore.deleteAll()
-                        if (OverlayChoice.of(prefs.overlay) is OverlayChoice.Imported) prefs.overlay = OverlayChoice.None.key
+                        prefs.overlay = overlayImports.deleteAll().selectionAfter(prefs.overlay)
                         overlayRemoveMode = false
                         revision++
                     },
@@ -568,9 +570,9 @@ class SettingsActivity : ComponentActivity() {
                     onDismiss = { removingOverlay = null },
                     onConfirm = {
                         removingOverlay = null
-                        overlayStore.delete(id)
-                        if (prefs.overlay == OverlayChoice.Imported(id).key) prefs.overlay = OverlayChoice.None.key
-                        if (overlayStore.list().isEmpty()) overlayRemoveMode = false
+                        val removal = overlayImports.delete(id)
+                        prefs.overlay = removal.selectionAfter(prefs.overlay)
+                        if (removal.choices.none { it.first is OverlayChoice.Imported }) overlayRemoveMode = false
                         revision++
                     },
                 )
@@ -1133,10 +1135,7 @@ class SettingsActivity : ComponentActivity() {
             expand = prefs.gameAspect == com.pokedaisy.app.companion.GameAspect.WIDE, touchShown = touchWouldShow(style),
             skins = skins, skinUi = touchSkinUi, setStyle = { prefs.touchControlsStyle = it; revision++ },
             onDeleteSkin = { skin ->
-                skinStore.delete(skin.id)
-                val st = prefs.touchControlsStyle
-                prefs.touchControlsStyle = st.withoutSkin(skin.id)
-                revision++
+                if (skinImports.delete(skin.id)) revision++
             },
         ) { mod ->
             OptionListWindow(m, mod) {
@@ -1191,12 +1190,12 @@ class SettingsActivity : ComponentActivity() {
 
     /** SCREEN > OVERLAY's imports (overlay/Overlays.kt), beside the game's other files. */
     private val overlayStore by lazy { OverlayStore(filesRoot) }
+    private val overlayImports by lazy { OverlayImportSession(overlayStore) }
     private var overlayRemoveMode by mutableStateOf(false)
     /** An import's result to show (title, message). */
     private var overlayNotice by mutableStateOf<Pair<String, String>?>(null)
-    /** A .cfg picked without its image: asks for it ([pickOverlayImage]); [overlayPending] holds what was picked. */
+    /** A .cfg picked without its image: asks for it ([pickOverlayImage]). */
     private var overlayNeeds by mutableStateOf<OverlayStore.Result.NeedsImage?>(null)
-    private var overlayPending: List<OverlayStore.Picked>? = null
     /** The imported overlay (id, label) REMOVE asks about. */
     private var removingOverlay by mutableStateOf<Pair<String, String>?>(null)
     /** REMOVE ALL's confirm is up. */
@@ -1204,6 +1203,9 @@ class SettingsActivity : ComponentActivity() {
 
     /** TOUCH CONTROLS > SKINS: the imported Delta skins, their pick-lists, IMPORT SKIN's file picker. */
     private val skinStore by lazy { com.pokedaisy.app.companion.DeltaSkinStore(filesDir.toOkioPath() / "skins") }
+    private val skinImports by lazy {
+        TouchSkinSession(skinStore, { prefs.touchControlsStyle }, { prefs.touchControlsStyle = it })
+    }
     private val touchSkinUi = com.pokedaisy.app.companion.ui.TouchSkinUi()
     private val pickSkin = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { importSkin(it) } }
 
@@ -1211,28 +1213,30 @@ class SettingsActivity : ComponentActivity() {
     private fun importSkin(uri: Uri) {
         Thread {
             // The store reads a zip from a file: the picked document is copied into the cache first.
-            val temp = java.io.File(cacheDir, "skin-import.deltaskin")
-            val result = runCatching {
-                contentResolver.openInputStream(uri)?.use { input -> temp.outputStream().use { input.copyTo(it) } }
-                    ?.let { skinStore.import(temp.toOkioPath()) }
-            }.getOrNull().also { temp.delete() }
-                ?: com.pokedaisy.app.companion.DeltaSkinStore.ImportResult(emptyList(), listOf("it couldn't be opened"))
+            val temp = runCatching { java.io.File.createTempFile("skin-import-", ".deltaskin", cacheDir) }.getOrNull()
+            val result = try {
+                val copied = runCatching {
+                    if (temp == null) null else contentResolver.openInputStream(uri)?.use { input ->
+                        temp.outputStream().use { input.copyTo(it) }
+                        temp.toOkioPath()
+                    }
+                }.getOrNull()
+                skinImports.import(copied)
+            } finally { temp?.delete() }
             runOnUiThread {
-                val completed = com.pokedaisy.app.companion.TouchSkinImport.complete(result, prefs.touchControlsStyle)
-                prefs.touchControlsStyle = completed.style
-                touchSkinUi.notice = completed.notice
+                touchSkinUi.notice = skinImports.complete(result)
                 revision++
             }
         }.start()
     }
 
     private val importOverlayFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        overlayImports.cancel()
         if (uris.isNotEmpty()) importOverlays(uris, emptyList())
     }
     private val pickOverlayImage = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val pending = overlayPending
-        overlayPending = null
-        if (uri != null && pending != null) importOverlays(listOf(uri), pending)
+        val pending = overlayImports.takePendingImage()
+        if (uri != null && pending.isNotEmpty()) importOverlays(listOf(uri), pending)
     }
 
     /**
@@ -1283,38 +1287,24 @@ class SettingsActivity : ComponentActivity() {
             var tooBig = false
             val picked = earlier + uris.mapNotNull { uri ->
                 val name = RomUris.displayName(this, uri) ?: uri.lastPathSegment?.substringAfterLast('/') ?: return@mapNotNull null
-                val bytes = runCatching { contentResolver.openInputStream(uri)?.use { readCapped(it, OverlayStore.MAX_PICKED_FILE) } }.getOrNull()
-                if (bytes == null) { tooBig = true; return@mapNotNull null }
                 // A real path lets a .cfg's images be read from beside it (with All files access).
-                OverlayStore.Picked(name, bytes, RomUris.originalPath(this, uri)?.takeIf { it.startsWith("/") })
+                val path = RomUris.originalPath(this, uri)?.takeIf { it.startsWith("/") }
+                val file = runCatching {
+                    contentResolver.openInputStream(uri)?.source()?.use { OverlayStore.readPicked(name, it, path) }
+                }.getOrNull()
+                if (file == null) tooBig = true
+                file
             }
-            val result = when {
-                picked.isNotEmpty() -> overlayStore.import(picked)
-                tooBig -> OverlayStore.Result.Failed(OverlayStore.Reason.TOO_BIG)
-                else -> OverlayStore.Result.Failed(OverlayStore.Reason.NOTHING_USABLE)
+            val reason = if (tooBig) OverlayStore.Reason.TOO_BIG else OverlayStore.Reason.NOTHING_USABLE
+            val imported = overlayImports.import(picked, reason)
+            runOnUiThread {
+                val completed = overlayImports.complete(imported, prefs.overlay)
+                prefs.overlay = completed.selection
+                overlayNotice = completed.notice
+                overlayNeeds = completed.needsImage
+                revision++
             }
-            runOnUiThread { onOverlaysImported(result, picked) }
         }.start()
-    }
-
-    private fun onOverlaysImported(result: OverlayStore.Result, picked: List<OverlayStore.Picked>) {
-        val completed = com.pokedaisy.app.companion.OverlayImport.complete(result, prefs.overlay, overlayChoices(overlayStore))
-        prefs.overlay = completed.selection
-        overlayNotice = completed.notice
-        completed.needsImage?.let { overlayPending = picked; overlayNeeds = it }
-        revision++
-    }
-
-    /** All of [input], or null once it passes [limit] bytes. */
-    private fun readCapped(input: java.io.InputStream, limit: Long): ByteArray? {
-        val out = java.io.ByteArrayOutputStream()
-        val buf = ByteArray(64 * 1024)
-        while (true) {
-            val n = input.read(buf)
-            if (n < 0) return out.toByteArray()
-            out.write(buf, 0, n)
-            if (out.size() > limit) return null
-        }
     }
 
     /** Version, author, Buy Me a Coffee, the Discord and the repo, under the settings list. */
@@ -2161,8 +2151,6 @@ class SettingsActivity : ComponentActivity() {
         const val MAX_CHEAT_FILE = com.pokedaisy.app.companion.GameCheats.MAX_FILE_BYTES
         /** Retail Emerald is 16 MB: the only size worth hashing for co-op. */
         const val EMERALD_ROM_BYTES = 16L * 1024 * 1024
-        /** One picked overlay file at most (read into memory; a pack of a few 4K borders is ~20 MB). */
-
         private val cheatCrcs = java.util.concurrent.ConcurrentHashMap<String, String>()
 
         /** [rom]'s CRC32 ([SaveStates.crc32], the key of its cheats like its states), remembered

@@ -3,7 +3,6 @@ package com.pokedaisy.app.companion
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.overlay.*
 import okio.FileSystem
-import okio.Path
 import kotlin.random.Random
 import kotlin.test.*
 
@@ -30,13 +29,17 @@ class OverlayStoreSharedTest {
 
     @Test fun missingImageRetryAndImportNoticesPreserveSelectionRules() = withStore { store ->
         val cfg = OverlayStore.Picked("my.cfg", "overlay0_overlay = missing.png".encodeToByteArray())
-        val waiting = store.import(listOf(cfg))
-        val need = OverlayImport.complete(waiting, "builtin:BEZEL", overlayChoices(store))
+        val session = OverlayImportSession(store)
+        val waiting = session.import(listOf(cfg))
+        val need = session.complete(waiting, "builtin:BEZEL")
         assertEquals("builtin:BEZEL", need.selection)
         assertEquals("missing.png", need.needsImage?.image)
         assertTrue(store.list().isEmpty())
-        val added = store.import(listOf(cfg, OverlayStore.Picked("renamed.png", png)))
-        val single = OverlayImport.complete(added, "builtin:BEZEL", overlayChoices(store))
+        val continuation = session.takePendingImage()
+        assertEquals(listOf(cfg), continuation)
+        assertTrue(session.takePendingImage().isEmpty())
+        val added = session.import(continuation + OverlayStore.Picked("renamed.png", png))
+        val single = session.complete(added, "builtin:BEZEL")
         assertEquals("user:my", single.selection)
         assertNotNull(single.notice)
         assertNull(single.needsImage)
@@ -44,6 +47,30 @@ class OverlayStoreSharedTest {
         assertEquals(single.selection, collection.selection)
         assertTrue(collection.notice!!.second.contains("2"))
         assertTrue(collection.notice!!.second.contains("1"))
+    }
+
+    @Test fun cancellingMissingImageDropsOnlyThePendingConfig() = withStore { store ->
+        val session = OverlayImportSession(store)
+        val cfg = OverlayStore.Picked("a.cfg", "overlay0_overlay = absent.png".encodeToByteArray())
+        assertNotNull(session.complete(session.import(listOf(cfg)), "").needsImage)
+        session.cancel()
+        assertTrue(session.takePendingImage().isEmpty())
+        val fresh = session.import(listOf(OverlayStore.Picked("fresh.png", png)))
+        assertEquals("user:fresh", session.complete(fresh, "builtin:BEZEL").selection)
+    }
+
+    @Test fun removalUpdatesTheAvailableChoicesAndClearsOnlyAffectedSelections() = withStore { store ->
+        val session = OverlayImportSession(store)
+        session.import(listOf(OverlayStore.Picked("one.png", png), OverlayStore.Picked("two.png", png)))
+        val first = session.delete("one")
+        assertEquals(listOf("user:two"), first.choices.map { it.first.key }.filter { it.startsWith("user:") })
+        assertEquals("", first.selectionAfter("user:one"))
+        assertEquals("user:two", first.selectionAfter("user:two"))
+        assertEquals("builtin:BEZEL", first.selectionAfter("builtin:BEZEL"))
+        val all = session.deleteAll()
+        assertTrue(all.choices.none { it.first is OverlayChoice.Imported })
+        assertEquals("", all.selectionAfter("user:two"))
+        assertEquals("builtin:BEZEL", all.selectionAfter("builtin:BEZEL"))
     }
 
     @Test fun nativePicksAreReadFromFilesAndJunkCannotReplaceTheSelection() = withStore { store ->

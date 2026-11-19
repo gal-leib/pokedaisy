@@ -1,8 +1,13 @@
 package com.pokedaisy.app.companion
 
+import com.pokedaisy.app.companion.data.deleteRecursively
+import com.pokedaisy.app.companion.data.mkdirs
+import okio.FileSystem
 import okio.Path.Companion.toPath
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TouchSkinImportTest {
@@ -28,6 +33,27 @@ class TouchSkinImportTest {
         assertEquals(style.copy(skinGba = null), style.withoutSkin("my-gba"))
         assertEquals(style, style.withoutSkin("not-selected"))
         assertEquals(style.copy(skinGba = null, skinGb = null), style.copy(skinGb = "my-gba").withoutSkin("my-gba"))
+    }
+
+    @Test fun sessionUsesTheLatestStyleAndOnlyClearsADeletedSkin() {
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "skin-session-${Random.nextLong().toULong()}"
+        try {
+            val store = DeltaSkinStore(root)
+            var current = style
+            val session = TouchSkinSession(store, { current }, { current = it })
+            val result = DeltaSkinStore.ImportResult(listOf(skin("new", "gba")), emptyList())
+            current = current.copy(opacity = 100)
+            assertTrue(session.complete(result).second.contains("new"))
+            assertEquals(style.copy(skinGba = "new", opacity = 100), current)
+
+            assertFalse(session.delete("new"))
+            assertEquals("new", current.skinGba)
+            (root / "new").mkdirs()
+            assertTrue(session.delete("new"))
+            assertEquals(style.copy(skinGba = null, opacity = 100), current)
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test fun refusedImportRetainsChoicesAndReportsTheReason() {

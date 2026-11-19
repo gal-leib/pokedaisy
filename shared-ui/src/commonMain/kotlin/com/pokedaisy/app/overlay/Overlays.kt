@@ -6,6 +6,7 @@ import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
 import okio.SYSTEM
+import okio.Source
 import okio.buffer
 import okio.openZip
 import okio.use
@@ -342,13 +343,16 @@ class OverlayStore(root: Path) {
         const val MAX_PICKED_FILE = 64L * 1024 * 1024
 
         /** Read a native pick off the UI thread, with the same cap as Android's document stream. */
-        fun readPicked(file: Path): Picked? = FileSystem.SYSTEM.source(file).buffer().use { source ->
+        fun readPicked(file: Path): Picked? = FileSystem.SYSTEM.source(file).use {
+            readPicked(file.name, it, file.toString())
+        }
+
+        fun readPicked(name: String, source: Source, path: String?): Picked? {
             val buffer = Buffer()
-            while (true) {
-                if (source.read(buffer, 64L * 1024) < 0) break
-                if (buffer.size > MAX_PICKED_FILE) return@use null
+            while (source.read(buffer, 64L * 1024) >= 0) {
+                if (buffer.size > MAX_PICKED_FILE) return null
             }
-            Picked(file.name, buffer.readByteArray(), file.toString())
+            return Picked(name, buffer.readByteArray(), path)
         }
 
         const val MAX_CFG = 256L * 1024
