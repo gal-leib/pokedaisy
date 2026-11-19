@@ -6,10 +6,15 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal class AndroidCoopNetwork(
     private val bindLoopback: Boolean,
@@ -19,12 +24,14 @@ internal class AndroidCoopNetwork(
 ) : CoopNetwork {
     private val io = Executors.newCachedThreadPool(daemon("pokedaisy-coop-io"))
     private val worker = Executors.newSingleThreadScheduledExecutor(daemon("pokedaisy-coop-net"))
+    private val relayJob = SupervisorJob()
+    private val relayWorkers = CoroutineScope(relayJob + Dispatchers.IO)
 
     override fun tickEvery(intervalMs: Long, tick: () -> Unit) {
         worker.scheduleWithFixedDelay(tick, intervalMs, intervalMs, TimeUnit.MILLISECONDS)
     }
 
-    override fun relayPipe(): CoopRelayPipe = RelayPipe()
+    override fun relayPipe(): CoopRelayPipe = RelayPipeWriter(relayWorkers)
 
     override fun listen(onAccept: (CoopTcpSocket) -> Unit): CoopTcpListener? = try {
         DirectListener(bindLoopback, io) { onAccept(DirectSocket(it, io)) }
@@ -50,48 +57,15 @@ internal class AndroidCoopNetwork(
     override fun close() {
         worker.shutdownNow()
         io.shutdown()
-        worker.awaitTermination(500, TimeUnit.MILLISECONDS)
-        io.awaitTermination(1_500, TimeUnit.MILLISECONDS)
-    }
-
-    private inner class RelayPipe : CoopRelayPipe {
-        private val ready = CountDownLatch(1)
-        private val guard = Any()
-        private var socket: CoopRelaySocket? = null
-        private var ended = false
-        private val writer = PipeWriter(
-            io, ready,
-            write = { bytes -> synchronized(guard) { socket }?.send(bytes) ?: false },
-            onEnd = {
-                val closed = synchronized(guard) {
-                    ended = true
-                    socket.also { socket = null }
-                }
-                closed?.close()
-            },
-        ).also { it.start() }
-
-        override val backlog: Int get() = writer.backlog
-        override fun offer(bytes: ByteArray) = writer.offer(bytes)
-        override fun closeSoon() {
-            writer.closeSoon()
-            ready.countDown()
-        }
-
-        override fun closeNow() {
-            writer.closeNow()
-            ready.countDown()
-        }
-
-        override fun attach(socket: CoopRelaySocket) {
-            val close = synchronized(guard) {
-                if (ended) true else {
-                    this.socket = socket
-                    false
-                }
-            }
-            ready.countDown()
-            if (close) socket.close()
+        try {
+            worker.awaitTermination(500, TimeUnit.MILLISECONDS)
+            val shutdownMs = 1_500L
+            val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(shutdownMs)
+            // The router already sealed the relay queues. Wait for their CLOSE frames before cancelling.
+            runBlocking { withTimeoutOrNull(shutdownMs) { relayJob.children.toList().joinAll() } }
+            io.awaitTermination((deadline - System.nanoTime()).coerceAtLeast(0), TimeUnit.NANOSECONDS)
+        } finally {
+            relayJob.cancel()
         }
     }
 
