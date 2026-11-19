@@ -4034,6 +4034,11 @@ If restoration is blocked too, the error names the retained battery backup. Same
 usual extension. Backup stamps use common date/time code in the device's timezone. Android keeps its RZIP decoder;
 iOS keeps its existing compressed-save refusal. A native host test verifies the iOS save/state paths and backup.
 
+Both restore pickers use `GameSaves.restoreBackups` to combine import backups and snapshots by path. Android keeps
+the date encoded after `.backup-` as its sort key because both sources use dated names. It searches the automatic
+backup folders and matches imports against the ROM's archive aliases. iOS uses modification time, then filename,
+because its automatic snapshots use content hashes. Equal sort keys retain discovery order within each host.
+
 For closed-game edits, `ClosedSaveEdits` checks the pending trade journal before either host opens
 the save. It publishes a fresh-boot marker before replacing a single battery save. A two-save
 trade journals both versions before the first replacement. Recovery keeps both committed edits or

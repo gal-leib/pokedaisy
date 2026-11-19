@@ -3,6 +3,7 @@ package com.pokedaisy.app
 import com.pokedaisy.app.companion.ui.LibraryMenuItem as RomMenuItem
 
 import com.pokedaisy.app.companion.SaveImportFlow
+import okio.Path.Companion.toOkioPath
 import okio.source
 import com.pokedaisy.app.companion.data.LibraryView
 import com.pokedaisy.app.companion.data.RomCategory
@@ -1301,9 +1302,12 @@ class LibraryActivity : ComponentActivity() {
     private fun showBackups(rom: File) {
         val save = SavesLocation.saveFor(this, prefs, rom)
         val dir = save.parentFile ?: SavesLocation.dir(this, prefs)
-        val files = (SaveBackups.list(save) + RomArchive.saveNames(rom).flatMap { GameSaves.backups(dir, it) })
-            .distinctBy { it.absolutePath }
-            .sortedByDescending { it.name.substringAfter(".backup-") }
+        val files = GameSaves.restoreBackups(
+            dir.absoluteFile.toOkioPath(),
+            RomArchive.saveNames(rom),
+            SaveBackups.list(save).map { it.absoluteFile.toOkioPath() },
+            GameSaves.RestoreBackupOrder.DATED_NAME,
+        ).map { File(it.toString()) }
         if (files.isEmpty()) {
             Toast.makeText(this, tr("No backups of this game's save yet"), Toast.LENGTH_LONG).show()
         } else {
