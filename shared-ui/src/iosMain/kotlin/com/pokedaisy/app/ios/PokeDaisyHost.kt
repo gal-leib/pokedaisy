@@ -238,7 +238,13 @@ object PokeDaisyHost {
                             com.pokedaisy.app.companion.ui.FlyStyleAskHost(
                                 active = true, roomy = panels.portrait,
                                 onAnswer = { currentRuntime?.flight?.answerStyle(it) })
-                            currentCoop?.let { coop -> IosCoopOverlays(coop, panels, ::finishClose) }
+                            currentCoop?.let { coop ->
+                                com.pokedaisy.app.companion.ui.CoopGameOverlays(
+                                    coop.overlay, coop.storyLock, coop.partnerName, proposalOnGameScreen = true,
+                                    closeGame = ::finishClose, showNotice = coop.overlay::showNotice,
+                                    captureInput = { panels.captureOverlay(IosGameScreen.Overlay.COOP, it) },
+                                )
+                            }
                             val asking = currentSettings?.battleRetryAsking == true
                             DisposableEffect(asking) {
                                 panels.captureOverlay(IosGameScreen.Overlay.BATTLE_RETRY, asking)

@@ -3927,8 +3927,10 @@ class PokeDaisyActivity : Activity() {
             com.pokedaisy.app.companion.ui.QuickMenu(quickMenu, snap, quickActions, quickShown.value, hudStyle.value.look)
             com.pokedaisy.app.companion.ui.HealedAnimation(healShow.value, hudStyle.value.look) { healShow.value = null }
             // Co-op joined battles: the join prompt, the waits, the notices - over the game, HUD on or off.
-            com.pokedaisy.app.companion.ui.CoopBattleOverlays(coopOverlay)
-            CoopLockLayer()
+            com.pokedaisy.app.companion.ui.CoopGameOverlays(
+                coopOverlay, coopLockState.value, coopLockPartner.value, proposalOnGameScreen = secondScreen() == null,
+                closeGame = { exitGame() }, showNotice = { showHud(it) },
+            )
             // X sent the buttons to the other screen's companion: the strip pointing there; the game leaving the
             // field (a battle, its PC opened from the companion) wants them back.
             val focused = bottomFocus.value
@@ -3988,37 +3990,6 @@ class PokeDaisyActivity : Activity() {
                 onFailure = { Log.w("pokedaisy", "tips", it) },
                 afterTick = { runCatching { syncFlight() }.onFailure { Log.w("pokedaisy", "flight", it) } },
             )
-        }
-    }
-
-    /**
-     * PLAY TOGETHER ONLY over the game (in the HUD's ComposeView, so it shows with the HUD off): the waiting screen while the
-     * lock holds the game, the partner's proposal (ACCEPT / NO) where the screen over the game can be touched - one screen; with two the
-     * SETTINGS row carries it and a HUD line says so - and the lock's notices, each shown once.
-     */
-    @androidx.compose.runtime.Composable
-    private fun CoopLockLayer() {
-        val lock = coopLockState.value ?: return
-        val ui by lock.ui.collectAsState()
-        val notice by lock.notice.collectAsState()
-        val partner = coopLockPartner.value
-        val oneScreen = secondScreen() == null
-        ui.waiting?.let { w -> com.pokedaisy.app.companion.ui.CoopWaitOverlay(w, partner) { exitGame() } }
-        var dismissed by remember(ui.partnerProposed) { androidx.compose.runtime.mutableStateOf(false) }
-        if (ui.partnerProposed && oneScreen && !dismissed) {
-            com.pokedaisy.app.companion.ui.CoopLockProposal(partner, lock) { dismissed = true }
-        }
-        androidx.compose.runtime.LaunchedEffect(ui.partnerProposed) {
-            if (ui.partnerProposed && !oneScreen) showHud(tr("{0} wants to PLAY TOGETHER ONLY.", partner))
-        }
-        androidx.compose.runtime.LaunchedEffect(notice) {
-            val text = when (notice) {
-                LockNotice.PARTNER_TURNED_OFF -> tr("Your partner turned off PLAY TOGETHER ONLY.")
-                LockNotice.NO_STORY_HOLD -> tr("Story events can't wait for your partner in this game")
-                null -> return@LaunchedEffect
-            }
-            showHud(text)
-            lock.clearNotice()
         }
     }
 
