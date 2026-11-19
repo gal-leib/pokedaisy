@@ -9,7 +9,6 @@ import com.pokedaisy.app.companion.data.coop.CoopBattleWire
 import com.pokedaisy.app.companion.data.coop.CoopCore
 import com.pokedaisy.app.companion.data.coop.CoopHostUi
 import com.pokedaisy.app.companion.data.coop.CoopIdentity
-import com.pokedaisy.app.companion.data.coop.CoopJoinRules
 import com.pokedaisy.app.companion.data.coop.CoopLinkEngine
 import com.pokedaisy.app.companion.data.coop.CoopLinkEnv
 import com.pokedaisy.app.companion.data.coop.CoopLinkFlow
@@ -55,20 +54,14 @@ interface CoopEmu {
 }
 
 /** What the glue needs from the app: the game's RAM reads, the player's facts, the save backup. Emu thread unless said. */
-interface CoopGlueEnv {
+interface CoopGlueEnv : CoopBattleField {
     val range: Int
-    fun mySpot(): CoopJoinRules.Spot?
-    fun partnerSpot(): CoopJoinRules.Spot?
-    fun hostParty(): List<ByteArray>
-    fun foeSpecies(): Int
     fun partnerName(): String
     fun identity(): CoopIdentity
     /** The running save copied to the backups folder; false if the copy failed (nothing is written to the save then). */
     fun beforeSave(): Boolean
     /** The co-op busy state changed (RetroAchievements idle). */
     fun busyChanged(busy: Boolean) {}
-    /** The story spot the player stands at (or waits parked at): [CoopJoinRules.StoryAt.NONE] when none. */
-    fun storyAt(): CoopJoinRules.StoryAt = CoopJoinRules.StoryAt.NONE
     /** The save is in "play together only" mode (a story battle dropped for good blacks the player out). */
     fun playTogetherOnly(): Boolean = false
     /** The pair the partner's un-acknowledged catches belong to, and where they are kept (null = in memory only). */
@@ -363,12 +356,4 @@ class CoopBattleSession(
 
     /** A game button while an overlay wants it. */
     fun takeKey(k: MenuKey): Boolean = glue?.takeKey(k) == true
-}
-
-/** The retail Emerald's RAM addresses the app side reads (the co-op bridge's own are in pk_coop_emerald.h). */
-object CoopEmeraldRam {
-    const val PLAYER_PARTY = 0x020244ECL
-    const val PLAYER_PARTY_COUNT = 0x020244E9L
-    const val ENEMY_PARTY = 0x02024744L
-    const val MON_SIZE = 100
 }

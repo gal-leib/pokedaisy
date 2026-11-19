@@ -2311,6 +2311,11 @@ class PokeDaisyActivity : Activity() {
 
     private val catchFile by lazy { com.pokedaisy.app.companion.data.coop.FileCatchStore(filesDir.toOkioPath() / "coop" / "catches.txt") }
 
+    private val coopBattleField = EmeraldBattleField(
+        MgbaCore::pkReadBytes, MgbaPartnerCore::self, { coopPresence?.lastReceived },
+        { (coopLock?.ui?.value?.waiting as? com.pokedaisy.app.companion.coop.lock.LockWait.AtStory)?.eventId },
+    )
+
     private val coopApp = object : CoopApp {
         override val coopOn get() = FeatureFlags.coop(this@PokeDaisyActivity)
         override val emu = object : CoopEmu {
@@ -2325,24 +2330,8 @@ class PokeDaisyActivity : Activity() {
         override fun core(): com.pokedaisy.app.companion.data.coop.CoopCore =
             MgbaCoopCore()
         override fun setHook(hook: CoopFrameHook?) { if (::engine.isInitialized) engine.coopBattles = hook }
-        override val env = object : CoopGlueEnv {
+        override val env = object : CoopGlueEnv, CoopBattleField by coopBattleField {
             override val range get() = Prefs(this@PokeDaisyActivity).coopNearbyRange
-            override fun mySpot(): com.pokedaisy.app.companion.data.coop.CoopJoinRules.Spot? {
-                val s = MgbaPartnerCore.self() ?: return null
-                if (s.size < 5 || s[0] == 0) return null
-                return com.pokedaisy.app.companion.data.coop.CoopJoinRules.Spot(s[1], s[2], s[3] / 16, s[4] / 16)
-            }
-            override fun partnerSpot(): com.pokedaisy.app.companion.data.coop.CoopJoinRules.Spot? {
-                val u = coopPresence?.lastReceived?.takeIf { it.valid } ?: return null
-                return com.pokedaisy.app.companion.data.coop.CoopJoinRules.Spot(u.mapGroup, u.mapNum, u.fineX / 16, u.fineY / 16)
-            }
-            override fun hostParty(): List<ByteArray> {
-                val n = (MgbaCore.pkReadBytes(CoopEmeraldRam.PLAYER_PARTY_COUNT, 1)?.get(0)?.toInt() ?: 0) and 0xFF
-                val all = MgbaCore.pkReadBytes(CoopEmeraldRam.PLAYER_PARTY, 6 * CoopEmeraldRam.MON_SIZE) ?: return emptyList()
-                return List(n.coerceIn(0, 6)) { all.copyOfRange(it * CoopEmeraldRam.MON_SIZE, (it + 1) * CoopEmeraldRam.MON_SIZE) }
-            }
-            override fun foeSpecies(): Int = MgbaCore.pkReadBytes(CoopEmeraldRam.ENEMY_PARTY, CoopEmeraldRam.MON_SIZE)
-                ?.let { runCatching { com.pokedaisy.app.companion.data.save.Gen3BoxMon.read(it, 0).species }.getOrNull() } ?: 0
             override fun partnerName(): String {
                 val st = com.pokedaisy.app.companion.coop.CoopSession.link.state.value
                 val p = when (st) {
@@ -2363,15 +2352,6 @@ class PokeDaisyActivity : Activity() {
                 return coopBackup(save)
             }
             override fun busyChanged(busy: Boolean) { RetroAchievements.coopBattle = busy }
-            override fun storyAt(): com.pokedaisy.app.companion.data.coop.CoopJoinRules.StoryAt {
-                // The lock's hold names the event it parks the player at; otherwise the player's own spot decides.
-                val held = (coopLock?.ui?.value?.waiting as? com.pokedaisy.app.companion.coop.lock.LockWait.AtStory)?.eventId ?: 0
-                val event = if (held != 0) com.pokedaisy.app.companion.data.coop.CoopStory.byId(held)
-                else com.pokedaisy.app.companion.data.coop.CoopStorySpots.at(mySpot())
-                return com.pokedaisy.app.companion.data.coop.CoopStorySpots.storyAt(event) { id ->
-                    com.pokedaisy.app.companion.data.coop.CoopStorySpots.trainerBeaten(id) { addr, n -> MgbaCore.pkReadBytes(addr, n) }
-                }
-            }
             override fun playTogetherOnly() = coopLock?.ui?.value?.locked == true
             override fun pairKey() = currentCoopPair?.let { it.ownSave.key + ":" + it.partner.peer.hex }.orEmpty()
             override fun catchStore() = catchFile
@@ -2455,11 +2435,7 @@ class PokeDaisyActivity : Activity() {
     private fun makeCoopLock(pair: CoopPair) = CoopLock(
         CoopSession.link, com.pokedaisy.app.companion.coop.lock.CoopLockStore(filesDir.toOkioPath() / "coop" / "locks.json"),
         pair.ownSave.key, pair.partner.save.key, MgbaLockNative,
-        {
-            val b = MgbaCore.pkReadBytes(com.pokedaisy.app.companion.data.coop.COOP_PLAYER_PARTY_COUNT, 1)
-                ?: throw IllegalStateException("no core")
-            b[0].toInt() and 0xFF
-        },
+        { coopBattleField.partySize() ?: error("no core") },
         android.os.SystemClock::elapsedRealtime,
         { eventId -> CoopBattles.storyPending(eventId) },
     )

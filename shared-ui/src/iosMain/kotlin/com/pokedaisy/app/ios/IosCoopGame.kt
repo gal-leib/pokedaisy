@@ -5,7 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pokedaisy.app.CoopApp
 import com.pokedaisy.app.CoopBattleSession
-import com.pokedaisy.app.CoopEmeraldRam
+import com.pokedaisy.app.CoopBattleField
+import com.pokedaisy.app.EmeraldBattleField
 import com.pokedaisy.app.CoopEmu
 import com.pokedaisy.app.CoopFrameHook
 import com.pokedaisy.app.CoopGlueEnv
@@ -31,14 +32,10 @@ import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.data.coop.CoopIdentity
-import com.pokedaisy.app.companion.data.coop.CoopJoinRules
-import com.pokedaisy.app.companion.data.coop.CoopStory
-import com.pokedaisy.app.companion.data.coop.CoopStorySpots
 import com.pokedaisy.app.companion.data.coop.FileCatchStore
 import com.pokedaisy.app.companion.data.coop.PartnerArt
 import com.pokedaisy.app.companion.data.coop.PartnerPlacement
 import com.pokedaisy.app.companion.data.readBytes
-import com.pokedaisy.app.companion.data.save.Gen3BoxMon
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.CoopOverlayState
 import com.pokedaisy.app.companion.ui.MenuKey
@@ -157,43 +154,20 @@ internal class IosCoopGame(
 
     private fun makeStoryLock(id: CoopSaveId, paired: CoopPair) = CoopLock(
         link, CoopLockStore(IosCoopHost.directory() / "locks.json"), id.key,
-        paired.partner.save.key, IosStoryCore, ::partySize, ::now, battle::storyPending,
+        paired.partner.save.key, IosStoryCore, { battleField.partySize() ?: 0 }, ::now, battle::storyPending,
     )
 
-    private fun gameFacts(id: CoopSaveId, paired: CoopPair) = object : CoopGlueEnv {
+    private val battleField = EmeraldBattleField(
+        PkApiCore::read, PkCoopCore::partnerPosition, { presence?.lastReceived },
+        { (storyLock?.ui?.value?.waiting as? LockWait.AtStory)?.eventId },
+    )
+
+    private fun gameFacts(id: CoopSaveId, paired: CoopPair) = object : CoopGlueEnv, CoopBattleField by battleField {
         override val range get() = iosPreferences.coopNearbyRange
-        override fun mySpot(): CoopJoinRules.Spot? {
-            val spot = PkCoopCore.partnerPosition() ?: return null
-            return if (spot[0] == 0) null else CoopJoinRules.Spot(spot[1], spot[2], spot[3] / 16, spot[4] / 16)
-        }
-
-        override fun partnerSpot(): CoopJoinRules.Spot? {
-            val spot = presence?.lastReceived?.takeIf { it.valid } ?: return null
-            return CoopJoinRules.Spot(spot.mapGroup, spot.mapNum, spot.fineX / 16, spot.fineY / 16)
-        }
-
-        override fun hostParty(): List<ByteArray> {
-            val size = CoopEmeraldRam.MON_SIZE
-            val count = partySize().coerceIn(0, 6)
-            val data = PkApiCore.read(CoopEmeraldRam.PLAYER_PARTY, size * count)
-            if (data.size < size * count) return emptyList()
-            return List(count) { data.copyOfRange(it * size, (it + 1) * size) }
-        }
-
-        override fun foeSpecies(): Int = runCatching {
-            Gen3BoxMon.read(PkApiCore.read(CoopEmeraldRam.ENEMY_PARTY, CoopEmeraldRam.MON_SIZE), 0).species
-        }.getOrDefault(0)
-
         override fun partnerName() = paired.partner.name
         override fun identity() = CoopIdentity(id.name, if (look.isFemale) 1 else 0, (id.secretId shl 16) or id.trainerId)
         override fun beforeSave() = runCatching { StateFiles.backupBattery(save) != null }.getOrDefault(false)
         override fun busyChanged(busy: Boolean) { IosAchievements.session.coopBattle = busy }
-
-        override fun storyAt(): CoopJoinRules.StoryAt {
-            val held = storyLock?.ui?.value?.waiting as? LockWait.AtStory
-            val event = if (held != null) CoopStory.byId(held.eventId) else CoopStorySpots.at(mySpot())
-            return CoopStorySpots.storyAt(event) { trainer -> CoopStorySpots.trainerBeaten(trainer, PkApiCore::read) }
-        }
 
         override fun playTogetherOnly() = storyLock?.ui?.value?.locked == true
         override fun pairKey() = id.key + ":" + paired.partner.peer.hex
@@ -201,7 +175,6 @@ internal class IosCoopGame(
         override fun log(text: String) = coopLog(text)
     }
 
-    private fun partySize() = (PkApiCore.read(CoopEmeraldRam.PLAYER_PARTY_COUNT, 1).firstOrNull()?.toInt() ?: 0) and 0xFF
 
     private fun partnerArt(female: Boolean, look: LookChar?): ByteArray? {
         val key = female to look
