@@ -1,20 +1,14 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
-// The companion's data and language code (app/.../companion/data and companion/i18n) as a Kotlin Multiplatform
-// module, compiled where it lives: Android for the app, iOS for the iPad app. Nothing in those folders may use
-// java.* or android.* (the iOS compile fails on it); what differs by platform comes in from outside
-// (EmulatorCore, Logs' sink). The app depends on it and leaves those folders out of its own compile.
+// The multiplatform companion data, translations, and emulator policies. The app links the Android target,
+// and the iPad app links the native target. Platform bindings supply the emulator core and the log sink.
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val appSrc = rootDir.resolve("app/src/main/kotlin")
-@Suppress("UNCHECKED_CAST")
-val sharedCoreSources = rootProject.extra["sharedCoreSources"] as List<String>
-val legacyCoreFiles = fileTree(appSrc) { include(sharedCoreSources) }.files
 val appTest = rootDir.resolve("app/src/test/kotlin/com/pokedaisy/app/companion")
 
 // The emulator core for iOS (pk_api.h: mGBA + the app's portable C), built with Xcode's tools by
@@ -59,9 +53,6 @@ kotlin {
 
     sourceSets {
         commonMain {
-            kotlin.srcDir(appSrc)
-            // Restrict only imported app sources. The module owns its entire commonMain directory.
-            kotlin.exclude { !it.isDirectory && it.file.startsWith(appSrc) && it.file !in legacyCoreFiles }
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 implementation("org.jetbrains.kotlinx:atomicfu:0.23.1")

@@ -2,7 +2,7 @@
 """One-off: moves the Gen 3 NativeConfigs out of NativeReader.kt into gamedata/ (phase 1 of
 the shared game data plan, gamedata/README.md).
 
-Reads app/.../companion/data/NativeReader.kt and writes:
+Reads shared/.../companion/data/NativeReader.kt and writes:
 
 - gamedata/schema/gen3_config.toml   every NativeConfig field: Kotlin type, default, its comments;
 - gamedata/gen3/{retail,hacks}/*.toml one file per game family, each config with its comments;
@@ -19,7 +19,7 @@ import re
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DATA = os.path.join(ROOT, "app/src/main/kotlin/com/pokedaisy/app/companion/data")
+DATA = os.path.join(ROOT, "shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data")
 READER = os.path.join(DATA, "NativeReader.kt")
 GAMEDATA = os.path.join(ROOT, "gamedata")
 LEGACY = os.path.join(ROOT, "app/src/test/kotlin/com/pokedaisy/app/companion/data/LegacyNativeConfigs.kt")

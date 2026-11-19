@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "app/src/main/kotlin"
 COMMON = [ROOT / module / "src/commonMain/kotlin" for module in ("shared", "shared-ui")]
-I18N = SRC / "com/pokedaisy/app/companion/i18n"
+I18N = ROOT / "shared/src/commonMain/kotlin/com/pokedaisy/app/companion/i18n"
 STR = r'"((?:[^"\\]|\\.)*)"'
 CALL = re.compile(r'\bt[rk]\(\s*' + STR)
 ENTRY = re.compile(

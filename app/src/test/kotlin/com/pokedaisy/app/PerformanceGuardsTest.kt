@@ -13,7 +13,9 @@ class PerformanceGuardsTest {
     private val src = listOf(File("src/main/kotlin"), File("app/src/main/kotlin")).first { it.isDirectory }
     private val appDir = File(src, "com/pokedaisy/app")
     private fun read(path: String) = File(appDir, path).readText()
-    private fun kotlinFiles() = src.walkTopDown().filter { it.isFile && it.extension == "kt" }
+    private val repo = src.absoluteFile.normalize().parentFile.parentFile.parentFile.parentFile
+    private fun kotlinFiles() = sequenceOf(src, File(repo, "shared/src/commonMain/kotlin"), File(repo, "shared-ui/src/commonMain/kotlin"))
+        .flatMap { root -> root.walkTopDown() }.filter { it.isFile && it.extension == "kt" }
 
     @Test
     fun `fonts are only built by PixelTypeface, once per process`() {

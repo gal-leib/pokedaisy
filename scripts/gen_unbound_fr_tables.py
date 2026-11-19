@@ -6,7 +6,7 @@ French, like the other-language Emeralds.
 
     scripts/gen_unbound_fr_tables.py <french rom.gba> [<english rom.gba>]
 
-Writes app/src/main/kotlin/.../companion/data/UnboundTextFrGen.kt: species,
+Writes shared/src/commonMain/kotlin/.../companion/data/UnboundTextFrGen.kt: species,
 move, item, nature and map section names by Unbound's own ids (the translation keeps every
 id, table and RAM address of the English release - it rewrote text in place or
 repointed it). Item descriptions aren't written: the app reads them from the
@@ -35,7 +35,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_emerald_lang_tables import CHARS, LANG_CHARS  # noqa: E402
 
-OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app", "src", "main", "kotlin",
+OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared", "src", "commonMain", "kotlin",
                        "com", "pokedaisy", "app", "companion", "data")
 SHA1 = "0ce2a880aa097f1dce4e1db8ee513d0e82d15859"
 EN_SHA1 = "b4776b82a4c7915d0fadeaa27e013523f99dfd94"

@@ -76,7 +76,7 @@ def app_title(sha1: str) -> str:
         m = re.search(rf'\b{name}\s+to\s+"([^"]+)"', gt)
         if m:
             return m.group(1)
-    gen = git("grep", "-h", "-A0", sha1, "--", "app/src/main/kotlin/com/pokedaisy/app/companion/data/RetailPortsGen.kt")
+    gen = git("grep", "-h", "-A0", sha1, "--", "shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data/RetailPortsGen.kt")
     m = re.search(r'to\s+"([^"]+)"', gen)
     if m:
         return m.group(1)

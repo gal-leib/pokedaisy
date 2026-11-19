@@ -25,7 +25,7 @@ native-capture/mgba_dump.c's `vdump`):
 
 Outputs:
   app/.../companion/ui/CfruPartyStylesGen.kt     one PartySlotStyle per game
-  app/.../companion/data/GenderRatiosCfru.kt     gBaseStats genderRatio per game
+  shared/.../companion/data/GenderRatiosCfru.kt     gBaseStats genderRatio per game
 
 The art isn't bundled: the app rebuilds it from the player's ROM
 (companion/data/RomArt.kt, CFRU_* / <game>_STATUS_GFX in
@@ -54,7 +54,7 @@ from decomps import decomp
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KT_UI = os.path.join(HERE, "../app/src/main/kotlin/com/pokedaisy/app/companion/ui/CfruPartyStylesGen.kt")
-KT_DATA = os.path.join(HERE, "../app/src/main/kotlin/com/pokedaisy/app/companion/data/GenderRatiosCfru.kt")
+KT_DATA = os.path.join(HERE, "../shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data/GenderRatiosCfru.kt")
 FR_DECOMP = decomp("pokefirered")
 FR_ROM = open(os.path.join(FR_DECOMP, "pokefirered_rev1.gba"), "rb").read()
 
