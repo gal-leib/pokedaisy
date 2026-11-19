@@ -26,6 +26,7 @@ import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.*
 import com.pokedaisy.app.companion.ui.theme.AppColors
+import com.pokedaisy.app.gameAudioGain
 import com.pokedaisy.app.game.LinkGameSession
 import com.pokedaisy.app.game.RomPicker
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +75,7 @@ internal fun IosLinkPlay(
             focused = 0
             fast = false
             val game = LinkGameSession(
-                picked, saves.paths.map(Path::toString), iosPreferences.gameVolume / 100f,
+                picked, saves.paths.map(Path::toString), gameAudioGain(iosPreferences.gameVolume, iosPreferences.gameMuted),
                 onOpen = { opened ->
                     if (opened) {
                         phase = LinkPhase.PLAYING

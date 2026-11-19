@@ -251,6 +251,7 @@ class LinkActivity : ComponentActivity() {
             .setBufferSizeInBytes(bytes)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
+        track.setVolume(GameVolume.gain)
         track.play()
         val pump = LinkFramePump(games.size, LinkCore::pkLinkSetKeys, LinkCore::pkLinkReadAudio)
         var frames = 0L

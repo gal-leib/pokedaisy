@@ -19,6 +19,7 @@ import com.pokedaisy.app.companion.data.displayName
 import com.pokedaisy.app.companion.ui.theme.pickTheme
 import com.pokedaisy.app.companion.ui.theme.themeById
 import platform.Foundation.NSUserDefaults
+import com.pokedaisy.app.gameAudioGain
 import com.pokedaisy.app.game.GameViewController
 
 private val IOS_FF_MUSIC_MODES = FfMusicMode.entries
@@ -317,7 +318,7 @@ internal class IosCompanionSettings(
         val game = game ?: return
         val requested = com.pokedaisy.app.companion.PlaybackPolicy.requestedSpeed(ffActive, ffMaxSpeed, slowmoHeld, gameSpeed)
         game.speed = if (requested.isInfinite()) 0.0 else requested.toDouble()
-        game.volume = gameVolume / 100f
+        game.volume = gameAudioGain(gameVolume, gameMuted)
         game.muted = gameMuted
         val music = ffMusicMode
         game.muteAudioAtSpeed = { speed -> com.pokedaisy.app.companion.PlaybackPolicy.muteFastAudio(speed.toFloat(), music) }
