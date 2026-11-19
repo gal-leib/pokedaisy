@@ -26,10 +26,12 @@ val appSrc = fileTree(app) {
         .forEach { include(it) }
     exclude("**/*.java")   // compiled by javac below (companion/coop/x25519)
 }
-val sharedInput = fileTree(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app")) {
-    include("GbaControls.kt", "GbaInput.kt", "Hotkeys.kt", "ScriptInput.kt", "companion/KeyCapture.kt")
+sourceSets["main"].kotlin {
+    srcDir("shims")
+    // Compile the portable sources with the imported app data and the JVM shims, like the production modules.
+    srcDir(rootDir.resolve("../shared/src/commonMain/kotlin"))
+    srcDir(rootDir.resolve("../shared-ui/src/commonMain/kotlin"))
 }
-sourceSets["main"].kotlin.srcDir("shims")
 // The Java in the app's sources (CoopKeys' X25519, copied from Bouncy Castle).
 sourceSets["main"].java { srcDir(app); include("companion/coop/x25519/**") }
 // -PgameExport (the game data the 3DS port builds from: 3ds/tools/gen_games.py): MgbaCore without its native library,
@@ -91,16 +93,6 @@ object ExportCore {
     }
 }
 tasks.withType<KotlinCompile>().configureEach {
-    source(sharedInput)
-    source(rootDir.resolve("../shared-ui/src/commonMain/kotlin"))
-    // FieldItemUse reaches the shared frame-work queue; compile that same source here too.
-    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/GameSession.kt"))
-    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/FlightCore.kt"))
-    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/FollowerCore.kt"))
-    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/PlayerLookCore.kt"))
-    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/RideCore.kt"))
-    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/PictureEffects.kt"))
-    source(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app/game/RaClient.kt"))
     if (gameExport) {
         dependsOn(stubCore)
         source(appSrc.matching { exclude("MgbaCore.kt") })

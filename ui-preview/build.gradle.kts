@@ -25,9 +25,6 @@ val appIncludes = listOf(
 // Copied (not referenced in place) so the few Android-only APIs desktop
 // Compose 1.5 lacks can be rewritten on the way.
 val prepSrc = tasks.register<Sync>("prepSrc") {
-    from(rootDir.resolve("../shared/src/commonMain/kotlin/com/pokedaisy/app")) {
-        include("GameSaves.kt", "SaveEditFiles.kt", "SaveTradeJournal.kt")
-    }
     from(app) { appIncludes.forEach { include(it) } }
     // PC BOXES' demo save is built with the save tests' own writer.
     from(rootDir.resolve("../app/src/test/kotlin/com/pokedaisy/app/companion/data/save")) { include("SyntheticSave.kt", "SyntheticGen4.kt", "SyntheticGen5.kt"); into("synthetic") }
