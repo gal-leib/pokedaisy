@@ -2415,7 +2415,7 @@ class PokeDaisyActivity : Activity() {
         val down = event.action == KeyEvent.ACTION_DOWN
         if (code == KeyEvent.KEYCODE_BACK) return null
         if (::hotkeys.isInitialized && hotkeysOn) {
-            for (e in hotkeys.onKey(code, down)) handleHotkey(e)
+            if (!down || event.repeatCount == 0) for (e in hotkeys.onKey(code, down)) handleHotkey(e)
             if (hotkeys.consumes(code)) return true
         }
         val key = menuKeyFor(input.buttonFor(code) ?: 0) ?: return null
@@ -2681,7 +2681,10 @@ class PokeDaisyActivity : Activity() {
 
     /** Everything onPause does: the game stops (or holds, asleep), its listeners and the second screen go. */
     private fun pauseGame() {
-        if (::engine.isInitialized) gameActions.cancelTouch()
+        if (::engine.isInitialized) {
+            gameActions.cancelTouch()
+            engine.rewindHold.revoke()
+        }
         stopPlayClock()
         AudioEffectsTrack.close(this)
         keyCapture.cancel()
@@ -3024,6 +3027,12 @@ class PokeDaisyActivity : Activity() {
         super.onWindowFocusChanged(hasFocus)
         CrashReports.breadcrumb("game window focus: $hasFocus (display ${Screens.displayOf(this)})")
         if (hasFocus) followDisplay()
+        else if (::engine.isInitialized) {
+            cancelRewindForOverlay()
+            // The OS may deliver UP to another window. Reset the old parser's owners before focus returns.
+            if (::hotkeys.isInitialized) hotkeys.releaseAll().forEach(::handleHotkey)
+            gameActions.cancelHardware()
+        }
     }
 
     /** The game's stage as this activity's content (dropping the swapped companion). */
@@ -4266,7 +4275,10 @@ class PokeDaisyActivity : Activity() {
     private fun openTouchEditor() {
         if (touchEditor.isOpen) return
         val measured = measuredTouchStage() ?: return
-        if (::engine.isInitialized) gameActions.cancelTouch()
+        if (::engine.isInitialized) {
+            gameActions.cancelTouch()
+            engine.rewindHold.revoke()
+        }
         if (::sidePanel.isInitialized) sidePanel.closeWindow()
         input.setTouchBits(0)
         touchEditor.open(measured)
@@ -4290,7 +4302,7 @@ class PokeDaisyActivity : Activity() {
         menuKeyTakes(event)?.let { return it }
         quickMenuTakes(event)?.let { return it }
         dsBattleTakes(event)?.let { return it }
-        if (hotkeyTakes(event.keyCode, down)) return true
+        if (hotkeyTakes(event.keyCode, down, repeat = down && event.repeatCount > 0)) return true
         battleSteerTakes(event)?.let { return it }
         if (input.onKey(event.keyCode, down)) {
             if (down && !physicalPadUsed && event.device?.isVirtual == false) {
@@ -4344,6 +4356,7 @@ class PokeDaisyActivity : Activity() {
 
     private fun setBottomFocus(on: Boolean) {
         if (bottomFocus.value == on) return
+        if (on && ::engine.isInitialized) cancelRewindForOverlay()
         bottomFocus.value = on
         // A DS game's second screen goes back to its touch screen with the buttons; a hidden upright companion comes up.
         if (!on && twoScreenGame) dsBottom?.show(false)
@@ -4369,7 +4382,9 @@ class PokeDaisyActivity : Activity() {
             menuHeld.add(code)
             return true
         }
-        if (::hotkeys.isInitialized && hotkeysOn) for (e in hotkeys.onKey(code, down)) if (!e.pressed || e.action == Hotkeys.Action.COMPANION) handleHotkey(e)
+        if (::hotkeys.isInitialized && hotkeysOn && (!down || event.repeatCount == 0)) {
+            for (e in hotkeys.onKey(code, down)) if (!e.pressed || e.action == Hotkeys.Action.COMPANION) handleHotkey(e)
+        }
         if (code == KeyEvent.KEYCODE_BUTTON_MODE) {
             if (!down && !event.isCanceled) companionBackTap()
             return true
@@ -4423,6 +4438,7 @@ class PokeDaisyActivity : Activity() {
     /** The window came up (the buttons are the companion's: the player's held keys let go in the game, which runs
      * on) or went away (the buttons are the game's again). */
     private fun onCompanionWindow(open: Boolean) {
+        if (open && ::engine.isInitialized) cancelRewindForOverlay()
         input.releaseAll()
         menuHat = 0
         hatRepeat.stop()
@@ -4469,7 +4485,9 @@ class PokeDaisyActivity : Activity() {
             }
             return true
         }
-        if (::hotkeys.isInitialized && hotkeysOn) for (e in hotkeys.onKey(code, down)) if (!e.pressed) handleHotkey(e)
+        if (::hotkeys.isInitialized && hotkeysOn && (!down || event.repeatCount == 0)) {
+            for (e in hotkeys.onKey(code, down)) if (!e.pressed) handleHotkey(e)
+        }
         if (code == KeyEvent.KEYCODE_BUTTON_MODE) {
             if (!down && !event.isCanceled) companionBackTap()
             return true
@@ -4497,7 +4515,7 @@ class PokeDaisyActivity : Activity() {
         val down = event.action == KeyEvent.ACTION_DOWN
         if (code == KeyEvent.KEYCODE_BACK) return null
         if (::hotkeys.isInitialized && hotkeysOn) {
-            for (e in hotkeys.onKey(code, down)) handleHotkey(e)
+            if (!down || event.repeatCount == 0) for (e in hotkeys.onKey(code, down)) handleHotkey(e)
             if (hotkeys.consumes(code)) return true
         }
         val key = menuKeyFor(input.buttonFor(code) ?: 0) ?: return null
@@ -4680,8 +4698,9 @@ class PokeDaisyActivity : Activity() {
 
     /** Feeds a key change to the hotkeys (only while they're on); true when the game mustn't see it
      *  ([Hotkeys.gameKey]: completing a chord, or SELECT / START of one held back until let go). */
-    private fun hotkeyTakes(keyCode: Int, down: Boolean): Boolean {
+    private fun hotkeyTakes(keyCode: Int, down: Boolean, repeat: Boolean = false): Boolean {
         if (!::hotkeys.isInitialized || !hotkeysOn) return false
+        if (repeat) return hotkeys.consumes(keyCode)
         return hotkeys.gameKey(keyCode, down, input, ::handleHotkey)
     }
 
@@ -4794,23 +4813,40 @@ class PokeDaisyActivity : Activity() {
     private val gameActions get() = engine.playback.actions ?:
         engine.playback.bindActions(companionSettings, stateSlots,
             selectSlot = { index -> engine.cycleSlot(index - engine.currentSlot) },
-            hold = ::holdGameAction, companion = ::toggleGameCompanion)
+            hold = ::holdGameAction, companion = ::toggleGameCompanion,
+            rewindHold = engine.rewindHold,
+            canRewind = {
+                !romIsNds && !romIs3ds && engine.running && engine.canRewind &&
+                    !quickMenu.open && !touchEditor.isOpen && keyCapture.request == null && !bottomFocus.value &&
+                    !coopOverlay.takesKeys && !(::sidePanel.isInitialized && sidePanel.windowOpen)
+            },
+            rewindDenied = ::showRewindDenied)
 
     private fun holdGameAction(action: Hotkeys.Action, down: Boolean) {
         if (romIs3ds) { n3dsHotkey(Hotkeys.Event(action, down)); return }
         when (action) {
             Hotkeys.Action.FF_HOLD -> engine.setFastForwardHeld(down)
             Hotkeys.Action.SLOWMO_HOLD -> engine.setSlowmoHeld(down)
-            Hotkeys.Action.REWIND_HOLD -> if (romIsNds) {
-                // The rewind ring is mGBA's: the hotkey would do nothing at all and look broken.
-                if (down) showHud(com.pokedaisy.app.companion.i18n.tr("Rewind doesn't work in DS games"))
-            } else {
-                if (down && !Prefs(this).rewind) showHud(com.pokedaisy.app.companion.i18n.tr("Rewind is off - turn it on in SETTINGS"))
-                else if (down) showHud(com.pokedaisy.app.companion.i18n.tr("Rewinding"))
-                engine.setRewindHeld(down)
-            }
+            Hotkeys.Action.REWIND_HOLD -> if (down) showHud(com.pokedaisy.app.companion.i18n.tr("Rewinding"))
             else -> Unit
         }
+    }
+
+    private fun cancelRewindForOverlay() {
+        engine.rewindHold.revoke()
+        engine.rewindHold.update(com.pokedaisy.app.game.RewindHold.Source.TOUCH, false)
+    }
+
+    private fun showRewindDenied() {
+        if (romIs3ds) return
+        val message = when {
+            romIsNds -> com.pokedaisy.app.companion.i18n.tr("Rewind doesn't work in DS games")
+            coopRefuses() -> return
+            CoopGuards.statesBlockedBy(CoopGuards.StateBlock.LOCK) -> com.pokedaisy.app.companion.i18n.tr("Not while you play together only")
+            !Prefs(this).rewind -> com.pokedaisy.app.companion.i18n.tr("Rewind is off - turn it on in SETTINGS")
+            else -> return
+        }
+        showHud(message)
     }
 
     private fun toggleGameCompanion() {
@@ -4884,6 +4920,7 @@ class PokeDaisyActivity : Activity() {
         quickMenu.trigger(pressed)
         // Opened: the buttons are the menu's now, so a held direction stops walking.
         if (!wasOpen && quickMenu.open) {
+            if (::engine.isInitialized) cancelRewindForOverlay()
             com.pokedaisy.app.companion.FeatureTips.used(TipId.QUICK_MENU)
             input.releaseAll()
             quickHat = 0

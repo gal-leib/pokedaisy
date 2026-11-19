@@ -185,8 +185,11 @@ class GameRuntime(
     }
 
     fun bindActions(settings: CompanionSettings, slots: StateSlots, selectSlot: (Int) -> Unit,
-                    hold: (Hotkeys.Action, Boolean) -> Unit, companion: () -> Unit): GameActions =
-        actions ?: GameActions(settings, slots, selectSlot, hold, companion).also {
+                    hold: (Hotkeys.Action, Boolean) -> Unit, companion: () -> Unit,
+                    rewindHold: com.pokedaisy.app.game.RewindHold = com.pokedaisy.app.game.RewindHold(),
+                    canRewind: () -> Boolean = { true }, rewindDenied: () -> Unit = {}): GameActions =
+        actions ?: GameActions(settings, slots, selectSlot, hold, companion,
+            rewindHold = rewindHold, canRewind = canRewind, rewindDenied = rewindDenied).also {
             actions = it
             if (closed.value) it.close()
         }

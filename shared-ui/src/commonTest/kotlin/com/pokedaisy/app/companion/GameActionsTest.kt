@@ -29,8 +29,12 @@ class GameActionsTest {
     }
     private val holds = mutableListOf<Pair<Hotkeys.Action, Boolean>>()
     private var time = 1_000L
+    private var rewindAllowed = true
+    private var deniedRewinds = 0
+    private val rewindHold = com.pokedaisy.app.game.RewindHold()
     private val actions = GameActions(settings, slots, { index = it },
-        { action, down -> holds += action to down }, { companion++ }, { time })
+        { action, down -> holds += action to down }, { companion++ }, { time },
+        rewindHold = rewindHold, canRewind = { rewindAllowed }, rewindDenied = { deniedRewinds++ })
     private fun key(action: Hotkeys.Action, down: Boolean = true) = actions.hotkey(Hotkeys.Event(action, down))
 
     @Test fun shortcutReleasesNeverRepeatActionsAndSlotsWrap() {
@@ -80,6 +84,48 @@ class GameActionsTest {
         assertEquals(Hotkeys.Action.REWIND_HOLD to true, holds.last())
         actions.clear(); actions.clear()
         assertEquals(4, holds.size)
+    }
+
+    @Test fun aDeniedPressDoesNotOwnRewindOrPreventAnIndependentAcceptedHold() {
+        rewindAllowed = false
+        key(Hotkeys.Action.REWIND_HOLD)
+        key(Hotkeys.Action.REWIND_HOLD)
+        assertEquals(1, deniedRewinds)
+        assertFalse(rewindHold.active)
+        rewindAllowed = true
+        key(Hotkeys.Action.REWIND_HOLD)
+        assertFalse(rewindHold.active)
+        actions.touch(TouchButton.REWIND, true)
+        assertTrue(rewindHold.active)
+        actions.touch(TouchButton.REWIND, false)
+        assertFalse(rewindHold.active)
+        assertEquals(listOf(Hotkeys.Action.REWIND_HOLD to true, Hotkeys.Action.REWIND_HOLD to false), holds)
+    }
+
+    @Test fun aFrameThreadRevocationRequiresFreshInputAfterTheGateReopens() {
+        key(Hotkeys.Action.REWIND_HOLD)
+        assertTrue(rewindHold.active)
+        rewindHold.revoke()
+        assertFalse(rewindHold.active)
+        key(Hotkeys.Action.REWIND_HOLD)
+        assertFalse(rewindHold.active)
+        actions.touch(TouchButton.REWIND, true)
+        assertTrue(rewindHold.active)
+        key(Hotkeys.Action.REWIND_HOLD, false)
+        assertTrue(rewindHold.active)
+        actions.cancelTouch()
+        assertFalse(rewindHold.active)
+    }
+
+    @Test fun aParserResetMakesTheNextGenuinePressWorkAfterTheOldReleaseWasLost() {
+        key(Hotkeys.Action.REWIND_HOLD)
+        actions.release(Hotkeys.Action.REWIND_HOLD)
+        actions.cancelHardware()
+        key(Hotkeys.Action.REWIND_HOLD)
+        assertTrue(rewindHold.active)
+        key(Hotkeys.Action.REWIND_HOLD, false)
+        assertFalse(rewindHold.active)
+        assertEquals(listOf(true, false, true, false), holds.map { it.second })
     }
 
     @Test fun clearingAllHoldsCancelsPendingTapAndIsIdempotent() {

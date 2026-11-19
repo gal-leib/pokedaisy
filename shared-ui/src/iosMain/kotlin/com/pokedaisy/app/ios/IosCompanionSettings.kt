@@ -171,20 +171,20 @@ internal class IosCompanionSettings(
 
     var optionsChanged: () -> Unit = {}
     override val rewindBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_REWIND)
-    override fun setRewind(on: Boolean) { stored.setRewind(on); releaseRewind() }
+    override fun setRewind(on: Boolean) {
+        stored.setRewind(on)
+        releaseRewind()
+        game?.rewindEnabled = rewind
+    }
     var actions: com.pokedaisy.app.companion.GameActions? = null
-    var rewindHeld = false
-        private set
-    var rewindChanged: () -> Unit = {}
     var rewindUnavailable: () -> Unit = {}
-    fun holdRewind(on: Boolean) {
-        if (on && coop?.refuseLoad() == true) return
-        if (on && !rewind) rewindUnavailable()
-        rewindHeld = on && rewind; rewindChanged()
+    fun showRewindDenied() {
+        if (coop?.refuseLoad() == true) return
+        if (!rewind) rewindUnavailable()
     }
     fun releaseRewind() {
         actions?.release(Hotkeys.Action.REWIND_HOLD)
-        holdRewind(false)
+        game?.revokeRewind()
     }
     override val autoRunBuiltIn get() = hasRunningGame && activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
     override val runIndoorsSupported get() = fieldReadable && com.pokedaisy.app.companion.data.GameField.supportsRunIndoors(romCode.orEmpty())

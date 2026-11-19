@@ -75,13 +75,16 @@ class GameViewControllerTest {
 
             session.postForward { events += "after rewind" }
             session.post { events += "rewind callback" }
-            controller.holdRewind(true)
+            assertTrue(controller.canRewind)
+            controller.rewindHold.update(RewindHold.Source.TOUCH, true)
+            controller.applyRewindHold()
             refresh()
             assertEquals(FrameWork.REWINDING, passes.last())
             assertEquals("rewind callback", events.last())
             assertFalse(controller.playingForward)
 
-            controller.holdRewind(false)
+            controller.rewindHold.update(RewindHold.Source.TOUCH, false)
+            controller.applyRewindHold()
             refresh()
             assertTrue(controller.playingForward)
             assertEquals(FrameWork.ADVANCING, passes.last())

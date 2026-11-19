@@ -132,11 +132,13 @@ object PokeDaisyHost {
             currentSettings.rewindUnavailable = panels::showRewindUnavailable
             val shortcuts = currentRuntime.bindActions(currentSettings, currentSlots,
                 selectSlot = { currentSlots.select(it) }, companion = panels::toggleCompanion,
+                rewindHold = current.rewindHold, canRewind = { current.canRewind },
+                rewindDenied = currentSettings::showRewindDenied,
                 hold = { action, down ->
                     when (action) {
                         com.pokedaisy.app.Hotkeys.Action.FF_HOLD -> currentSettings.holdFastForward(down)
                         com.pokedaisy.app.Hotkeys.Action.SLOWMO_HOLD -> currentSettings.holdSlowmo(down)
-                        com.pokedaisy.app.Hotkeys.Action.REWIND_HOLD -> currentSettings.holdRewind(down)
+                        com.pokedaisy.app.Hotkeys.Action.REWIND_HOLD -> current.applyRewindHold()
                         else -> Unit
                     }
                 })
@@ -367,8 +369,7 @@ object PokeDaisyHost {
             looks = currentLook, tradeSupported = { game === g && evolution?.supported() == true }, coop = currentCoop)
             .also { s ->
                 L10n.apply(s.appLanguage, code)
-                s.rewindChanged = { g.rewindEnabled = s.rewind; g.holdRewind(s.rewindHeld) }
-                s.rewindChanged()
+                g.rewindEnabled = s.rewind
             }
         battle = com.pokedaisy.app.companion.GameBattleInput(telemetry, code, revision,
             changed = { sample() }, silent = { g.audioSilent },

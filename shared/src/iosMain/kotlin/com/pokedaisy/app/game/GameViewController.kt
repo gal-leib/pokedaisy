@@ -123,28 +123,44 @@ class GameViewController(
 
     /** A modal editor is open: foreground notifications must not start frames underneath it. */
     var uiPaused: Boolean = false
-        set(value) { field = value; input.editorCaptured(value) }
+        set(value) {
+            if (value && !field) revokeRewind()
+            field = value
+            input.editorCaptured(value)
+        }
 
     /** A companion window owns manual input while emulation and scripted battle input continue. */
     var companionInputCaptured: Boolean
         get() = input.companionCaptured
-        set(value) { input.companionCaptured = value }
+        set(value) {
+            if (value && !input.companionCaptured) revokeRewind()
+            input.companionCaptured = value
+        }
     var onCompanionButtons: (Int) -> Unit
         get() = input.onCompanionButtons
         set(value) { input.onCompanionButtons = value }
     val controllerButtons: Int get() = input.controllerKeys()
     var overlayMenuInputCaptured: Boolean
         get() = input.overlayMenuCaptured
-        set(value) { input.overlayMenuCaptured = value }
+        set(value) {
+            if (value && !input.overlayMenuCaptured) revokeRewind()
+            input.overlayMenuCaptured = value
+        }
     var quickMenuInputCaptured: Boolean
         get() = input.quickMenuCaptured
-        set(value) { input.quickMenuCaptured = value }
+        set(value) {
+            if (value && !input.quickMenuCaptured) revokeRewind()
+            input.quickMenuCaptured = value
+        }
     var onCompanionAim: (Float, Float) -> Boolean
         get() = input.onCompanionAim
         set(value) { input.onCompanionAim = value }
     var keyboardInputCaptured: Boolean
         get() = input.keyboardCaptured
-        set(value) { input.keyboardCaptured = value }
+        set(value) {
+            if (value && !input.keyboardCaptured) revokeRewind()
+            input.keyboardCaptured = value
+        }
 
     /** Per-game pace, or zero for unlimited FF (bounded work per display refresh). Main thread. */
     var speed: Double = 1.0
@@ -159,10 +175,22 @@ class GameViewController(
     private fun shouldMuteAudio(rate: Double) = rewinding || muted || volume == 0f || rate == 0.0 ||
         muteAudioAtSpeed(rate) || audio.hasSteadyMusic || steadyAwaiting && rate > 1.0
     /** The same diff-ring capacity as Android; configuring it releases any current hold. */
+    val rewindHold = RewindHold()
+    val canRewind get() = running && active && !uiPaused && !stateChanging &&
+        !input.companionCaptured && !input.overlayMenuCaptured && !input.quickMenuCaptured &&
+        !input.keyboardCaptured && !input.capture.active && rewindEnabled && rewindAllowed()
+
+    fun applyRewindHold() = holdRewind(rewindHold.active)
+
+    fun revokeRewind() {
+        rewindHold.revoke()
+        holdRewind(false)
+    }
+
     var rewindEnabled: Boolean = false
         set(value) {
             if (field == value) return
-            holdRewind(false)
+            revokeRewind()
             field = value
             if (running) updateRewindCapacity()
         }
@@ -175,12 +203,12 @@ class GameViewController(
     private fun updateRewindCapacity() {
         val enabled = rewindEnabled && rewindAllowed()
         if (enabled == rewindFramesEnabled) return
-        if (!enabled) holdRewind(false)
+        if (!enabled) revokeRewind()
         PkApiCore.setRewind(RewindPolicy.capacity(enabled))
         rewindFramesEnabled = enabled
     }
 
-    fun holdRewind(on: Boolean) {
+    private fun holdRewind(on: Boolean) {
         val next = on && rewindEnabled && rewindAllowed()
         if (next == rewinding) return
         rewinding = next
@@ -275,6 +303,7 @@ class GameViewController(
         input.capture.cancel()
         input.backgroundCaptured(true)
         active = false
+        revokeRewind()
         onMusicPause(true)
         audio.stop()
         return beforeSuspend()
@@ -345,6 +374,7 @@ class GameViewController(
         // GameController queries. A controller action can close/restart the game or open the editor here.
         input.poll()
         if (!running || !active || uiPaused) return
+        if (rewindHold.active && !canRewind) revokeRewind()
         view.drawableSize.useContents {
             val w = width.toInt(); val h = height.toInt()
             if (camera.viewW != w || camera.viewH != h) {

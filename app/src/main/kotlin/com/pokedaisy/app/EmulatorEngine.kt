@@ -72,7 +72,7 @@ class EmulatorEngine(
     @Volatile private var ffHeld = false
     @Volatile private var ffToggled = false
     @Volatile private var slowmoHeld = false
-    @Volatile private var rewindHeld = false
+    val rewindHold = com.pokedaisy.app.game.RewindHold()
     @Volatile private var speedIdx = 0          // index into SPEED_STEPS
 
     /** Cap for hold/toggle fast-forward. 0 = unlimited. (Phase 4: make configurable.) */
@@ -87,6 +87,12 @@ class EmulatorEngine(
 
     /** REWIND (Settings): states kept for the rewind hotkey, 0 = off. Picked up on the emu thread. */
     @Volatile var rewindEntries = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            rewindHold.revoke()
+        }
+    val canRewind get() = rewindEntries > 0 && rewindAllowed(coopStatesBlocked)
 
     /** WIDE's native tables for this game ([WideScreen.gameFor]), or [WideScreen.OFF]; applied between frames. */
     @Volatile var wideGame = WideScreen.OFF
@@ -355,10 +361,6 @@ class EmulatorEngine(
      * the title screen without saving, wherever they allow it). */
     fun softReset() { softResetFrames = SOFT_RESET_FRAMES }
 
-    fun setRewindHeld(on: Boolean) {
-        rewindHeld = on && rewindAllowed(coopStatesBlocked)
-    }
-
     fun setSlowmoHeld(on: Boolean) {
         if (slowmoHeld == on) return
         slowmoHeld = on
@@ -582,7 +584,7 @@ class EmulatorEngine(
     /** What the emulator actually runs at: [requestedSpeed], unless SMART is holding it at 1x for now. */
     private fun effectiveSpeed(): Float {
         // Rewinding steps back at the display's pace (2 game frames a frame), whatever FF says.
-        if (rewindHeld && rewindEntries > 0) return 1f
+        if (rewindHold.active && rewindEntries > 0) return 1f
         // An automated switch drives the game's party menu behind the held frame: nothing to watch
         // there, so it runs flat out (muted) and the battle comes back in a fraction of a second.
         if (battleInput.holdFrame) return Float.POSITIVE_INFINITY
@@ -1158,7 +1160,7 @@ class EmulatorEngine(
         /** Before the core runs: holds, rewind, EXPAND's camera, the keys, DS drawing. False = no frame this time round. */
         fun beforeFrame(): Boolean {
             frameStart = System.nanoTime()
-            if (rewindHeld && !rewindAllowed(coopStatesBlocked)) rewindHeld = false
+            if (rewindHold.active && !canRewind) rewindHold.revoke()
             if (loopAction(coopStartupPending || CoopGuards.held, !running, pendingSave >= 0) != LoopAction.RUN) {
                 wasHeld = true
                 // Co-op holds the game: no frame, the last picture stays; saves, suspend, sleep and stop still served.
@@ -1224,7 +1226,7 @@ class EmulatorEngine(
                     runCatching { onWideOff?.invoke("camera") }
                 }
             }
-            rewinding = rewindHeld && rewindWanted > 0
+            rewinding = rewindHold.active && rewindWanted > 0
             if (rewinding) {
                 playback.cancelFieldActions()
                 playback.battleRetry.reset()
@@ -2002,6 +2004,7 @@ class EmulatorEngine(
         else states.files.writeState(target.toOkioPath(), ::writeCoreState, snapshot = stateSnapshot())
 
     private fun readManualState(source: okio.Path): Boolean {
+        rewindHold.revoke()
         // An attempted load invalidates Android's outstanding retry even if the core rejects the file.
         playback.battleRetry.reset()
         playback.cancelFieldActions()
