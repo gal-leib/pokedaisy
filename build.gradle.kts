@@ -15,17 +15,3 @@ plugins {
     id("com.google.gms.google-services") version "4.4.4" apply false
     id("com.google.firebase.crashlytics") version "3.0.8" apply false
 }
-
-// The companion's data / i18n tests that also use the app's own classes: they compile with the app, the rest
-// with shared/ (shared/build.gradle.kts), from the same folder.
-val appOnlyTests by extra(
-    listOf(
-        "Black2ReduxTest", "DsPortsTest", "FrenchDsTest", "HeartGoldGermanTest", "LegacyHacksTest",
-        "NuzlockeFixturesTest", "PartyReorderConfigTest", "PolishedCrystalDecodeTest", "PrismDecodeTest",
-        "RenegadePlatinumTest", "ShinyOddsTest",
-    ),
-)
-// Test helpers in those folders that the app's own tests use too: compiled in both modules' tests.
-val sharedTestHelpers by extra(
-    listOf("FixtureMemoryReader", "RomFileReader", "Gen3RetailSupport", "NativeDecodeSupport", "SyntheticSave", "FakeLinkEngine"),
-)

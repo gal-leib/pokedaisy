@@ -1197,7 +1197,7 @@ guessing:
    extras dump the full EWRAM (256 KB) + IWRAM (32 KB) to a device file —
    `scripts/capture_fixture.sh <key>` drives this (live session if the app's
    already running via `onNewIntent`, cold relaunch otherwise) and pulls the
-   result into `app/src/test/resources/fixtures/<key>/{ewram,iwram}.bin`.
+   result into `test-fixtures/resources/fixtures/<key>/{ewram,iwram}.bin`.
 2. `gPlayerParty` is found by scanning every 4-byte-aligned offset for a valid
    Gen3 `struct Pokemon` (`PID^OTID` key, `PID%24` substruct order, 16-bit
    checksum over the 12 decrypted words) — a checksum match is ~1/65536 odds,
@@ -1256,7 +1256,7 @@ guessing:
    "looks like a valid ROM pointer" alone — Amethyst's mon/item icons were
    confirmed by actually seeing a recognizable Tepig and Potion bottle.
 5. Once addresses are confirmed, add a fixture (step 1) + a
-   `<Game>DecodeTest.kt` under `app/src/test/kotlin/.../companion/data/`
+   `<Game>DecodeTest.kt` under `shared/src/androidUnitTest/kotlin/.../companion/data/`
    asserting the known real values from that capture — this is what keeps a
    future refactor from silently re-breaking a hard-won address. `forkEvery = 1`
    in `build.gradle.kts` restarts the test JVM per class, needed because the
@@ -4008,11 +4008,10 @@ Put portable game rules, save transactions and their tests under `shared/src/com
 `shared/src/commonTest`. Common Compose screens and the actions they present belong under
 `shared-ui/src/commonMain`. Both modules compile their own directories for both mobile targets.
 The companion's data and language code lives under `shared/src/commonMain/kotlin/com/pokedaisy/app/companion`.
-Android and iOS supply the emulator through `EmulatorCore` and logging through the `Logs` sink.
-Their tests stay in `app/src/test` too and run as
-`:shared:testDebugUnitTest` (from `app/`, as before), except the few that also use the app's classes (the root
-build's `appOnlyTests`), which run with the app's. Something the app uses from those folders must be public, not
-`internal` (another module now). `./gradlew :shared:compileKotlinIosArm64` compiles it for an iPad; since the
+Android and iOS provide the emulator through `EmulatorCore` and logging through the `Logs` sink.
+Core JVM tests live in `shared/src/androidUnitTest`. Tests that exercise Android app classes or Paparazzi
+live in `app/src/test`. Both JVM suites read the helpers and RAM captures from `test-fixtures`.
+`./gradlew :shared:compileKotlinIosArm64` compiles it for an iPad; since the
 emulator core comes in through cinterop (see "The core's C API"), that needs a Mac with Xcode. CI's macOS "Shared code
 for iOS" job compiles both iOS targets, then links and runs the iOS tests in the simulator: the core's (`PkApiCoreTest`)
 and the portable smoke tests in `shared/src/commonTest` (files, PNGs, background work / locks and a fake emulator).
@@ -4363,8 +4362,8 @@ pushing a different file (only one at a time for now). SRAM persists to
 | `.../companion/data/ActiveTables.kt`                    | Picks which species/item/map-name tables and sprite source apply for the currently-detected `GameKind`.                                                            |
 | `.../companion/data/SpeciesNames*.kt`, `Poller.kt`      | Per-hack species tables and the SHA1 detection constants, respectively.                                                                                            |
 | `scripts/capture_fixture.sh`, `scripts/roms.conf`       | Captures a live EWRAM+IWRAM memory fixture for one ROM off the device.                                                                                             |
-| `app/src/test/resources/fixtures/<key>/`                | Captured `{ewram,iwram}.bin` + `README.txt` per ROM — replayed by the JVM decode tests, not committed ROMs/saves themselves.                                       |
-| `app/src/test/kotlin/.../companion/data/*DecodeTest.kt` | One regression test per supported ROM, decoding its fixture and asserting the known-real values.                                                                   |
+| `test-fixtures/resources/fixtures/<key>/`                | Captured `{ewram,iwram}.bin` + `README.txt` per ROM — replayed by the JVM decode tests, not committed ROMs/saves themselves.                                       |
+| `shared/src/androidUnitTest/kotlin/.../companion/data/*DecodeTest.kt` | One regression test per supported ROM, decoding its fixture and asserting the known-real values.                                                                   |
 
 ### Shared touch-control preferences
 

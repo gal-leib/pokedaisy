@@ -2,12 +2,11 @@ package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.game.GameSession
-import org.junit.Assert.*
-import org.junit.Test
+import kotlin.test.*
 
 class ClassicFlyActionTest {
     private class Game : GameCalls {
-        private val zero = java.util.zip.CRC32().apply { update(ByteArray(32)) }.value
+        private val zero = 0x190A55ADL // CRC32 of a 32-byte zero-filled mock code probe.
         val fly = FLY_FIRERED_REV1.copy(codeCrcs = List(7) { zero })
         val fns = FIELD_ITEMS_FIRERED_REV1.copy(codeCrcs = List(5) { zero }, fly = fly,
             party = FIELD_ITEMS_FIRERED_REV1.party!!.let { it.copy(codeCrcs = List(it.functions.size) { zero }) })

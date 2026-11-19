@@ -104,8 +104,8 @@ if(BUILD_TESTING)
   target_compile_options(ds-battle-strip-test PRIVATE -UNDEBUG)
   target_link_libraries(ds-battle-strip-test PRIVATE pd_ds_presentation)
   add_test(NAME ds-platinum-battle-strip COMMAND ds-battle-strip-test
-    ${ROOT}/app/src/test/resources/fixtures/platinum_battle/mainram.bin
-    ${ROOT}/app/src/test/resources/fixtures/black_wild/mainram.bin)
+    ${ROOT}/test-fixtures/resources/fixtures/platinum_battle/mainram.bin
+    ${ROOT}/test-fixtures/resources/fixtures/black_wild/mainram.bin)
   add_executable(ds-settings-test test/settings.cpp)
   add_executable(ds-companion-parity test/companion_parity.cpp)
   foreach(test ds-companion-fixture ds-shared-default-ui ds-settings-test ds-companion-parity)
@@ -118,9 +118,9 @@ if(BUILD_TESTING)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
     target_link_libraries(ds-settings-test PRIVATE stdc++fs)
   endif()
-  add_test(NAME ds-settings COMMAND ds-settings-test ${ROOT}/app/src/test/resources/fixtures/platinum/mainram.bin ${CMAKE_CURRENT_BINARY_DIR}/validation)
-  add_test(NAME ds-companion-fixture COMMAND ds-companion-fixture ${ROOT}/app/src/test/resources/fixtures/platinum/mainram.bin)
-  set(DS_FIXTURES ${ROOT}/app/src/test/resources/fixtures)
+  add_test(NAME ds-settings COMMAND ds-settings-test ${ROOT}/test-fixtures/resources/fixtures/platinum/mainram.bin ${CMAKE_CURRENT_BINARY_DIR}/validation)
+  add_test(NAME ds-companion-fixture COMMAND ds-companion-fixture ${ROOT}/test-fixtures/resources/fixtures/platinum/mainram.bin)
+  set(DS_FIXTURES ${ROOT}/test-fixtures/resources/fixtures)
   add_test(NAME ds-companion-parity COMMAND ds-companion-parity
     ${DS_FIXTURES}/heartgold/mainram.bin ${DS_FIXTURES}/soulsilver/mainram.bin ${DS_FIXTURES}/black/mainram.bin
     ${DS_FIXTURES}/white/mainram.bin ${DS_FIXTURES}/black2/mainram.bin ${DS_FIXTURES}/white2/mainram.bin)

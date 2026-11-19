@@ -1,6 +1,5 @@
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 import java.net.URI
 import java.nio.file.FileSystems
@@ -184,7 +183,8 @@ android {
     sourceSets["dev"].res.srcDirs("src/debug/res", "src/dev/res")
     sourceSets["main"].java.srcDirs("src/main/kotlin")
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/licenses"))
-    sourceSets["test"].java.srcDirs("src/test/kotlin", "../server/coop-relay/src/main/kotlin")
+    sourceSets["test"].java.srcDirs("src/test/kotlin", "../server/coop-relay/src/main/kotlin", "../test-fixtures/kotlin")
+    sourceSets["test"].resources.srcDir("../test-fixtures/resources")
 
     testOptions {
         unitTests.isIncludeAndroidResources = false
@@ -194,20 +194,6 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
-
-// companion/data and companion/i18n are compiled by shared/ (Android + iOS), so the app leaves them out of its own
-// compile, and their tests too but those that also use the app's classes (the root build's appOnlyTests).
-@Suppress("UNCHECKED_CAST")
-val appOnlyTests = rootProject.extra["appOnlyTests"] as List<String>
-@Suppress("UNCHECKED_CAST")
-val sharedTestHelpers = rootProject.extra["sharedTestHelpers"] as List<String>
-val sharedDirs = listOf("com/pokedaisy/app/companion/data/", "com/pokedaisy/app/companion/i18n/")
-tasks.withType<KotlinCompile>().configureEach {
-    val tests = name.contains("UnitTest")
-    if (tests) exclude { e ->
-        !e.isDirectory && sharedDirs.any { e.path.startsWith(it) } && e.file.nameWithoutExtension !in appOnlyTests + sharedTestHelpers
     }
 }
 

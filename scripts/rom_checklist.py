@@ -55,7 +55,8 @@ def port_needles(rom: dict) -> list[str] | None:
         return [base, lang]
     return None
 
-FIXTURES = REPO / "app" / "src" / "test" / "resources" / "fixtures"
+FIXTURES = REPO / "test-fixtures" / "resources" / "fixtures"
+DECODE_TEST_SOURCES = ("app/src/test/kotlin", "shared/src/androidUnitTest/kotlin")
 
 
 def git(*args: str) -> str:
@@ -199,7 +200,7 @@ def main() -> int:
         r.add("ok", "fixtures", "a DS language port: none expected (checked headless beside its US cart)")
     elif not keys:
         r.add("MISSING", "fixtures", "no scripts/host_roms.conf line for this file name (key|label|~ rom path|~ save path)")
-    tests = git("grep", "-l", "-E", "|".join(rf'"{re.escape(k)}"' for k in keys), "--", "app/src/test") if keys else ""
+    tests = git("grep", "-l", "-E", "|".join(rf'"{re.escape(k)}"' for k in keys), "--", *DECODE_TEST_SOURCES) if keys else ""
     for k in keys:
         d = FIXTURES / k
         if not d.is_dir():
@@ -207,7 +208,7 @@ def main() -> int:
             continue
         has_ram = any(d.glob("*.bin"))
         readme = d / "README.txt"
-        used = bool(git("grep", "-l", f'"{k}"', "--", "app/src/test"))
+        used = bool(git("grep", "-l", f'"{k}"', "--", *DECODE_TEST_SOURCES))
         problems = ([] if readme.exists() else ["no README.txt"]) + ([] if has_ram else ["no RAM dump"]) + \
                    ([] if used else ["no test reads it"])
         if readme.exists() and str(Path.home()) in readme.read_text():

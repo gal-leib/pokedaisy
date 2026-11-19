@@ -5,7 +5,7 @@ JNI, no adb, no physical device or emulator. Loads a ROM (+ optional save),
 runs a scripted boot sequence, and dumps EWRAM+IWRAM to the same
 `ewram.bin`/`iwram.bin` format `PokeDaisyActivity`'s on-device capture
 (`scripts/capture_fixture.sh`) produces — so it's a drop-in alternative data
-source for the JVM decode-logic tests under `app/src/test/`.
+source for the JVM decode-logic tests.
 
 Runs identically on a Mac (via Docker Desktop) or a Linux CI runner (e.g.
 GitHub Actions) — it's just a Docker container + `libmgba-dev`, nothing
@@ -20,7 +20,7 @@ Normally you don't invoke this directly — use
 copying the ROM/save (never touches your real save file — always works on a
 disposable copy, since the emulator can write to it), running the boot
 sequence, and writing the result into
-`app/src/test/resources/fixtures/<key>/`.
+`test-fixtures/resources/fixtures/<key>/`.
 
 To run it by hand (e.g. to iterate on a new boot sequence):
 
