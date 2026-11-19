@@ -1,30 +1,12 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
-// The companion's screens (app/.../companion/ui, the companion's settings and state next to them, the co-op
-// screens' model, the manual reader, cheats, the controls' bindings) as a Kotlin Multiplatform module, compiled
-// where they live: Android for the app, iOS for the iPad app. The app links it and leaves these files out of its own
-// compile (the root build's sharedUiSources). Nothing in these files may use java.* or android.*: what differs by
-// platform comes in through hosts set at start (FontSource, PictureCodec, ThemeStore, DocsSources, CheatParser,
-// DeviceDates, Logs' sink). Their tests stay the app's (Paparazzi runs there), so what they reach is public.
+// Portable companion screens, settings, controls and co-op, with Android and iOS hosts.
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
     kotlin("plugin.compose")
 }
-
-val app = rootDir.resolve("app/src/main/kotlin")
-
-@Suppress("UNCHECKED_CAST")
-val sharedUiSources = rootProject.extra["sharedUiSources"] as List<String>
-@Suppress("UNCHECKED_CAST")
-val sharedUiAppOnly = rootProject.extra["sharedUiAppOnly"] as List<String>
-
-@Suppress("UNCHECKED_CAST")
-val legacyUiFiles = fileTree(app) {
-    include(sharedUiSources)
-    exclude(sharedUiAppOnly)
-}.files
 
 kotlin {
     androidTarget {
@@ -47,8 +29,6 @@ kotlin {
         androidMain { dependencies { implementation("io.ktor:ktor-client-android:3.6.1") } }
         iosMain { dependencies { implementation("io.ktor:ktor-client-darwin:3.6.1") } }
         commonMain {
-            kotlin.srcDir(app)
-            kotlin.exclude { !it.isDirectory && it.file.startsWith(app) && it.file !in legacyUiFiles }
             dependencies {
                 api(project(":shared"))
                 // Compose Multiplatform 1.7.x, as shared/ (Compose 1.7 on Android, the app's BOM picks the exact version).

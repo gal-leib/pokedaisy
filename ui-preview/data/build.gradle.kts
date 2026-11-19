@@ -22,15 +22,19 @@ val desktopTarget = System.getProperty("os.name").lowercase().let { os ->
 
 val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appSrc = fileTree(app) {
-    listOf("companion/data/**", "companion/*.kt", "companion/i18n/**", "companion/coop/**", "FeatureFlags.kt", "MgbaCore.kt", "Prefs.kt", "PrefsAndroid.kt", "cheats/Cheats.kt", "BpsPatch.kt", "RomPatchFiles.kt", "BattleInputController.kt", "GameVolume.kt", "ScreenShaders.kt", "CompanionShaders.kt", "overlay/Overlays.kt", "overlay/OverlayGeometry.kt", "overlay/OverlayLabels.kt")
-        .forEach { include(it) }
+    include("companion/data/**", "companion/i18n/**", "companion/coop/**", "FeatureFlags.kt",
+        "MgbaCore.kt", "PrefsAndroid.kt", "BpsPatch.kt", "RomPatchFiles.kt", "GameVolume.kt")
     exclude("**/*.java")   // compiled by javac below (companion/coop/x25519)
 }
+val sharedUi = rootDir.resolve("../shared-ui/src/commonMain/kotlin")
+@Suppress("UNCHECKED_CAST")
+val previewScreenSources = rootProject.extra["previewScreenSources"] as List<String>
+
 sourceSets["main"].kotlin {
     srcDir("shims")
     // Compile the portable sources with the imported app data and the JVM shims, like the production modules.
     srcDir(rootDir.resolve("../shared/src/commonMain/kotlin"))
-    srcDir(rootDir.resolve("../shared-ui/src/commonMain/kotlin"))
+
 }
 // The Java in the app's sources (CoopKeys' X25519, copied from Bouncy Castle).
 sourceSets["main"].java { srcDir(app); include("companion/coop/x25519/**") }
@@ -93,6 +97,7 @@ object ExportCore {
     }
 }
 tasks.withType<KotlinCompile>().configureEach {
+    source(fileTree(sharedUi) { exclude(previewScreenSources) })
     if (gameExport) {
         dependsOn(stubCore)
         source(appSrc.matching { exclude("MgbaCore.kt") })
