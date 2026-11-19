@@ -528,6 +528,7 @@ class FieldHudCloseUpScreenshotTest {
  *     ./gradlew :app:recordPaparazziDebug --tests '*FieldHudGCloudScreenshotTest'
  */
 class FieldHudGCloudScreenshotTest {
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(
