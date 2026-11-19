@@ -39,8 +39,8 @@ for slice in "ios-arm64 iphoneos" "ios-arm64-simulator iphonesimulator"; do
 done
 
 mkdir -p "$out/include"
-cp "$root/app/src/main/cpp/pk_api.h" "$root/app/src/main/cpp/pk_link_api.h" \
-    "$root/app/src/main/cpp/pk_ra_client.h" "$root/app/src/main/cpp/pk_coop_api.h" "$out/include/"
+cp "$root/shared/src/commonMain/cpp/pk_api.h" "$root/shared/src/commonMain/cpp/pk_link_api.h" \
+    "$root/shared/src/commonMain/cpp/pk_ra_client.h" "$root/shared/src/commonMain/cpp/pk_coop_api.h" "$out/include/"
 rm -rf "$out/PkCore.xcframework"
 xcodebuild -create-xcframework \
     -library "$out/ios-arm64/libpkcore.a" -headers "$out/include" \

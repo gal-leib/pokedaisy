@@ -5,9 +5,10 @@ project(pokedaisy C CXX)
 # mGBA and the plain C API over it (pk_api.h, the portable pk_*.c): pk_api.cmake,
 # shared with the other hosts (the iPad app, the host test).
 # ---------------------------------------------------------------------------
-include("${CMAKE_CURRENT_SOURCE_DIR}/pk_api.cmake")
+set(PK_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/src/commonMain/cpp")
+include("${PK_CORE_DIR}/pk_api.cmake")
 
-include("${CMAKE_CURRENT_SOURCE_DIR}/pk_ra.cmake")
+include("${PK_CORE_DIR}/pk_ra.cmake")
 
 # ---------------------------------------------------------------------------
 # Vendored melonDS (git submodule, pinned to 1.1) — its core library only, for
