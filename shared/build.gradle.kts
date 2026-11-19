@@ -9,7 +9,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val testFixtures = rootDir.resolve("test-fixtures")
+val sharedJvmFixtures = rootDir.resolve("test-fixtures")
 
 // The emulator core for iOS (pk_api.h: mGBA + the app's portable C), built with Xcode's tools by
 // native/build_ios_core.sh into build/pkcore/<slice>/libpkcore.a, reached from iosMain through cinterop (PkApiCore).
@@ -65,7 +65,7 @@ kotlin {
             dependencies { implementation(kotlin("test")) }
         }
         androidUnitTest {
-            kotlin.srcDir(testFixtures.resolve("kotlin"))
+            kotlin.srcDir(sharedJvmFixtures.resolve("kotlin"))
             dependencies {
                 implementation("junit:junit:4.13.2")
                 // The real org.json (android.jar's is a stub in unit tests).
@@ -79,7 +79,7 @@ android {
     namespace = "com.pokedaisy.shared"
     compileSdk = 34
     defaultConfig { minSdk = 26 }
-    sourceSets["test"].resources.srcDir(testFixtures.resolve("resources"))
+    sourceSets["test"].resources.srcDir(sharedJvmFixtures.resolve("resources"))
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
