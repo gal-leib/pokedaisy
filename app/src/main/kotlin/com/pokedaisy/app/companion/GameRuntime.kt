@@ -101,6 +101,27 @@ class GameRuntime(
         return controller
     }
 
+    /** Restore state-dependent effects after the native core accepted a load, while still between frames.
+     * Some adapters clear retry at the start of an attempt or already stage telemetry before boot. */
+    fun afterStateLoad(
+        restoreProgress: () -> Unit,
+        settleAppearance: () -> Unit,
+        reinstallStoryLock: () -> Unit = {},
+        companionState: Path? = null,
+        retryAlreadyReset: Boolean = false,
+    ) {
+        if (closed.value) return
+        restoreProgress()
+        if (!retryAlreadyReset) battleRetry.reset()
+        settleAppearance()
+        reinstallStoryLock()
+        if (companionState != null) {
+            telemetry.reset()
+            SnapshotCache.read(companionState)?.let(telemetry::showCached)
+            sample()
+        }
+    }
+
     var actions: GameActions? = null
         private set
     var cheats: GameCheats? = null

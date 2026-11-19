@@ -1,8 +1,10 @@
 package com.pokedaisy.app.companion
 
+import com.pokedaisy.app.Hotkeys
 import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.game.GameSession
+import kotlin.random.Random
 import kotlin.test.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -10,6 +12,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import kotlinx.atomicfu.atomic
+import okio.FileSystem
 import okio.Path.Companion.toPath
 
 class GameRuntimeTest {
@@ -39,8 +42,7 @@ class GameRuntimeTest {
     private fun withPlayback(patcher: RomOptionPatcher = object : RomOptionPatcher {
         override fun unpatch() {}
         override fun patch(expectAt: Long, expect: ByteArray, at: Long, value: ByteArray) = true
-    }, test: (GameRuntime, GameSession, GameBattleInput) -> Unit) {
-        val telemetry = TelemetryStore()
+    }, telemetry: TelemetryStore = TelemetryStore(), test: (GameRuntime, GameSession, GameBattleInput) -> Unit) {
         val calls = object : GameCalls {
             override fun call(fn: Long, a0: Int, a1: Int, a2: Int, a3: Int) = 0L
             override fun read(addr: Long, len: Int) = ByteArray(len)
@@ -270,6 +272,80 @@ class GameRuntimeTest {
         actions.hotkey(com.pokedaisy.app.Hotkeys.Event(com.pokedaisy.app.Hotkeys.Action.LOAD_STATE, true))
         assertEquals(listOf(true, false), held)
         assertFalse(settings.ffToggled)
+    }
+
+    @Test fun acceptedStateLoadsRestoreEffectsInOrderAndRejectedLoadsKeepTheCurrentSnapshot() {
+        val directory = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "pokedaisy-load-effects-${Random.nextLong().toULong()}"
+        val telemetry = TelemetryStore()
+        val originalGame = activeGame
+        val originalCode = romGameCode
+        val originalLanguage = romLanguage
+        val originalHeader = romHeaderCode
+        val originalIcons = DecompIconSource.tables
+        try {
+            withPlayback(telemetry = telemetry) { runtime, _, _ ->
+                val files = StateFiles(directory)
+                val state = files.stateFile(3)
+                state.writeText("state")
+                SnapshotCache.fileFor(state).writeBytes(SnapshotCache.encode(SnapshotView(game = GameKind.EMERALD, x = 3)))
+                val live = SnapshotView(connected = true, game = GameKind.EMERALD, x = 9)
+                telemetry.publish(live)
+                val retry = runtime.battleRetry
+                retry.set(true)
+                val fainted = MonView(species = 25, name = "A", level = 5, hp = 0, maxHp = 10,
+                    status = "", types = emptyList(), iconAsset = null)
+                retry.observe(live.copy(inBattle = true, isTrainerBattle = true, party = listOf(fainted)), true) { true }
+                retry.observe(live, true) { error("The battle ended") }
+                assertTrue(retry.asking)
+                val steps = mutableListOf<String>()
+                val results = mutableListOf<Pair<Hotkeys.Action, Boolean>>()
+                var accept = false
+                val slots = runtime.bindStates {
+                    StateSlotController(files, onCore = { it() }, write = { it.writeText("undo"); true },
+                        read = { steps += "read"; accept },
+                        beforeLoad = {},
+                        loaded = { path ->
+                            runtime.afterStateLoad(
+                                restoreProgress = {
+                                    assertTrue(retry.asking)
+                                    steps += "progress"
+                                },
+                                settleAppearance = {
+                                    assertFalse(retry.asking)
+                                    steps += "appearance"
+                                },
+                                reinstallStoryLock = {
+                                    assertSame(live, telemetry.snapshot.value)
+                                    steps += "story lock"
+                                },
+                                companionState = path,
+                            )
+                        },
+                        completed = { action, _, ok -> results += action to ok })
+                }
+
+                slots.requestLoad(3)
+                slots.requestUndoLoad()
+                assertEquals(listOf("read", "read"), steps)
+                assertSame(live, telemetry.snapshot.value)
+                assertTrue(retry.asking)
+                assertEquals(listOf(Hotkeys.Action.LOAD_STATE to false, Hotkeys.Action.UNDO_LOAD to false), results)
+
+                steps.clear()
+                accept = true
+                slots.requestLoad(3)
+                assertEquals(listOf("read", "progress", "appearance", "story lock"), steps)
+                assertEquals(3, telemetry.snapshot.value.x)
+                assertEquals(Hotkeys.Action.LOAD_STATE to true, results.last())
+            }
+        } finally {
+            directory.deleteRecursively()
+            activeGame = originalGame
+            romGameCode = originalCode
+            romLanguage = originalLanguage
+            romHeaderCode = originalHeader
+            DecompIconSource.tables = originalIcons
+        }
     }
 
     @Test fun ownedStateControllersAreRetiredEvenWhenBoundAfterClose() {

@@ -6,6 +6,7 @@ import android.util.Log
 import com.pokedaisy.app.BuildConfig
 import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.CompanionAchievements
+import com.pokedaisy.app.companion.data.StateFiles
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import okio.Path.Companion.toOkioPath
 
 @Volatile private var androidPrefs: Prefs? = null
 private val androidRa = RaSession(
@@ -55,8 +57,8 @@ object RetroAchievements : CompanionAchievements by androidRa {
     fun onCoreStopped() = androidRa.onCoreStopped()
 
     fun onCoreStarted(rom: File?, resumedFrom: File? = null) {
-        val resume = resumedFrom?.let(::progressFile)?.let { file ->
-            runCatching { file.readBytes() }.getOrNull().also { file.delete() }
+        val resume = resumedFrom?.let { state ->
+            StateFiles.readAchievementProgress(state.toOkioPath()).also { progressFile(state).delete() }
         }
         androidRa.onCoreStarted({ rom?.let(::romHash) }, resume)
     }
@@ -68,7 +70,7 @@ object RetroAchievements : CompanionAchievements by androidRa {
         return com.pokedaisy.app.RomIdentity.raHash(rom).also { hashed = Triple(key, rom.length(), it) }
     }
 
-    fun progressFile(state: File) = File(state.path + ".ra")
+    fun progressFile(state: File) = File(StateFiles.achievementProgressFile(state.toOkioPath()).toString())
 
     fun afterSaveState(state: File) {
         if (!androidRa.gameAttached) return
@@ -79,8 +81,7 @@ object RetroAchievements : CompanionAchievements by androidRa {
 
     fun afterLoadState(state: File) {
         if (!androidRa.gameAttached) return
-        val file = progressFile(state)
-        androidRa.loadProgress(if (file.isFile) runCatching { file.readBytes() }.getOrNull() else null)
+        androidRa.loadProgress(StateFiles.readAchievementProgress(state.toOkioPath()))
     }
 
     private val gameIds = java.util.concurrent.ConcurrentHashMap<String, Int>()

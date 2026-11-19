@@ -4,6 +4,7 @@ import okio.FileSystem
 import okio.HashingSource
 import okio.SYSTEM
 import okio.Path
+import okio.Path.Companion.toPath
 import okio.blackholeSink
 import okio.buffer
 import okio.use
@@ -89,6 +90,14 @@ class StateFiles(val directory: Path, private val extraSidecars: List<String> = 
     }
 
     companion object {
+        const val ACHIEVEMENT_PROGRESS_SUFFIX = ".ra"
+
+        fun achievementProgressFile(state: Path): Path = "$state$ACHIEVEMENT_PROGRESS_SUFFIX".toPath()
+
+        fun readAchievementProgress(state: Path): ByteArray? = runCatching {
+            achievementProgressFile(state).takeIf { it.isFile }?.readBytes()
+        }.getOrNull()
+
         private fun present(path: Path) = path.isFile && path.length > 0
         private fun sidecar(path: Path, suffix: String) = path.parent!! / "${path.name}$suffix"
 

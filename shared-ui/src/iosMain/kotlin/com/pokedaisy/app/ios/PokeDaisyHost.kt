@@ -330,24 +330,24 @@ object PokeDaisyHost {
         var currentRuntime: com.pokedaisy.app.companion.GameRuntime? = null
         val stateSnapshot = { telemetry.forState()?.takeIf { it.hasData && !it.unsupported }?.let(SnapshotCache::encode) }
         val ra = IosAchievements.session
-        var initialState = true
         var restoredProgress: ByteArray? = null
         var flewAnywhere = false
-        val stateLoaded: (Path) -> Unit = { state ->
-            val progress = IosAchievements.readProgress(state)
-            if (initialState) restoredProgress = progress else ra.loadProgress(progress)
-            currentRuntime?.battleRetry?.reset()
-            if (currentLook.supported) currentLook.renderer.settle()
-            currentCoop.storyLock?.requestReinstall()
-            telemetry.reset()
-            SnapshotCache.read(state)?.let(telemetry::showCached)
-            sample()
+        fun stateLoaded(runtime: com.pokedaisy.app.companion.GameRuntime, state: Path, applyProgress: (ByteArray?) -> Unit) {
+            runtime.afterStateLoad(
+                restoreProgress = { applyProgress(StateFiles.readAchievementProgress(state)) },
+                settleAppearance = { if (currentLook.supported) currentLook.renderer.settle() },
+                reinstallStoryLock = { currentCoop.storyLock?.requestReinstall() },
+                companionState = state,
+            )
         }
         val resume = StateResume(files,
             write = IosAchievements::writeState, read = { PkApiCore.loadState(it.toString()) },
             matchesSave = { PkApiCore.stateMatchesSave(it.toString()) },
             enabled = { iosPreferences.autoResume },
-            snapshot = stateSnapshot, loaded = stateLoaded)
+            snapshot = stateSnapshot, loaded = { state ->
+                // The startup state supplies progress to the achievement session once the ROM attaches.
+                currentRuntime?.let { runtime -> stateLoaded(runtime, state) { restoredProgress = it } }
+            })
         val (code, revision) = (if (romPath.lowercase().endsWith(".gba"))
             com.pokedaisy.app.companion.data.RomIdentityReader.forPath(romPath.toPath()).header() else null) ?: (null to 0)
         g.beforeSuspend = {
@@ -595,7 +595,6 @@ object PokeDaisyHost {
                 currentOptions.start(romPath.toPath(), PkApiCore::configureWild) { currentOptions.settingsChanged(currentSettings) }
                 currentCheats.start()
                 g.withState { resume.restore() }
-                initialState = false
                 currentCoop.start(code, revision) { currentSettings.cheatsEnabled && currentCheats.list.any { it.enabled } }
                 ra.setShinyOddsActive(p.shiny?.active == true)
                 ra.setExpShareActive(currentOptions.expShareActive)
@@ -615,7 +614,7 @@ object PokeDaisyHost {
             },
             beforeLoad = { StateFiles.backupBattery(savePath.toPath()) },
             thumbnail = { PkApiCore.stateThumbnail() },
-            snapshot = stateSnapshot, loaded = stateLoaded,
+            snapshot = stateSnapshot, loaded = { state -> stateLoaded(p, state, ra::loadProgress) },
             failed = { stateError = it },
             initialIndex = defaults.integerForKey("state_slot").toInt(),
             selected = { defaults.setInteger(it.toLong(), "state_slot") }) }

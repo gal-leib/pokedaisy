@@ -1957,8 +1957,16 @@ class EmulatorEngine(
     private val slots by lazy { playback.bindStates {
         com.pokedaisy.app.companion.StateSlotController(states.files, onCore = { it() },
             write = ::writeCoreState,
-            read = { loadState(File(it.toString())) },
+            read = ::readManualState,
             beforeLoad = {}, thumbnail = ::stateThumbnail, snapshot = ::stateSnapshot,
+            loaded = { source ->
+                playback.afterStateLoad(
+                    restoreProgress = { RetroAchievements.afterLoadState(File(source.toString())) },
+                    // The state may hold another PLAYER LOOK's palettes.
+                    settleAppearance = { if (gba) playerLook.settle() },
+                    retryAlreadyReset = true,
+                )
+            },
             selected = { currentSlot = it }, completed = { action, index, ok -> onStateResult?.invoke(action, index, ok) })
     } }
 
@@ -1992,15 +2000,11 @@ class EmulatorEngine(
     private fun saveState(target: File): Boolean = if (target == states.resumeFile) stateResume().save()
         else states.files.writeState(target.toOkioPath(), ::writeCoreState, snapshot = stateSnapshot())
 
-    /** Loads [source] and puts achievement progress back to where that state had it. */
-    private fun loadState(source: File): Boolean {
+    private fun readManualState(source: okio.Path): Boolean {
+        // An attempted load invalidates Android's outstanding retry even if the core rejects the file.
         playback.battleRetry.reset()
         playback.cancelFieldActions()
-        val ok = MgbaCore.pkLoadState(source.absolutePath)
-        if (ok) RetroAchievements.afterLoadState(source)
-        // A state made in another PLAYER LOOK holds that look's palettes.
-        if (ok && gba) playerLook.settle()
-        return ok
+        return MgbaCore.pkLoadState(File(source.toString()).absolutePath)
     }
 
     private fun stateThumbnail(): ByteArray? {

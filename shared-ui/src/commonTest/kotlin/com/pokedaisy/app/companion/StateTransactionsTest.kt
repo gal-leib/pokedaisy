@@ -10,10 +10,22 @@ import okio.Path
 class StateTransactionsTest {
     private inline fun temporary(test: (StateFiles) -> Unit) {
         val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "pokedaisy-state-transactions-${Random.nextLong().toULong()}"
-        val files = StateFiles(root, extraSidecars = listOf(".ra"))
+        val files = StateFiles(root, extraSidecars = listOf(StateFiles.ACHIEVEMENT_PROGRESS_SUFFIX))
         try { test(files) } finally { root.deleteRecursively() }
     }
     private fun ra(path: Path) = path.parent!! / "${path.name}.ra"
+
+    @Test fun achievementSidecarLookupTreatsMissingAndNonFilesAsNoProgress() = temporary { files ->
+        val state = files.stateFile(2)
+        val sidecar = StateFiles.achievementProgressFile(state)
+        assertEquals("ss2.ra", sidecar.name)
+        assertNull(StateFiles.readAchievementProgress(state))
+        sidecar.mkdirs()
+        assertNull(StateFiles.readAchievementProgress(state))
+        sidecar.delete()
+        sidecar.writeText("progress")
+        assertContentEquals("progress".encodeToByteArray(), StateFiles.readAchievementProgress(state))
+    }
 
     @Test fun stateAndAchievementSidecarsFollowSaveUndoAndDelete() = temporary { files ->
         var moment = "first"
