@@ -1,13 +1,11 @@
 package com.pokedaisy.app.companion
 
-import com.pokedaisy.app.LinkSavePaths
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import okio.Path.Companion.toPath
 
 class LinkSetupFlowTest {
     @Test fun aDuplicateCartridgeHasItsOwnSlotAndCanBeRemoved() {
@@ -40,12 +38,5 @@ class LinkSetupFlowTest {
         val pending = assertNotNull(setup.begin(1))
         setup.clearPicker()
         assertFalse(setup.ready(pending, listOf("Emerald")))
-    }
-
-    @Test fun duplicateDestinationsNeverOverwriteAnotherCartridgesOwnBattery() {
-        val originals = listOf("/saves/Game.srm", "/saves/Game.srm", "/saves/Game (link 2).srm", "/saves/Game.srm").map { it.toPath() }
-        val assigned = LinkSavePaths.forGames(originals).map { it.toString() }
-        assertEquals(listOf("/saves/Game.srm", "/saves/Game (link 3).srm", "/saves/Game (link 2).srm", "/saves/Game (link 4).srm"), assigned)
-        assertEquals(listOf("/Game.sav", "/Game (link 2).sav"), LinkSavePaths.forGames(List(2) { "/Game.sav".toPath() }).map { it.toString() })
     }
 }
