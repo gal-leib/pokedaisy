@@ -1206,7 +1206,7 @@ a row matches on its label (English and translated), value, `subtitle` and its w
 label, shared by both screens: "rebind", "keybinds", "turbo"... - give a new row its words). The companion's SETTINGS has
 no search (the Presentation can't host a keyboard). `SettingRow.subtitle` / `OptionLine(subtitle)` draw a grey line
 under the label (GAME BUTTONS: key bindings; each TWEAKS switch its own `Tweak.description`, on a wider label column). **Rebinding is always by pressing the keys,
-never a list of key names** (the user's rule: a list confused players): `KeyCapture` (companion/KeyCapture.kt) + `KeyBindRow` /
+never a list of key names** (the user's rule: a list confused players): `KeyCapture` (shared/src/commonMain/kotlin/com/pokedaisy/app/companion/KeyCapture.kt) + `KeyBindRow` /
 `KeyCaptureBar` / `KeyCapturePopup` (companion/ui/KeyCaptureUi.kt), one per activity - top-screen Settings, first-time setup's
 GAME BUTTONS step (`SetupState.capture`: rows rebind in place, never another screen) and the game, which runs the companion's
 (`CompanionSettings.keyCapture`: the Presentation gets no keys, so `PokeDaisyActivity` takes every key / trigger first and shows

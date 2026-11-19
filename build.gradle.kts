@@ -25,14 +25,11 @@ val appOnlyTests by extra(
         "RenegadePlatinumTest", "ShinyOddsTest",
     ),
 )
-// The input models are needed by the native iOS core, below shared-ui. All sources compile in place.
+// Legacy app-tree sources compiled in place by shared/.
 val sharedCoreSources by extra(
     listOf(
         "com/pokedaisy/app/companion/data/**",
         "com/pokedaisy/app/companion/i18n/**",
-        "com/pokedaisy/app/GbaControls.kt",
-        "com/pokedaisy/app/GbaInput.kt",
-        "com/pokedaisy/app/Hotkeys.kt",
         "com/pokedaisy/app/BpsPatch.kt",
         "com/pokedaisy/app/RomPatchFiles.kt",
         "com/pokedaisy/app/FlacWriter.kt",
@@ -45,9 +42,7 @@ val sharedCoreSources by extra(
         "com/pokedaisy/app/GameSoundFiles.kt",
         "com/pokedaisy/app/M4aLoop.kt",
         "com/pokedaisy/app/Gen1Loop.kt",
-        "com/pokedaisy/app/ScriptInput.kt",
         "com/pokedaisy/app/WideCamera.kt",
-        "com/pokedaisy/app/companion/KeyCapture.kt",
     ),
 )
 // The companion's screens and what they need (shared-ui/build.gradle.kts), as paths under app/src/main/kotlin: the

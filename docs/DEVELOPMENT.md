@@ -4027,10 +4027,11 @@ For focused JVM tests, use `make test-quick MODULE=shared T='*RomFilesTest'` (`M
 A filter must match a test in that module. Unfiltered `make test-quick` runs the app and both shared modules.
 ui-preview still compiles the same files straight into its desktop build.
 
-The canonical key codes, `GbaControls`, `Hotkeys`, `GbaInput`, `ScriptInput` and `KeyCapture` also compile in
-`shared/`, from their existing app paths (`sharedCoreSources` in the root build). Both native hosts can use the same
-bindings, chord capture, deferred taps, turbo and script ownership. `AndroidGbaInput.kt` converts Android motion
-events to the common axis policy; UI badges stay in `shared-ui/`. The app excludes these files from its own compile.
+The input models `GbaControls`, `Hotkeys`, `GbaInput`, `ScriptInput` and `KeyCapture` live in
+`shared/src/commonMain/kotlin`. Both native hosts and the desktop preview use these sources for bindings, chord
+capture, deferred taps, turbo and script ownership. The canonical key codes compile in `shared/` from the app's data
+sources. `AndroidGbaInput.kt` converts Android motion events to the common axis policy, and UI badges live in
+`shared-ui/`.
 
 `GameSaves` shares battery-save import transactions and dated backup names/listing. Hosts choose locations and
 their existing compression/extra-backup adapters. The common import rejects invalid input before opening state
