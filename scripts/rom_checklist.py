@@ -73,7 +73,7 @@ def app_title(sha1: str) -> str:
     m = re.search(rf'"{sha1}"\s+to\s+"([^"]+)"', gt)
     if m:
         return m.group(1)
-    for name in re.findall(rf'val\s+(\w+)\s*=\s*"{sha1}"', git("grep", "-h", sha1, "--", "app/src/main")):
+    for name in re.findall(rf'val\s+(\w+)\s*=\s*"{sha1}"', git("grep", "-h", sha1, "--", "app/src/main", "shared/src/commonMain")):
         m = re.search(rf'\b{name}\s+to\s+"([^"]+)"', gt)
         if m:
             return m.group(1)
@@ -141,7 +141,7 @@ def main() -> int:
     print(f"{rom['file_name']}  ({plat} {rom.get('code') or '-'} rev {rom.get('revision')}, SHA-1 {sha1})\n")
 
     # Detection
-    named = [l for l in git("grep", "-l", sha1, "--", "app/src/main", "gamedata").splitlines() if l]
+    named = [l for l in git("grep", "-l", sha1, "--", "app/src/main", "shared/src/commonMain", "gamedata").splitlines() if l]
     if named:
         r.add("ok", "detection", ", ".join(Path(n).name for n in named[:5]))
     elif by_header and RETAIL_NAME.match(rom["file_name"]):
