@@ -12,6 +12,8 @@ import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.GameAspect
 import com.pokedaisy.app.companion.PlayerLookSession
 import com.pokedaisy.app.companion.Smoothing
+import com.pokedaisy.app.companion.changeExpandedZoom
+import com.pokedaisy.app.companion.zoomFactors
 import com.pokedaisy.app.companion.TouchControlsStyle
 import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.data.displayName
@@ -384,17 +386,16 @@ internal class IosCompanionSettings(
     override val wideSupported get() = game?.wideSupported == true && playback()?.blocked != true
     override val pictureBadge get() = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.IOS_EXPAND)
     var cameraRomKey = ""
-    override val zoomSteps get() = game?.camera?.let { camera -> camera.levels().indices.map(camera::factor) }.orEmpty()
+    override val zoomSteps get() = game?.camera?.zoomFactors().orEmpty()
     override val zoomLevel get() = game?.camera?.level ?: 0
-    override fun setZoomLevel(level: Int) {
-        val camera = game?.camera ?: return
-        if (game?.expanded == true) {
-            camera.level = level.coerceIn(0, (camera.levels().size - 1).coerceAtLeast(0))
-            com.pokedaisy.app.companion.FeatureTips.used(com.pokedaisy.app.companion.TipId.ZOOM)
-            if (cameraRomKey.isNotEmpty()) iosPreferences.setZoomLevelFor(cameraRomKey, camera.level)
-        }
+    override fun setZoomLevel(level: Int) = changeZoom(level)
+    fun cycleZoom() = changeZoom()
+
+    private fun changeZoom(step: Int? = null) {
+        val game = game ?: return
+        if (game.expanded) game.camera.changeExpandedZoom(iosPreferences, cameraRomKey, step)
     }
-    fun cycleZoom() { if (game?.expanded == true) setZoomLevel((zoomLevel + 1) % zoomSteps.size.coerceAtLeast(1)) }
+
     override val lookAround get() = iosPreferences.lookAround
     override fun setLookAround(on: Boolean) { iosPreferences.lookAround = on; gameScreen()?.refreshPicture() }
     override val expandZoomOnText get() = iosPreferences.expandZoomOnText

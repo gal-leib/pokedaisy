@@ -68,6 +68,8 @@ import com.pokedaisy.app.companion.TipId
 import com.pokedaisy.app.companion.GameTipFrame
 import com.pokedaisy.app.companion.GameTipSession
 import com.pokedaisy.app.companion.controllerTipShortcut
+import com.pokedaisy.app.companion.changeExpandedZoom
+import com.pokedaisy.app.companion.zoomFactors
 import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.RomRegionMap
@@ -1366,7 +1368,7 @@ class PokeDaisyActivity : Activity() {
             view.camera.lookAround = on
         }
         override fun feelVibration(level: Int) = TouchHaptics.buzz(this@PokeDaisyActivity, level)
-        override val zoomSteps get() = view.camera.levels().indices.map { view.camera.factor(it) }
+        override val zoomSteps get() = view.camera.zoomFactors()
         override val zoomLevel get() = view.camera.level
         override fun setZoomLevel(level: Int) { runOnUiThread { zoomTo(level) } }
         override val expandZoomOnText get() = Prefs(this@PokeDaisyActivity).expandZoomOnText
@@ -4809,16 +4811,14 @@ class PokeDaisyActivity : Activity() {
     /** ZOOM (its hotkey, or a tip's SHOW ME): EXPAND's next zoom step. */
     private fun zoomStep() = runCatching {
         if (!view.wide) showHud(com.pokedaisy.app.companion.i18n.tr("Zoom needs ASPECT > EXPAND"))
-        else zoomTo((view.camera.level + 1) % view.camera.levels().size.coerceAtLeast(1))
+        else zoomTo()
     }
 
     /** EXPAND's zoom step [step] (the hotkey's next one, or SETTINGS > ZOOM's pick), kept for this game. */
-    private fun zoomTo(step: Int) {
+    private fun zoomTo(step: Int? = null) {
         if (!view.wide) return
-        com.pokedaisy.app.companion.FeatureTips.used(TipId.ZOOM)
-        view.camera.level = step.coerceIn(0, (view.camera.levels().size - 1).coerceAtLeast(0))
-        if (romKey.isNotEmpty()) Prefs(this).setZoomLevelFor(romKey, view.camera.level)
-        showHud(com.pokedaisy.app.companion.i18n.tr("Zoom {0}", com.pokedaisy.app.companion.zoomLabel(view.camera.factor(view.camera.level))))
+        val factor = view.camera.changeExpandedZoom(Prefs(this), romKey, step)
+        showHud(tr("Zoom {0}", com.pokedaisy.app.companion.zoomLabel(factor)))
     }
 
     /** The QUICK MENU's key went down ([pressed]) or up: it opens or closes. */
