@@ -25,43 +25,6 @@ val appOnlyTests by extra(
         "RenegadePlatinumTest", "ShinyOddsTest",
     ),
 )
-// The companion's screens and what they need (shared-ui/build.gradle.kts), as paths under app/src/main/kotlin: the
-// app leaves them out of its own compile and links shared-ui instead. The co-op transport stays the app's (sockets,
-// Android NSD, Bouncy Castle, OkHttp).
-val sharedUiSources by extra(
-    listOf(
-        "com/pokedaisy/app/companion/ui/**",
-        "com/pokedaisy/app/companion/*.kt",
-        "com/pokedaisy/app/companion/coop/**",
-        "com/pokedaisy/app/CoopSettingsPages.kt",
-        "com/pokedaisy/app/CoopBattleSession.kt",
-        "com/pokedaisy/app/CoopGuards.kt",
-        "com/pokedaisy/app/CoopLock.kt",
-        "com/pokedaisy/app/CoopPresence.kt",
-        "com/pokedaisy/app/cheats/Cheats.kt",
-        "com/pokedaisy/app/achievements/RaRecords.kt",
-        "com/pokedaisy/app/achievements/RaSession.kt",
-        "com/pokedaisy/app/DocsApi.kt",
-        "com/pokedaisy/app/DocsCache.kt",
-        "com/pokedaisy/app/DocsSearch.kt",
-        "com/pokedaisy/app/Prefs.kt",
-        "com/pokedaisy/app/LinkSavePaths.kt",
-        "com/pokedaisy/app/GameInfo.kt",
-        "com/pokedaisy/app/GameInfoDetails.kt",
-        "com/pokedaisy/app/BattleInputController.kt",
-        "com/pokedaisy/app/ScreenShaders.kt",
-    "com/pokedaisy/app/CompanionShaders.kt",
-        "com/pokedaisy/app/overlay/OverlayGeometry.kt",
-        "com/pokedaisy/app/overlay/Overlays.kt",
-        "com/pokedaisy/app/overlay/OverlayLabels.kt",
-    ),
-)
-val sharedUiAppOnly by extra(
-    listOf(
-        "AndroidCoopNetwork", "CoopDirect", "CoopIpHello", "CoopKeys", "CoopLan", "JvmCoopCrypto",
-        "CoopSession", "OkHttpRelayConnector",
-    ).map { "com/pokedaisy/app/companion/coop/$it.kt" },
-)
 // Test helpers in those folders that the app's own tests use too: compiled in both modules' tests.
 val sharedTestHelpers by extra(
     listOf("FixtureMemoryReader", "RomFileReader", "Gen3RetailSupport", "NativeDecodeSupport", "SyntheticSave", "FakeLinkEngine"),

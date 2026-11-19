@@ -4094,15 +4094,10 @@ The device-performance default for DS CPU boost stays with Android. The iOS sett
 theme store, NEW dates and learned fast-forward callbacks use this same implementation. Other settings
 orchestration and the library's historical format are consolidated separately, without resetting stored data.
 
-`shared-ui/` compiles the companion's screens for Android and iOS the same way, where they live: `companion/ui`, the
-`companion/*.kt` settings and state beside them, the co-op screens' model (`companion/coop`, without the transport and
-session files, which are Android / JVM only: sockets, Android NSD, Bouncy Castle, OkHttp), the manual reader
-(`DocsApi.kt`, `DocsSearch.kt`), `cheats/Cheats.kt` and the binding rows' NEW badges (`InputBadges.kt`), against
-`:shared` and Compose Multiplatform 1.7. The app links it and leaves those files out of its own compile and lint (the
-root build's `sharedUiSources` / `sharedUiAppOnly` name them for both); ui-preview still compiles them straight into its
-desktop build. Their tests stay the app's (Paparazzi and the rest under `app/src/test`), so a declaration the app or its
-tests reach is public, not `internal`. The same rule holds there (no `java.*` / `android.*`); what only the platform can do comes in through a
-host set at start, as `EmulatorCore` does for the data code: `FontSource` (fonts), `PictureCodec` (images), `ThemeStore`,
+The shared companion screens, co-op model, manual reader, cheats and input badges live under
+`shared-ui/src/commonMain/kotlin`. Android and iOS link this module, and the desktop preview compiles
+the same sources. Android socket discovery, transport and platform libraries live in the Android app.
+Shared UI accesses platform services through a host set at start, as `EmulatorCore` does for the data code: `FontSource` (fonts), `PictureCodec` (images), `ThemeStore`,
 `DocsSources`, `CheatParser` (mGBA's code check), `DeviceDates` (the device's date format). A new host is set in
 `PokeDaisyApp`, ui-preview's `installPreviewHosts` and the screenshot tests' `installTestHosts`. CI's "iPad app (simulator
 build)" job compiles it for the iPad (`./gradlew :shared-ui:compileKotlinIosArm64`) and links it for the simulator, on a Mac
