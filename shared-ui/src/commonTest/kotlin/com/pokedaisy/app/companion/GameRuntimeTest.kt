@@ -287,7 +287,7 @@ class GameRuntimeTest {
                 val files = StateFiles(directory)
                 val state = files.stateFile(3)
                 state.writeText("state")
-                SnapshotCache.fileFor(state).writeBytes(SnapshotCache.encode(SnapshotView(game = GameKind.EMERALD, x = 3)))
+                SnapshotCache.fileFor(state).writeBytes(SnapshotCache.encode(SnapshotView(connected = true, game = GameKind.EMERALD, x = 3)))
                 val live = SnapshotView(connected = true, game = GameKind.EMERALD, x = 9)
                 telemetry.publish(live)
                 val retry = runtime.battleRetry
