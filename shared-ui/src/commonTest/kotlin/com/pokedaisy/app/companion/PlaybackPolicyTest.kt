@@ -2,10 +2,10 @@ package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.companion.data.*
 import com.pokedaisy.app.companion.PlaybackPolicy.Scene
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.test.Test
 
 class PlaybackPolicyTest {
     private fun scene(battle: Int = BATTLE_INPUT_NONE, menu: Boolean = false, map: Boolean = false,
