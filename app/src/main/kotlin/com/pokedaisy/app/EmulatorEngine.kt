@@ -174,7 +174,7 @@ class EmulatorEngine(
     @Volatile var ndsScale = 1
     private var ndsScaleSet = -1
 
-    /** Desired option state is shared; this host still decides when its frame loop may apply patches. */
+    /** Desired option state for the loaded game. */
     val gameOptions get() = playback.options
     fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean) =
         gameOptions.setReusableTms(sites, on)
@@ -1913,10 +1913,8 @@ class EmulatorEngine(
     private fun servicePending(work: GameSession.FrameWork) {
         gameSession.servicePending(work, gba, { gbOnField }) {
             if (cheatsDirty) applyCheats()
-            // Never during a co-op battle: both reach pkRomUnpatch / pkRomUnblock, which uninstall co-op.
-            if (!CoopGuards.battleActive()) {
-                if (gameOptions.dirty) { gameOptions.tick(); coopLock?.requestReinstall() }
-                if (gba && playerLook.service()) coopLock?.requestReinstall()
+            playback.serviceFramePatches(CoopGuards.battleActive(), { gba && playerLook.service() }) {
+                coopLock?.requestReinstall()
             }
         }
         pendingSuspend?.let { target ->

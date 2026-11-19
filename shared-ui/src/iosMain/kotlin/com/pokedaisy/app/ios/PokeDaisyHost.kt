@@ -409,12 +409,8 @@ object PokeDaisyHost {
             }
             g.beforeFrame = { work ->
                 p.beforeFrame(work) {
-                    if (!currentCoop.battleActive) {
-                        if (gameOptions.dirty) {
-                            gameOptions.tick()
-                            currentCoop.storyLock?.requestReinstall()
-                        }
-                        if (currentLook.renderer.service()) currentCoop.storyLock?.requestReinstall()
+                    p.serviceFramePatches(currentCoop.battleActive, { currentLook.renderer.service() }) {
+                        currentCoop.storyLock?.requestReinstall()
                     }
                 }
                 if (work == com.pokedaisy.app.game.GameSession.FrameWork.ADVANCING) {

@@ -316,6 +316,21 @@ class GameRuntime(
         if (snapshot.connected) FfMenuWatch.notePosition(snapshot.x, snapshot.y, snapshot.mapGroup, snapshot.mapNum, snapshot.inBattle)
     }
 
+    /** Option and appearance patches can both remove native co-op hooks. Restore the story lock
+     * after each operation and defer both while a joined battle owns the hooks. */
+    inline fun serviceFramePatches(
+        coopBattleActive: Boolean,
+        serviceAppearance: () -> Boolean,
+        reinstallStoryLock: () -> Unit,
+    ) {
+        if (coopBattleActive) return
+        if (options.dirty) {
+            options.tick()
+            reinstallStoryLock()
+        }
+        if (serviceAppearance()) reinstallStoryLock()
+    }
+
     fun beforeFrame(work: GameSession.FrameWork = GameSession.FrameWork.ADVANCING, applyPatches: () -> Unit = {}) {
         // As Android with an unknown GB scene: each GB helper validates its own field RAM.
         session.servicePending(work, gba, { true }, applyPatches)

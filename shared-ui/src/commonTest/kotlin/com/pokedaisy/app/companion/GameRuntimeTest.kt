@@ -204,6 +204,40 @@ class GameRuntimeTest {
         }
     }
 
+    @Test fun framePatchesWaitForCoopAndRewindThenReinstallTheStoryLockInOrder() {
+        val steps = mutableListOf<String>()
+        val patcher = object : RomOptionPatcher {
+            override fun unpatch() { steps += "unpatch options" }
+            override fun patch(expectAt: Long, expect: ByteArray, at: Long, value: ByteArray): Boolean {
+                steps += "patch options"
+                return true
+            }
+        }
+        withPlayback(patcher) { runtime, _, _ ->
+            runtime.options.setReusableTms(listOf(ReusableTms.Site(0x08001000L, ByteArray(16))), true)
+            var appearanceChanged = true
+            fun frame(work: GameSession.FrameWork, coopBattleActive: Boolean = false) = runtime.beforeFrame(work) {
+                runtime.serviceFramePatches(coopBattleActive, {
+                    steps += "appearance"
+                    appearanceChanged.also { appearanceChanged = false }
+                }) { steps += "story lock" }
+            }
+
+            frame(GameSession.FrameWork.ADVANCING, coopBattleActive = true)
+            frame(GameSession.FrameWork.REWINDING)
+            assertTrue(steps.isEmpty())
+            assertTrue(runtime.options.dirty)
+
+            frame(GameSession.FrameWork.HELD)
+            assertEquals(listOf("unpatch options", "patch options", "story lock", "appearance", "story lock"), steps)
+            assertFalse(runtime.options.dirty)
+
+            steps.clear()
+            frame(GameSession.FrameWork.ADVANCING)
+            assertEquals(listOf("appearance"), steps)
+        }
+    }
+
     @Test fun closeRetiresOptionsSoLateSettingsCannotRepatchTheCore() = withPlayback { runtime, _, _ ->
         val options = runtime.options
         options.setReusableTms(listOf(ReusableTms.Site(0x08001000L, ByteArray(16))), true)
