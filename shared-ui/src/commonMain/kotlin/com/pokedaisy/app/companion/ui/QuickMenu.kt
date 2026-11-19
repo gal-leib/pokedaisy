@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.companion.data.FLY_MOVE
 import com.pokedaisy.app.companion.data.FlyWithoutMoveGame
 import com.pokedaisy.app.companion.data.HmFree
 

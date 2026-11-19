@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.Hotkeys
+import com.pokedaisy.app.companion.data.FLY_MOVE
 import com.pokedaisy.app.companion.data.FlyWithoutMoveGame
 import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.data.hasData
