@@ -3,8 +3,6 @@ package com.pokedaisy.app.ios
 import com.pokedaisy.app.achievements.RaSession
 import com.pokedaisy.app.companion.data.RomIdentityReader
 import com.pokedaisy.app.companion.data.StateFiles
-import com.pokedaisy.app.companion.data.delete
-import com.pokedaisy.app.companion.data.writeAtomically
 import com.pokedaisy.app.core.PkApiCore
 import com.pokedaisy.app.game.IosRaClient
 import com.pokedaisy.app.game.RomPicker
@@ -31,11 +29,7 @@ internal object IosAchievements {
 
     fun writeState(path: Path): Boolean {
         if (!PkApiCore.saveState(path.toString())) return false
-        val sidecar = StateFiles.achievementProgressFile(path)
-        runCatching {
-            val bytes = session.saveProgress()
-            if (bytes == null) sidecar.delete() else sidecar.writeAtomically(bytes)
-        }.onFailure { runCatching { sidecar.delete() } }
+        session.writeProgressForState(path)
         return true
     }
 }

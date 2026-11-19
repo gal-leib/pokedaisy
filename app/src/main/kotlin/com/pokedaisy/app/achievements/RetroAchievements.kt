@@ -74,9 +74,7 @@ object RetroAchievements : CompanionAchievements by androidRa {
 
     fun afterSaveState(state: File) {
         if (!androidRa.gameAttached) return
-        val file = progressFile(state)
-        val data = androidRa.saveProgress()
-        runCatching { if (data != null) file.writeBytes(data) else file.delete() }
+        androidRa.writeProgressForState(state.toOkioPath())
     }
 
     fun afterLoadState(state: File) {

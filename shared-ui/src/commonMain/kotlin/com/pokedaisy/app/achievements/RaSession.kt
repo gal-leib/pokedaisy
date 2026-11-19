@@ -8,6 +8,7 @@ import com.pokedaisy.app.companion.ChallengeIndicator
 import com.pokedaisy.app.companion.CompanionAchievements
 import com.pokedaisy.app.companion.LeaderboardPage
 import com.pokedaisy.app.companion.LeaderboardTracker
+import com.pokedaisy.app.companion.data.StateFiles
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.game.GameSession.FrameWork
 import com.pokedaisy.app.game.RaClient
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import okio.Path
 
 /** Sign-in, game frames and progress belong to the client session on both mobile hosts. */
 class RaSession(
@@ -402,7 +404,11 @@ class RaSession(
 
     val gameAttached: Boolean get() = ready && coreAttached
 
-    fun saveProgress(): ByteArray? = if (gameAttached) native.raSerializeProgress() else null
+    fun writeProgressForState(state: Path) {
+        StateFiles.writeAchievementProgress(state) {
+            if (gameAttached) native.raSerializeProgress() else null
+        }
+    }
 
     fun loadProgress(data: ByteArray?) {
         if (!gameAttached) return
