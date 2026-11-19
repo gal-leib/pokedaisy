@@ -330,7 +330,7 @@ dependencies {
     implementation("com.google.firebase:firebase-crashlytics-ndk")
 
     // Decode-logic regression tests (app/src/test) - see scripts/capture_fixture.sh
-    // for how the fixtures they read (app/src/test/resources/fixtures/) get made.
+    // for how the fixtures they read (test-fixtures/resources/fixtures/) get made.
     testImplementation("junit:junit:4.13.2")
     // CoopQrTest reads the invite codes back (the app draws them with its own encoder, CoopQr).
     testImplementation("com.google.zxing:core:3.5.3")
