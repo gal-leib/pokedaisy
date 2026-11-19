@@ -20,6 +20,7 @@ import com.pokedaisy.app.SaveEditFiles
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.Gen3SaveFile
 import com.pokedaisy.app.companion.data.save.MissingDex
+import com.pokedaisy.app.companion.data.save.MissingTradeRoute
 import com.pokedaisy.app.companion.data.save.MonRef
 import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.i18n.tr
@@ -157,15 +158,15 @@ internal fun IosSaveEditor(
             onTrade = { onTrade(IosTradeRequest(first = path)) },
             onMissing = ::loadMissing,
             onGet = { selected ->
-                val source = dexSources.getOrNull(selected.source)
-                if (state.changed) {
-                    state.missing = null
-                    state.notice = tr("Save your changes first, then bring it over")
-                } else if (source != null) {
-                    val trade = if (selected.way == MissingDex.Way.TRADE_BACK)
-                        IosTradeRequest(first = path, second = source, firstPick = selected.at)
-                    else IosTradeRequest(first = path, second = source, secondPick = selected.at)
-                    onTrade(trade)
+                when (val route = MissingTradeRoute.resolve(selected, dexSources, state.changed, supportsTransfers = false)) {
+                    MissingTradeRoute.SaveChangesFirst -> {
+                        state.missing = null
+                        state.notice = tr("Save your changes first, then bring it over")
+                    }
+                    is MissingTradeRoute.Trade -> onTrade(
+                        IosTradeRequest(first = path, second = route.partner, firstPick = route.firstPick, secondPick = route.secondPick),
+                    )
+                    is MissingTradeRoute.PalPark, is MissingTradeRoute.PokeTransfer, null -> Unit
                 }
             },
             onSave = ::saveChanges,

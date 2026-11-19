@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.companion.data.save.Gen3SaveReader
 import com.pokedaisy.app.companion.data.save.Gen3SaveEditor
 import com.pokedaisy.app.companion.data.save.Gen3SaveFile
+import com.pokedaisy.app.companion.data.save.MissingDex
+import com.pokedaisy.app.companion.data.save.MissingTradeRoute
 import com.pokedaisy.app.companion.data.save.RomMonIcons
 import com.pokedaisy.app.companion.data.save.TradeSide
 import com.pokedaisy.app.companion.i18n.tk
@@ -476,7 +478,8 @@ class SaveEditorActivity : ComponentActivity() {
      */
     private fun loadMissing(ready: Page.Ready) {
         val s = ready.state
-        s.missing = com.pokedaisy.app.companion.ui.MissingView(null, emptyList())
+        val loading = com.pokedaisy.app.companion.ui.MissingView(null, emptyList())
+        s.missing = loading
         val target = TradeSide(ready.opened.name, s.editor, ready.opened.gameCode)
         val ds = ready.opened.ds != null
         val gen5 = ready.opened.gen5 != null
@@ -486,35 +489,28 @@ class SaveEditorActivity : ComponentActivity() {
                 .filter { if (gen5) SaveFileEdits.isDsEditable(it) || SaveFileEdits.isGen5(it) else if (ds) true else !SaveFileEdits.isDsEditable(it) }
                 .mapNotNull { f -> (open(f) as? Opened)?.let { f to it } }
             val sides = others.map { (_, o) -> TradeSide(o.name, o.editor(), o.gameCode) }
-            val entries = runCatching { com.pokedaisy.app.companion.data.save.MissingDex.find(target, sides) }.getOrElse { emptyList() }
+            val entries = runCatching { MissingDex.find(target, sides) }.getOrElse { emptyList() }
             runOnUiThread {
-                missingRoms = others.map { it.first }
-                if (s.missing != null) s.missing = com.pokedaisy.app.companion.ui.MissingView(entries, sides)
+                if (page === ready && s.missing === loading) {
+                    missingRoms = others.map { it.first }
+                    s.missing = com.pokedaisy.app.companion.ui.MissingView(entries, sides)
+                }
             }
             others.forEach { loadIcons(it.first) }
         }.start()
     }
 
-    /** A MISSING row: the trade (or Pal Park) that brings it, with it picked on the other side. */
-    private fun getMissing(ready: Page.Ready, o: com.pokedaisy.app.companion.data.save.MissingDex.Owned) {
-        if (ready.state.changed) {
-            ready.state.missing = null
-            ready.state.notice = tr("Save your changes first, then bring it over")
-            return
-        }
-        val src = missingRoms.getOrNull(o.source) ?: return
-        when (o.way) {
-            com.pokedaisy.app.companion.data.save.MissingDex.Way.PAL_PARK -> {
-                val at = (o.at as? com.pokedaisy.app.companion.data.save.MonRef.Pc)?.at ?: return
-                openPalPark(src, rom, at)
+    private fun getMissing(ready: Page.Ready, selected: MissingDex.Owned) {
+        val state = ready.state
+        when (val route = MissingTradeRoute.resolve(selected, missingRoms, state.changed, supportsTransfers = true)) {
+            MissingTradeRoute.SaveChangesFirst -> {
+                state.missing = null
+                state.notice = tr("Save your changes first, then bring it over")
             }
-            // This save's own Pokémon, picked on this side: TRADE AND BACK is then one press.
-            com.pokedaisy.app.companion.data.save.MissingDex.Way.TRADE_BACK -> startTrade(src, pickA = o.at)
-            com.pokedaisy.app.companion.data.save.MissingDex.Way.POKE_TRANSFER -> {
-                val at = (o.at as? com.pokedaisy.app.companion.data.save.MonRef.Pc)?.at ?: return
-                openTransfer(src, rom, pick = at, back = true)
-            }
-            else -> startTrade(src, pick = o.at)
+            is MissingTradeRoute.Trade -> startTrade(route.partner, pick = route.secondPick, pickA = route.firstPick)
+            is MissingTradeRoute.PalPark -> openPalPark(route.source, rom, route.pick)
+            is MissingTradeRoute.PokeTransfer -> openTransfer(route.source, rom, pick = route.pick, back = true)
+            null -> Unit
         }
     }
 
