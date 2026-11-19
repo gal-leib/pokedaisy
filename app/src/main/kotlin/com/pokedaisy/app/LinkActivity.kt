@@ -80,9 +80,16 @@ class LinkActivity : ComponentActivity() {
     private var mainCount = 0
     private val input = GbaInput()
     @Volatile private var focused = 0
-    @Volatile private var looping = false
-    private var loop: Thread? = null
-    private var opened = false
+    private class LinkLoop {
+        @Volatile var running = true
+        lateinit var thread: Thread
+    }
+
+    private var loop: LinkLoop? = null
+    private val session = LinkSessionLifecycle(nativeSlot, { isFinishing }, {
+        showSecondScreen()
+        startLoop()
+    }, ::closeNative)
     private var presentation: DualScreenPresentation? = null
     private var secondGrid: LinkGrid? = null
     private var ltDown = false
@@ -102,15 +109,13 @@ class LinkActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         OptionColors.inGame = false
-        if (play.phase == Phase.PLAYING) {
-            showSecondScreen()
-            startLoop()
-        }
+        session.resume()
     }
 
     override fun onPause() {
         super.onPause()
         // The games wait while the app is away (HOME, the screen off): nothing runs unseen.
+        session.pause()
         stopLoop()
         input.releaseAll()
         presentation?.dismiss()
@@ -123,10 +128,7 @@ class LinkActivity : ComponentActivity() {
         presentation?.dismiss()
         presentation = null
         // Closed from the recents list mid-game: still let a save in progress finish.
-        if (opened && play.phase != Phase.CLOSING) {
-            opened = false
-            thread(name = "pokedaisy-link-close") { LinkCore.pkLinkClose(CLOSE_FRAMES) }
-        }
+        session.destroy()
     }
 
     // --- setup ---
@@ -150,41 +152,55 @@ class LinkActivity : ComponentActivity() {
 
     private fun start() {
         val picked = play.beginStart() ?: return
-        thread(name = "pokedaisy-link-open") {
-            if (!SaveFileEdits.recover(this)) {
-                runOnUiThread { play.startFailed(ClosedSaveEdits.recoveryError()) }
-                return@thread
-            }
-            var refused: String? = null
-            val saves = LinkSavePaths.forGames(picked.map { SavesLocation.saveFor(this, prefs, it).absoluteFile.toOkioPath(normalize = true) })
-            val list = picked.zip(saves).map { (rom, path) ->
-                val save = File(path.toString())
-                SaveBackups.snapshot(save)
-                RzipSave.unpackForPlay(save)?.let { refused = refused ?: it }
-                Game(rom, RomArchive.playable(rom, cacheDir) ?: rom, save)
-            }
-            refused?.let { why ->
-                runOnUiThread { play.startFailed(why) }
-                return@thread
-            }
-            val ok = LinkCore.pkLinkOpen(list.map { it.playable.absolutePath }.toTypedArray(), list.map { it.save.absolutePath }.toTypedArray())
-            Log.i(TAG, "open ${list.size} games: $ok (${list.joinToString { it.rom.name }})")
-            runOnUiThread {
-                if (!ok) {
-                    play.startFailed()
-                    return@runOnUiThread
-                }
-                opened = true
-                games = list
-                views = list.indices.map { i -> LinkGameView(this, i, LinkCore.pkLinkVideoWidth(i), LinkCore.pkLinkVideoHeight(i)) { focus(it) } }
-                mainCount = if (secondScreen() != null) (list.size + 1) / 2 else list.size
-                focused = 0
-                views.forEachIndexed { i, v -> v.focused = i == 0 }
-                play.opened()
-                showSecondScreen()
-                startLoop()
-            }
+        if (!session.beginOpen()) {
+            play.startFailed()
+            return
         }
+        thread(name = "pokedaisy-link-open") {
+            val list = try {
+                if (!SaveFileEdits.recover(this)) {
+                    reportOpenFailure(ClosedSaveEdits.recoveryError())
+                    return@thread
+                }
+                var refused: String? = null
+                val saves = LinkSavePaths.forGames(picked.map { SavesLocation.saveFor(this, prefs, it).absoluteFile.toOkioPath(normalize = true) })
+                val list = picked.zip(saves).map { (rom, path) ->
+                    val save = File(path.toString())
+                    SaveBackups.snapshot(save)
+                    RzipSave.unpackForPlay(save)?.let { refused = refused ?: it }
+                    Game(rom, RomArchive.playable(rom, cacheDir) ?: rom, save)
+                }
+                refused?.let {
+                    reportOpenFailure(it)
+                    return@thread
+                }
+                val ok = LinkCore.pkLinkOpen(list.map { it.playable.absolutePath }.toTypedArray(), list.map { it.save.absolutePath }.toTypedArray())
+                Log.i(TAG, "open ${list.size} games: $ok (${list.joinToString { it.rom.name }})")
+                if (!ok) {
+                    reportOpenFailure()
+                    return@thread
+                }
+                list
+            } catch (error: Exception) {
+                Log.e(TAG, "Could not open Link Play", error)
+                reportOpenFailure()
+                return@thread
+            }
+            runOnUiThread { session.openSucceeded { preparePlaying(list) } }
+        }
+    }
+
+    private fun reportOpenFailure(message: String? = null) {
+        runOnUiThread { session.openFailed { if (message == null) play.startFailed() else play.startFailed(message) } }
+    }
+
+    private fun preparePlaying(list: List<Game>) {
+        games = list
+        views = list.indices.map { i -> LinkGameView(this, i, LinkCore.pkLinkVideoWidth(i), LinkCore.pkLinkVideoHeight(i)) { focus(it) } }
+        mainCount = if (secondScreen() != null) (list.size + 1) / 2 else list.size
+        focused = 0
+        views.forEachIndexed { i, v -> v.focused = i == 0 }
+        play.opened()
     }
 
     // --- playing ---
@@ -213,15 +229,26 @@ class LinkActivity : ComponentActivity() {
     }
 
     private fun startLoop() {
-        if (looping || !opened) return
-        looping = true
-        loop = thread(name = "pokedaisy-link") { runLoop() }
+        if (loop != null || !session.active) return
+        val current = LinkLoop()
+        loop = current
+        current.thread = thread(name = "pokedaisy-link") {
+            try {
+                runLoop(current)
+            } finally {
+                runOnUiThread {
+                    loop = null
+                    // Resume may have arrived while the previous loop was still stopping.
+                    if (!current.running) startLoop()
+                }
+            }
+        }
     }
 
     private fun stopLoop() {
-        looping = false
-        loop?.join(2000)
-        loop = null
+        val current = loop ?: return
+        current.running = false
+        current.thread.join(2000)
     }
 
     private fun setFf(on: Boolean) {
@@ -231,7 +258,7 @@ class LinkActivity : ComponentActivity() {
 
     /** The link thread: a frame of every game, the focused one's keys and sound; its blocking audio writes pace it. With
      * FF on the frames are paced by the clock instead, [FF_SPEED] to a 60th of a second, and the track stays quiet. */
-    private fun runLoop() {
+    private fun runLoop(current: LinkLoop) {
         val rate = LinkCore.pkLinkSampleRate()
         val bytes = maxOf(AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT), rate / 15 * 4)
         val track = AudioTrack.Builder()
@@ -252,7 +279,7 @@ class LinkActivity : ComponentActivity() {
         var runNanos = 0L
         var writeNanos = 0L
         try {
-            while (looping) {
+            while (current.running) {
                 if (ff != fast) {
                     fast = ff
                     if (fast) { track.pause(); track.flush() } else track.play()
@@ -294,10 +321,15 @@ class LinkActivity : ComponentActivity() {
         stopLoop()
         presentation?.dismiss()
         presentation = null
-        opened = false
+        session.close { if (play.closed(savesFinished = true)) finish() }
+    }
+
+    private fun closeNative(onClosed: () -> Unit) {
+        val stopping = loop?.thread
         thread(name = "pokedaisy-link-close") {
+            stopping?.join()
             LinkCore.pkLinkClose(CLOSE_FRAMES)
-            runOnUiThread { if (play.closed(savesFinished = true)) finish() }
+            runOnUiThread(onClosed)
         }
     }
 
@@ -372,6 +404,7 @@ class LinkActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_ROM = "rom"
+        private val nativeSlot = LinkSessionLifecycle.Slot()
         private const val TAG = "pokedaisy/link"
         /** FF's speed: four frames of every game per 60th of a second. */
         private const val FF_SPEED = 4
