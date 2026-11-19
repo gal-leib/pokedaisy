@@ -8,7 +8,7 @@ import com.pokedaisy.app.overlay.overlayChoices
 class OverlayImportSession(private val store: OverlayStore) {
     private var pending = emptyList<OverlayStore.Picked>()
 
-    data class Imported internal constructor(
+    class Imported internal constructor(
         internal val result: OverlayStore.Result,
         internal val files: List<OverlayStore.Picked>,
         val choices: List<Pair<OverlayChoice, String>>,
