@@ -128,17 +128,18 @@ object PokeDaisyHost {
             RunningGameStatusBar(title, snapshot, FoundationDates::shortTime)
         }
         var quickActions: com.pokedaisy.app.companion.ui.GameQuickActions? = null
-        if (currentSettings != null && currentSlots != null && currentRuntime != null) {
+        val controller = current as? GameViewController
+        if (controller != null && currentSettings != null && currentSlots != null && currentRuntime != null) {
             currentSettings.rewindUnavailable = panels::showRewindUnavailable
             val shortcuts = currentRuntime.bindActions(currentSettings, currentSlots,
                 selectSlot = { currentSlots.select(it) }, companion = panels::toggleCompanion,
-                rewindHold = current.rewindHold, canRewind = { current.canRewind },
+                rewindHold = controller.rewindHold, canRewind = { controller.canRewind },
                 rewindDenied = currentSettings::showRewindDenied,
                 hold = { action, down ->
                     when (action) {
                         com.pokedaisy.app.Hotkeys.Action.FF_HOLD -> currentSettings.holdFastForward(down)
                         com.pokedaisy.app.Hotkeys.Action.SLOWMO_HOLD -> currentSettings.holdSlowmo(down)
-                        com.pokedaisy.app.Hotkeys.Action.REWIND_HOLD -> current.applyRewindHold()
+                        com.pokedaisy.app.Hotkeys.Action.REWIND_HOLD -> controller.applyRewindHold()
                         else -> Unit
                     }
                 })
