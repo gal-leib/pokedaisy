@@ -679,7 +679,7 @@ fun realShinyBattle(state: Int): SnapshotView {
     val (cfg, fixture) = if (activeGame == GameKind.EMERALD) NATIVE_EMERALD_RETAIL to "emerald_shiny_battle"
         else NATIVE_FIRERED_REV1 to "firered_shiny_battle"
     // The render task runs in app/src/main/assets.
-    val t = com.pokedaisy.app.companion.data.readNativeTelemetry(RamFixture(File("../../test/resources/fixtures/$fixture")), cfg.copy(shinyBelow = 8))
+    val t = com.pokedaisy.app.companion.data.readNativeTelemetry(RamFixture(ramFixtures.resolve(fixture)), cfg.copy(shinyBelow = 8))
     // buildSnapshotView points the icon loader at the ROM's tables (read through the core): keep the preview's own.
     val icons = com.pokedaisy.app.companion.data.DecompIconSource.tables
     val real = com.pokedaisy.app.companion.data.buildSnapshotView(t)
@@ -740,7 +740,10 @@ class RomFile(private val rom: ByteArray) : MemoryReader {
     }
 }
 
-/** Serves RAM reads from a save fixture's ewram.bin / iwram.bin (app/src/test/resources/fixtures). */
+// Preview render tasks run from app/src/main/assets.
+private val ramFixtures = File("../../../../test-fixtures/resources/fixtures")
+
+/** Serves RAM reads from a save fixture's ewram.bin / iwram.bin. */
 class RamFixture(dir: File) : MemoryReader {
     private val ewram = File(dir, "ewram.bin").readBytes()
     private val iwram = File(dir, "iwram.bin").readBytes()
@@ -769,7 +772,7 @@ fun liveGuide(): ((SnapshotView) -> SnapshotView)? {
     val tables = cfg.guideTables!!
     PokedexSource.reader = RomFile(File(path).readBytes())
     // The render task runs in app/src/main/assets. -Phour=22: the game's clock at that hour (Lazarus's night lists).
-    val fixtureRam = RamFixture(File("../../test/resources/fixtures/$fixture"))
+    val fixtureRam = RamFixture(ramFixtures.resolve(fixture))
     val hour = System.getProperty("hour").orEmpty().toIntOrNull()
     val hourAddr = tables.nightWild?.hourAddr
     val ram = if (hour == null || hourAddr == null) fixtureRam else object : MemoryReader {
@@ -807,7 +810,7 @@ fun dexShots(game: GameKind, live: ((SnapshotView) -> SnapshotView)?, w: Int, h:
         game == GameKind.EMERALD -> NATIVE_EMERALD_RETAIL to "emerald_vanilla"
         else -> NATIVE_FIRERED_REV1 to "firered_vanilla"
     }
-    val dex = com.pokedaisy.app.companion.data.readPokedexState(RamFixture(File("../../test/resources/fixtures/$fixture")), cfg, cfg.pokedex!!)
+    val dex = com.pokedaisy.app.companion.data.readPokedexState(RamFixture(ramFixtures.resolve(fixture)), cfg, cfg.pokedex!!)
         ?: return emptyList()
     val g = game.name.lowercase()
     // EEVEE's family / INFO, MAGIKARP's rods and routes (Emerald: ZIGZAGOON's), BULBASAUR's moves (Emerald: TREECKO's).
@@ -1481,7 +1484,7 @@ fun ndsFirstMon(game: GameKind) = when (game) {
 
 /** A DS game's real snapshot (-PndsFixture): the fixture's main RAM read the way the app reads it. */
 fun ndsSnapshot(): SnapshotView {
-    val main = File("../../test/resources/fixtures/${System.getProperty("ndsFixture")}/mainram.bin").readBytes()
+    val main = ramFixtures.resolve("${System.getProperty("ndsFixture")}/mainram.bin").readBytes()
     val reader = object : com.pokedaisy.app.companion.data.MemoryReader {
         override fun readCoreMemory(addr: Long, size: Int): ByteArray {
             val o = (addr - 0x02000000L).toInt()

@@ -37,7 +37,15 @@ val prepSrc = tasks.register<Sync>("prepSrc") {
     from(app) { include(appIncludes) }
     from(sharedUi) { include(previewScreenSources) }
     // PC BOXES' demo save is built with the save tests' own writer.
-    from(rootDir.resolve("../app/src/test/kotlin/com/pokedaisy/app/companion/data/save")) { include("SyntheticSave.kt", "SyntheticGen4.kt", "SyntheticGen5.kt"); into("synthetic") }
+    val saveFixtures = "com/pokedaisy/app/companion/data/save"
+    from(rootDir.resolve("../test-fixtures/kotlin/$saveFixtures")) {
+        include("SyntheticSave.kt")
+        into("synthetic")
+    }
+    from(rootDir.resolve("../shared/src/androidUnitTest/kotlin/$saveFixtures")) {
+        include("SyntheticGen4.kt", "SyntheticGen5.kt")
+        into("synthetic")
+    }
     into(layout.buildDirectory.dir("appsrc"))
     filter { line: String ->
         line.replace("Icons.AutoMirrored.Filled.", "Icons.Filled.")
@@ -131,7 +139,7 @@ tasks.register<JavaExec>("render") {
     // FireRed / Emerald art is rebuilt from ROMs (see Main.kt's romArt()).
     systemProperty("artRoms", (project.findProperty("artRoms") as String?) ?: "")
     // -PndsRom=<.nds> -PndsFixture=heartgold: a DS game's real-data shots ($game-real-*): its art rebuilt from the cart
-    // (NdsArt), the snapshot read from that save fixture (app/src/test/resources/fixtures/<name>/mainram.bin).
+    // (NdsArt), the snapshot read from that save fixture (test-fixtures/resources/fixtures/<name>/mainram.bin).
     systemProperty("ndsRom", (project.findProperty("ndsRom") as String?) ?: "")
     systemProperty("ndsFixture", (project.findProperty("ndsFixture") as String?) ?: "")
     // -PdsBattleShots=<dir>: the ds-battle-* shots over that folder's <game>.png (a DS top screen, 256x192, e.g. nds_dump's

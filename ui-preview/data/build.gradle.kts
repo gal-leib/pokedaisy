@@ -22,8 +22,7 @@ val desktopTarget = System.getProperty("os.name").lowercase().let { os ->
 
 val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appSrc = fileTree(app) {
-    include("companion/data/**", "companion/i18n/**", "companion/coop/**", "FeatureFlags.kt",
-        "MgbaCore.kt", "PrefsAndroid.kt", "BpsPatch.kt", "RomPatchFiles.kt", "GameVolume.kt")
+    include("companion/coop/**", "FeatureFlags.kt", "MgbaCore.kt", "PrefsAndroid.kt", "GameVolume.kt")
     exclude("**/*.java")   // compiled by javac below (companion/coop/x25519)
 }
 val sharedUi = rootDir.resolve("../shared-ui/src/commonMain/kotlin")
@@ -34,7 +33,6 @@ sourceSets["main"].kotlin {
     srcDir("shims")
     // Compile the portable sources with the imported app data and the JVM shims, like the production modules.
     srcDir(rootDir.resolve("../shared/src/commonMain/kotlin"))
-
 }
 // The Java in the app's sources (CoopKeys' X25519, copied from Bouncy Castle).
 sourceSets["main"].java { srcDir(app); include("companion/coop/x25519/**") }
