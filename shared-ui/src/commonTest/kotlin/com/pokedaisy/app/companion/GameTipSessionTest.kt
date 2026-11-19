@@ -5,9 +5,6 @@ import com.pokedaisy.app.Prefs
 import com.pokedaisy.app.companion.data.GameKind
 import com.pokedaisy.app.companion.data.LocationView
 import com.pokedaisy.app.companion.data.SnapshotView
-import com.pokedaisy.app.companion.ui.GameTipFrame
-import com.pokedaisy.app.companion.ui.GameTipSession
-import com.pokedaisy.app.companion.ui.controllerTipShortcut
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

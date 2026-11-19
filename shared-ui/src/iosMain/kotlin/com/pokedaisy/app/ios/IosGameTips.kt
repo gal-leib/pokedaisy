@@ -23,9 +23,9 @@ import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.ui.FeatureTipHost
 import com.pokedaisy.app.companion.ui.FlyStyleAsk
 import com.pokedaisy.app.companion.ui.GameQuickActions
-import com.pokedaisy.app.companion.ui.GameTipFrame
-import com.pokedaisy.app.companion.ui.GameTipSession
-import com.pokedaisy.app.companion.ui.controllerTipShortcut
+import com.pokedaisy.app.companion.GameTipFrame
+import com.pokedaisy.app.companion.GameTipSession
+import com.pokedaisy.app.companion.controllerTipShortcut
 import com.pokedaisy.app.game.GameViewController
 import platform.GameController.GCController
 import kotlin.time.TimeSource

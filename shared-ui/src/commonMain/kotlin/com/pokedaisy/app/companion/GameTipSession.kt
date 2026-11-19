@@ -1,16 +1,6 @@
-package com.pokedaisy.app.companion.ui
+package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.Hotkeys
-import com.pokedaisy.app.companion.CompanionSettings
-import com.pokedaisy.app.companion.FeatureTips
-import com.pokedaisy.app.companion.FlyAction
-import com.pokedaisy.app.companion.GameAspect
-import com.pokedaisy.app.companion.GameTipMoments
-import com.pokedaisy.app.companion.ItemUse
-import com.pokedaisy.app.companion.KeyCapture
-import com.pokedaisy.app.companion.QuickAction
-import com.pokedaisy.app.companion.TipId
-import com.pokedaisy.app.companion.TipScheduler
 import com.pokedaisy.app.companion.data.FlyWithoutMoveGame
 import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.data.hasData

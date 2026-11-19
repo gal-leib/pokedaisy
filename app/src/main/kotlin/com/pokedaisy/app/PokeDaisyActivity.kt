@@ -68,9 +68,9 @@ import com.pokedaisy.app.companion.FoldPosture
 import com.pokedaisy.app.companion.data.FfMenuWatch
 import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.TipId
-import com.pokedaisy.app.companion.ui.GameTipFrame
-import com.pokedaisy.app.companion.ui.GameTipSession
-import com.pokedaisy.app.companion.ui.controllerTipShortcut
+import com.pokedaisy.app.companion.GameTipFrame
+import com.pokedaisy.app.companion.GameTipSession
+import com.pokedaisy.app.companion.controllerTipShortcut
 import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.RomRegionMap
