@@ -4084,7 +4084,7 @@ no installed value is rewritten merely by reading it.
 
 The follow-up ownership and host-reduction sequence is in [Shared host composition](specs/shared-host-composition.md).
 
-`Prefs` is common code too, compiled in place by `shared-ui`. `PreferenceStore` is its primitive
+`Prefs` lives in `shared-ui/src/commonMain`. `PreferenceStore` is its primitive
 storage interface: Android keeps the existing `pokedaisy` SharedPreferences file through `PrefsAndroid`,
 and iOS keeps its NSUserDefaults domain through `DefaultsPreferenceStore`. Existing Android `Prefs(context)`
 callers and file-name helpers stay source compatible. Shared getters, codecs and compound edits retain their
@@ -4158,7 +4158,7 @@ The GBA field options use `pk_api_field_wild` to bind the shared finder's verifi
 `pk_api_field_step` once per frame for the existing indoor/encounter policy. JNI delegates the same operations to
 that API; the DS path stays separate. Field stepping owns the core write lock. `pk_field_observe` reads flags
 without changing the encounter switch, ownership or RNG. A resumed OFF state keeps the original ownership rule.
-`AutoRunPolicy` is compiled in place for both hosts and runs on manual keys before battle scripts. The native
+`AutoRunPolicy` lives in the shared core and runs on manual keys before battle scripts. The native
 table and field-callback guards remain required; Game Boy's separate field routines have not been wired on iOS.
 
 Both STATES bridges use common `StateSlotController` over `StateFiles`: slot saves, loads, delete and both
@@ -4355,8 +4355,12 @@ pushing a different file (only one at a time for now). SRAM persists to
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `third_party/mgba/`                                     | mGBA source, git submodule @ `0.10.5`                                                                                                                              |
 | `third_party/rcheevos/`                                 | RetroAchievements' rcheevos, git submodule @ `v12.5.0`                                                                                                             |
-| `app/src/main/cpp/`                                     | `CMakeLists.txt` + JNI bridge                                                                                                                                      |
-| `app/src/main/kotlin/com/pokedaisy/app/`               | app code                                                                                                                                                           |
+| `app/src/main/cpp/` | Android CMake, JNI bindings and DS integration. |
+| `app/src/main/kotlin/` | Android Activities, services and platform adapters. |
+| `shared/src/commonMain/kotlin/` | Game rules, ROM decoding, save operations and emulator contracts. |
+| `shared/src/commonMain/cpp/` | Portable emulator engine, C API and generated tables. |
+| `shared-ui/src/commonMain/kotlin/` | Common Compose UI, settings and loaded-game coordination. |
+| `shared/src/iosMain/`, `shared-ui/src/iosMain/`, `iosApp/` | Apple core bindings, platform adapters and Swift entry point. |
 | `gamedata/gen3/`                                        | Per-ROM `NativeConfig` address tables (TOML, `gamedata/README.md`) — start here for "how is game X read" (each config has an extensive comment on how its addresses were found); `make gamedata` writes `NativeConfigsGen.kt` from them. |
 | `.../companion/data/NativeReader.kt`                    | The `NativeConfig` data class + the decode logic.                                                                                                                  |
 | `.../companion/data/ActiveTables.kt`                    | Picks which species/item/map-name tables and sprite source apply for the currently-detected `GameKind`.                                                            |
