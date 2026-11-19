@@ -4589,6 +4589,7 @@ adapters own the core write lock. Core pause/restart keeps the loaded-game owner
 
 ### Shared binding edits
 
+The shared input actions and binding editor live in `shared-ui/src/commonMain`.
 `GameBindings` validates supported hotkey actions and publishes reloads only after a successful edit. Both game
 hosts use it for shared settings. `GbaControls` and `Hotkeys` keep their installed properties formats and return
 write success; each file is replaced atomically. Invalid key names never reach disk. A D-pad edit also removes
