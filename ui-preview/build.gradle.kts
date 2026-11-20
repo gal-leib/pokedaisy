@@ -15,7 +15,7 @@ val cmp by extra("1.5.12")
 
 val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appIncludes = listOf(
-    "companion/ui/**", "SettingsActivity.kt", "KeyEvents.kt", "CoopSettingsPages.kt", "LibraryActivity.kt", "SavesLocation.kt",
+    "companion/ui/**", "companion/PrefsCompanionSettings.kt", "SettingsActivity.kt", "KeyEvents.kt", "CoopSettingsPages.kt", "LibraryActivity.kt", "SavesLocation.kt",
     "CoverArtSync.kt", "CoverSync.kt", "DocsApi.kt", "DocsCache.kt", "DocsStore.kt", "DocsSearch.kt", "RomFolder.kt", "StorageAccess.kt", "SetupScreen.kt", "AppUpdater.kt", "AppUpdate.kt", "GameSaves.kt", "GameSavesAndroid.kt", "RzipSave.kt", "SaveBackups.kt", "GameInfo.kt", "LibraryOrder.kt", "RomSupportRequest.kt", "RomIntake.kt", "BestEffortShare.kt", "SaveStates.kt", "RomIdentity.kt", "RomArchive.kt", "CompanionSupport.kt", "CoverPicker.kt", "SteamGridDbGames.kt", "SteamGridDbClient.kt", "GameTitles.kt", "SaveEditorActivity.kt", "SaveFileEdits.kt",
     "BpsPatch.kt", "RomPatcher.kt", "RomPatchFlow.kt", "RomCrcs.kt", "SpritePackFlow.kt", "n3ds/N3dsCart.kt",
     "ScreenScraperClient.kt", "ScreenScraperUi.kt", "GameMedia.kt", "LauncherScreen.kt",
