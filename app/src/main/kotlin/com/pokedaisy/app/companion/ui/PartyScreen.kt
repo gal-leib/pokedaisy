@@ -851,7 +851,7 @@ object PokemonPicturesSwitch {
  * see-through everywhere, so over a dark window or the game (DARK MODE, the HUD) its white parts showed what lay behind.
  * Only what the outside can't reach is filled, so the outline stays free. Cached per tables and species.
  */
-private val pokemonPictureCache = java.util.concurrent.ConcurrentHashMap<Triple<Any, Int, Boolean>, com.pokedaisy.app.companion.data.RomArt.Image>()
+private val pokemonPictureCache = LockedMap<Triple<Any, Int, Boolean>, com.pokedaisy.app.companion.data.RomArt.Image>()
 
 /** A picture's key bit for its shiny colours (above every species id). */
 private const val SHINY_PICTURE = 1 shl 20
