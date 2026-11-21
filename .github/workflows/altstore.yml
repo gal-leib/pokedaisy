@@ -35,16 +35,17 @@ jobs:
       - name: Generate the Xcode project
         run: brew install xcodegen && cd iosApp && xcodegen
 
+      # Kotlin/Native release optimization exceeds the hosted runner heap with this framework.
       - name: Build the unsigned device app
         run: |
           xcodebuild -project iosApp/PokeDaisy.xcodeproj -scheme PokeDaisy \
-            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -configuration Debug -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/build" ARCHS=arm64 CODE_SIGNING_ALLOWED=NO \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
 
       - name: Package the IPA and generate its AltStore source
         run: |
-          app="$RUNNER_TEMP/build/Build/Products/Release-iphoneos/PokeDaisy.app"
+          app="$RUNNER_TEMP/build/Build/Products/Debug-iphoneos/PokeDaisy.app"
           xcrun vtool -show-build "$app/PokeDaisy" | grep -E 'platform[[:space:]]+IOS$'
           mkdir -p "$RUNNER_TEMP/package/Payload" "$RUNNER_TEMP/distribution"
           ditto "$app" "$RUNNER_TEMP/package/Payload/PokeDaisy.app"

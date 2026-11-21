@@ -234,7 +234,7 @@ https://raw.githubusercontent.com/gal-leib/pokedaisy/altstore/source.json
 ```
 
 Install **PokeDaisy** from **PokeDaisy Builds**. New successful builds from the
-fork's `main` appear as updates in AltStore. The first successful
+fork's `main` (Debug device builds) appear as updates in AltStore. The first successful
 [AltStore workflow run](https://github.com/gal-leib/pokedaisy/actions/workflows/altstore.yml)
 creates the source, and subsequent runs update it after verifying the IPA
 download. Builds are public GitHub prereleases. AltStore Classic handles
