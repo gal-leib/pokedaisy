@@ -3,7 +3,8 @@ package com.pokedaisy.app
 /** The app's generated BuildConfig (AGP makes it; the preview has no AGP). */
 object BuildConfig {
     const val DEBUG = true
-    const val VERSION_NAME = "1.1.0"
+    /** -PappVersion=1.6.1 puts another version on the shots (marketing pictures); 1.1.0 otherwise. */
+    @JvmField val VERSION_NAME: String = System.getProperty("appVersion").orEmpty().ifEmpty { "1.1.0" }
     const val SCREENSCRAPER_DEV_ID = ""
     const val SCREENSCRAPER_DEV_PASSWORD = ""
     /** Off as in a default build; the ScreenScraper shots turn it on (`withScreenScraper`). */
@@ -13,5 +14,7 @@ object BuildConfig {
     /** Off as in a release: the blocked-game shots show the notice. */
     @JvmField var FEATURE_ALLOW_BLOCKED = false
     @JvmField var FEATURE_KEEP_BLOCKED = false
+    /** Off as in a default build: 3DS games (the n3ds module) aren't in the preview's build. */
+    const val FEATURE_N3DS = false
     const val COOP_RELAY_URL = ""
 }

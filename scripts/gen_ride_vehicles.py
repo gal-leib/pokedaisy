@@ -11,7 +11,7 @@ PlayerLook's frames are untouched there), the vehicle goes round and under it: a
 in the vehicle's palette in the low 6 bits (0 = none), 0x40 FRONT (over the rider: a fairing, a windscreen, a leg shield),
 0x80 LEG (the rider's leg and shoe: over the body, under FRONT). RideOn.kt maps the colours onto the hero's palette.
 
-Writes app/src/main/kotlin/com/pokedaisy/app/companion/data/RideVehiclesGen.kt and, with --preview DIR, PNGs at 8x.
+Writes shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data/RideVehiclesGen.kt and, with --preview DIR, PNGs at 8x.
 
 Usage: scripts/gen_ride_vehicles.py [--preview DIR]
 """
@@ -353,12 +353,14 @@ def write(out):
         "// rider's LEG (drawn into their frame in the hero's colours). The vehicle is a sprite of its own behind the rider.",
         "package com.pokedaisy.app.companion.data",
         "",
+        "import kotlin.io.encoding.Base64",
+        "",
         "internal object RideVehiclesGen {",
         "    /** smoke: the exhaust's puffs, 16 x 8 frames (six from the side, six from behind), a byte a pixel (palette index);",
         "     * exhaust: the smoke sprite's top left per view (south, north, west: x, y; -128 none). */",
         "    class Art(val palette: IntArray, val views: List<ByteArray>, val cut: IntArray, val smoke: ByteArray, val exhaust: IntArray, val width: Int = 32)",
         "",
-        "    private fun views(vararg b64: String) = b64.map { java.util.Base64.getDecoder().decode(it) }",
+        "    private fun views(vararg b64: String) = b64.map { Base64.decode(it) }",
         "",
     ]
     names = []
@@ -372,7 +374,7 @@ def write(out):
             lines.append(f'            "{base64.b64encode(d).decode()}",')
         lines.append("        ),")
         lines.append(f"        intArrayOf({', '.join(str(CUT[w]) for w in VIEWS)}),")
-        lines.append(f'        java.util.Base64.getDecoder().decode("{base64.b64encode(smoke).decode()}"),')
+        lines.append(f'        Base64.decode("{base64.b64encode(smoke).decode()}"),')
         ex = [c for e in v["exhaust"] for c in (e if e else (-128, -128))]
         lines.append(f"        intArrayOf({', '.join(map(str, ex))}),")
         lines.append("    )")
@@ -413,4 +415,4 @@ if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
     if "--preview" in sys.argv:
         preview(sys.argv[sys.argv.index("--preview") + 1])
-    write(os.path.join(here, "../app/src/main/kotlin/com/pokedaisy/app/companion/data/RideVehiclesGen.kt"))
+    write(os.path.join(here, "../shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data/RideVehiclesGen.kt"))

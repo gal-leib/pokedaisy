@@ -1,0 +1,463 @@
+package com.pokedaisy.app.companion.data
+
+import kotlin.concurrent.Volatile
+import kotlin.math.roundToInt
+
+/**
+ * A Game Boy (Gen 1) game's POKéDEX, read from the cart's own bytes ([rom] - a GB cart
+ * is bank-switched, so the bus can't reach most of it): the page (PokedexEntryPointers:
+ * category, feet / inches, pounds x 10, the text), base stats and types (BaseStats), and
+ * the front sprite - Gen 1's own compression (home/uncompress.asm), coloured with the
+ * mon's GBC palette. Addresses are pret/pokeyellow's symbols ([Gen1DexTables]); the
+ * seen / owned flags are WRAM bit arrays by Dex number ([readGen1PokedexState]).
+ */
+data class Gen1DexTables(
+    val baseStats: Pair<Int, Int>,          // BaseStats: 28 bytes per Dex number
+    val dexEntryPointers: Pair<Int, Int>,   // by internal index - 1, in the same bank as the entries
+    val monsterPalettes: Pair<Int, Int>,    // a palette id per Dex number (0 = MISSINGNO.)
+    val cgbPalettes: Pair<Int, Int>,        // CGBBasePalettes: 4 RGB555 colours per id
+    /** The first of the "Pics" banks, and the internal indexes where the next one starts (UncompressMonSprite). */
+    val picsBank: Int,
+    val picsBankBreaks: IntArray,
+    val fossilKabutops: Int,
+    val fossilKabutopsBank: Int,
+    val internalToDex: IntArray,
+    /** wPokedexOwned / wPokedexSeen: 19 bytes each, bit n-1 = Dex No. n. */
+    val owned: Long,
+    val seen: Long,
+    /** The European carts keep the page's height in decimetres (1 byte) and weight in hectograms (2), English's
+     * feet / inches and pounds x 10 (4 bytes), and print with their own characters. */
+    val metric: Boolean = false,
+    val charset: Gen1Charset = Gen1Charset.EN,
+    /** Red / Blue keep MEW apart (added last, in bank 1): its base stats ([BaseStats] holds 150) and its pics' bank. */
+    val mewBaseStats: Pair<Int, Int>? = null,
+    val mewPicsBank: Int = 0,
+    /**
+     * PureRGB's shapes: 35-byte base data whose front pic's bank is its own byte ([picBankOffset], BASE_PICBANK), and
+     * pages that are fixed 8-byte records by Dex number ([dexEntryData]: feet, inches, pounds x 10, a text_far) with the
+     * category apart - [categoryMapping] gives each Dex number the index of its string in [categoryStrings] (@-ended).
+     */
+    val baseStatsSize: Int = 28,
+    val picBankOffset: Int = -1,
+    val dexEntryData: Pair<Int, Int>? = null,
+    val categoryMapping: Pair<Int, Int>? = null,
+    val categoryStrings: Pair<Int, Int>? = null,
+    /** The text command that points at the page's text: TX_FAR 0x17 (PureRGB renumbered its commands: TX_FAR_END 0x15). */
+    val textFar: Int = 0x17,
+    /** The highest Dex number (Brown: 252), and the bytes of each flag array ([owned] / [seen]: 19 = 152 bits in Red). */
+    val dexCount: Int = 151,
+    val flagBytes: Int = 19,
+    /** [seen]'s byte [flagBytes] - 1 kept elsewhere (Brown's last one sits at D300: the next byte is the bag's count). */
+    val seenLastByte: Long = 0,
+    /** The Dex numbers the game lists (null = 1..[dexCount]): Brown's 231..251 are unused. */
+    val listed: Set<Int>? = null,
+    /** A Dex number whose flags, page and front pic are another number's / internal index's (Brown's PHANCERO, No.252,
+     * takes slot 231's flags and the GLITCHBIRD page of internal 0xED, but its own base stats). */
+    val flagSlot: Map<Int, Int> = emptyMap(),
+    val entryInternal: Map<Int, Int> = emptyMap(),
+    /** Brown's front pics: base data's byte [rawPicBankOffset] is a ROM bank, and the pic at the front pic pointer there is
+     * a plain 7x7-tile 2bpp block (0x310 bytes, the tiles column by column) - its bank 0 means the usual compressed pic. */
+    val rawPicBankOffset: Int = -1,
+)
+
+val GEN1_DEX_YELLOW = Gen1DexTables(
+    baseStats = 0x0E to 0x43DE,
+    dexEntryPointers = 0x10 to 0x450B,
+    monsterPalettes = 0x1C to 0x6921,
+    cgbPalettes = 0x1C to 0x6AF9,
+    picsBank = 0x09,
+    picsBankBreaks = intArrayOf(0x1F, 0x4A, 0x74, 0x99),   // TANGELA + 1, MOLTRES + 1, BEEDRILL + 2, STARMIE + 1
+    fossilKabutops = 0xB6,
+    fossilKabutopsBank = 0x0B,
+    internalToDex = gen1InternalToDexYellow,
+    owned = 0xD2F6L,
+    seen = 0xD309L,
+)
+
+/**
+ * Red and Blue (pret/pokered: every address the same in both builds): their own dex pages (Yellow rewrote the text),
+ * palettes - Super Game Boy ones, as the game shows them on one (mGBA runs a DMG cart with SGB support as one) - and
+ * MEW apart in bank 1 ([Gen1DexTables.mewBaseStats]).
+ */
+private val GEN1_DEX_RED = GEN1_DEX_YELLOW.copy(
+    dexEntryPointers = 0x10 to 0x447E,
+    monsterPalettes = 0x1C to 0x65C8,
+    cgbPalettes = 0x1C to 0x6660,   // SuperPalettes: the same 4 RGB colours per id as CGBBasePalettes
+    owned = 0xD2F7L,
+    seen = 0xD30AL,
+    mewBaseStats = 0x01 to 0x425B,
+    mewPicsBank = 0x01,
+)
+
+/** Pokémon Red Gen II Graphics V2.0: pic's bank from byte 27 of base stats, CGB palettes in bank 0x2F. */
+val GEN1_DEX_RED_GEN2_GRAPHICS = GEN1_DEX_RED.copy(
+    cgbPalettes = 0x2F to 0x4000,
+    picBankOffset = 27,
+)
+
+/** Pokémon Yellow Gen II Graphics V1.1: pic's bank from byte 27 of base stats, CGB palettes in bank 0x42. */
+val GEN1_DEX_YELLOW_GEN2_GRAPHICS = GEN1_DEX_YELLOW.copy(
+    monsterPalettes = 0x1C to 0x6995,
+    cgbPalettes = 0x42 to 0x4000,
+    picBankOffset = 27,
+)
+
+/**
+ * PureRed / PureBlue v2.7.6 (Vortyne/pureRGB's pokered.sym; every address the same in both builds): its own base data
+ * (MEW in the main table), pages and Super Game Boy palettes (the colours its SGB and COLORS > SGB1 modes give each
+ * Pokémon; on a Color it shows them two-tone by default). Seen / owned keep Red's bit order, in WRAM bank 1.
+ */
+private val GEN1_DEX_PURE_RED = GEN1_DEX_YELLOW.copy(
+    baseStats = 0x2C to 0x6445,
+    dexEntryPointers = 0 to 0,
+    monsterPalettes = 0x1C to 0x6435,
+    cgbPalettes = 0x1C to 0x6565,   // SuperPalettes
+    internalToDex = gen1InternalToDexPureRgb,
+    owned = wramx(1, 0xD2FF),
+    seen = wramx(1, 0xD312),
+    charset = Gen1Charset.PURE,
+    baseStatsSize = 35,
+    picBankOffset = 27,
+    dexEntryData = 0x10 to 0x4859,
+    categoryMapping = 0x10 to 0x4D2F,
+    categoryStrings = 0x10 to 0x4DC6,
+    textFar = 0x15,   // dex_entry's text_far_end
+)
+
+/** Yellow Legacy v1.0.10 (its pokeyellow.sym): its own base data, pages and palettes. */
+private val GEN1_DEX_YELLOW_LEGACY = GEN1_DEX_YELLOW.copy(
+    baseStats = 0x3B to 0x5272,
+    dexEntryPointers = 0x10 to 0x46D3,
+    monsterPalettes = 0x1C to 0x68B5,
+    cgbPalettes = 0x1C to 0x6A8D,   // GBCBasePalettes
+)
+
+/** The European Yellows: English's tables but for the dex pages' text and palettes (port_gen1.py, checked by contents). */
+private val GEN1_DEX_YELLOW_DE = GEN1_DEX_YELLOW.copy(dexEntryPointers = 0x10 to 0x4507, monsterPalettes = 0x1C to 0x6900,
+    cgbPalettes = 0x1C to 0x6AD8, owned = 0xD2FBL, seen = 0xD30EL, metric = true, charset = Gen1Charset.DF)
+private val GEN1_DEX_YELLOW_FR = GEN1_DEX_YELLOW_DE.copy(dexEntryPointers = 0x10 to 0x4508, monsterPalettes = 0x1C to 0x68F2,
+    cgbPalettes = 0x1C to 0x6ACA)
+private val GEN1_DEX_YELLOW_IT = GEN1_DEX_YELLOW_DE.copy(dexEntryPointers = 0x10 to 0x450D, monsterPalettes = 0x1C to 0x6961,
+    cgbPalettes = 0x1C to 0x6B39, charset = Gen1Charset.IS)
+private val GEN1_DEX_YELLOW_ES = GEN1_DEX_YELLOW_IT.copy(monsterPalettes = 0x1C to 0x6911, cgbPalettes = 0x1C to 0x6AE9)
+
+/** German Red / Blue: Red's tables, their pages' text and palettes moved (port_gen1.py), German Yellow's letters, metric. */
+private val GEN1_DEX_RED_DE = GEN1_DEX_RED.copy(dexEntryPointers = 0x10 to 0x447A, monsterPalettes = 0x1C to 0x65A2,
+    cgbPalettes = 0x1C to 0x663A, owned = 0xD2FCL, seen = 0xD30FL, metric = true, charset = Gen1Charset.DF)
+
+/**
+ * Pokémon Brown 6.1.2 / 6.0.1 (its pages read headless against the game's own POKéDEX; addresses mapped from pokered.sym by
+ * scripts/port_gen1.py and its rewritten code): base data for all 252 at 3F:4336 (MEW in the table), PokedexEntryPointers
+ * at 10:6C20 (by internal index, Red's page records), its own palette ids (MonsterPalettes at 1C:7250; its shiny ones are
+ * 1C:65D0) over its own SuperPalettes (7D:4000, sent to the Super Game Boy), its front pics uncompressed
+ * ([Gen1DexTables.rawPicBankOffset]). Its flags are 29 bytes each, caught at D490 and seen at D301 with the last byte at
+ * D300 (the game swaps it into D31D to count them): 211 / 227 on the player's save, as the game's own POKéDEX says.
+ */
+private val GEN1_DEX_BROWN = GEN1_DEX_RED.copy(
+    baseStats = 0x3F to 0x4336,
+    dexEntryPointers = 0x10 to 0x6C20,
+    monsterPalettes = 0x1C to 0x7250,
+    cgbPalettes = 0x7D to 0x4000,
+    internalToDex = gen1InternalToDexBrown,
+    owned = 0xD490L,
+    seen = 0xD301L,
+    mewBaseStats = null,
+    mewPicsBank = 0,
+    dexCount = 252,
+    flagBytes = 29,
+    seenLastByte = 0xD300L,
+    listed = speciesNamesBrown.keys,
+    flagSlot = mapOf(252 to 231),
+    entryInternal = mapOf(252 to 0xED),
+    rawPicBankOffset = 27,
+)
+
+/** The Kanto dex: 151, no regional / national split. Its pages come from [Gen1Dex]. */
+val POKEDEX_YELLOW = PokedexTables(
+    entries = 0, frontPics = 0, palettes = 0, speciesInfo = 0, speciesToNational = 0, abilityNames = 0, footprints = 0,
+    speciesCount = 152, nationalCount = 151, regionalCount = 151, regionName = null,
+    gen1 = GEN1_DEX_YELLOW,
+)
+/** The European pages print metric, "0.4m" / "6.0kg" (a full stop, no space: headless shots of each cart's page). */
+private val POKEDEX_YELLOW_METRIC = POKEDEX_YELLOW.copy(metric = true, decimalPoint = '.', unitSpace = false)
+val POKEDEX_YELLOW_DE = POKEDEX_YELLOW_METRIC.copy(gen1 = GEN1_DEX_YELLOW_DE)
+val POKEDEX_YELLOW_FR = POKEDEX_YELLOW_METRIC.copy(gen1 = GEN1_DEX_YELLOW_FR)
+val POKEDEX_YELLOW_IT = POKEDEX_YELLOW_METRIC.copy(gen1 = GEN1_DEX_YELLOW_IT)
+val POKEDEX_YELLOW_ES = POKEDEX_YELLOW_METRIC.copy(gen1 = GEN1_DEX_YELLOW_ES)
+/** Red's and Blue's: one set of tables over each cart's own bytes (two objects, so a dex cache never crosses them). */
+val POKEDEX_RED = POKEDEX_YELLOW.copy(gen1 = GEN1_DEX_RED)
+val POKEDEX_BLUE = POKEDEX_YELLOW.copy(gen1 = GEN1_DEX_RED.copy())
+/** Red Gen II Graphics's. */
+val POKEDEX_RED_GEN2_GRAPHICS = POKEDEX_RED.copy(gen1 = GEN1_DEX_RED_GEN2_GRAPHICS)
+/** Yellow Gen II Graphics's. */
+val POKEDEX_YELLOW_GEN2_GRAPHICS = POKEDEX_YELLOW.copy(gen1 = GEN1_DEX_YELLOW_GEN2_GRAPHICS)
+val POKEDEX_RED_DE = POKEDEX_YELLOW_METRIC.copy(gen1 = GEN1_DEX_RED_DE)
+val POKEDEX_BLUE_DE = POKEDEX_YELLOW_METRIC.copy(gen1 = GEN1_DEX_RED_DE.copy())
+/** Yellow Legacy's. */
+val POKEDEX_YELLOW_LEGACY = POKEDEX_YELLOW.copy(gen1 = GEN1_DEX_YELLOW_LEGACY)
+/** Brown's one dex of 252 (the numbers it uses: 1-230 and PHANCERO, No.252), one object per version. */
+val POKEDEX_BROWN = POKEDEX_YELLOW.copy(speciesCount = 253, nationalCount = 252, regionalCount = 252, gen1 = GEN1_DEX_BROWN)
+val POKEDEX_BROWN_V601 = POKEDEX_YELLOW.copy(speciesCount = 253, nationalCount = 252, regionalCount = 252,
+    gen1 = GEN1_DEX_BROWN.copy())
+/** PureRed's and PureBlue's, likewise. */
+val POKEDEX_PURE_RED = POKEDEX_YELLOW.copy(gen1 = GEN1_DEX_PURE_RED)
+val POKEDEX_PURE_BLUE = POKEDEX_YELLOW.copy(gen1 = GEN1_DEX_PURE_RED.copy())
+
+fun readGen1PokedexState(r: MemoryReader, t: Gen1DexTables, tables: PokedexTables): PokedexState {
+    val owned = r.readCoreMemory(t.owned, t.flagBytes)
+    val seen = r.readCoreMemory(t.seen, t.flagBytes)
+    if (t.seenLastByte != 0L) seen[t.flagBytes - 1] = r.readCoreMemory(t.seenLastByte, 1)[0]
+    fun bit(b: ByteArray, n: Int): Boolean {
+        val i = (t.flagSlot[n] ?: n) - 1
+        return i / 8 < b.size && (b[i / 8].toInt() shr (i % 8)) and 1 != 0
+    }
+    fun bits(b: ByteArray) = (1..t.dexCount).filter { n -> (t.listed == null || n in t.listed) && bit(b, n) }.toSet()
+    val caught = bits(owned)
+    return PokedexState(tables, bits(seen) + caught, caught, national = true)
+}
+
+object Gen1Dex {
+    /** The running cart's bytes (PokeDaisyActivity sets it for a Game Boy ROM; tests from the file). */
+    @Volatile
+    var rom: ByteArray? = null
+
+    private fun off(bank: Int, addr: Int) = if (bank == 0) addr else bank * 0x4000 + (addr - 0x4000)
+    private fun u8(b: ByteArray, o: Int) = b[o].toInt() and 0xFF
+    private fun u16(b: ByteArray, o: Int) = u8(b, o) or (u8(b, o + 1) shl 8)
+
+    /** Gen 1 text from [o] until its end (@, or the dex text's DEXEND 0x5F). */
+    private fun text(rom: ByteArray, o: Int, chars: Map<Int, String>): String {
+        val sb = StringBuilder()
+        var i = o
+        while (i < rom.size && i < o + 400) {
+            val c = u8(rom, i++)
+            if (c == 0x5F) { sb.append('.'); break }   // DEXEND prints the entry's last full stop
+            if (c == 0x50) break
+            if (c == 0x00 && sb.isEmpty()) continue   // the text command that opens a far text
+            sb.append(chars[c] ?: "")
+        }
+        return sb.toString().split(' ').filter { it.isNotEmpty() }.joinToString(" ")
+    }
+
+    private const val MEW = 151
+
+    /** [dex]'s 28 bytes of base stats: BaseStats by Dex number, MEW's apart in Red / Blue. */
+    private fun baseStatsOff(t: Gen1DexTables, dex: Int): Int =
+        t.mewBaseStats?.takeIf { dex == MEW }?.let { off(it.first, it.second) }
+            ?: (off(t.baseStats.first, t.baseStats.second) + t.baseStatsSize * (dex - 1))
+
+    private fun internalOf(t: Gen1DexTables, dex: Int): Int = t.entryInternal[dex] ?: t.internalToDex.indexOfFirst { it == dex }
+
+    private fun listed(t: Gen1DexTables, dex: Int) = dex in 1..t.dexCount && (t.listed == null || dex in t.listed)
+
+    fun entry(t: Gen1DexTables, dex: Int): DexEntry? {
+        val rom = rom ?: return null
+        if (!listed(t, dex)) return null
+        val chars = t.charset.chars
+        val category: String
+        var o: Int
+        if (t.dexEntryData != null) {
+            // PureRGB: the record by Dex number, the category by its index among DexCategoryStrings.
+            val (cb, ca) = t.categoryMapping ?: return null
+            var s = off(t.categoryStrings!!.first, t.categoryStrings.second)
+            repeat(u8(rom, off(cb, ca) + dex - 1)) { while (u8(rom, s) != 0x50) s++; s++ }
+            category = text(rom, s, chars)
+            o = off(t.dexEntryData.first, t.dexEntryData.second) + 8 * (dex - 1)
+        } else {
+            val internal = internalOf(t, dex).takeIf { it > 0 } ?: return null
+            val (pb, pa) = t.dexEntryPointers
+            val e = off(pb, u16(rom, off(pb, pa) + 2 * (internal - 1)))
+            o = e
+            while (u8(rom, o) != 0x50) o++
+            category = text(rom, e, chars)
+            o++
+        }
+        // English: feet, inches, pounds x 10; Europe: decimetres, hectograms (one byte less).
+        val feet = u8(rom, o)
+        val inches = u8(rom, o + 1)
+        val lbs10 = u16(rom, o + 2)
+        val dm = u8(rom, o)
+        val hg = u16(rom, o + 1)
+        val far = o + if (t.metric) 3 else 4
+        // text_far: 0x17, address, bank.
+        val desc = if (u8(rom, far) == t.textFar) text(rom, off(u8(rom, far + 3), u16(rom, far + 1)), chars) else ""
+        val s = baseStatsOff(t, dex)
+        return DexEntry(
+            national = dex,
+            species = dex,
+            category = category,
+            heightDm = if (t.metric) dm else ((feet * 12 + inches) * 2.54 / 10).roundToInt(),
+            weightHg = if (t.metric) hg else (lbs10 * 0.45359237).roundToInt(),
+            description = desc,
+            type1 = u8(rom, s + 6),
+            type2 = u8(rom, s + 7),
+            // HP, ATTACK, DEFENSE, SPEED, SPECIAL: Gen 1 has one SPECIAL, its own order.
+            baseStats = listOf(u8(rom, s + 1), u8(rom, s + 2), u8(rom, s + 3), u8(rom, s + 4), u8(rom, s + 5)),
+            abilities = emptyList(),
+            catchRate = u8(rom, s + 8),
+            genderRatio = -1,
+            eggGroups = emptyList(),
+            heightIn = if (t.metric) null else feet * 12 + inches,
+            weightLbs10 = if (t.metric) null else lbs10,
+        )
+    }
+
+    /**
+     * The 56x56 front sprite as ARGB pixels (colour 0 clear), placed in its 7x7-tile box
+     * the way LoadUncompressedSpriteData centres it: horizontally (rounded up), bottom-aligned.
+     */
+    fun frontPixels(t: Gen1DexTables, dex: Int): IntArray? {
+        val rom = rom ?: return null
+        if (!listed(t, dex)) return null
+        val s = baseStatsOff(t, dex)
+        val ptr = u16(rom, s + 11)
+        val rawBank = if (t.rawPicBankOffset >= 0) u8(rom, s + t.rawPicBankOffset) else 0
+        if (rawBank != 0) return rawPic(t, rom, dex, off(rawBank, ptr))
+        val bank = if (t.picBankOffset >= 0) u8(rom, s + t.picBankOffset) else {
+            val internal = internalOf(t, dex).takeIf { it > 0 } ?: return null
+            if (internal == t.fossilKabutops) t.fossilKabutopsBank
+            else if (dex == MEW && t.mewBaseStats != null) t.mewPicsBank
+            else t.picsBank + t.picsBankBreaks.count { internal >= it }
+        }
+        val pic = Gen1Pic.decompress(rom, off(bank, ptr)) ?: return null
+        val colors = colors(t, rom, dex)
+        val out = IntArray(56 * 56)
+        val ox = ((8 - pic.widthTiles) / 2) * 8
+        val oy = (7 - pic.heightTiles) * 8
+        for (y in 0 until pic.heightTiles * 8) for (x in 0 until pic.widthTiles * 8) {
+            val v = pic.pixels[y * pic.widthTiles * 8 + x]
+            val px = ox + x
+            val py = oy + y
+            if (px in 0 until 56 && py in 0 until 56) out[py * 56 + px] = colors[v]
+        }
+        return out
+    }
+
+    /** [dex]'s four colours (colour 0 clear): its palette id's RGB555 colours. */
+    private fun colors(t: Gen1DexTables, rom: ByteArray, dex: Int): IntArray {
+        val palId = u8(rom, off(t.monsterPalettes.first, t.monsterPalettes.second) + dex)
+        val pal = off(t.cgbPalettes.first, t.cgbPalettes.second) + 8 * palId
+        return IntArray(4) { i ->
+            val c = u16(rom, pal + 2 * i)
+            fun ch(v: Int) = (v and 31) * 255 / 31
+            if (i == 0) 0 else (0xFF shl 24) or (ch(c) shl 16) or (ch(c shr 5) shl 8) or ch(c shr 10)
+        }
+    }
+
+    /** Brown's uncompressed front pic: 49 2bpp tiles at [o], down each column of the 7x7 box in turn (00:3FB2's copy to vFrontPic). */
+    private fun rawPic(t: Gen1DexTables, rom: ByteArray, dex: Int, o: Int): IntArray? {
+        if (o < 0 || o + 0x310 > rom.size) return null
+        val colors = colors(t, rom, dex)
+        val out = IntArray(56 * 56)
+        for (tile in 0 until 49) {
+            val tx = tile / 7 * 8
+            val ty = tile % 7 * 8
+            for (row in 0 until 8) {
+                val lo = u8(rom, o + tile * 16 + row * 2)
+                val hi = u8(rom, o + tile * 16 + row * 2 + 1)
+                for (bx in 0 until 8) {
+                    val v = ((lo shr (7 - bx)) and 1) or (((hi shr (7 - bx)) and 1) shl 1)
+                    out[(ty + row) * 56 + tx + bx] = colors[v]
+                }
+            }
+        }
+        return out
+    }
+}
+
+/** Gen 1's sprite compression (home/uncompress.asm): two 1bpp chunks, RLE-packed bit pairs, delta-coded. */
+object Gen1Pic {
+    class Pic(val widthTiles: Int, val heightTiles: Int, val pixels: IntArray)
+
+    private val DECODE0 = intArrayOf(0x01, 0x32, 0x76, 0x45, 0xFE, 0xCD, 0x89, 0xBA)
+    private val DECODE1 = intArrayOf(0xFE, 0xCD, 0x89, 0xBA, 0x01, 0x32, 0x76, 0x45)
+
+    fun decompress(rom: ByteArray, start: Int): Pic? = runCatching {
+        var pos = start
+        var curByte = 0
+        var bitsLeft = 0
+        fun bit(): Int {
+            if (bitsLeft == 0) { curByte = rom[pos++].toInt() and 0xFF; bitsLeft = 8 }
+            bitsLeft--
+            return (curByte shr bitsLeft) and 1
+        }
+        val dims = rom[pos++].toInt() and 0xFF
+        val hT = dims and 0xF
+        val wT = dims shr 4
+        if (wT == 0 || hT == 0 || wT > 8 || hT > 8) return null
+        val height = hT * 8
+        val size = wT * height                      // bytes per buffer, column-major (8 px per byte)
+        val buf = arrayOf(ByteArray(size), ByteArray(size))
+        val firstInBuffer2 = bit() == 1
+        var mode = 0
+
+        fun chunk(b: ByteArray) {
+            var col = 0
+            var y = 0
+            var shift = 6                            // bit offset 3: bits 7-6 first
+            var done = false
+            fun put(pair: Int) {
+                b[col * height + y] = (b[col * height + y].toInt() or (pair shl shift)).toByte()
+                if (++y == height) {
+                    y = 0
+                    if (shift > 0) shift -= 2 else { shift = 6; if (++col == wT) done = true }
+                }
+            }
+            var rle = bit() == 0
+            while (!done) {
+                if (rle) {
+                    var c = 0
+                    while (bit() == 1) c++
+                    var v = 0
+                    repeat(c + 1) { v = (v shl 1) or bit() }
+                    val n = v + (1 shl (c + 1)) - 1
+                    repeat(n) { if (!done) put(0) }
+                    rle = false
+                } else {
+                    val pair = (bit() shl 1) or bit()
+                    if (pair == 0) rle = true else put(pair)
+                }
+            }
+        }
+        // The game's Y-major delta decode: each row left to right, a 1 bit toggles the value.
+        fun delta(b: ByteArray) {
+            for (y in 0 until height) {
+                var last = 0
+                for (col in 0 until wT) {
+                    val v = b[col * height + y].toInt() and 0xFF
+                    fun nyb(n: Int): Int {
+                        val t = if (last and 1 == 1) DECODE1 else DECODE0
+                        val e = t[n shr 1]
+                        val r = if (n and 1 == 0) e shr 4 else e and 0xF
+                        last = r
+                        return r
+                    }
+                    val hi = nyb(v shr 4)
+                    val lo = nyb(v and 0xF)
+                    b[col * height + y] = ((hi shl 4) or lo).toByte()
+                }
+            }
+        }
+        val first = if (firstInBuffer2) buf[1] else buf[0]
+        val second = if (firstInBuffer2) buf[0] else buf[1]
+        chunk(first)
+        mode = if (bit() == 0) 0 else 1 + bit()
+        chunk(second)
+        when (mode) {
+            0 -> { delta(buf[0]); delta(buf[1]) }
+            1 -> { delta(first); for (i in 0 until size) second[i] = (second[i].toInt() xor first[i].toInt()).toByte() }
+            else -> { delta(second); delta(first); for (i in 0 until size) second[i] = (second[i].toInt() xor first[i].toInt()).toByte() }
+        }
+        // sSpriteBuffer1 is the low bitplane, sSpriteBuffer2 the high one.
+        val px = IntArray(wT * 8 * height)
+        for (col in 0 until wT) for (y in 0 until height) {
+            val lo = buf[0][col * height + y].toInt()
+            val hi = buf[1][col * height + y].toInt()
+            for (bx in 0 until 8) {
+                val v = ((lo shr (7 - bx)) and 1) or (((hi shr (7 - bx)) and 1) shl 1)
+                px[y * wT * 8 + col * 8 + bx] = v
+            }
+        }
+        Pic(wT, hT, px)
+    }.getOrNull()
+}

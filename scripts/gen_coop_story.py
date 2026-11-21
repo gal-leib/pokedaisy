@@ -2,13 +2,13 @@
 """Co-op lock (pk_coop_lock.c) and story events: retail English Emerald's story moments, trainer wins, addresses and
 struct offsets, from pret/pokeemerald built byte for byte as retail (agbcc). Writes
 
-- app/src/main/cpp/pk_coop_lock_emerald.h: the hook's addresses / CRC / struct offsets / script bytes and the story
+- shared/src/commonMain/cpp/pk_coop_lock_emerald.h: the hook's addresses / CRC / struct offsets / script bytes and the story
   table (`COOP_LK_STORY`) as C data (everything `#define` or `static const`: the header may be included twice), and
   `COOP_LK_CODE[]`: scripts/coop_lock_emerald.s (the story hook's Thumb code) assembled with binutils at
   `COOP_LK_CODE_ADDR` = 0x08FFE000, every value above handed to it as `.set COOP_LK_<name>`, then 0xFF up to
   `COOP_LK_TABLE_ADDR` (0x08FFE800) and the story table as bytes (8 an event: script u32, id u16, kind u8, 0), with the head
   patch's words (`COOP_LK_HEAD_*`) and the `COOP_LK_ASM_*` mailbox layout pk_coop_lock.c checks;
-- app/src/main/kotlin/com/pokedaisy/app/companion/data/coop/CoopStoryGen.kt: COOP_STORY_EVENTS, COOP_TRAINER_WINS and
+- shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data/coop/CoopStoryGen.kt: COOP_STORY_EVENTS, COOP_TRAINER_WINS and
   the ROM / RAM constants Kotlin needs.
 
     scripts/gen_coop_story.py <pokeemerald dir> [--kotlin-dir DIR] [--header FILE]
@@ -53,8 +53,8 @@ sys.path.insert(0, HERE)
 import gen_coop_emerald as gce  # noqa: E402
 
 REPO = os.path.join(HERE, "..")
-OUT_H = os.path.join(REPO, "app", "src", "main", "cpp", "pk_coop_lock_emerald.h")
-OUT_KT_DIR = os.path.join(REPO, "app", "src", "main", "kotlin", "com", "pokedaisy", "app", "companion", "data", "coop")
+OUT_H = os.path.join(REPO, "shared", "src", "commonMain", "cpp", "pk_coop_lock_emerald.h")
+OUT_KT_DIR = os.path.join(REPO, "shared", "src", "commonMain", "kotlin", "com", "pokedaisy", "app", "companion", "data", "coop")
 
 ROM_BASE = 0x08000000
 BLOCK_OFF, BLOCK_END = 0x00FFE000, 0x00FFF000

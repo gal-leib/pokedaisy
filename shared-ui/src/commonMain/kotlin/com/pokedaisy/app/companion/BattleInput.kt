@@ -1,0 +1,50 @@
+package com.pokedaisy.app.companion
+
+/**
+ * Bridge for the bottom-screen touch battle control: BattleControlsScreen asks to
+ * select an action or move, and the emulator drives the real battle menu via
+ * synthetic button presses (see EmulatorEngine/BattleInputController).
+ * Implemented by PokeDaisyActivity so the companion module stays
+ * independent of the emulator. See PLAN.md Phase 5.
+ */
+interface BattleInput {
+    /** The game can't be heard right now (FF with a STEADY clip, or muted): a button that presses the game's own
+     * button then makes the companion's click, since the game's select sound is silent too. */
+    val gameSilent: Boolean get() = false
+
+    /** True while a queued button sequence hasn't fully drained — the UI
+     * should disable further taps while this is true. */
+    val busy: Boolean
+
+    /** The game's cursor in the open battle menu (the same numbers as [selectAction] / [selectMove]); -1 unknown. */
+    val menuCursor: Int get() = -1
+
+    /** HIDE BATTLE MENU is on: the game's own battle menus are off its screen and the companion's buttons are the menu. So
+     * they show the game's cursor ([menuCursor]) from the moment it opens - the D-pad steers it round them - and FIGHT /
+     * POKéMON press the game's own (its moves, its party screen) rather than opening ours over its action menu, so the
+     * game is always on the menu the buttons show. */
+    val menuOnCompanion: Boolean get() = false
+
+    /** actionIndex: 0=FIGHT, 1=BAG, 2=POKEMON, 3=RUN. */
+    fun selectAction(actionIndex: Int)
+
+    /** moveIndex 0-3; opens the FIGHT menu first if it isn't already open. */
+    fun selectMove(moveIndex: Int)
+
+    /** Backs out of move-select to action-select (a single B press). */
+    fun back()
+
+    /** LAST BALL: the ball [throwBall] would throw now (its icon and count on the button); null = no button (not a wild battle
+     * with one foe and room for a catch, no ball in the bag, a game it can't throw in, or the option off). */
+    val lastBall: com.pokedaisy.app.companion.data.ItemView? get() = null
+
+    /** Throws [lastBall] from the action menu, without the bag. */
+    fun throwBall() {}
+
+    /** Whether [switchTo] works in this game (PokeDaisyActivity's switchAddrsFor knows it). */
+    val canSwitch: Boolean get() = false
+
+    /** Switches to the party mon with this personality ([com.pokedaisy.app.companion.data.MonView.personality]):
+     * opens POKéMON if needed, steers the party menu's cursor to it and picks SHIFT. */
+    fun switchTo(personality: Long) {}
+}

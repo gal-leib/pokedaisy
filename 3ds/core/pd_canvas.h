@@ -14,6 +14,9 @@ struct pd_canvas {
     uint32_t* px;
     // Drawing is clipped to this rectangle (pd_clip / pd_unclip).
     int cx0, cy0, cx1, cy1;
+    // pd_canvas_limit's rectangle: no clip reaches past it and pd_unclip goes back to it (0 wide = the whole canvas).
+    // A redraw of one part of a picture already drawn (a list scrolled): everything outside it stays as it was.
+    int lx0, ly0, lx1, ly1;
 };
 
 struct pd_layer {
@@ -24,6 +27,9 @@ struct pd_layer {
 void pd_canvas_init(struct pd_canvas* c, int w, int h, uint32_t* px);
 void pd_clip(struct pd_canvas* c, int x, int y, int w, int h);
 void pd_unclip(struct pd_canvas* c);
+// Limits all drawing to the rectangle until pd_canvas_unlimit (clips set meanwhile are cut to it).
+void pd_canvas_limit(struct pd_canvas* c, int x, int y, int w, int h);
+void pd_canvas_unlimit(struct pd_canvas* c);
 
 void pd_fill(struct pd_canvas* c, int x, int y, int w, int h, uint32_t color);
 // A filled rectangle whose corners step like the app's PixelRoundedShape(r).
@@ -52,6 +58,9 @@ void pd_button_box(struct pd_canvas* c, int x, int y, int w, int h, int r,
 #define PD_NO_SHADOW 0xFF000000u
 int pd_text(struct pd_canvas* c, int x, int y, const char* utf8, uint32_t color, uint32_t shadow);
 // Each font pixel `scale` canvas pixels square, the shadow one font pixel down and right.
+// Smaller than the font ([num] / [den] < 1) and smoothed; its width.
+int pd_text_mini(struct pd_canvas* c, int x, int y, const char* utf8, uint32_t color, uint32_t shadow, int num, int den);
+int pd_text_mini_width(const char* utf8, int num, int den);
 int pd_text_scaled(struct pd_canvas* c, int x, int y, const char* utf8, uint32_t color, uint32_t shadow, int scale);
 // Text [scale] tall with each font pixel num / den canvas pixels wide (a label narrowed to fit, not shrunk), no shadow.
 int pd_text_narrow(struct pd_canvas* c, int x, int y, const char* utf8, uint32_t color, int scale, int num, int den);
@@ -59,6 +68,10 @@ int pd_text_narrow(struct pd_canvas* c, int x, int y, const char* utf8, uint32_t
 int pd_text_narrow_shifted(struct pd_canvas* c, int x, int y, const char* utf8, uint32_t color, int scale, int num, int den,
                            int shift);
 int pd_text_width(const char* utf8);
+// Pixel Operator's width whatever TEXT SIZE says: pd_text_narrow's letters (times num / den).
+int pd_text_width_pixel(const char* utf8);
+// What pd_text_scaled draws at [scale]: the current font at 1, Pixel Operator times scale above.
+int pd_text_width_scaled(const char* utf8, int scale);
 // Like pd_text, cut with "..." to fit max_w.
 int pd_text_fit(struct pd_canvas* c, int x, int y, int max_w, const char* utf8, uint32_t color, uint32_t shadow);
 // Right-aligned at right.

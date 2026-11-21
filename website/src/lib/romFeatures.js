@@ -16,6 +16,7 @@ export function romFeaturesFile() {
 export const FEATURE_GROUPS = [
   [msg('COMPANION'), [
     ['Trainer card', msg('TRAINER CARD'), msg('Your trainer card, drawn like the game\'s, front and back.')],
+    ['Area map', msg('AREA MAP'), msg('A cave\'s or a big building\'s own map, floor by floor, on the MAP tab and the HUD.')],
   ]],
   [msg('ON THE GAME SCREEN'), [
     ['EXPAND', msg('EXPAND'), msg('The map drawn past the game\'s edges to fill a wide screen.')],
@@ -80,6 +81,10 @@ const ALIASES = {
   'FireRed / Emerald, randomized': ['FireRed, randomized (UPR ZX 4.6.1)', 'Emerald, randomized (UPR ZX 4.6.1)'],
   Quetzal: ['Quetzal', 'Quetzal, Moemon Quetzal'],
   'Moemon Quetzal': ['Quetzal, Moemon Quetzal'],
+  'Sacred Gold (DS)': ['Sacred Gold (DS), Storm Silver (DS)'],
+  'Storm Silver (DS)': ['Sacred Gold (DS), Storm Silver (DS)'],
+  'Elysium (Part A)': ['Elysium (Part A), Elysium (Part B)'],
+  'Elysium (Part B)': ['Elysium (Part A), Elysium (Part B)'],
 };
 /**
  * Rows no games-table game owns: hacks the app proves by their code (never listed by name), and Emerald Kaizo,

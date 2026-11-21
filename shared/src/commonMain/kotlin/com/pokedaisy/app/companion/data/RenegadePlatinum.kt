@@ -1,0 +1,91 @@
+package com.pokedaisy.app.companion.data
+
+import kotlin.concurrent.Volatile
+import okio.Path
+
+/**
+ * Pokémon Renegade Platinum (v1.3.0): Drayano's hack, retail Platinum (USA rev 1) edited in place. Its header is the
+ * retail cart's (CPUE rev 1) and so are its ARM9 (but the shiny check's one word), its field overlays and its RAM: the
+ * save, party, bag, field and battle structs read as Platinum's ([GEN4_PLATINUM_US]'s addresses, checked headless on a
+ * new game). It's told apart by its code: overlay 16 (the battle's) points its type-matchup lookups at a chart of its own
+ * in overlay 21 ([SIG_OFFSET] holds [SIG]; retail's is 0x0226ECD5), the overlays uncompressed at fixed cart offsets, so
+ * another build fails the check and reads as plain Platinum.
+ *
+ * It runs as [GameKind.PLATINUM] on Platinum's reader with [GEN4_RENEGADE_PLATINUM] and, while [renegadePlatinum], its own tables,
+ * all read from the player's cart by [NdsArt.readRenegade] ([data]): its species' types (Fairy as type 9, "???"'s slot),
+ * its moves' types, powers and categories, Gen 6's type chart, its machines (five TMs teach other moves), its icon palettes
+ * and its maps' wild encounter rates. Its "Classic" patch shares every one of these places (only its species' types and
+ * stats differ), so it matches too and reads its own; so do the shiny rate and Speed Up patches (a few bytes of code each).
+ */
+object RenegadePlatinum {
+    const val CODE = "CPUE"
+    const val REV = 1
+    /** The build mapped. */
+    const val V1_3_0_SHA1 = "d4ee068b7e0a19a848436369f145e3154afe13ca"
+    /** v1.3.0 with its "Classic" patch: only the species' data differs (pl_personal.narc). */
+    const val V1_3_0_CLASSIC_SHA1 = "8b9d933ed88dd5bffed1e96e229db568b5dad237"
+    /** v1.3.0 with its "ShinyRate_1_4096" patch: one byte of the shiny check (cart 0x79E50). */
+    const val V1_3_0_SHINY_4096_SHA1 = "f4011800c9513892d862e71c93a08eaf7056acec"
+    /** v1.3.0 with its "ShinyRate_1_8192" patch: the same byte. */
+    const val V1_3_0_SHINY_8192_SHA1 = "51bff1a74f5759ed799a9698c3df21ab07269507"
+    /** v1.3.0 with its "SpeedUpPatch" (instant text, quick HP / EXP bars, no 30 fps cap): 21 bytes of the ARM9 and
+     * battle overlay 16, none of them a place this app reads or calls, so [matches] and every table below still hold. */
+    const val V1_3_0_SPEED_UP_SHA1 = "b26f7412bbd3309a1638c571864ea0b6cb71d20e"
+    /** Every v1.3.0 build named above (the add-on patches stack, so other combinations match [matches] without a title). */
+    val V1_3_0_PATCH_SHA1S = listOf(V1_3_0_CLASSIC_SHA1, V1_3_0_SHINY_4096_SHA1, V1_3_0_SHINY_8192_SHA1, V1_3_0_SPEED_UP_SHA1)
+    /** v1.2.0: v1.3.0's ARM9 and every place below byte for byte, one data byte apart in overlay 16 and 12 data files
+     * (species, moves, trainers, encounters...) of its own, which [NdsArt.readRenegade] reads through the file system. */
+    const val V1_2_0_SHA1 = "381f9eef44564602a5f6469ee8c390fbb8ebac3a"
+
+    /** Overlay 16 (cart 0x207200, RAM 0x0223B140) at RAM 0x02254FA0: the first of its type chart's pointers, Thumb-tagged. */
+    const val SIG_OFFSET = 0x221060L
+    const val SIG = 0x021E9F81L
+
+    /** Cart offsets of what [NdsArt.readRenegade] reads past the file system (the build is pinned by [matches]). */
+    /** Its type chart in overlay 21 (cart 0x296A00, RAM 0x021D0D80) at RAM 0x021E9F80: { attacker, defender, x10 } triples,
+     * all 18 x 18 of them, the foresight pair after 0xFE, 0xFF at the end. */
+    const val TYPE_CHART_OFFSET = 0x2AFC00L
+    /** The ARM9 (uncompressed at 0x4000): sPokemonIconPaletteIndex (0x020F0780), by species / form id. */
+    const val ICON_PALETTES_OFFSET = 0x4000L + 0xF0780
+    const val ICON_PALETTES_SIZE = 0x21C
+    /** sTMHMMoves (0x020F0BFC): TM01 .. TM92, then HM01 .. HM08. */
+    const val TM_MOVES_OFFSET = 0x4000L + 0xF0BFC
+    /** sMapHeaders (0x020E601C): 593 of 24 bytes, the wild encounter set a u16 at +0x0E (0xFFFF none). */
+    const val MAP_HEADERS_OFFSET = 0x4000L + 0xE601C
+    const val MAP_HEADER_COUNT = 593
+
+    /** Whether [read] (cart offset, length) is this build's cart. */
+    fun matches(read: (Long, Int) -> ByteArray?): Boolean {
+        val code = read(0x0C, 4)?.takeIf { it.size == 4 } ?: return false
+        if (asciiString(code) != CODE) return false
+        if (read(0x1E, 1)?.firstOrNull()?.toInt() != REV) return false
+        val w = read(SIG_OFFSET, 4)?.takeIf { it.size == 4 } ?: return false
+        return u32le(w, 0) == SIG
+    }
+
+    /** [matches] on a plain ROM file. */
+    fun matches(rom: Path): Boolean = runCatching { withRomFile(rom) { matches(it.cartReader()) } }.getOrDefault(false)
+
+    /** Its tables from the player's cart ([NdsArt.readRenegade]); null until read, or for another game. */
+    class Data(
+        /** By species id (its personal records: Fairy is 9). */
+        val speciesTypes: Map<Int, SpeciesTypes>,
+        /** By move id: the cart's names, types and powers. */
+        val moveData: Map<Int, MoveInfo>,
+        /** By move id: 0 physical, 1 special, 2 status (the move's own, as Gen 4 keeps it). */
+        val moveCategories: Map<Int, Int>,
+        /** atkType * 100 + defType -> percent (the app's charts' key), pairs at 100 left out. */
+        val typeChart: Map<Int, Int>,
+        /** TM01 .. TM92, HM01 .. HM08: each machine's move. */
+        val machines: IntArray,
+        /** Each species / form id's icon palette (sPokemonIconPaletteIndex). */
+        val iconPalettes: ByteArray,
+        /** WILD ENCOUNTERS' cart rates: map header, walking rate, surfing rate, ... (MgbaCore.pkNdsWildRates). */
+        val wildRates: IntArray,
+    )
+
+    @Volatile var data: Data? = null
+
+    /** English type names by the hack's ids: Gen 4's, Fairy in "???"'s place (its own text calls 9 Fairy). */
+    val typeNames: Map<Int, String> = typeNamesGlazed
+}

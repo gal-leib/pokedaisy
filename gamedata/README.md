@@ -10,7 +10,7 @@ reads (phase 2: retail FireRed / LeafGreen / Emerald's Pokédex, guide, trainer-
 tables, their bag orders and the field items' functions: `FIELD_ITEMS_*` with their `PARTY_ITEMS_*`, `PC_*`
 and `FLY_*`). The outputs:
 
-- the app's `app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt` (the configs) and
+- the app's `shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt` (the configs) and
   `GameDataRecordsGen.kt` (the records);
 - `3ds/core/pd_configs_gen.h`, the 3DS port's `struct pd_config`s, which the Linux host builds too
   (`targets/3ds.toml`).
@@ -26,6 +26,7 @@ gamedata/
   gen3/ports/*.toml         their other-language releases (written by scripts/port_retail.py)
   gen3/hacks/*.toml         one file per hack, every release of it
   gen3/records/*.toml       named records ([record.POKEDEX_EMERALD]) and lists the configs name
+  gen3/area_maps.toml       AREA maps' rows by ROM CRC32 (written by scripts/gen_area_maps.py --scan; not configs)
   nds/ports.toml            the DS carts in other languages (scripts/gen_nds_ports.py: its own header has the format)
   targets/3ds.toml          what the 3DS / Linux companion's C gets, field by field
 ```

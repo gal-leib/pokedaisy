@@ -986,15 +986,19 @@ static void wide_tick(void) {
 /* The canvas for a fw x fh game on the panel: the panel over the game's whole scale (one less for ZOOM OUT), so the
  * frontend shows it at exactly that integer scale. EXPAND's window is the whole canvas. */
 static void canvas_for(int fw, int fh, int kind, int *w, int *h) {
-  int s = panelW / fw < panelH / fh ? panelW / fw : panelH / fh;
+  int s;
+  if (kind == CANVAS_MENU) {
+    // The companion and its menus: the largest whole scale that still leaves them 320x240, the host menu's rule and
+    // about the size Android draws its companion at (a font pixel ~1/240-1/270 of the screen's height). Taking it
+    // from the game's scale less one drew a 640x480 screen's companion at 1x, everything half its size.
+    s = panelW / 320 < panelH / 240 ? panelW / 320 : panelH / 240;
+  } else {
+    s = panelW / fw < panelH / fh ? panelW / fw : panelH / fh;
+    if (kind != CANVAS_EXPAND && s > 1)
+      s--;
+  }
   if (s < 1)
     s = 1;
-  if (kind != CANVAS_EXPAND && s > 1)
-    s--;
-  // The companion and its menus are laid out for 320x240 at least: a Game Boy game's ZOOM OUT on a 1024x768 panel is
-  // 256x192, where text overran its boxes. Menus step down until the canvas holds them.
-  while (kind == CANVAS_MENU && s > 1 && (panelW / s < 320 || panelH / s < 240))
-    s--;
   int x = panelW / s, y = panelH / s;
   *w = x < fw ? fw : x > CANVAS_MAX_W ? CANVAS_MAX_W : x;
   *h = y < fh ? fh : y > CANVAS_MAX_H ? CANVAS_MAX_H : y;
@@ -1046,9 +1050,10 @@ static void canvas_update(bool notify) {
     h = (int)fh;
   } else if (panelW)
     canvas_for((int)fw, (int)fh, want_canvas(), &w, &h);
-  // Keep extra pixels available for the menu throughout gameplay. Double the game
-  // pixels exactly, then draw menu text and icons directly at output resolution.
-  if (PD_BE_IS_GBA() && !companion && (w < 320 || h < 240) && w <= CWMAX / 2 && h <= CHMAX / 2) {
+  // While the Quick Menu is open, double the game pixels exactly so menu text and icons
+  // draw at output resolution. Gameplay stays at 1x: a doubled canvas costs every frame
+  // four times the pixels (Brick: 4.5 -> 7.1 ms per shown frame).
+  if (PD_BE_IS_GBA() && !companion && quickOpen && (w < 320 || h < 240) && w <= CWMAX / 2 && h <= CHMAX / 2) {
     scale = 2;
     w *= scale;
     h *= scale;
@@ -1177,6 +1182,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   quickSel = 0;
   wideSupported = pk_wide_configure(crc) != 0;   // Polished Crystal 3.2.3 too (pk_wide_gb.c, by its CRC)
   wideReady = false;
+  quickOpen = flyList = repelList = false; // before the canvas: an open menu doubles it (canvas_update)
   canvas_update(false);
   fieldKnown = PD_BE_IS_GBA() && pk_field_configure(crc);
   wildSwitch = fieldKnown ? pk_wild_switch_find(rom, len) : 0;
@@ -1323,6 +1329,7 @@ RETRO_API void retro_unload_game(void) {
   WIDE_CHECK_REPORT();
   CALL_TEST_REPORT();
   wideSupported = wideReady = false;
+  quickOpen = flyList = repelList = false;
   PD_BE_BEFORE_UNLOAD();
   mgba_retro_unload_game();
   free(cvs);
@@ -1428,6 +1435,16 @@ static int hud_hit_at(int x, int y) {
         y < hudHits.at[i].y + hudHits.at[i].h)
       return hudHits.at[i].id;
   return -1;
+}
+
+/* Field frames in a row: the HUD comes up after 20. Also counted on a frame the frontend hides, so the HUD shows on the
+ * same frame with and without fast-forward's skipped frames. */
+static void hud_field_tick(void) {
+  const bool field = PD_BE_IS_GB()
+                         ? wideSupported && pk_wide_scene() == PK_WIDE_SCENE_FIELD && !snap.inBattle && flyStage == 0
+                         : (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
+                               (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
+  hudFieldFrames = field ? hudFieldFrames + 1 : 0;
 }
 
 RETRO_API void retro_run(void) {
@@ -1901,6 +1918,12 @@ RETRO_API void retro_run(void) {
   const bool repeat = late && canDupe && haveGameFrame && !paused && !quickOpen &&
                       (!ff || (expanded && !repeatedFrame));
   maskGame = paused;
+  // The button that closed the companion / quick menu / HUD cursor (A on a pick, B backing out) is still held: it stays
+  // out of the game until let go, as the app's menuHeld (GitHub #1100: on a Steam Deck it answered the game's prompt).
+  static bool wasPaused;
+  if (wasPaused && !paused)
+    shortcutBlocked |= held;
+  wasPaused = paused;
   shortcutExclusive = false;
   if (!paused) {
     if (polishedActions && !rewinding && settings.wildOff &&
@@ -2134,6 +2157,22 @@ RETRO_API void retro_run(void) {
     pf_frame();
     return;
   }
+  // A frame the frontend will not show (video bit clear, as diatom's fast-forward skip asks): the game and the layer's
+  // logic ran, the drawing is left out. Only the video bit counts: a fast-forward flag alone still shows its frames.
+  // A dupe needs what `repeat` needs: a frontend that takes one and a frame sent at this geometry (canvas_update clears
+  // it), else the frame is drawn and sent as usual.
+  int av = 3;
+  const bool hidden = realEnv && realEnv(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &av) && !(av & 1);
+  if (hidden && canDupe && haveGameFrame) {
+    if (!companion && !(quickOpen && ovPixels))
+      hud_field_tick(); // as the game's own draw below would
+    if (messageFrames > 0)
+      messageFrames--; // as present() would: a notice lasts as many game frames hidden or shown
+    realVideo(NULL, (unsigned)CW, (unsigned)CH, (size_t)CW * 2);
+    PF_SKIPPED();
+    pf_frame();
+    return;
+  }
   PF_T(td0);
   if (companion) {
     pd_ui_update(&ui, &snap);
@@ -2189,11 +2228,8 @@ RETRO_API void retro_run(void) {
       draw_game_fast();
     else
       draw_game();
-    bool gb = PD_BE_IS_GB();
-    bool field = gb ? wideSupported && pk_wide_scene() == PK_WIDE_SCENE_FIELD && !snap.inBattle && flyStage == 0
-                    : (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
-                          (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
-    hudFieldFrames = field ? hudFieldFrames + 1 : 0;
+    const bool gb = PD_BE_IS_GB();
+    hud_field_tick();
     if (settings.hud && game.cfg && host.hasHud && hudFieldFrames >= 20) {
       int steps = polishedActions ? polished_byte(PD_PC_REPEL_STEPS) : gb ? 0 : repel_steps(core, game.cfg);
       if (steps <= 0)

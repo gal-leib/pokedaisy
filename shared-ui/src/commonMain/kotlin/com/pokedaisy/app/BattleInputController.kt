@@ -1,0 +1,1272 @@
+package com.pokedaisy.app
+
+import com.pokedaisy.app.companion.data.Logs
+import com.pokedaisy.app.companion.data.isGen1
+import com.pokedaisy.app.companion.data.isGen2
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlin.concurrent.Volatile
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_BUSY
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_MOVE_SELECT
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_TARGET_SELECT
+import com.pokedaisy.app.companion.data.CoreKey
+import com.pokedaisy.app.companion.data.GbPartySwitch
+import com.pokedaisy.app.companion.data.Gfx
+import com.pokedaisy.app.companion.data.InProcessReader
+import com.pokedaisy.app.companion.data.MemoryReader
+
+/**
+ * Drives the real in-game battle menu (FIGHT/BAG/POKEMON/RUN, then a move, or
+ * a Pokémon to switch to) via synthetic button presses injected through
+ * [ScriptInput.setScript] - exclusively: while a sequence runs, the player's own
+ * keys are ignored so they can't throw it off. No ROM patch involved: this
+ * just presses buttons a real player could press. See PLAN.md
+ * Phase 5 for the full design (why this works unchanged under any GAME SPEED /
+ * fast-forward setting, etc). Where the game's menu cursors are known
+ * ([cursorAddrs]) a pick reads them and presses only what it needs - the move
+ * already highlighted is one A; elsewhere it walks there blind.
+ *
+ * Thread model: [selectAction]/[selectMove]/[cancel] are called from the UI
+ * thread (Compose taps); [tick] and [onState] are called from the emulator
+ * thread once per real frame / on the fast telemetry-poll cadence
+ * respectively. All mutable state is behind a lock since the two sides run
+ * on different threads.
+ */
+class BattleInputController(
+    private val input: ScriptInput,
+    private val reader: MemoryReader = InProcessReader,
+    private val log: (String) -> Unit = { Logs.i(it, "pokedaisy-battle") },
+    /** Writes the game's RAM (the emu thread, between frames): a pick puts the menu's cursor on its cell and presses A
+     * once, so the game plays one select sound, not one per cursor step too. Null = the cursor is walked there. */
+    private val writer: ((addr: Long, bytes: ByteArray) -> Boolean)? = null,
+    /** Calls one of the game's functions between frames (r0-r3, r0 back; -1 = it never returned): LAST BALL's
+     * RemoveBagItem and fade ([throwBall]). Null = no throws. */
+    private val caller: ((fn: Long, a0: Int, a1: Int, a2: Int, a3: Int) -> Long)? = null,
+    /** A host can enable the throw's verified writes while leaving ordinary menu navigation alone. */
+    private val ballWriter: ((Long, ByteArray) -> Boolean)? = writer,
+) {
+
+    /**
+     * Where the party menu keeps its cursor and the party, for [switchTo]:
+     * FireRed / Emerald and the hacks [PokeDaisyActivity] lists (Lazarus...). [partyMenu] is gPartyMenu (`slotId` at +9), [party] gPlayerParty.
+     * [grid]: the slots sit in two columns (0 2 4 | 1 3 5, Lazarus), where
+     * DOWN stays in its column - else one list that DOWN walks through.
+     * [gridOption]: the shape is the player's choice (SoulGold's OPTIONS > PARTY MENU), read at every step - a grid while
+     * it's set, else [grid].
+     * [gb]: a Game Boy game (Yellow, Crystal and its hacks), whose party menu is read through it instead
+     * ([driveGbSwitchLocked]); the addresses above go unused then.
+     */
+    data class SwitchAddrs(
+        val partyMenu: Long = 0,
+        val party: Long = 0,
+        val monStride: Int = 100,
+        val grid: Boolean = false,
+        val gridOption: GridOption? = null,
+        val gb: GbPartySwitch? = null,
+        /** Ruby / Sapphire: no gPartyMenu.slotId - the cursor is the party menu's invisible sprite's data[0], the one in-use,
+         * invisible sprite in gSprites ([sprites]) whose callback is SpriteCallbackDummy (this, its Thumb address). */
+        val cursorSpriteCallback: Long = 0,
+        val sprites: Long = 0,
+    )
+
+    /** A save option that makes the party menu a two-column grid: the byte at `*ptr + off` with any of [mask]'s bits set
+     * (SoulGold's PARTY MENU: gSaveBlock1Ptr, +0x348C - 0 its own list, 1 BW, 2 HGSS). */
+    data class GridOption(val ptr: Long, val off: Int, val mask: Int = 0x03)
+
+    /**
+     * A Gen 1 game (Yellow): its battle menu is FIGHT / PkMn over ITEM / RUN, two one-column
+     * menus, and its moves are one list - not Gen 3's 2x2 grids. So presses go from the cursor
+     * the game shows straight to the target ([driveGbPickLocked], read every frame through
+     * [SwitchAddrs.gb]; the last poll's [gen1Cursor] without one): no LEFT / UP normalising,
+     * which would wrap in a list. Crystal and its hacks share it (the same 2x2 menu and move column).
+     */
+    @Volatile
+    var gen1 = false
+
+    /**
+     * A fresh read of the battle input state (the emu thread, between frames), or null. RUN's follow-up presses A
+     * only on a state read the same frame: A answers YES to the "Are you sure you want to run away?" Unbound asks
+     * (CFRU: a shiny foe, or its flag 0x16C6) - B said NO, and the tap did nothing - but an A that met the action
+     * menu coming back ("Can't escape!") between two ~4-frame polls would pick RUN again. Without it, B.
+     */
+    @Volatile
+    var stateNow: (() -> Int?)? = null
+
+    /**
+     * The foe in battle is shiny: RUN then picks RUN and nothing more. Unbound (CFRU) asks "Are you sure you want to run
+     * away?" before running from one, and that question is the player's to answer on the game's own YES / NO (the user's
+     * call) - the follow-up's A said YES for them. Its "Got away safely!" waits for the player's button too.
+     */
+    @Volatile
+    var runAsksFirst = false
+
+    /** The open Gen 1 menu's cursor (action cell column + 2 x row, or move index); -1 unknown. */
+    @Volatile
+    private var gen1Cursor = -1
+
+    /**
+     * Where the battle menus keep their cursors: gActionSelectionCursor and gMoveSelectionCursor,
+     * a byte per battler holding the cell (column + 2 x row). With them a pick is a closed loop -
+     * read the cursor, press only what moves it toward the cell (again if the game dropped it),
+     * A once it's there - so the move already highlighted is one press. Null = the blind walk
+     * ([queueCellLocked]: LEFT, UP, then RIGHT / DOWN, A, a settling gap after each).
+     */
+    data class CursorAddrs(val action: Long, val move: Long, val menus: MenuCells = MenuCells.GEN3)
+
+    /**
+     * How the battle menus lay out their cursor values. [GEN3]: both are 2x2 grids, the value = column + 2 x row, and an
+     * action's value is its index (0 FIGHT, 1 BAG, 2 POKéMON, 3 RUN). [ELITE_REDUX]: FIGHT / INFO over POKéMON / RUN, valued
+     * 0 / 3 over 1 / 2, no BAG (its own battle menu, checked headless: a written 2 + A ran, 1 + A opened the party), and the
+     * moves one column of four (DOWN = the next move).
+     */
+    enum class MenuCells {
+        GEN3, ELITE_REDUX;
+
+        /** The cursor value for Gen 3's action [index], or -1 where this menu has no such cell. */
+        fun actionValue(index: Int): Int = when (this) {
+            GEN3 -> index
+            ELITE_REDUX -> when (index) { 0 -> 0; 2 -> 1; 3 -> 2; else -> -1 }
+        }
+
+        /** Where cursor [value] sits: column (0 / 1) and row. */
+        fun col(value: Int, move: Boolean): Int = when (this) {
+            GEN3 -> value and 1
+            ELITE_REDUX -> if (move) 0 else if (value == 2 || value == 3) 1 else 0
+        }
+
+        fun row(value: Int, move: Boolean): Int = when (this) {
+            GEN3 -> (value shr 1) and 1
+            ELITE_REDUX -> if (move) value else if (value == 1 || value == 2) 1 else 0
+        }
+    }
+
+    @Volatile
+    var cursorAddrs: CursorAddrs? = null
+
+    /**
+     * HIDE BATTLE MENU's D-pad (two screens): the game's action menu is off its screen and the companion's buttons stand in
+     * for it, FIGHT over BAG / RUN / POKéMON - not the game's 2 x 2. A direction ([steerAction], from the UI thread) moves
+     * the game's cursor round them as they're laid out there ([HiddenMenuSteer]), written straight into
+     * gActionSelectionCursor on the next frame: the game reads it on A, which stays the player's own, and the companion
+     * lights that button ([menuCursor]). The moves need none of it: the game's grid and the companion's are both 2 x 2.
+     */
+    @Volatile
+    private var steerKey = 0
+
+    /** Whether [steerAction] can move the action menu's cursor now: the menu is up, its cursor known and writable, no pick
+     * of ours steering it. */
+    val canSteerAction: Boolean
+        get() = gameState == BATTLE_INPUT_ACTION_SELECT && writer != null && cursorAddrs?.menus == MenuCells.GEN3 &&
+            menuCursor in 0..3 && pickCell < 0
+
+    /** A D-pad press ([CoreKey] bits) for the action menu's cursor, applied on the next frame ([tick]). */
+    fun steerAction(key: Int) {
+        steerKey = key
+    }
+
+    private fun steerLocked() {
+        val key = steerKey
+        if (key == 0) return
+        steerKey = 0
+        if (lastKnownState != BATTLE_INPUT_ACTION_SELECT || pickCell >= 0 || queue.isNotEmpty() || framesLeft > 0) return
+        val addrs = cursorAddrs?.takeIf { it.menus == MenuCells.GEN3 } ?: return
+        val write = writer ?: return
+        val addr = addrs.action + lastBattler
+        val cur = runCatching { reader.readCoreMemory(addr, 1)[0].toInt() and 0xFF }.getOrNull()?.takeIf { it in 0..3 } ?: return
+        val next = HiddenMenuSteer.next(cur, key)
+        if (next != cur && !runCatching { write(addr, byteArrayOf(next.toByte())) }.getOrDefault(false)) log("steer to $next didn't write")
+    }
+
+    /** The open menu's cursor, read each frame ([BattleInput.menuCursor]); -1 = no such menu, or a game whose cursor isn't known. */
+    @Volatile
+    var menuCursor = -1
+        private set
+
+    private fun readMenuCursorLocked() {
+        val addrs = cursorAddrs?.takeIf { it.menus == MenuCells.GEN3 }
+        val at = when (lastKnownState) {
+            BATTLE_INPUT_ACTION_SELECT -> addrs?.action
+            BATTLE_INPUT_MOVE_SELECT -> addrs?.move
+            else -> null
+        }
+        menuCursor = at?.let { a ->
+            runCatching { reader.readCoreMemory(a + lastBattler, 1)[0].toInt() and 0xFF }.getOrNull()?.takeIf { it in 0..3 }
+        } ?: -1
+    }
+
+    /** Set once the running game is known to support [switchTo]; null = it doesn't. */
+    @Volatile
+    var switchAddrs: SwitchAddrs? = null
+
+    private enum class SwitchPhase { WAIT_MENU, NAVIGATE, CONFIRM, WAIT_CLOSE }
+
+    private data class Step(val bits: Int, val frames: Int)
+
+    private val lock = SynchronizedObject()
+    private val queue = ArrayDeque<Step>()
+    private var currentBits = 0
+    private var framesLeft = 0
+    private var pendingMoveIndex: Int? = null
+    private var lastKnownState: Int = BATTLE_INPUT_NONE
+    /** The battler whose menu is up, as last polled: its byte in the cursor arrays. */
+    private var lastBattler = 0
+
+    // A closed-loop pick in flight (see [cursorAddrs]): the cell, which menu, presses so far.
+    private var pickCell = -1
+    private var pickMove = false
+    private var pickPresses = 0
+
+    // A Game Boy pick in flight ([driveGbPickLocked]): the menu it waits on (BATTLE_INPUT_ACTION_SELECT or MOVE_SELECT),
+    // the cell / move, presses so far, frames since it started and the frame of its last A (-1: none yet).
+    private var gbPickMenu = BATTLE_INPUT_NONE
+    private var gbPickCell = -1
+    private var gbPickPresses = 0
+    private var gbPickFrames = 0
+    private var gbPickA = -1
+
+    /** The game's battle input state as last polled (BATTLE_INPUT_NONE outside battles), for SMART fast-forward. */
+    @Volatile
+    var gameState: Int = BATTLE_INPUT_NONE
+        private set
+    // Set right after queuing a move-cell confirm. Some moves (anything
+    // flagged MOVE_TARGET_USER_OR_SELECTED, e.g. certain status moves) don't
+    // submit on that A press even in a single battle - they open a *third*
+    // "who does this hit" screen instead, which needs a second A to accept
+    // the game's own default target. Without watching for this, such a move
+    // would look exactly like "cursor lands on the right move, never fires".
+    private var awaitingTargetConfirm = false
+
+    // [switchTo] in flight: the chosen mon's personality, where the closed
+    // loop is, and counters that keep a stuck menu from blocking input forever.
+    private var switchTarget: Long? = null
+    private var switchPhase = SwitchPhase.WAIT_MENU
+    private var switchFrames = 0
+    private var switchPresses = 0
+    private var switchLastSlot = -1
+    // A Game Boy switch ([driveGbSwitchLocked]): the menu is the pick after a faint (no SWITCH menu follows), SWITCH's
+    // A went out, the frame of the last A (pressed again only while the menu still waits GB_REPRESS_FRAMES later).
+    private var gbForced = false
+    private var gbSwitchPressed = false
+    private var gbLastA = 0
+    private var gbAPresses = 0
+
+    // RUN's follow-up: presses left to close "Got away safely!" (or "Can't
+    // escape!", or answer a hack's "Are you sure you want to run away?"), the
+    // frames until the next one, and whether the game has left action-select
+    // since RUN was picked.
+    private var runPresses = 0
+    private var runGap = 0
+    private var runLeftMenu = false
+
+    // Frames spent in a passive watch (target confirm / pending move) with
+    // nothing queued, and frames the player's keys have been shut out in a
+    // row - both bounded, so nothing here can lock the player out for good.
+    private var watchFrames = 0
+    private var exclusiveFrames = 0
+
+    // Frames the screen stays held after a switch ends (see [holdFrame]).
+    private var holdTail = 0
+
+    /**
+     * True while the screen should keep showing the frame from before a
+     * [switchTo]: the switch drives the game's own party menu, which fades the
+     * battle to black and back - shown, that's a black flash and a party menu
+     * the player never asked to see. Held from the switch's start until the
+     * game is back in the battle (WaitForMonSelection only hands back once the
+     * battle has faded in), plus [HOLD_TAIL_FRAMES] for the state poll to catch up.
+     */
+    @Volatile
+    var holdFrame = false
+        private set
+
+    /**
+     * True while the game's own sounds for automated presses should go unheard (the engine mutes them in FF): every
+     * press of a sequence but its last (the A that does what was tapped; BACK's B) - so a tap makes one game click, not
+     * the cursor's chatter at FF speed. The user's call.
+     */
+    @Volatile
+    var muteGame = false
+        private set
+    // The A being played is the sequence's last: heard from its frame until another press starts.
+    private var finalPress = false
+
+    /** True while a queued sequence hasn't fully drained, a move selection is
+     * waiting on the FIGHT screen to open, or a submitted move is waiting on
+     * a target-confirm we haven't sent yet. UI should disable further taps
+     * while this is true, to avoid overlapping sequences. */
+    val isBusy: Boolean
+        get() = synchronized(lock) { busyLocked() }
+
+    private fun busyLocked() = exclusiveLocked() || pendingMoveIndex != null || awaitingTargetConfirm
+
+    /**
+     * Whether the player's own keys are shut out right now: only while presses
+     * are queued or playing, or a closed loop (switch / RUN) is steering. Not
+     * during the passive watches (a target screen that may follow a move, a
+     * move waiting on FIGHT to open): the turn plays out under those, and it can
+     * stop on a message that waits for the player's A (a level up, "learn a new
+     * move?", a trainer's "Will you change Pokémon?") - shutting them out there
+     * left the game stuck with no way to press anything.
+     */
+    private fun exclusiveLocked() = queue.isNotEmpty() || framesLeft > 0 || switchTarget != null || runPresses > 0 || pickCell >= 0 ||
+        gbPickCell >= 0
+
+    /** Call once per real emulated frame, before MgbaCore.pkSetKeys. */
+    fun tick() {
+        val (bitsToSend, exclusive) = synchronized(lock) {
+            steerLocked()
+            readMenuCursorLocked()
+            if (gbPickCell >= 0) gbPickFrames++
+            // The closed-loop steps (party cursor, RUN's B) queue their next
+            // presses only once the last ones have played out.
+            // LAST BALL: watched every frame (the bag's fade starts the frame BAG is taken).
+            driveThrowLocked()
+            if (framesLeft <= 0 && queue.isEmpty()) {
+                drivePickLocked()
+                driveGbPickLocked()
+                if (queue.isEmpty() && gbPickCell < 0) {
+                    driveSwitchLocked()
+                    driveRunLocked()
+                }
+            }
+            if (framesLeft <= 0) {
+                val next = queue.removeFirstOrNull()
+                currentBits = next?.bits ?: 0
+                framesLeft = next?.frames ?: 0
+                if (currentBits != 0) {
+                    finalPress = queue.none { it.bits != 0 } && pickCell < 0 && (gbPickCell < 0 || gbPickA >= 0) &&
+                        pendingMoveIndex == null && switchTarget == null
+                }
+            }
+            if (framesLeft > 0) framesLeft--
+            // A target screen follows a move's A within a few frames, and FIGHT
+            // opens as fast: a watch still unanswered after that is stale.
+            if (queue.isEmpty() && framesLeft <= 0 && (awaitingTargetConfirm || pendingMoveIndex != null)) {
+                if (++watchFrames > WATCH_TIMEOUT_FRAMES) {
+                    log("watch expired (awaitingTarget=$awaitingTargetConfirm, pending=$pendingMoveIndex)")
+                    awaitingTargetConfirm = false
+                    pendingMoveIndex = null
+                    watchFrames = 0
+                }
+            } else {
+                watchFrames = 0
+            }
+            // Every sequence is bounded on its own; this is the backstop.
+            if (exclusiveLocked()) {
+                if (++exclusiveFrames > EXCLUSIVE_TIMEOUT_FRAMES) {
+                    log("keys shut out for $exclusiveFrames frames - cancelling")
+                    cancelLocked()
+                }
+            } else {
+                exclusiveFrames = 0
+            }
+            if (switchTarget == null && holdTail > 0) holdTail--
+            holdFrame = switchTarget != null || holdTail > 0 || throwFns != null
+            if (!exclusiveLocked()) finalPress = false
+            muteGame = (exclusiveLocked() || pendingMoveIndex != null) && !finalPress
+            currentBits to exclusiveLocked()
+        }
+        if (bitsToSend != lastLoggedBits) {
+            log("tick sending bits=$bitsToSend")
+            lastLoggedBits = bitsToSend
+        }
+        input.setScript(bitsToSend, exclusive)
+    }
+
+    /**
+     * Switches to the party mon whose personality is [personality]: picks
+     * POKéMON if the action menu is up (or uses the party menu the game
+     * already opened, e.g. after a faint), then steers the menu's cursor to
+     * that mon and picks SHIFT. Closed loop on the game's own memory: the
+     * battle party menu shows the party in battle order (UpdatePartyToBattleOrder
+     * really reorders gPlayerParty while it's open), so the mon is looked up
+     * there by personality, and DOWN is pressed until gPartyMenu.slotId is its
+     * slot - no assumptions about where the cursor starts or how it wraps.
+     */
+    fun switchTo(personality: Long) {
+        synchronized(lock) {
+            val addrs = switchAddrs
+            if (addrs == null || personality == 0L) return
+            log("switchTo(pid=0x${personality.toString(16)}) lastKnownState=$lastKnownState")
+            // A Game Boy game: refused before anything is pressed if the mon can't go in (not in the party, fainted,
+            // already out) - the game would only say why and wait in its party menu.
+            addrs.gb?.let { gb -> gbRefusal(gb, personality)?.let { why -> log("switch refused: $why"); return } }
+            pendingMoveIndex = null
+            if (lastKnownState == BATTLE_INPUT_ACTION_SELECT) {
+                if (gen1) queueGen1ActionLocked(2) else pickCellLocked(2, move = false) // POKéMON (PkMn / PKMN)
+            }
+            gbForced = false
+            gbSwitchPressed = false
+            gbAPresses = 0
+            switchTarget = personality
+            switchPhase = SwitchPhase.WAIT_MENU
+            switchFrames = 0
+            switchPresses = 0
+            switchLastSlot = -1
+        }
+    }
+
+    private fun driveSwitchLocked() {
+        val target = switchTarget ?: return
+        val addrs = switchAddrs ?: return endSwitchLocked("no addresses")
+        switchFrames++
+        addrs.gb?.let { return driveGbSwitchLocked(it, target) }
+        when (switchPhase) {
+            // The party menu takes a moment to fade in after the controller
+            // starts waiting on it; presses before then are dropped.
+            // No fixed settle: NAVIGATE presses at once, and the presses the menu drops while it
+            // fades in (~50 frames on FireRed and Emerald) are simply pressed again.
+            SwitchPhase.WAIT_MENU ->
+                if (lastKnownState == BATTLE_INPUT_PARTY_OPEN) {
+                    switchPhase = SwitchPhase.NAVIGATE
+                    switchFrames = 0
+                    switchLastSlot = -1
+                } else if (switchFrames > MENU_TIMEOUT_FRAMES) {
+                    endSwitchLocked("party menu never opened")
+                }
+            SwitchPhase.NAVIGATE -> {
+                val slot = runCatching {
+                    if (addrs.cursorSpriteCallback != 0L) spriteCursor(addrs)
+                    else reader.readCoreMemory(addrs.partyMenu + PARTY_MENU_SLOT_ID, 1)[0].toInt()
+                }.getOrNull() ?: return endSwitchLocked("cursor unreadable")
+                val want = slotOf(addrs, target) ?: return endSwitchLocked("mon not in the party")
+                // Steps the cursor really took (dropped presses don't count).
+                if (slot != switchLastSlot) {
+                    if (switchLastSlot >= 0) switchPresses++
+                    switchLastSlot = slot
+                }
+                if (slot == want) {
+                    pressLocked(CoreKey.A)      // the mon -> its SHIFT / SUMMARY / CANCEL menu
+                    waitFramesLocked(SUBMENU_FRAMES)
+                    switchPhase = SwitchPhase.CONFIRM
+                } else if (switchPresses > MAX_CURSOR_PRESSES || switchFrames > MENU_TIMEOUT_FRAMES) {
+                    endSwitchLocked("cursor didn't reach slot $want")
+                } else {
+                    pressLocked(cursorKey(isGrid(addrs), slot, want, partyCount(addrs)))
+                    waitFramesLocked(CURSOR_FRAMES)
+                }
+            }
+            SwitchPhase.CONFIRM -> {
+                pressLocked(CoreKey.A)          // SHIFT, the menu's first entry
+                switchPhase = SwitchPhase.WAIT_CLOSE
+                switchFrames = 0
+            }
+            // Keep the player's keys out until the game has taken the switch.
+            SwitchPhase.WAIT_CLOSE ->
+                if (lastKnownState != BATTLE_INPUT_PARTY_OPEN || switchFrames > CLOSE_TIMEOUT_FRAMES) endSwitchLocked("done")
+        }
+    }
+
+    /** Ruby / Sapphire's party cursor ([SwitchAddrs.cursorSpriteCallback]): the one in-use, invisible sprite with that callback,
+     * its data[0] (a slot, 7 = CANCEL); null unless exactly one. */
+    private fun spriteCursor(addrs: SwitchAddrs): Int? {
+        val raw = reader.readCoreMemory(addrs.sprites, SPRITE_COUNT * SPRITE_SIZE)
+        val hits = (0 until SPRITE_COUNT).mapNotNull { i ->
+            val o = i * SPRITE_SIZE
+            val flags = raw[o + SPRITE_FLAGS].toInt()
+            if (flags and 0x05 != 0x05 || Gfx.u32(raw, o + SPRITE_CALLBACK) != addrs.cursorSpriteCallback) null
+            else ((raw[o + SPRITE_DATA0].toInt() and 0xFF) or (raw[o + SPRITE_DATA0 + 1].toInt() shl 8)).takeIf { it in 0..PARTY_MENU_CANCEL }
+        }
+        return hits.singleOrNull()
+    }
+
+    /** Whether the party menu is a two-column grid right now ([SwitchAddrs.grid], or its [SwitchAddrs.gridOption] set). */
+    private fun isGrid(addrs: SwitchAddrs): Boolean {
+        val o = addrs.gridOption ?: return addrs.grid
+        return runCatching {
+            val base = Gfx.u32(reader.readCoreMemory(o.ptr, 4), 0)
+            (reader.readCoreMemory(base + o.off, 1)[0].toInt() and o.mask) != 0
+        }.getOrDefault(addrs.grid)
+    }
+
+    /** The press that moves the party cursor from [slot] toward [want]: in a list, the shorter way round
+     * ([count] mons, then CANCEL; DOWN and UP both wrap through it). In a [grid] (0 1 / 2 3 / 4 5): across to [want]'s
+     * column, then along it - or along it first when there's no Pokémon beside [slot] (an odd party's last row). */
+    private fun cursorKey(grid: Boolean, slot: Int, want: Int, count: Int): Int = when {
+        !grid -> listKey(slot, want, count, cancel = true)
+        slot !in 0 until 6 -> CoreKey.UP     // CANCEL: back into the grid
+        slot % 2 != want % 2 && (slot xor 1) < count -> if (want % 2 == 1) CoreKey.RIGHT else CoreKey.LEFT
+        else -> if (want / 2 > slot / 2) CoreKey.DOWN else CoreKey.UP
+    }
+
+    /** DOWN or UP, the shorter way from [slot] to [want] round a wrapping list of [count] mons (then CANCEL, with [cancel]). */
+    private fun listKey(slot: Int, want: Int, count: Int, cancel: Boolean): Int {
+        val ring = (0 until count) + (if (cancel) listOf(PARTY_MENU_CANCEL) else emptyList())
+        val i = ring.indexOf(slot)
+        val j = ring.indexOf(want)
+        val down = (j - i + ring.size) % ring.size
+        return if (i < 0 || j < 0 || down <= ring.size - down) CoreKey.DOWN else CoreKey.UP
+    }
+
+    /**
+     * A Game Boy game's switch (Yellow, Crystal and its hacks): the same closed loop, on its own party menu
+     * ([GbPartySwitch]), which lists the party in its own order. The mon is found by its key
+     * ([com.pokedaisy.app.companion.data.gbMonKey]) at every step; A on it, then A on SWITCH (the first item of the
+     * menu that opens; none after a faint). The games drop presses for a few frames after drawing a menu's cursor
+     * (Yellow's Delay3, Crystal's SWITCH menu for ~30), so a press the menu didn't follow is pressed again - never
+     * before it could have been taken: a taken pick turns the cursor hollow at once.
+     */
+    private fun driveGbSwitchLocked(gb: GbPartySwitch, target: Long) {
+        val menu = runCatching { gb.menu(reader) }.getOrNull()
+        when (switchPhase) {
+            SwitchPhase.WAIT_MENU ->
+                if (menu != null) {
+                    switchPhase = SwitchPhase.NAVIGATE
+                    switchFrames = 0
+                    switchLastSlot = -1
+                } else if (switchFrames > MENU_TIMEOUT_FRAMES) {
+                    endSwitchLocked("party menu never opened")
+                }
+            SwitchPhase.NAVIGATE -> {
+                if (switchFrames > MENU_TIMEOUT_FRAMES) return endSwitchLocked("cursor didn't reach the mon")
+                if (menu == null) return                                   // being drawn
+                if (menu.submenu) {                                        // a SWITCH menu we didn't open: back to the list
+                    pressGbLocked(CoreKey.B)
+                    waitFramesLocked(GB_REPRESS_FRAMES)
+                    return
+                }
+                gbRefusal(gb, target)?.let { return endSwitchLocked(it) }
+                val party = runCatching { gb.party(reader) }.getOrNull() ?: return endSwitchLocked("party unreadable")
+                val want = party.indexOfFirst { it.key == target }
+                val slot = menu.cursor
+                // Steps the cursor really took (dropped presses don't count).
+                if (slot != switchLastSlot) {
+                    if (switchLastSlot >= 0) switchPresses++
+                    switchLastSlot = slot
+                }
+                if (slot == want) {
+                    pressGbLocked(CoreKey.A)                            // the mon -> SWITCH / STATS / CANCEL, or out after a faint
+                    waitFramesLocked(GB_SETTLE_FRAMES)
+                    gbForced = menu.forced
+                    gbLastA = 0
+                    gbAPresses = 0
+                    switchPhase = SwitchPhase.CONFIRM
+                    switchFrames = 0
+                } else if (switchPresses > MAX_CURSOR_PRESSES) {
+                    endSwitchLocked("cursor didn't reach slot $want")
+                } else {
+                    pressGbLocked(listKey(slot, want, party.size, gb.hasCancel))
+                    waitFramesLocked(CURSOR_FRAMES)
+                }
+            }
+            SwitchPhase.CONFIRM -> when {
+                // The pick was taken: the cursor went hollow and the game moves on.
+                menu == null ->
+                    if (gbForced || gbSwitchPressed) {
+                        switchPhase = SwitchPhase.WAIT_CLOSE
+                        switchFrames = 0
+                    } else if (switchFrames > MENU_TIMEOUT_FRAMES) {
+                        endSwitchLocked("SWITCH menu never opened")
+                    }
+                menu.submenu ->
+                    if (menu.cursor != 0) {
+                        pressGbLocked(CoreKey.UP)                       // SWITCH is the first item
+                        waitFramesLocked(CURSOR_FRAMES)
+                    } else if (!gbSwitchPressed || switchFrames - gbLastA >= GB_REPRESS_FRAMES) {
+                        if (++gbAPresses > MAX_GB_A_PRESSES) return endSwitchLocked("SWITCH never took A")
+                        pressGbLocked(CoreKey.A)
+                        waitFramesLocked(GB_SETTLE_FRAMES)
+                        gbSwitchPressed = true
+                        gbLastA = switchFrames
+                    }
+                // Back on the list after SWITCH: the game said no (already out, can't be recalled, no will to fight).
+                gbSwitchPressed -> endSwitchLocked("the game refused the switch")
+                // Still on the list: the A on the mon was dropped - steer again from wherever the cursor is.
+                switchFrames >= GB_REPRESS_FRAMES -> {
+                    switchPhase = SwitchPhase.NAVIGATE
+                    switchFrames = 0
+                    switchLastSlot = -1
+                }
+            }
+            // The game took it: hold the frame a little longer, while it leaves the party screen (white, then the battle).
+            SwitchPhase.WAIT_CLOSE -> if (menu == null || switchFrames > CLOSE_TIMEOUT_FRAMES) {
+                endSwitchLocked("done")
+                holdTail = GB_HOLD_TAIL_FRAMES
+            }
+        }
+    }
+
+    /** Why the mon keyed [key] can't be sent in (not in the party, fainted, already out), or null. */
+    private fun gbRefusal(gb: GbPartySwitch, key: Long): String? {
+        val party = runCatching { gb.party(reader) }.getOrNull() ?: return "party unreadable"
+        val slot = party.indexOfFirst { it.key == key }
+        return when {
+            slot < 0 -> "mon not in the party"
+            party[slot].hp == 0 -> "slot $slot has fainted"
+            slot == runCatching { gb.outSlot(reader) }.getOrDefault(-1) -> "slot $slot is already out"
+            else -> null
+        }
+    }
+
+    /** The party's size (the slots holding a Pokémon). */
+    private fun partyCount(addrs: SwitchAddrs): Int {
+        val raw = runCatching { reader.readCoreMemory(addrs.party, 6 * addrs.monStride) }.getOrNull() ?: return 6
+        return (0 until 6).count { Gfx.u32(raw, it * addrs.monStride) != 0L }.coerceAtLeast(1)
+    }
+
+    /** gPlayerParty's slot holding [personality] (the menu's slot while it's open), or null. */
+    private fun slotOf(addrs: SwitchAddrs, personality: Long): Int? {
+        val raw = runCatching { reader.readCoreMemory(addrs.party, 6 * addrs.monStride) }.getOrNull() ?: return null
+        return (0 until 6).firstOrNull { Gfx.u32(raw, it * addrs.monStride) == personality }
+    }
+
+    private fun endSwitchLocked(why: String) {
+        log("switch ended: $why")
+        switchTarget = null
+        holdTail = HOLD_TAIL_FRAMES
+    }
+
+    private fun driveRunLocked() {
+        // RUN's own pick (to the cell, then A) goes first.
+        if (runPresses <= 0 || pickCell >= 0) return
+        when {
+            // The battle ended (got away), or it's back on the menu (couldn't escape): done.
+            lastKnownState == BATTLE_INPUT_NONE -> runPresses = 0
+            runLeftMenu && lastKnownState == BATTLE_INPUT_ACTION_SELECT -> runPresses = 0
+            else -> {
+                if (lastKnownState != BATTLE_INPUT_ACTION_SELECT) runLeftMenu = true
+                if (--runGap > 0) return
+                runGap = RUN_PRESS_GAP
+                val read = stateNow ?: run {
+                    pressLocked(CoreKey.B)
+                    runPresses--
+                    return
+                }
+                when (runCatching { read() }.getOrNull()) {
+                    // A message or a YES / NO: A closes the one and says YES to the other.
+                    BATTLE_INPUT_BUSY -> {
+                        runLeftMenu = true
+                        pressLocked(CoreKey.A)
+                        runPresses--
+                    }
+                    // Still leaving the menu, or back on it: nothing to press this time.
+                    BATTLE_INPUT_ACTION_SELECT -> runPresses--
+                    // The battle's over, a party menu after a faint, an unreadable state: done.
+                    else -> runPresses = 0
+                }
+            }
+        }
+    }
+    private var lastLoggedBits = -1
+
+    /** Feed the latest (battleActiveBattler, battleInputState) from the fast
+     * telemetry poll (not the ~1 Hz full refresh). Resumes a move selection
+     * that's waiting for the FIGHT screen to actually open. */
+    fun onState(activeBattler: Int, state: Int, cursor: Int = -1) {
+        synchronized(lock) {
+            gen1Cursor = cursor
+            if (state != lastKnownState) {
+                log("state $lastKnownState -> $state (battler=$activeBattler, queue=${queue.size}, framesLeft=$framesLeft, pending=$pendingMoveIndex, awaitingTarget=$awaitingTargetConfirm)")
+            }
+            lastKnownState = state
+            lastBattler = activeBattler.coerceIn(0, 3)
+            gameState = state
+            // A pick still steering is still on its menu: nothing below has happened yet.
+            if (pickCell >= 0 || gbPickCell >= 0) return
+
+            if (awaitingTargetConfirm && queue.isEmpty() && framesLeft == 0) {
+                when (state) {
+                    BATTLE_INPUT_TARGET_SELECT -> {
+                        log("target-select seen, sending confirm A")
+                        awaitingTargetConfirm = false
+                        pressLocked(CoreKey.A) // accept the game's own default target
+                    }
+                    // Anything else here means the move submitted directly
+                    // (no target-select needed) or something unrelated
+                    // happened - either way, stop watching for it.
+                    BATTLE_INPUT_BUSY -> Unit // still resolving; keep waiting
+                    else -> {
+                        log("dropping awaitingTargetConfirm, state=$state")
+                        awaitingTargetConfirm = false
+                    }
+                }
+            }
+
+            val pending = pendingMoveIndex ?: return
+            // Doubles' battler-id-to-position mapping isn't handled yet (see
+            // PLAN.md) - if the choosing battler changed out from under a
+            // pending move (e.g. the partner mon's turn came up), drop it
+            // rather than risk firing into the wrong mon's menu.
+            if (activeBattler != 0) {
+                log("dropping pendingMoveIndex=$pending, activeBattler=$activeBattler != 0")
+                pendingMoveIndex = null
+                return
+            }
+            if (state == BATTLE_INPUT_MOVE_SELECT && queue.isEmpty() && framesLeft == 0) {
+                log("resuming pendingMoveIndex=$pending now that MOVE_SELECT is open")
+                pendingMoveIndex = null
+                queueMoveCellLocked(pending)
+            }
+        }
+    }
+
+    /** Cancels any in-flight or pending sequence and releases all keys. */
+    fun cancel() {
+        synchronized(lock) { cancelLocked() }
+    }
+
+    private fun cancelLocked() {
+        queue.clear()
+        pickCell = -1
+        gbPickCell = -1
+        pendingMoveIndex = null
+        awaitingTargetConfirm = false
+        switchTarget = null
+        runPresses = 0
+        currentBits = 0
+        framesLeft = 0
+        watchFrames = 0
+        exclusiveFrames = 0
+        holdTail = 0
+        holdFrame = false
+        throwFns = null
+    }
+
+    /** LAST BALL in flight ([throwBall]): the game's functions, the ball, its RemoveBagItem, frames since BAG was picked. */
+    private var throwFns: com.pokedaisy.app.companion.data.BattleBall.Fns? = null
+    private var throwItem = 0
+    private var throwRemove = 0L
+    private var throwFrames = 0
+
+    /**
+     * LAST BALL ([com.pokedaisy.app.companion.data.BattleBall]): picks BAG as a tap on it would, then catches the controller
+     * at OpenBagAndChooseItem before the bag opens ([driveThrowLocked]) - the ball out of the bag ([removeBagItem], as the
+     * bag's own ItemUseInBattle_PokeBall does), into gSpecialVar_ItemId, the controller on CompleteWhenChoseItem, the fade
+     * turned round. The game throws it. If any of that can't be done the bag just opens, as BAG would.
+     */
+    fun throwBall(fns: com.pokedaisy.app.companion.data.BattleBall.Fns, itemId: Int, removeBagItem: Long) {
+        if (caller == null || ballWriter == null) return
+        synchronized(lock) {
+            pendingMoveIndex = null
+            pickCellLocked(1, move = false)
+            throwFns = fns
+            throwItem = itemId
+            throwRemove = removeBagItem
+            throwFrames = 0
+        }
+    }
+
+    private fun driveThrowLocked() {
+        val f = throwFns ?: return
+        if (++throwFrames > THROW_TIMEOUT_FRAMES) return endThrowLocked("timed out")
+        val raw = runCatching { reader.readCoreMemory(f.controllerFuncs, MAX_BATTLERS * 4) }.getOrNull() ?: return
+        val want = (f.openBag or 1L).toInt()
+        val battler = (0 until MAX_BATTLERS).firstOrNull { le32(raw, it * 4) == want } ?: return
+        val call = caller ?: return endThrowLocked("no caller")
+        val write = ballWriter ?: return endThrowLocked("no writer")
+        val removed = call(throwRemove, throwItem, 1, 0, 0)
+        if (removed == CALL_NOT_NOW) return   // mid-interrupt: the next frame (the bag's fade takes ~16)
+        if (removed != 1L) return endThrowLocked("RemoveBagItem said no: the bag opens")
+        val fade = runCatching { reader.readCoreMemory(f.paletteFade + 7, 1)[0].toInt() and 0xFF }.getOrDefault(0)
+        val ok = write(f.itemIdVar, byteArrayOf(throwItem.toByte(), (throwItem shr 8).toByte())) &&
+            write(f.controllerFuncs + battler * 4, le32bytes((f.completeWhenChose or 1L).toInt())) &&
+            write(f.paletteFade + 7, byteArrayOf((fade and 0x7F).toByte()))
+        // A fade from 0 to 0: the palettes as they were before BAG's fade began (its blend colour, on the stack, is
+        // never applied at 0).
+        if (ok) call(f.beginNormalPaletteFade, -1, 0, 0, 0)
+        holdTail = THROW_HOLD_FRAMES
+        endThrowLocked(if (ok) "thrown $throwItem (battler $battler)" else "a write didn't take")
+    }
+
+    private fun endThrowLocked(why: String) {
+        log("last ball: $why")
+        throwFns = null
+    }
+
+    private fun le32(b: ByteArray, o: Int) =
+        (b[o].toInt() and 0xFF) or ((b[o + 1].toInt() and 0xFF) shl 8) or ((b[o + 2].toInt() and 0xFF) shl 16) or (b[o + 3].toInt() shl 24)
+
+    private fun le32bytes(v: Int) = byteArrayOf(v.toByte(), (v shr 8).toByte(), (v shr 16).toByte(), (v shr 24).toByte())
+
+    /** actionIndex: 0=FIGHT, 1=BAG, 2=POKEMON, 3=RUN — matches the ROM's own
+     * gActionSelectionCursor values (B_ACTION_USE_MOVE/USE_ITEM/SWITCH/RUN). */
+    fun selectAction(actionIndex: Int) {
+        synchronized(lock) {
+            pendingMoveIndex = null
+            if (gen1) queueGen1ActionLocked(actionIndex) else pickCellLocked(actionIndex, move = false)
+            if (actionIndex == ACTION_RUN) {
+                // "Got away safely!" waits for a button: close it (a press while
+                // it's still printing just finishes the text). Not from a shiny
+                // foe ([runAsksFirst]): the game's question waits for the player.
+                runPresses = if (runAsksFirst) 0 else RUN_PRESSES
+                runGap = RUN_FIRST_GAP
+                runLeftMenu = false
+            }
+        }
+    }
+
+    /** moveIndex 0-3. The move-select screen only ever gets tapped while it's
+     * already open (that's the only time the UI shows move cards at all), so
+     * this navigates that grid directly - it must NOT re-run the "open
+     * FIGHT" detour here, since LEFT/UP/A would then be misread as move-grid
+     * navigation and confirm whatever the game's own default move slot is
+     * (0) regardless of which card was tapped. The FIGHT-then-continue path
+     * stays available for [onState] to resume a pending selection made while
+     * still on the action-select screen (not currently reachable from the
+     * UI, since it only calls this once already in MOVE_SELECT, but kept so
+     * a future caller doesn't have to re-solve this). */
+    fun selectMove(moveIndex: Int) {
+        synchronized(lock) {
+            log("selectMove($moveIndex) lastKnownState=$lastKnownState col=${col(moveIndex)} row=${row(moveIndex)}")
+            if (lastKnownState == BATTLE_INPUT_ACTION_SELECT) {
+                pendingMoveIndex = moveIndex
+                if (gen1) queueGen1ActionLocked(0) else pickCellLocked(0, move = false) // open FIGHT (action index 0)
+            } else {
+                pendingMoveIndex = null
+                queueMoveCellLocked(moveIndex)
+            }
+        }
+    }
+
+    /** A single B press — backs out of the move-select screen to action-select,
+     * same as the real B button. */
+    fun back() {
+        synchronized(lock) {
+            log("back()")
+            pendingMoveIndex = null
+            // A Game Boy party menu (the POKéMON pane's CANCEL) takes it held: Prism's party menu reads keys every other frame.
+            if (gen1) pressGbLocked(CoreKey.B) else pressLocked(CoreKey.B)
+        }
+    }
+
+    // 2x2 grid shared by both the action-select and move-select screens:
+    // col = LEFT/RIGHT bit, row = UP/DOWN bit (see battle_controller_player.c's
+    // gActionSelectionCursor/gMoveSelectionCursor XOR-toggle logic).
+    private fun col(index: Int) = index and 1
+    private fun row(index: Int) = (index shr 1) and 1
+
+    /** The normalize-then-walk script: LEFT/UP unconditionally (each a no-op
+     * if already there), then RIGHT/DOWN only if the target needs them, then
+     * A - each press followed by a settling gap. Lands on the right cell
+     * with no need to know the current cursor.
+     *
+     * The settling gap exists because a cursor move that actually takes
+     * effect starts a cosmetic palette fade (BeginNormalPaletteFade), and at
+     * least Unbound's rewritten move-select screen appears to ignore *any*
+     * further input while that fade is still active - confirmed live twice:
+     * first a move whose cell required only one real DPAD move landed the
+     * cursor correctly but the immediately-following A never registered;
+     * fixed by gapping before A. Then a move needing *two* real moves (e.g.
+     * bottom-left -> top-right: UP lands on top-left, then RIGHT) landed on
+     * the *intermediate* cell instead of the target - the second directional
+     * press was getting swallowed by the first press's own fade the same
+     * way, since only the gap before A existed yet. Gapping after every
+     * press (not just the last one) fixes both without needing to read
+     * gPaletteFade.active, which we have no address for. A press whose guard
+     * doesn't apply (a no-op, cursor already there) doesn't start a fade, so
+     * the extra gap after it is just unused wait time, not a correctness
+     * risk. */
+    private fun queueCellLocked(col: Int, row: Int) {
+        pressAndSettleLocked(CoreKey.LEFT)
+        pressAndSettleLocked(CoreKey.UP)
+        if (col == 1) pressAndSettleLocked(CoreKey.RIGHT)
+        if (row == 1) pressAndSettleLocked(CoreKey.DOWN)
+        pressLocked(CoreKey.A)
+    }
+
+    private fun pressAndSettleLocked(bit: Int) {
+        pressLocked(bit)
+        waitFramesLocked(20)
+    }
+
+    private fun waitFramesLocked(frames: Int) {
+        queue.addLast(Step(0, frames))
+    }
+
+    /** Same as [queueCellLocked] but for a move specifically - also arms the
+     * target-confirm watch in [onState], since submitting a move (unlike an
+     * action) can land on a third "who does this hit" screen instead of
+     * completing outright. */
+    private fun queueMoveCellLocked(moveIndex: Int) {
+        if (gen1) {
+            // One list (items 1-4): UP / DOWN from the read cursor, then A. No target screen.
+            if (gbPickLocked(BATTLE_INPUT_MOVE_SELECT, moveIndex)) return
+            val from = gen1Cursor.takeIf { it in 0..3 } ?: 0
+            repeat(kotlin.math.abs(moveIndex - from)) { pressAndSettleLocked(if (moveIndex > from) CoreKey.DOWN else CoreKey.UP) }
+            pressLocked(CoreKey.A)
+            return
+        }
+        pickCellLocked(moveIndex, move = true)
+        awaitingTargetConfirm = true
+    }
+
+    /** Picks [index]'s cell on the action menu or ([move]) the move grid: straight there from the read
+     * cursor when [cursorAddrs] are known ([drivePickLocked]), else the blind walk. */
+    private fun pickCellLocked(index: Int, move: Boolean) {
+        val menus = cursorAddrs?.menus ?: MenuCells.GEN3
+        val value = if (move) index else menus.actionValue(index)
+        if (value < 0) return log("no cell for action $index on this game's menu")
+        if (cursorAddrs == null) return queueCellLocked(col(index), row(index))
+        pickCell = value
+        pickMove = move
+        pickPresses = 0
+    }
+
+    /** One step of a closed-loop pick: on the cell, A; else the press toward it (a dropped one is pressed again). */
+    private fun drivePickLocked() {
+        if (pickCell < 0) return
+        val addrs = cursorAddrs ?: return pickFallbackLocked("no addresses")
+        val cur = runCatching {
+            reader.readCoreMemory((if (pickMove) addrs.move else addrs.action) + lastBattler, 1)[0].toInt() and 0xFF
+        }.getOrNull()
+        if (cur == null || cur !in 0..3) return pickFallbackLocked("cursor read $cur")
+        // The game reads the cursor when A comes (HandleInputChooseAction / ChooseMove) and draws it from there the next
+        // time the menu opens: set, it's the press-free way to the cell. Read back, so a write that didn't take walks.
+        val write = writer
+        if (cur != pickCell && write != null && pickPresses == 0) {
+            val addr = (if (pickMove) addrs.move else addrs.action) + lastBattler
+            val set = runCatching { write(addr, byteArrayOf(pickCell.toByte())) && (reader.readCoreMemory(addr, 1)[0].toInt() and 0xFF) == pickCell }
+                .getOrDefault(false)
+            if (set) {
+                pickCell = -1
+                pressLocked(CoreKey.A)
+                return
+            }
+        }
+        if (cur == pickCell) {
+            pickCell = -1
+            pressLocked(CoreKey.A)
+            return
+        }
+        if (++pickPresses > MAX_PICK_PRESSES) return pickFallbackLocked("cursor stayed on $cur")
+        val m = addrs.menus
+        pressLocked(
+            when {
+                m.col(cur, pickMove) != m.col(pickCell, pickMove) -> if (m.col(pickCell, pickMove) == 1) CoreKey.RIGHT else CoreKey.LEFT
+                else -> if (m.row(pickCell, pickMove) > m.row(cur, pickMove)) CoreKey.DOWN else CoreKey.UP
+            },
+        )
+    }
+
+    /** The cursor can't be steered (unreadable, or it won't move): the blind walk does the pick instead. */
+    private fun pickFallbackLocked(why: String) {
+        log("pick of cell $pickCell falls back to the blind walk: $why")
+        val cell = pickCell
+        pickCell = -1
+        val m = cursorAddrs?.menus ?: MenuCells.GEN3
+        if (m == MenuCells.GEN3) return queueCellLocked(col(cell), row(cell))
+        // A column of moves: to the top (UP wraps nowhere past it), then DOWN to the row.
+        if (pickMove) {
+            repeat(NUM_MOVE_ROWS) { pressAndSettleLocked(CoreKey.UP) }
+            repeat(m.row(cell, true)) { pressAndSettleLocked(CoreKey.DOWN) }
+            pressLocked(CoreKey.A)
+        } else queueCellLocked(m.col(cell, false), m.row(cell, false))
+    }
+
+    /**
+     * Gen 1's battle menu: [actionIndex] in Gen 3's numbering (0 FIGHT, 1 BAG, 2 POKEMON,
+     * 3 RUN) onto its cells - FIGHT and PkMn on top, ITEM and RUN below. RIGHT / LEFT
+     * switches column on the same row, UP / DOWN the row; then A.
+     */
+    private fun queueGen1ActionLocked(actionIndex: Int) {
+        val target = when (actionIndex) { 0 -> 0; 1 -> 2; 2 -> 1; else -> 3 }
+        if (gbPickLocked(BATTLE_INPUT_ACTION_SELECT, target)) return
+        val from = gen1Cursor.takeIf { it in 0..3 } ?: 0
+        if ((from and 1) != (target and 1)) pressAndSettleLocked(if (target and 1 == 1) CoreKey.RIGHT else CoreKey.LEFT)
+        if ((from shr 1) != (target shr 1)) pressAndSettleLocked(if (target shr 1 == 1) CoreKey.DOWN else CoreKey.UP)
+        pressLocked(CoreKey.A)
+    }
+
+    /**
+     * Starts a Game Boy pick on its battle menu ([menu]: the action menu's [cell], column + 2 x row, or the move list's
+     * index), steered by [driveGbPickLocked] on the menu read straight from RAM ([GbPartySwitch.battleMenu]). False (and
+     * the blind walk from the last poll's cursor instead) when the game has no reader for it.
+     */
+    private fun gbPickLocked(menu: Int, cell: Int): Boolean {
+        if (switchAddrs?.gb == null) return false
+        gbPickMenu = menu
+        gbPickCell = cell
+        gbPickPresses = 0
+        gbPickFrames = 0
+        gbPickA = -1
+        return true
+    }
+
+    /**
+     * One step of a Game Boy pick: a closed loop like [drivePickLocked], on the cursor the game shows. The games drop
+     * presses for a few frames after drawing a menu or moving its cursor (Polished Crystal: the 3 frames after a cursor
+     * move, and the first frames of its action menu and move list, headless; Yellow's Delay3), and a press the poll's
+     * cursor was blind to went to the wrong move once (a DOWN dropped as the move list opened, then A on the first
+     * move). So: a press toward the cell, read again; A once there; and A again while the menu still waits on that cell
+     * [GB_REPRESS_FRAMES] later (a taken pick turns the cursor hollow at once, so a waiting one never took it).
+     */
+    private fun driveGbPickLocked() {
+        if (gbPickCell < 0) return
+        val gb = switchAddrs?.gb ?: return endGbPickLocked("no menu reader")
+        val (state, cur) = runCatching { gb.battleMenu(reader) }.getOrNull() ?: return endGbPickLocked("menu unreadable")
+        val waiting = state == gbPickMenu
+        if (gbPickA >= 0) {
+            if (!waiting || cur != gbPickCell) return endGbPickLocked(null)    // taken: the game moved on
+            if (gbPickFrames - gbPickA < GB_REPRESS_FRAMES) return
+            if (++gbPickPresses > MAX_GB_PICK_PRESSES) return endGbPickLocked("A never took")
+            pressLocked(CoreKey.A)
+            gbPickA = gbPickFrames
+            return
+        }
+        if (!waiting) {
+            if (gbPickFrames > MENU_TIMEOUT_FRAMES) endGbPickLocked("menu never showed")
+            return
+        }
+        if (cur == gbPickCell) {
+            pressLocked(CoreKey.A)
+            gbPickA = gbPickFrames
+            return
+        }
+        if (++gbPickPresses > MAX_GB_PICK_PRESSES) return endGbPickLocked("cursor stayed on $cur")
+        pressLocked(
+            when {
+                gbPickMenu == BATTLE_INPUT_MOVE_SELECT -> if (gbPickCell > cur) CoreKey.DOWN else CoreKey.UP
+                (cur and 1) != (gbPickCell and 1) -> if (gbPickCell and 1 == 1) CoreKey.RIGHT else CoreKey.LEFT
+                else -> if (gbPickCell shr 1 == 1) CoreKey.DOWN else CoreKey.UP
+            },
+        )
+        waitFramesLocked(GB_PICK_SETTLE_FRAMES)
+    }
+
+    private fun endGbPickLocked(why: String?) {
+        if (why != null) log("pick of cell $gbPickCell ended: $why")
+        gbPickCell = -1
+    }
+
+    /** A Game Boy party menu's press: held [GB_PRESS_FRAMES] and released as long. Prism's party menu takes input every
+     * other frame (a one-frame A was dropped on every try, headless: its re-presses all landed on the same parity), so a
+     * press must span two frames; Yellow's and Crystal's take it just the same. Its battle menus read every frame: one-frame
+     * RIGHT / DOWN / A / B took at all 8 frame offsets tried (headless), so FIGHT, moves and RUN keep [pressLocked]. */
+    private fun pressGbLocked(bit: Int) {
+        log("queue press bit=$bit (${keyName(bit)}) x$GB_PRESS_FRAMES")
+        queue.addLast(Step(bit, GB_PRESS_FRAMES))
+        queue.addLast(Step(0, GB_PRESS_FRAMES))
+    }
+
+    /** One real frame pressed, one real frame released — JOY_NEW only fires
+     * on the frame a bit transitions from unset to set, so back-to-back
+     * presses of the same button need an explicit release between them. */
+    private fun pressLocked(bit: Int) {
+        log("queue press bit=$bit (${keyName(bit)})")
+        queue.addLast(Step(bit, 1))
+        queue.addLast(Step(0, 1))
+    }
+
+    companion object {
+        /** [caller]'s answer when a call can't run this frame (the CPU mid-interrupt). */
+        const val CALL_NOT_NOW = -2L
+        private const val ACTION_RUN = 3
+        private const val MAX_BATTLERS = 4
+        /** LAST BALL: frames from BAG to the bag's controller step (headless: the next frame, both games) before giving up. */
+        private const val THROW_TIMEOUT_FRAMES = 180
+        /** Frames the top screen keeps its picture after a throw went in (the fade's first step, turned round). */
+        private const val THROW_HOLD_FRAMES = 4
+        private const val NUM_MOVE_ROWS = 3            // UPs that reach the top of a one-column move list from anywhere
+        private const val PARTY_MENU_SLOT_ID = 9L      // struct PartyMenu.slotId, both games
+        private const val PARTY_MENU_CANCEL = 7        // slotId on CANCEL (after the last mon), both games
+        // struct Sprite (0x44 bytes, 64 of them): callback +0x1C, data[0] +0x2E, flags +0x3E (bit 0 in use, bit 2 invisible).
+        private const val SPRITE_COUNT = 64
+        private const val SPRITE_SIZE = 0x44
+        private const val SPRITE_CALLBACK = 0x1C
+        private const val SPRITE_DATA0 = 0x2E
+        private const val SPRITE_FLAGS = 0x3E
+        private const val MENU_TIMEOUT_FRAMES = 240    // the menu's fade-in drops presses for ~50 frames (headless, both games)
+        private const val CURSOR_FRAMES = 3            // after each press, before reading the cursor again (it moves every 3)
+        private const val MAX_PICK_PRESSES = 8         // a 2x2 grid needs two; the rest re-press dropped ones
+        private const val MAX_CURSOR_PRESSES = 16      // steps the cursor took: two laps of six slots + CANCEL, then give up
+        private const val SUBMENU_FRAMES = 8           // the SHIFT / SUMMARY / CANCEL menu opening (takes A after 6 on FireRed, 2 on Emerald)
+        private const val CLOSE_TIMEOUT_FRAMES = 240
+        private const val GB_PRESS_FRAMES = 2          // Prism's party menu reads keys every other frame (headless)
+        private const val GB_SETTLE_FRAMES = 2        // after a Game Boy A: a taken pick has turned the cursor hollow by then
+        private const val GB_REPRESS_FRAMES = 8        // a Game Boy menu still waiting this long after an A dropped it
+        private const val MAX_GB_A_PRESSES = 12        // Crystal's SWITCH menu drops presses for ~30 frames after it shows (headless)
+        private const val GB_PICK_SETTLE_FRAMES = 4    // after a battle menu's cursor step: Polished Crystal drops presses for 3 (headless)
+        private const val MAX_GB_PICK_PRESSES = 12     // two steps at most; the rest re-press dropped ones
+        private const val GB_HOLD_TAIL_FRAMES = 20     // white, then the battle back: ~8 frames on Yellow, ~14 on Crystal (headless)
+        private const val RUN_PRESSES = 6
+        private const val RUN_FIRST_GAP = 45           // the escape message starts printing
+        private const val RUN_PRESS_GAP = 30
+        private const val HOLD_TAIL_FRAMES = 12        // the ~4-frame state poll, and a little more
+        private const val WATCH_TIMEOUT_FRAMES = 300   // a target screen / FIGHT that hasn't shown by then won't
+        private const val EXCLUSIVE_TIMEOUT_FRAMES = 1200 // a switch's worst case (every step timing out) is ~800
+    }
+
+    private fun keyName(bit: Int) = when (bit) {
+        CoreKey.A -> "A"
+        CoreKey.B -> "B"
+        CoreKey.LEFT -> "LEFT"
+        CoreKey.RIGHT -> "RIGHT"
+        CoreKey.UP -> "UP"
+        CoreKey.DOWN -> "DOWN"
+        else -> "?$bit"
+    }
+}
+
+/** The verified party-menu layouts, shared by Android and iPad. A header alone never admits an unknown hack. */
+fun battleSwitchAddrsFor(
+    telemetry: com.pokedaisy.app.companion.TelemetryStore,
+    game: com.pokedaisy.app.companion.data.GameKind?,
+    romCode: String?,
+    romRev: Int,
+): BattleInputController.SwitchAddrs? = when {
+    // Yellow and the Gen 2 games: their own party menus, read through GbPartySwitch (no gPartyMenu, no personality).
+    game.isGen1 || game.isGen2 ->
+        telemetry.gbPartySwitch()?.let { BattleInputController.SwitchAddrs(gb = it) }
+    // A hack nothing knows by its hash whose code proves it kept retail's engine (RetailEngine): retail's gPartyMenu and
+    // list, read through BEST EFFORT as retail FireRed / Emerald.
+    telemetry.retailEnginePartyMenu() != null ->
+        telemetry.retailEnginePartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party) }
+    game == com.pokedaisy.app.companion.data.GameKind.FIRERED && romCode == "BPRE" && romRev == 1 ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L)
+    // Retail English FireRed rev 0 and LeafGreen rev 0 / 1 (and their randomized builds): rev 1's RAM, checked headless on
+    // each retail cart (2026-11-18: POKéMON, DOWN, A, SHIFT sent party slot 1 in). By the retail hash only: the hacks edited
+    // in place share BPRE rev 0 and have lines of their own below.
+    game == com.pokedaisy.app.companion.data.GameKind.FIRERED && telemetry.retailRom() &&
+        (romCode == "BPRE" && romRev == 0 || romCode == "BPGE" && (romRev == 0 || romRev == 1)) ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L)
+    // Recharged Emerald runs as Emerald (BPEE) but is a rebuild with its own RAM: its config carries gPartyMenu (Emerald's
+    // list; headless on all three builds: a written POKéMON cell, DOWN, A, SHIFT sent party slot 1 in).
+    game == com.pokedaisy.app.companion.data.GameKind.EMERALD && com.pokedaisy.app.companion.data.runningEmeraldHack != null ->
+        telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party) }
+    // Japanese Emerald: its own RAM (NATIVE_EMERALD_JA).
+    game == com.pokedaisy.app.companion.data.GameKind.EMERALD && romCode == "BPEJ" ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203CB94L, party = 0x02024190L)
+    // Emerald Legacy keeps retail's header but is its own build: gPartyMenu from its config (NATIVE_EMERALD_LEGACY),
+    // retail's one-column list. Before retail's BPEE line, which would hand it retail's address.
+    game == com.pokedaisy.app.companion.data.GameKind.EMERALD && com.pokedaisy.app.companion.data.emeraldLegacy ->
+        telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party) }
+    game == com.pokedaisy.app.companion.data.GameKind.EMERALD &&
+        (romCode == "BPEE" || romCode in com.pokedaisy.app.companion.data.EMERALD_EUROPEAN_CODES) ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203CEC8L, party = 0x020244ECL)
+    // Orange Islands is retail FireRed rev 0's RAM and party menu, edited in place.
+    game == com.pokedaisy.app.companion.data.GameKind.ORANGE_ISLANDS ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L)
+    // Let's Go Pikachu / Eevee: rev 0's gPartyMenu under a two-column grid (headless in its battle: DOWN 0 -> 2 -> 4,
+    // RIGHT 0 -> 1; A, SHIFT on slot 3 sent it in).
+    game == com.pokedaisy.app.companion.data.GameKind.FIRERED && com.pokedaisy.app.companion.data.runningLetsGo ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L, grid = true)
+    // So are Ultra Violet, Rocket Edition, Ash Gray and Ghost Grey (FireRed 1.0 edited in place, ActiveTables' fireRedHack;
+    // their fixtures' READMEs: a written POKéMON cell + DOWN, A, SHIFT sent party slot 1 in).
+    game == com.pokedaisy.app.companion.data.GameKind.FIRERED && com.pokedaisy.app.companion.data.runningFireRedHack != null ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L)
+    game == com.pokedaisy.app.companion.data.GameKind.TMT2 ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203242CL, party = 0x02032C94L)
+    // Elite Redux (both builds): gPartyMenu from its config, a two-column grid (DOWN 0 -> 2, RIGHT 2 -> 3), its packed
+    // 0x4C-byte party mons (the personality first, as the switch reads it). Headless: A, SHIFT on slot 2 put it out.
+    game == com.pokedaisy.app.companion.data.GameKind.ELITE_REDUX ->
+        telemetry.knownPartyMenu()?.let { (menu, party) ->
+            BattleInputController.SwitchAddrs(partyMenu = menu, party = party, monStride = 0x4C, grid = true)
+        }
+    // Team Rocket Edition 2026: Emerald's layout at its own gPartyMenu, from its config (NATIVE_TEAM_ROCKET_V3: the battle's
+    // POKéMON menu walked slotId 0 -> 7, CANCEL, on DOWN with one Pokémon). Before v1.5's line, which has v1.5's addresses.
+    game == com.pokedaisy.app.companion.data.GameKind.TEAM_ROCKET && com.pokedaisy.app.companion.data.teamRocketV3 ->
+        telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party) }
+    // Team Rocket Edition: Dragonsden: Emerald's one-column list at its own gPartyMenu (NATIVE_TEAM_ROCKET). Headless: a
+    // written POKéMON cell + A opened it, DOWN, A, SHIFT sent slot 1 in (gBattlerPartyIndexes[0] = 1).
+    game == com.pokedaisy.app.companion.data.GameKind.TEAM_ROCKET ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203DE64L, party = 0x02025170L)
+    // Wishes of Tomorrow: Emerald's list at its own gPartyMenu (NATIVE_WISHES). Headless: a written POKéMON cell + A
+    // opened it, DOWN, A, SHIFT sent slot 1 in (gBattlerPartyIndexes[0] = 1).
+    game == com.pokedaisy.app.companion.data.GameKind.WISHES ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x02031BB0L, party = 0x02031EBCL)
+    // Ceruleum: a two-column grid at its own gPartyMenu (NATIVE_CERULEUM). Headless: a written POKéMON cell + A opened it,
+    // DOWN walked slotId 0 -> 2 -> 3.
+    game == com.pokedaisy.app.companion.data.GameKind.CERULEUM ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x020372F0L, party = 0x02037748L, grid = true)
+    game == com.pokedaisy.app.companion.data.GameKind.AMETHYST ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L, grid = true)
+    // Unbound (EN / FR): FireRed's gPartyMenu / gPlayerParty (CFRU keeps its EWRAM) under CFRU's two-column party
+    // grid - slot 0 top-left, 1 top-right, 2 below: RIGHT 0 -> 1, DOWN 0 -> 2, then CANCEL (7). Headless on the
+    // user's save with the lead copied into slots 2-3: DOWN, A, SHIFT put party slot 2 into gBattlerPartyIndexes[0].
+    game == com.pokedaisy.app.companion.data.GameKind.UNBOUND ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L, grid = true)
+    // Radical Red: the same CFRU grid at FireRed's addresses (radical_red_battle's README).
+    game == com.pokedaisy.app.companion.data.GameKind.RADICAL_RED ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L, grid = true)
+    // Gaia: FireRed's addresses and FireRed's own one-column list (DOWN 0 -> 1; gaia_battle's README).
+    game == com.pokedaisy.app.companion.data.GameKind.GAIA ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L)
+    // Odyssey, Sword and Shield and GS Chronicles: CFRU's grid at FireRed's addresses, like Unbound (their fixtures' READMEs).
+    game == com.pokedaisy.app.companion.data.GameKind.ODYSSEY || game == com.pokedaisy.app.companion.data.GameKind.SWORD_SHIELD ||
+        game == com.pokedaisy.app.companion.data.GameKind.GS_CHRONICLES ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L, grid = true)
+    // Heart and Soul: gPartyMenu found by its slotId walking 0 -> 7 -> 0 with one Pokémon (CANCEL at 7); a list
+    // (DOWN 0 -> 1 with three). Headless: a written POKéMON cell opened it, DOWN, A, SHIFT sent slot 1 in.
+    game == com.pokedaisy.app.companion.data.GameKind.HEART_AND_SOUL ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x020341FCL, party = 0x02034764L)
+    // Celia: gPartyMenu found by its slotId (0 -> 7 -> 0 with one Pokémon), a list; its gPlayerParty is
+    // FireRed's moved (NATIVE_CELIA). Headless: DOWN, A, SHIFT with three put slot 1 into gBattlerPartyIndexes[0].
+    game == com.pokedaisy.app.companion.data.GameKind.CELIA ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203B368L, party = 0x0202433CL)
+    game == com.pokedaisy.app.companion.data.GameKind.ROWE ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203E774L, party = 0x02025128L, monStride = 0x4C, grid = true)
+    // Quetzal: Emerald's list (DOWN walks slotId 0 -> 1), gPartyMenu by release - Alpha 9's 0x0203E9FC, 0.8.4's
+    // 0x0203EA08 (its config; headless on all four 0.8.4 builds: DOWN, A, SHIFT sent slot 1 in).
+    game == com.pokedaisy.app.companion.data.GameKind.QUETZAL ->
+        telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party, monStride = 0x68) }
+    game == com.pokedaisy.app.companion.data.GameKind.IMPERIUM ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x020370E0L, party = 0x020375F8L, grid = true)
+    // Dreamstone Mysteries: a two-column grid (NATIVE_DREAMSTONE). Headless: a written POKéMON cell + A opened it, DOWN
+    // (slotId 0 -> 2), A, SHIFT put slot 2 into gBattlerPartyIndexes[0].
+    game == com.pokedaisy.app.companion.data.GameKind.DREAMSTONE ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x02031E04L, party = 0x02032314L, grid = true)
+    // Monomyth: a two-column grid at its own gPartyMenu (NATIVE_MONOMYTH). Headless: a written POKéMON cell + A opened
+    // it, DOWN (slotId 0 -> 2), A, SHIFT put slot 2 into gBattlerPartyIndexes[0].
+    game == com.pokedaisy.app.companion.data.GameKind.MONOMYTH ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203D8D0L, party = 0x02025908L, grid = true)
+    // Glazed is retail Emerald's RAM and party menu code (NATIVE_GLAZED).
+    game == com.pokedaisy.app.companion.data.GameKind.GLAZED ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0203CEC8L, party = 0x020244ECL)
+    game == com.pokedaisy.app.companion.data.GameKind.LAZARUS ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x0201B67CL, party = 0x0201B960L, grid = true)
+    game == com.pokedaisy.app.companion.data.GameKind.EMERALD_SEAGLASS ->
+        BattleInputController.SwitchAddrs(partyMenu = 0x02019964L, party = 0x02019C20L)
+    // Recharged Yellow: FireRed's one-column party menu (DOWN steps gPartyMenu.slotId 0, 1, 2 in battle),
+    // at each release's own address - its config carries it.
+    game == com.pokedaisy.app.companion.data.GameKind.RECHARGED_YELLOW ->
+        telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party) }
+    // Super Mariomon: two RAM layouts across its releases (NATIVE_MARIOMON_*); a 2-column grid
+    // (DOWN walks 0 -> 2 -> 4 -> 5 -> CANCEL, headless).
+    game == com.pokedaisy.app.companion.data.GameKind.MARIOMON ->
+        telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party, grid = true) }
+    game == com.pokedaisy.app.companion.data.GameKind.SOULGOLD ->
+        // Its builds sit at different addresses: their configs carry them. Its shape is the player's OPTIONS > PARTY
+        // MENU (the config's partyMenuStyleOff): CUSTOM is one column of six (DOWN wraps 5 -> 0, no CANCEL row), HGSS
+        // and BW a two-column grid - steered as a list, the cursor bounced between two slots (GitHub #316). Headless
+        // on every build with the real controller: each style, a switch from POKéMON and the pick after a faint.
+        telemetry.knownPartyMenu()?.let { (menu, party) ->
+            BattleInputController.SwitchAddrs(
+                partyMenu = menu, party = party, monStride = 96,
+                gridOption = telemetry.knownPartyMenuStyle()?.let { (ptr, off) -> BattleInputController.GridOption(ptr, off) },
+            )
+        }
+    // Ruby / Sapphire (retail, every language but Japanese): the cursor as its sprite's data[0] (SwitchAddrs.cursorSpriteCallback);
+    // gPlayerParty in battle order while the menu is up, as FireRed's. SpriteCallbackDummy is 0x08001210 in the English builds,
+    // 0x08001344 in the German ones (pokeruby's symbols) and at German's place (a `bx lr`) in French / Italian / Spanish.
+    // Headless on English Ruby rev 1 (2026-11-18): POKéMON, DOWN, A, SHIFT sent slot 1 in, and again from the battle order.
+    game == com.pokedaisy.app.companion.data.GameKind.EMERALD && telemetry.retailRom() && romCode != null &&
+        (romCode.startsWith("AXV") || romCode.startsWith("AXP")) && romCode[3] != 'J' ->
+        com.pokedaisy.app.companion.data.activeNativeConfig?.playerParty?.let { party ->
+            BattleInputController.SwitchAddrs(party = party, cursorSpriteCallback = if (romCode[3] == 'E') 0x08001211L else 0x08001345L,
+                sprites = 0x02020004L)
+        }
+    // The other-language FireRed / LeafGreen (RETAIL_PORTS): their mapped gPartyMenu, checked by
+    // scripts/verify_ports.py's party step. (Ruby / Sapphire have no battle input.)
+    game == com.pokedaisy.app.companion.data.GameKind.FIRERED &&
+        com.pokedaisy.app.companion.data.RETAIL_PORTS.containsKey("$romCode$romRev") ->
+        telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party) }
+    else -> null
+}
+
+/**
+ * HIDE BATTLE MENU's D-pad on the companion's action buttons - FIGHT on top, BAG / RUN / POKéMON left to right under it
+ * (both battle styles) - in the game's cursor cells: 0 FIGHT, 1 BAG, 2 POKéMON, 3 RUN. UP goes to FIGHT, DOWN from FIGHT to
+ * RUN under it; LEFT / RIGHT walk the bottom row, and from FIGHT reach its ends. Nothing wraps.
+ */
+object HiddenMenuSteer {
+    fun next(cell: Int, key: Int): Int = when {
+        key and CoreKey.UP != 0 -> 0
+        key and CoreKey.DOWN != 0 -> if (cell == 0) 3 else cell
+        key and CoreKey.LEFT != 0 -> when (cell) { 0, 3 -> 1; 2 -> 3; else -> cell }
+        key and CoreKey.RIGHT != 0 -> when (cell) { 0, 3 -> 2; 1 -> 3; else -> cell }
+        else -> cell
+    }
+}

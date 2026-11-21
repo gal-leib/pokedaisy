@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -24,15 +25,18 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import app.cash.paparazzi.DeviceConfig
+import com.pokedaisy.app.companion.BattleStyle
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.ScreenOrientation
 import com.pokedaisy.app.companion.BattleInput
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT
 import com.pokedaisy.app.companion.data.BATTLE_INPUT_BUSY
+import com.pokedaisy.app.companion.data.GameKind
 import com.pokedaisy.app.companion.data.MonView
 import com.pokedaisy.app.companion.data.MoveView
 import com.pokedaisy.app.companion.data.MoveVsFoe
 import com.pokedaisy.app.companion.data.SnapshotView
+import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.data.spriteAsset
 import org.junit.After
 import org.junit.Before
@@ -48,6 +52,7 @@ import org.junit.Test
  *     ./gradlew :app:recordPaparazziDebug --tests '*BattleButtons*'
  */
 class BattleButtonsScreenshotTest {
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 1920, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE),
@@ -67,6 +72,22 @@ class BattleButtonsScreenshotTest {
     @Test fun moveWindow() = paparazzi.snapshot { BattleScene(window = BattleButtonsWindow.MOVES) }
 
     @Test fun partyWindow() = paparazzi.snapshot { BattleScene(window = BattleButtonsWindow.PARTY) }
+
+    /** BATTLE STYLE GEN 5: the buttons and both lists in Black / White's look. */
+    @Test fun gen5() = paparazzi.snapshot { BattleScene(style = BattleStyle.GEN5) }
+
+    @Test fun gen5MoveWindow() = paparazzi.snapshot { BattleScene(window = BattleButtonsWindow.MOVES, style = BattleStyle.GEN5) }
+
+    @Test fun gen5PartyWindow() = paparazzi.snapshot { BattleScene(window = BattleButtonsWindow.PARTY, style = BattleStyle.GEN5) }
+
+    @Test fun gen5Original() = paparazzi.snapshot { BattleScene(expand = false, style = BattleStyle.GEN5) }
+
+    @Test fun matchingPartyMembers() = paparazzi.snapshot {
+        val active = lead.copy(personality = 101)
+        val bench = active.copy(personality = 102, nickname = "SECOND")
+        BattleScene(window = BattleButtonsWindow.PARTY,
+            snap = battle.copy(party = listOf(active, bench), battlePlayer = listOf(active)))
+    }
 
     @Test fun dark() {
         com.pokedaisy.app.companion.ui.theme.DarkMode.override = true
@@ -111,6 +132,7 @@ class BattleButtonsScreenshotTest {
 
 /** [BattleButtonsScreenshotTest]'s scenes cropped at 1:1 to the screen's right 600 px (Paparazzi scales 1920 down). */
 class BattleButtonsCloseUpScreenshotTest {
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 600, screenHeight = 1080, orientation = ScreenOrientation.PORTRAIT),
@@ -129,6 +151,12 @@ class BattleButtonsCloseUpScreenshotTest {
 
     @Test fun partyWindow() = paparazzi.snapshot { Right { BattleScene(window = BattleButtonsWindow.PARTY) } }
 
+    @Test fun gen5() = paparazzi.snapshot { Right { BattleScene(style = BattleStyle.GEN5) } }
+
+    @Test fun gen5MoveWindow() = paparazzi.snapshot { Right { BattleScene(window = BattleButtonsWindow.MOVES, style = BattleStyle.GEN5) } }
+
+    @Test fun gen5PartyWindow() = paparazzi.snapshot { Right { BattleScene(window = BattleButtonsWindow.PARTY, style = BattleStyle.GEN5) } }
+
     @Composable
     private fun Right(content: @Composable () -> Unit) {
         val px = LocalDensity.current
@@ -144,6 +172,7 @@ class BattleButtonsCloseUpScreenshotTest {
 
 /** A 20:9 phone (2400x1080): wide margins beside the battle. */
 class BattleButtonsPhoneScreenshotTest {
+    @Before fun hosts() = installTestHosts(paparazzi.context)
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 2400, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE),
@@ -160,6 +189,21 @@ class BattleButtonsPhoneScreenshotTest {
 
     /** Between the touch controls' rows: the words stay whole. */
     @Test fun squeezed() = paparazzi.snapshot { BattleScene(expand = false, width = 2400, clearTop = 131, clearBottom = 549) }
+
+    /** The four Game Boy moves and CANCEL must all fit in the visible landscape stage. */
+    @Test fun gameBoyMoves() {
+        activeGame = GameKind.YELLOW
+        paparazzi.snapshot {
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                val picture = Rect(600f, 0f, 1800f, 1080f)
+                Box(Modifier.align(Alignment.Center).fillMaxWidth(0.5f).fillMaxHeight().background(Color(0xFF487050)))
+                BattleButtons(
+                    BattleButtonsScreenshotTest.battle, shown = true, BattleButtonsScreenshotTest.input, showHints = true,
+                    core = picture, initialWindow = BattleButtonsWindow.MOVES, clearTop = 270,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -170,6 +214,7 @@ internal fun BattleScene(
     width: Int = 1920,
     clearTop: Int = 0,
     clearBottom: Int = 0,
+    style: BattleStyle = BattleStyle.GEN4,
 ) {
     val left = (width - 1620) / 2f
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -177,7 +222,7 @@ internal fun BattleScene(
         BattleButtons(
             snap, shown = true, BattleButtonsScreenshotTest.input, showHints = true,
             core = if (expand) null else Rect(left, 0f, left + 1620f, 1080f),
-            initialWindow = window, clearTop = clearTop, clearBottom = clearBottom,
+            initialWindow = window, clearTop = clearTop, clearBottom = clearBottom, style = style,
         )
     }
 }

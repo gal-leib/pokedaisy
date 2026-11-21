@@ -65,6 +65,11 @@
 //   framediff A B [LABEL] - the box of pixels two `shot` PPMs differ in: "framediff box X0,Y0-X1,Y1" or "framediff none"
 //   lookrefresh [PAL]  - PLAYER LOOK's refresh of the player's sprite from its record (pk_look_refresh), after
 //                        `romblocks` / `romunblock` changed the look in place; needs `wideon` (the field reads' table)
+//   battlemenu 0|1|2 [FLAGS] - HIDE BATTLE MENU (pk_battle_menu_hide): 1 / 2 hide the battle's FIGHT / BAG and move
+//                        menus from the next frame drawn (the two-screens sign lighting the bottom / top one), 0 shows them again; FLAGS =
+//                        gBattleTypeFlags' address (hex), whose double / Safari bits keep the menus
+//   battlemenuinfo     - which battle menu the last frame hid (160 / 320 / 0) and why it had no two-screens sign
+//                        (0 = drawn: pk_battle_menu_sign_why)
 //   tint R G B         - DAY AND NIGHT's tint from the next frame (256 each = none): the map's and sprites' palettes
 //   rawshot FILE       - write the current frame as "W H\n" then its 32-bit pixels as the core gives them, mGBA's
 //                        layer tags in the top byte (BG n = 0x08 | n << 4; DAY AND NIGHT's tint reads them)
@@ -73,7 +78,7 @@
 //                        Image.open("x.ppm").save("x.png")'` converts it
 //   cheat TYPE CODE    - add a cheat (TYPE auto/cb/gs/ar, CODE's lines joined by
 //                        '+') and load the list into the core the way the app
-//                        does (app/src/main/cpp/pk_cheats.c, compiled in below)
+//                        does (shared/src/commonMain/cpp/pk_cheats.c, compiled in below)
 //   cheatclear         - take every cheat out again
 //   gbpark SPIN        - GB: park the main loop on SPIN (a `jr @`) once interrupts are on
 //                        (the app's pkRenderGbPark); a SPIN in WRAM gets the `jr @` written first
@@ -84,6 +89,7 @@
 //   gbinject TRAMP BANK ADDR [AT] - GB (hex): make the game call BANK:ADDR from its frame wait (runs on in `wait`s)
 //   gbpoke BANK ADDR BYTE.. - GB (hex): write WRAM bank BANK's bytes at ADDR
 //   gbpeek BANK ADDR N - GB (hex): print N bytes of WRAM bank BANK at ADDR (C000-CFFF ignores the bank)
+//   gbwram - GB: C000-DFFF and FF80-FFFE as one hex line, stdout flushed (a harness reading the game every frame)
 //   gbcallat AT FN A B HL - GB (hex): the game calls FN (A, B, HL) from its loop at AT, back there after (pk_gb_call_at)
 //   gbvdump DIR        - GB: VRAM (both banks), OAM and the Color palettes into DIR
 //   rompatch AT EXPECT ADDR VALUE - a game option's ROM patch the way the app makes it
@@ -186,40 +192,44 @@
 // repo is there to compile it from (the capture scripts mount native-capture/
 // alone; mount the repo root and build from native-capture/ to get it).
 #if defined(__has_include)
-#if __has_include("../app/src/main/cpp/pk_cheats.c")
-#include "../app/src/main/cpp/pk_cheats.c"
+#if __has_include("../shared/src/commonMain/cpp/pk_cheats.c")
+#include "../shared/src/commonMain/cpp/pk_cheats.c"
 #define HAVE_PK_CHEATS 1
-#if __has_include("../app/src/main/cpp/pk_coop.c")
-#include "../app/src/main/cpp/pk_coop.c"
-#include "../app/src/main/cpp/pk_coop_field.c"
-#include "../app/src/main/cpp/pk_coop_after.c"
+#if __has_include("../shared/src/commonMain/cpp/pk_coop.c")
+#include "../shared/src/commonMain/cpp/pk_coop.c"
+#include "../shared/src/commonMain/cpp/pk_coop_field.c"
+#include "../shared/src/commonMain/cpp/pk_coop_after.c"
 // coop-field (plan 4 Task 7)
 // coop-after (plan 4 Task 8)
 // romcheck's last counts (and the mark romchecksame compares to)
 static int lastRomDiffs[3], markRomDiffs[3];
-#include "../app/src/main/cpp/pk_coop_lock.c"   // coop-lock (plan 5 Task 5)
-#include "../app/src/main/cpp/pk_coop_link.c"   // the link bridge (plan 6 Task 1)
-#include "../app/src/main/cpp/pk_coop_link_start.c"   // task 2: a joined trainer battle starts as a link battle
-#include "../app/src/main/cpp/pk_coop_link_wild.c"   // task 3: wild as a link battle
-#include "../app/src/main/cpp/pk_coop_link_story.c"   // task 6: story battles
-#include "../app/src/main/cpp/pk_coop_link_drop.c"   // a dropped link (plan 6 Task 7)
-#include "../app/src/main/cpp/pk_coop_link_rewards.c"   // task 4: EXP, the BAG and catching in a link battle
-#include "../app/src/main/cpp/pk_coop_link_end.c"   // task 5: the end of a joined link battle
+#include "../shared/src/commonMain/cpp/pk_coop_lock.c"   // coop-lock (plan 5 Task 5)
+#include "../shared/src/commonMain/cpp/pk_coop_link.c"   // the link bridge (plan 6 Task 1)
+#include "../shared/src/commonMain/cpp/pk_coop_link_start.c"   // task 2: a joined trainer battle starts as a link battle
+#include "../shared/src/commonMain/cpp/pk_coop_link_wild.c"   // task 3: wild as a link battle
+#include "../shared/src/commonMain/cpp/pk_coop_link_story.c"   // task 6: story battles
+#include "../shared/src/commonMain/cpp/pk_coop_link_drop.c"   // a dropped link (plan 6 Task 7)
+#include "../shared/src/commonMain/cpp/pk_coop_link_rewards.c"   // task 4: EXP, the BAG and catching in a link battle
+#include "../shared/src/commonMain/cpp/pk_coop_link_end.c"   // task 5: the end of a joined link battle
 #define HAVE_PK_COOP 1
 #endif
 #endif
-#if __has_include("../app/src/main/cpp/pk_wide.c")
-#include "../app/src/main/cpp/pk_wide.c"
-#include "../app/src/main/cpp/pk_wide_gb.c"
-#include "../app/src/main/cpp/pk_gb_field.c"
+#if __has_include("../shared/src/commonMain/cpp/pk_wide.c")
+#include "../shared/src/commonMain/cpp/pk_wide.c"
+#include "../shared/src/commonMain/cpp/pk_wide_gb.c"
+#include "../shared/src/commonMain/cpp/pk_gb_field.c"
 #define HAVE_PK_WIDE 1
 #endif
-#if __has_include("../app/src/main/cpp/pk_flight.c")
-#include "../app/src/main/cpp/pk_flight.c"
+#if __has_include("../shared/src/commonMain/cpp/pk_flight.c")
+#include "../shared/src/commonMain/cpp/pk_flight.c"
 #define HAVE_PK_FLIGHT 1
 #endif
-#if __has_include("../app/src/main/cpp/pk_gb_audio.c")
-#include "../app/src/main/cpp/pk_gb_audio.c"
+#if __has_include("../shared/src/commonMain/cpp/pk_perf.h")
+#include "../shared/src/commonMain/cpp/pk_perf.h"
+#define HAVE_PK_PERF 1
+#endif
+#if __has_include("../shared/src/commonMain/cpp/pk_gb_audio.c")
+#include "../shared/src/commonMain/cpp/pk_gb_audio.c"
 #define HAVE_PK_GB_AUDIO 1
 #endif
 #endif
@@ -1362,6 +1372,11 @@ int main(int argc, char** argv) {
     }
 
     core->reset(core);
+#ifdef HAVE_PK_PERF
+    // PK_IDLE=1: idle loops found as the app finds them (pk_idle_detect); left out, mGBA's own table only, as every
+    // capture and boot script so far was made with.
+    pk_idle_detect(core, getenv("PK_IDLE") && atoi(getenv("PK_IDLE")));
+#endif
     fprintf(stderr, "mgba_dump: core ready (%ux%u, %d Hz)\n", w, h, core->frequency(core));
 
     char line[8192];   // a scenic FLY route (`flightroute`) is one line
@@ -1378,6 +1393,55 @@ int main(int argc, char** argv) {
         if (!strcmp(cmd, "wait")) {
             sscanf(line, "%*s %d", &n);
             for (int i = 0; i < n; i++) runFrame();
+#if defined(HAVE_PK_WIDE) && defined(PK_WIDE_CACHE)
+        } else if (!strcmp(cmd, "widecache")) {
+            // widecache M: EXPAND's margin cache (pk_wide_cache: 0 off, 1 on, 2 every animated cell at once); `widecache`
+            // with no M prints how many frames came from it. A build with -DPK_WIDE_CACHE.
+            if (sscanf(line, "%*s %d", &n) == 1) pk_wide_cache(n);
+            printf("widecache: %d frames from the cache\n", pk_wide_cache_hits());
+#endif
+#ifdef HAVE_PK_WIDE
+        } else if (!strcmp(cmd, "widecrcs")) {
+            // widecrcs N: N frames, each printed as `widecrc FRAME HASH` (FNV-1a) of the whole EXPAND picture (the RGB of `wideon`'s
+            // window) - two runs of one script (the margin cache off and on) compared line by line.
+            sscanf(line, "%*s %d", &n);
+            for (int i = 0; i < n; i++) {
+                runFrame();
+                uint32_t c = 2166136261u;   // FNV-1a over the pixels
+                for (int j = 0; j < wideView.w * wideView.h; j++) c = (c ^ (wideOut[j] & 0xFFFFFF)) * 16777619u;
+                printf("widecrc %u %08X\n", core->frameCounter(core), c);
+            }
+#endif
+        } else if (!strcmp(cmd, "bench")) {
+            // bench N: N frames timed - wall clock and this process's CPU time (every thread) a frame, and the worst
+            // frame; what pk_perf.h's settings buy. Keys stay as they are (hold a direction first to walk).
+            sscanf(line, "%*s %d", &n);
+            static double walls[1 << 16];
+            if (n > (int) (sizeof(walls) / sizeof(walls[0]))) n = (int) (sizeof(walls) / sizeof(walls[0]));
+            struct timespec w0, w1, c0, c1;
+            clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c0);
+            double total = 0, worst = 0;
+            for (int i = 0; i < n; i++) {
+                clock_gettime(CLOCK_MONOTONIC, &w0);
+                runFrame();
+                clock_gettime(CLOCK_MONOTONIC, &w1);
+                walls[i] = (w1.tv_sec - w0.tv_sec) * 1e3 + (w1.tv_nsec - w0.tv_nsec) / 1e6;
+                total += walls[i];
+                if (walls[i] > worst) worst = walls[i];
+            }
+            clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &c1);
+            double cpu = (c1.tv_sec - c0.tv_sec) * 1e3 + (c1.tv_nsec - c0.tv_nsec) / 1e6;
+            int over = 0;
+            for (int i = 0; i < n; i++) over += walls[i] > 2 * (total / n);
+            int idle = -1;
+            uint32_t loop = 0;
+            if (core->platform(core) == mPLATFORM_GBA) {
+                struct GBA* gba = (struct GBA*) core->board;
+                idle = gba->idleOptimization;
+                loop = gba->idleLoop;
+            }
+            printf("bench: %d frames, wall %.3f ms/frame (worst %.2f, %d over 2x avg), cpu %.3f ms/frame, idle mode %d loop %08X\n",
+                   n, n ? total / n : 0, worst, over, n ? cpu / n : 0, idle, loop);
         } else if (!strcmp(cmd, "keys")) {
             sscanf(line, "%*s %255s", arg1);
             core->setKeys(core, strcmp(arg1, "NONE") ? parseKeys(arg1) : 0);
@@ -1596,6 +1660,14 @@ int main(int argc, char** argv) {
             printf("gbpeek %x:%04x:", bank, addr);
             for (unsigned k = 0; k < cnt; k++) printf(" %02x", buf[k]);
             printf("\n");
+        } else if (!strcmp(cmd, "gbwram")) {
+            // gbwram: C000-DFFF then FF80-FFFE over the bus, one hex line, flushed - for a harness that reads the game
+            // every frame through a pipe (the battle controls run against the running game: BrownLiveControlsTest).
+            printf("gbwram ");
+            for (unsigned a = 0xC000; a < 0xE000; a++) printf("%02x", core->busRead8(core, (uint16_t) a));
+            for (unsigned a = 0xFF80; a < 0xFFFF; a++) printf("%02x", core->busRead8(core, (uint16_t) a));
+            printf("\n");
+            fflush(stdout);
         } else if (!strcmp(cmd, "gbcallat")) {
             // gbcallat AT FN A B HL: the app's pkGbCallAt - Yellow's PC anywhere (Bankswitch into the PC tile's routine
             // from the overworld loop).
@@ -3081,6 +3153,13 @@ int main(int argc, char** argv) {
             int havePal = sscanf(line, "%*s %79s", hex) == 1 && strlen(hex) == 64;
             for (int i = 0; havePal && i < 32; i++) { unsigned v; sscanf(hex + i * 2, "%2x", &v); pal[i] = (uint8_t) v; }
             printf("lookrefresh: %d\n", pk_look_refresh(core, havePal ? pal : NULL));
+        } else if (!strcmp(cmd, "battlemenu")) {
+            int mode = 0;
+            unsigned flags = 0;
+            sscanf(line, "%*s %d %x", &mode, &flags);
+            pk_battle_menu_hide(core, mode, flags);
+        } else if (!strcmp(cmd, "battlemenuinfo")) {
+            printf("battlemenuinfo: hidden %d sign %d\n", pk_battle_menu_hidden(), pk_battle_menu_sign_why());
         } else if (!strcmp(cmd, "tint")) {
             int tr = 256, tg = 256, tb = 256;
             sscanf(line, "%*s %d %d %d", &tr, &tg, &tb);

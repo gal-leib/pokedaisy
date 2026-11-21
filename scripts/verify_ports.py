@@ -14,7 +14,7 @@ game's boot script, twice:
           then (FireRed / LeafGreen) A -> moves, B, RIGHT A -> bag, B, LEFT DOWN
           A -> party, each with gBattlerControllerFuncs[0] read (peeks.txt)
 
-then runs PortsVerifyTest (app/src/test), which reads each dump with the
+then runs PortsVerifyTest (shared/src/androidUnitTest), which reads each dump with the
 ported config and compares it with English's: the same party, bag, money and
 place; the dex and guide tables found in the ROM; the probe trainer's party;
 the battlers; the battle handlers. It writes build/ports/report.md.
@@ -153,7 +153,7 @@ def main():
                                refs[p["english"]]["path"], refs[p["english"]]["native"],
                                str(p["probe_trainer"]), p["file"], p["tables_path"], p["guide"]]) + "\n")
     contact_sheet([p["key"] for p in ports], os.path.join(PORTS, "fields.png"))
-    r = subprocess.run([os.path.join(ROOT, "gradlew"), "-p", ROOT, ":app:testDebugUnitTest", "--tests", "*PortsVerifyTest", "--rerun", "-q"])
+    r = subprocess.run([os.path.join(ROOT, "gradlew"), "-p", ROOT, ":shared:testDebugUnitTest", "--tests", "*PortsVerifyTest", "--rerun", "-q"])
     report = os.path.join(PORTS, "report.md")
     if os.path.exists(report):
         print(open(report, encoding="utf-8").read())

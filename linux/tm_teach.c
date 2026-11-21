@@ -1,8 +1,8 @@
-/* USE on a TM / HM (tm_teach.h): app/.../companion/data/TmTeach.kt's tmStart / tmFinish over the config's generated TM
+/* USE on a TM / HM (tm_teach.h): shared/.../companion/data/TmTeach.kt's tmStart / tmFinish over the config's generated TM
  * fields - keep the two in step. GPL-3.0. */
 #include "tm_teach.h"
 
-#include "../app/src/main/cpp/pk_call.h"
+#include "../shared/src/commonMain/cpp/pk_call.h"
 #include "field_items.h"
 #include <mgba-util/crc32.h>
 #include <mgba/core/core.h>

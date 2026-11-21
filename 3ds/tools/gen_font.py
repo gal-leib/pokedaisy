@@ -10,6 +10,7 @@ cell (ascent 13, descent 3); a row is a bitmask, bit 0 = leftmost pixel.
     python3 3ds/tools/gen_font.py      (needs Pillow)
 """
 import os
+import unicodedata
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -21,8 +22,9 @@ SIZE = 16
 # Rasterized this many times larger and sampled at each pixel's centre: at
 # 16 px FreeType's hinting breaks diagonal strokes (é's accent got a gap).
 SCALE = 10
-# ASCII plus the few non-ASCII letters the names use (Poké Ball, Pokémon ...).
-EXTRA = "é×·"
+# ASCII plus the non-ASCII characters the names use (Poké Ball, Pokémon ...) and the European games' letters (German,
+# French, Italian, Spanish names and titles: Pokémon Blattgrüne Edition read "Blattgr?ne" before).
+EXTRA = "é×·" + "ÀÁÂÄÇÈÉÊËÌÍÎÏÑÒÓÔÖÙÚÛÜßàáâäçèêëìíîïñòóôöùúûüŒœ¡¿‘’“”…"
 CHARS = [chr(c) for c in range(32, 127)] + list(EXTRA)
 
 # Pixel Operator has no gender symbols; these are drawn here, on the font's
@@ -38,6 +40,23 @@ PIXEL_GLYPHS = {
         "#...#..",
         ".###...",
         ".......",
+    ]),
+    "º": (5, [
+        ".##.",
+        "#..#",
+        "#..#",
+        ".##.",
+        "....",
+        "####",
+    ]),
+    "ª": (5, [
+        ".##.",
+        "...#",
+        ".###",
+        "#..#",
+        ".###",
+        "....",
+        "####",
     ]),
     "♀": (6, [
         ".###.",
@@ -74,20 +93,247 @@ def main():
                 if im.getpixel((x * SCALE + SCALE // 2, y * SCALE + SCALE // 2)) > 127:
                     rows[y] |= 1 << x
         desc = "space" if ch == " " else ch.replace("\\", "backslash")
-        out.append(f"    {{ 0x{ord(ch):04X}, {advance}, {{ {', '.join(f'0x{r:04X}' for r in rows)} }}, 0 }}, // {desc}")
+        out.append(f"    {{ 0x{ord(ch):04X}, {advance}, {{ {', '.join(f'0x{r:04X}' for r in rows)} }}, 0, 0 }}, // {desc}")
     for ch, (advance, art) in PIXEL_GLYPHS.items():
         rows = [0] * SIZE
         for y, line in enumerate(art):
             for x, px in enumerate(line):
                 if px == "#":
                     rows[CAP_TOP + y] |= 1 << x
-        out.append(f"    {{ 0x{ord(ch):04X}, {advance}, {{ {', '.join(f'0x{r:04X}' for r in rows)} }}, 0 }}, // {ch} (drawn)")
+        out.append(f"    {{ 0x{ord(ch):04X}, {advance}, {{ {', '.join(f'0x{r:04X}' for r in rows)} }}, 0, 0 }}, // {ch} (drawn)")
     out.append("};")
     out.append(f"const int pd_font_glyph_count = {len(CHARS) + len(PIXEL_GLYPHS)};")
     out.append("")
+    small(out)
     with open(OUT, "w", encoding="utf-8") as f:
         f.write("\n".join(out))
     print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(CHARS) + len(PIXEL_GLYPHS)} glyphs")
+
+
+# The small text (TEXT SIZE SMALL): the HUD's own drawn pixel font (linux/hud.c's SMALL_FONT, the minimap's place names:
+# capitals 8 tall, letters 5 wide and a pixel apart), with what it lacked drawn here in its style. Its capitals sit on rows
+# 5-12 of the 16-row cell, its baseline on Pixel Operator's (row 13), so pd_text_y centres both. Tried and left (the
+# user's call, 2026-11-15): Atkinson Hyperlegible smoothed at 10 / 11 px - readable, but not the pixel look.
+# Each glyph: (width, rows from the capitals' top; '#' = lit). The advance is the width + 1.
+# Smoothed (the user's call): an unlit pixel on the outside of a diagonal step - two lit neighbours, side and above /
+# below, that touch only at a corner - gets SMALL_STEP of the colour, so slopes and curves read rounder; the strokes stay
+# whole pixels.
+SMALL_TOP = 5
+SMALL_STEP = 96
+SMALL_GLYPHS = {
+    ' ': (3, []),
+    '!': (1, ['#', '#', '#', '#', '#', '#', '.', '#']),
+    '&': (5, ['.##..', '#..#.', '#..#.', '.##..', '#.#.#', '#..#.', '#..#.', '.##.#']),
+    "'": (1, ['#', '#']),
+    '(': (2, ['.#', '#.', '#.', '#.', '#.', '#.', '#.', '.#']),
+    ')': (2, ['#.', '.#', '.#', '.#', '.#', '.#', '.#', '#.']),
+    ',': (2, ['..', '..', '..', '..', '..', '..', '..', '.#', '.#', '#.']),
+    '-': (3, ['...', '...', '...', '...', '###']),
+    '.': (1, ['.', '.', '.', '.', '.', '.', '.', '#']),
+    '/': (4, ['...#', '...#', '..#.', '..#.', '.#..', '.#..', '#...', '#...']),
+    '0': (5, ['.###.', '#...#', '#..##', '#.#.#', '#.#.#', '##..#', '#...#', '.###.']),
+    '1': (3, ['.#.', '##.', '.#.', '.#.', '.#.', '.#.', '.#.', '###']),
+    '2': (5, ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#....', '#####']),
+    '3': (5, ['.###.', '#...#', '....#', '..##.', '....#', '....#', '#...#', '.###.']),
+    '4': (5, ['...#.', '..##.', '.#.#.', '#..#.', '#..#.', '#####', '...#.', '...#.']),
+    '5': (5, ['#####', '#....', '#....', '####.', '....#', '....#', '#...#', '.###.']),
+    '6': (5, ['.###.', '#....', '#....', '####.', '#...#', '#...#', '#...#', '.###.']),
+    '7': (5, ['#####', '....#', '...#.', '...#.', '..#..', '..#..', '..#..', '..#..']),
+    '8': (5, ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '#...#', '.###.']),
+    '9': (5, ['.###.', '#...#', '#...#', '#...#', '.####', '....#', '....#', '.###.']),
+    ':': (1, ['.', '.', '#', '.', '.', '#']),
+    '?': (5, ['.###.', '#...#', '....#', '...#.', '..#..', '..#..', '.....', '..#..']),
+    'A': (5, ['.###.', '#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#']),
+    'B': (5, ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '#...#', '####.']),
+    'C': (5, ['.###.', '#...#', '#....', '#....', '#....', '#....', '#...#', '.###.']),
+    'D': (5, ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '####.']),
+    'E': (5, ['#####', '#....', '#....', '####.', '#....', '#....', '#....', '#####']),
+    'F': (5, ['#####', '#....', '#....', '####.', '#....', '#....', '#....', '#....']),
+    'G': (5, ['.###.', '#...#', '#....', '#....', '#.###', '#...#', '#...#', '.###.']),
+    'H': (5, ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#', '#...#']),
+    'I': (3, ['###', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '###']),
+    'J': (5, ['..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '#..#.', '.##..']),
+    'K': (5, ['#...#', '#..#.', '#.#..', '##...', '##...', '#.#..', '#..#.', '#...#']),
+    'L': (5, ['#....', '#....', '#....', '#....', '#....', '#....', '#....', '#####']),
+    'M': (5, ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#', '#...#']),
+    'N': (5, ['#...#', '##..#', '##..#', '#.#.#', '#.#.#', '#..##', '#..##', '#...#']),
+    'O': (5, ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.']),
+    'P': (5, ['####.', '#...#', '#...#', '#...#', '####.', '#....', '#....', '#....']),
+    'Q': (5, ['.###.', '#...#', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#']),
+    'R': (5, ['####.', '#...#', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#']),
+    'S': (5, ['.###.', '#...#', '#....', '.###.', '....#', '....#', '#...#', '.###.']),
+    'T': (5, ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..']),
+    'U': (5, ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.']),
+    'V': (5, ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '.#.#.', '..#..']),
+    'W': (5, ['#...#', '#...#', '#...#', '#...#', '#.#.#', '#.#.#', '##.##', '#...#']),
+    'X': (5, ['#...#', '#...#', '.#.#.', '..#..', '..#..', '.#.#.', '#...#', '#...#']),
+    'Y': (5, ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..', '..#..']),
+    'Z': (5, ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#....', '#####']),
+    'a': (5, ['.....', '.....', '.###.', '....#', '.####', '#...#', '#...#', '.####']),
+    'b': (5, ['#....', '#....', '####.', '#...#', '#...#', '#...#', '#...#', '####.']),
+    'c': (4, ['....', '....', '.###', '#...', '#...', '#...', '#...', '.###']),
+    'd': (5, ['....#', '....#', '.####', '#...#', '#...#', '#...#', '#...#', '.####']),
+    'e': (5, ['.....', '.....', '.###.', '#...#', '#####', '#....', '#...#', '.###.']),
+    'f': (4, ['..##', '.#..', '###.', '.#..', '.#..', '.#..', '.#..', '.#..']),
+    'g': (5, ['.....', '.....', '.####', '#...#', '#...#', '#...#', '.####', '....#', '....#', '.###.']),
+    'h': (5, ['#....', '#....', '####.', '#...#', '#...#', '#...#', '#...#', '#...#']),
+    'i': (1, ['#', '.', '#', '#', '#', '#', '#', '#']),
+    'j': (3, ['..#', '...', '..#', '..#', '..#', '..#', '..#', '..#', '#.#', '.#.']),
+    'k': (4, ['#...', '#...', '#..#', '#.#.', '##..', '##..', '#.#.', '#..#']),
+    'l': (2, ['##', '.#', '.#', '.#', '.#', '.#', '.#', '.#']),
+    'm': (5, ['.....', '.....', '####.', '#.#.#', '#.#.#', '#.#.#', '#.#.#', '#.#.#']),
+    'n': (5, ['.....', '.....', '####.', '#...#', '#...#', '#...#', '#...#', '#...#']),
+    'o': (5, ['.....', '.....', '.###.', '#...#', '#...#', '#...#', '#...#', '.###.']),
+    'p': (5, ['.....', '.....', '####.', '#...#', '#...#', '#...#', '#...#', '####.', '#....', '#....']),
+    'q': (5, ['.....', '.....', '.####', '#...#', '#...#', '#...#', '#...#', '.####', '....#', '....#']),
+    'r': (3, ['...', '...', '#.#', '##.', '#..', '#..', '#..', '#..']),
+    's': (4, ['....', '....', '.###', '#...', '.##.', '...#', '...#', '###.']),
+    't': (4, ['.#..', '.#..', '###.', '.#..', '.#..', '.#..', '.#..', '..##']),
+    'u': (5, ['.....', '.....', '#...#', '#...#', '#...#', '#...#', '#...#', '.####']),
+    'v': (5, ['.....', '.....', '#...#', '#...#', '#...#', '.#.#.', '.#.#.', '..#..']),
+    'w': (5, ['.....', '.....', '#...#', '#...#', '#.#.#', '#.#.#', '#.#.#', '.#.#.']),
+    'x': (5, ['.....', '.....', '#...#', '.#.#.', '..#..', '..#..', '.#.#.', '#...#']),
+    'y': (5, ['.....', '.....', '#...#', '#...#', '#...#', '#...#', '.####', '....#', '....#', '.###.']),
+    'z': (5, ['.....', '.....', '#####', '...#.', '..#..', '.#...', '#....', '#####']),
+    'é': (5, ['..#..', '.#...', '.###.', '#...#', '#####', '#....', '#...#', '.###.']),
+    # Drawn for the 3DS's SMALL text (the HUD's place names never needed them).
+    '"': (3, ['#.#', '#.#']),
+    '#': (5, ['.#.#.', '.#.#.', '#####', '.#.#.', '.#.#.', '#####', '.#.#.', '.#.#.']),
+    '$': (5, ['..#..', '.####', '#.#..', '.###.', '..#.#', '####.', '..#..']),
+    '%': (5, ['##..#', '##..#', '...#.', '..#..', '..#..', '.#...', '#..##', '#..##']),
+    '*': (5, ['.....', '..#..', '#.#.#', '.###.', '#.#.#', '..#..']),
+    '+': (5, ['.....', '.....', '..#..', '..#..', '#####', '..#..', '..#..']),
+    ';': (2, ['..', '..', '.#', '..', '..', '.#', '.#', '#.']),
+    '<': (4, ['....', '...#', '..#.', '.#..', '#...', '.#..', '..#.', '...#']),
+    '=': (4, ['....', '....', '....', '####', '....', '####']),
+    '>': (4, ['....', '#...', '.#..', '..#.', '...#', '..#.', '.#..', '#...']),
+    '@': (6, ['.####.', '#....#', '#.###.', '#.#.#.', '#.###.', '#.....', '.####.']),
+    '[': (2, ['##', '#.', '#.', '#.', '#.', '#.', '#.', '##']),
+    '\\': (4, ['#...', '#...', '.#..', '.#..', '..#.', '..#.', '...#', '...#']),
+    ']': (2, ['##', '.#', '.#', '.#', '.#', '.#', '.#', '##']),
+    '^': (3, ['.#.', '#.#']),
+    '_': (5, ['.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '#####']),
+    '`': (2, ['#.', '.#']),
+    '{': (3, ['..#', '.#.', '.#.', '#..', '.#.', '.#.', '.#.', '..#']),
+    '|': (1, ['#', '#', '#', '#', '#', '#', '#', '#', '#']),
+    '}': (3, ['#..', '.#.', '.#.', '..#', '.#.', '.#.', '.#.', '#..']),
+    '~': (5, ['.....', '.....', '.....', '.##.#', '#.##.']),
+    '×': (5, ['.....', '.....', '#...#', '.#.#.', '..#..', '.#.#.', '#...#']),
+    '·': (1, ['.', '.', '.', '.', '#']),
+    '♂': (6, ['......', '...###', '....##', '...#.#', '.###..', '#...#.', '#...#.', '.###..']),
+    '♀': (5, ['.....', '.###.', '#...#', '#...#', '.###.', '..#..', '.###.', '..#..']),
+}
+
+
+# The small accented letters are their base letter's art with the mark drawn over it (lower case: in the two empty rows
+# above the x-height; capitals: rows above the capitals, an offset the art carries as its third item).
+SMALL_MARKS = {  # (row, x from the letter's centre); rows -1 / -2 sit right above the art's top
+    "\u0300": [(-2, -1), (-1, 0)],           # grave
+    "\u0301": [(-2, 1), (-1, 0)],            # acute (é's own shape, above)
+    "\u0302": [(-2, 0), (-1, -1), (-1, 1)],  # circumflex
+    "\u0308": [(-1, -1), (-1, 1)],           # diaeresis
+    "\u0303": [(-2, -1), (-2, 0), (-1, 1), (-2, 2), (-1, -2)],  # tilde
+}
+
+
+def small_composed(ch):
+    base, *marks = unicodedata.decomposition(ch).split()
+    base = chr(int(base, 16))
+    mark = chr(int(marks[0], 16))
+    width, art = SMALL_GLYPHS[base][:2]
+    art = [list(line) for line in art]
+    top = 0
+    if base == "i":  # the dotless stem, centred in three columns
+        width, art = 3, [list("..."), list("...")] + [list(".#.") for _ in range(6)]
+    centre = width // 2
+    if mark == "\u0327":  # cedilla: under the letter's foot
+        while len(art) < 10:
+            art.append(["."] * width)
+        art[8][centre] = "#"
+        art[9][centre - 1] = "#"
+        return (width, ["".join(line) for line in art])
+    if base.isupper():
+        art = [["."] * width for _ in range(3)] + art
+        top = -3
+        offset = 2  # the mark's rows -1 / -2 land on 1 / 0, a row clear of the capital
+    else:
+        offset = 2  # the two empty rows above a lower-case letter
+    for dy, dx in SMALL_MARKS[mark]:
+        x = min(max(centre + dx, 0), width - 1)
+        art[offset + dy][x] = "#"
+    return (width, ["".join(line) for line in art], top)
+
+
+SMALL_GLYPHS.update({
+    "ß": (5, [".##..", "#..#.", "#..#.", "#.#..", "#..#.", "#...#", "#...#", "#.##."]),
+    "Œ": (7, [".######", "#..#...", "#..#...", "#..####", "#..#...", "#..#...", "#..#...", ".######"]),
+    "œ": (7, [".......", ".......", ".##.##.", "#..#..#", "#..####", "#..#...", "#..#..#", ".##.##."]),
+    "¡": (1, [".", ".", "#", ".", "#", "#", "#", "#", "#", "#"]),
+    "¿": (5, ["..#..", ".....", "..#..", "..#..", ".#...", "#....", "#...#", ".###."]),
+    "‘": (2, [".#", "#.", "#."]),
+    "’": (2, [".#", ".#", "#."]),
+    "“": (4, [".#.#", "#.#.", "#.#."]),
+    "”": (4, [".#.#", ".#.#", "#.#."]),
+    "…": (5, [".....", ".....", ".....", ".....", ".....", ".....", ".....", "#.#.#"]),
+    "º": (3, [".#.", "#.#", ".#.", "...", "###"]),
+    "ª": (3, ["##.", ".##", "#.#", "...", "###"]),
+})
+for _ch in EXTRA:
+    if _ch not in SMALL_GLYPHS and unicodedata.decomposition(_ch):
+        SMALL_GLYPHS[_ch] = small_composed(_ch)
+
+
+def small(out):
+    count = len(CHARS) + len(PIXEL_GLYPHS)
+    order = CHARS + list(PIXEL_GLYPHS)
+    missing = [ch for ch in order if ch not in SMALL_GLYPHS]
+    assert not missing, f"SMALL_GLYPHS lacks {missing!r}"
+    out.append("// TEXT SIZE SMALL: the HUD's drawn pixel font, capitals 8 tall (pd_font_small_glyphs, same order as pd_font_glyphs),")
+    out.append("// its diagonal steps softened (pd_font_small_alpha / _cover).")
+    alphas, covers, glyphs = [], [], []
+    for ch in order:
+        width, art, *rest = SMALL_GLYPHS[ch]
+        top = rest[0] if rest else 0
+        assert all(len(line) == width for line in art), ch
+        rows = [0] * SIZE
+        for y, line in enumerate(art):
+            for x, px in enumerate(line):
+                if px == "#":
+                    rows[SMALL_TOP + top + y] |= 1 << x
+        lit = lambda x, y: 0 <= x < 16 and 0 <= y < SIZE and rows[y] >> x & 1
+        alpha = [0] * 256
+        for y in range(SIZE):
+            for x in range(16):
+                if lit(x, y):
+                    alpha[y * 16 + x] = 255
+                    continue
+                # The outside of a step only (at most 3 lit neighbours): inside a letter's curve (an O's corners, 4 and
+                # more) the hole would fill in.
+                around = sum(lit(x + i, y + j) for i in (-1, 0, 1) for j in (-1, 0, 1))
+                for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+                    if around <= 3 and lit(x + dx, y) and lit(x, y + dy) and not lit(x + dx, y + dy):
+                        alpha[y * 16 + x] = SMALL_STEP
+        alphas.append(alpha)
+        covers.append([sum(1 << x for x in range(16) if alpha[y * 16 + x]) for y in range(SIZE)])
+        glyphs.append((ch, width + 1, rows))
+    out.append(f"static const uint8_t pd_font_small_alpha[{count}][256] = {{")
+    for a in alphas:
+        out.append("    {" + ",".join(str(v) for v in a) + "},")
+    out.append("};")
+    out.append(f"static const uint16_t pd_font_small_cover[{count}][16] = {{")
+    for cv in covers:
+        out.append("    {" + ", ".join(f"0x{v:04X}" for v in cv) + "},")
+    out.append("};")
+    out.append(f"const struct pd_glyph pd_font_small_glyphs[{count}] = {{")
+    for i, (ch, advance, rows) in enumerate(glyphs):
+        desc = "space" if ch == " " else ch.replace("\\", "backslash")
+        out.append(f"    {{ 0x{ord(ch):04X}, {advance}, {{ {', '.join(f'0x{r:04X}' for r in rows)} }}, pd_font_small_alpha[{i}], "
+                   f"pd_font_small_cover[{i}] }}, // {desc}")
+    out.append("};")
+    out.append(f"const int pd_font_small_glyph_count = {count};")
+    # A line at this size (pd_lh): the capitals, a descender's 2 rows, the shadow's and one between.
+    out.append("const int pd_font_small_line = 13; // pd_lh: a NORMAL 16 px line at this size")
+    out.append("")
 
 
 if __name__ == "__main__":

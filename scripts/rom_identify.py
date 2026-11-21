@@ -80,19 +80,20 @@ def git(*args: str) -> str:
 
 def repo_sha1s() -> set[str]:
     """Every SHA-1 the app's code, game data or the website's data names (detection, titles, configs)."""
-    out = git("grep", "-ohE", "[0-9a-f]{40}", "--", "app/src/main", "gamedata", "website/src/data")
+    out = git("grep", "-ohE", "[0-9a-f]{40}", "--", "app/src/main", "shared/src/commonMain", "gamedata", "website/src/data")
     return set(out.split())
 
 
 def repo_titles() -> dict[str, str]:
-    """SHA-1 -> library title: the website's export, then GameTitles' own pairs (newer than the export), the DS ports."""
+    """SHA-1 -> library title: the website's export, then the shared catalog's own pairs (newer than the export), the DS ports."""
     titles: dict[str, str] = {}
     compat = REPO / "website" / "src" / "data" / "compat.json"
     if compat.exists():
         titles.update(json.loads(compat.read_text()).get("titles", {}))
     consts = dict(re.findall(r'val\s+(\w+)\s*=\s*"([0-9a-f]{40})"', git("grep", "-hE", r'val\s+\w+\s*=\s*"[0-9a-f]{40}"',
-                                                                            "--", "app/src/main")))
-    text = (REPO / "app/src/main/kotlin/com/pokedaisy/app/GameTitles.kt").read_text()
+                                                                            "--", "app/src/main", "shared/src/commonMain")))
+    src = REPO / "shared/src/commonMain/kotlin/com/pokedaisy/app"
+    text = (src / "GameTitleCatalog.kt").read_text() + (src / "companion/data/RetailLookTitles.kt").read_text()
     for key, title in re.findall(r'([\w.]+|"[0-9a-f]{40}")\s+to\s+"([^"]+)"', text):
         sha = key.strip('"') if key.startswith('"') else consts.get(key.split(".")[-1])
         if sha:
@@ -127,7 +128,7 @@ def config_files(sha1: str, title: str, file_name: str) -> list[str]:
     """Where the repo names the game: the files naming its SHA-1 (detection, titles), then the game data TOML that
     holds its config (configs name their game, not its hash: retail's under retail/ and ports/, a hack's under
     hacks/ by a word of its title)."""
-    named = [Path(l).name for l in git("grep", "-l", sha1, "--", "gamedata", "app/src/main").splitlines()
+    named = [Path(l).name for l in git("grep", "-l", sha1, "--", "gamedata", "app/src/main", "shared/src/commonMain").splitlines()
              if l and "ShinyOdds" not in l]
     gen3 = REPO / "gamedata" / "gen3"
     if RETAIL_NAME.match(file_name):

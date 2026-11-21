@@ -1,5 +1,5 @@
 // Which game is running and where its RAM globals live - the C twin of the
-// app's NativeConfig (app/.../companion/data/NativeReader.kt). Only the
+// app's NativeConfig (shared/.../companion/data/NativeReader.kt). Only the
 // fields this port reads so far; the values are generated from gamedata/,
 // like the app's (pd_configs_gen.h, from gamedata/targets/3ds.toml).
 #ifndef PD_GAME_H
@@ -412,6 +412,12 @@ struct pd_config {
     uint32_t tmSetMainCallback2, tmReturnToField, tmCleanup, tmFade, tmLock, tmUnlock;
     int tmPartyMenuSlotOff, tmFirst, tmLast;
     uint32_t tmCrcs[9];
+
+    // TRADE EVOS (TradeEvolution.kt's TradeEvoFns, the config's TRADE_EVO record): GetEvolutionTargetSpecies,
+    // BeginEvolutionScene, gCB2_AfterEvolution (IWRAM), CB2_ReturnToField, LockPlayerFieldControls, and CRC32 of the four
+    // functions' first 32 bytes (target, scene, return, lock). tradeEvoTarget 0 = none.
+    uint32_t tradeEvoTarget, tradeEvoScene, tradeEvoAfter, tradeEvoReturn, tradeEvoLock;
+    uint32_t tradeEvoCrcs[4];
 
     // REPEL and PC anywhere (the app's FieldItemFns / PcFns, FieldItems.kt / Pc.kt): VarGet, VarSet,
     // CheckBagHasItem, RemoveBagItem and ArePlayerFieldControlsLocked (fieldCrcs, in that order), VAR_REPEL_STEP_COUNT

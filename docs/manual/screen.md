@@ -26,6 +26,8 @@ On the top screen, `ASPECT` opens a preview: each choice is drawn as a little to
 
 ## EXPAND: more of the map
 
+On iPhone and iPad, use `SETTINGS` > `ASPECT` to pick `ORIGINAL`, `STRETCH` or `EXPAND`. Supported GB, GBC and GBA games use the same expanded picture and camera as Android. Pick `ZOOM` in Settings or tap its touch button to see more of the map. A controller’s right stick looks around when `LOOK AROUND` is on. Your zoom choice is kept for each game.
+
 With `EXPAND` you see more of the route around you instead of black bars. The strips beside the game aren't stretched or made up: they're rebuilt every frame from the game's own map, tiles and characters, so people walk in from the edges, water moves and the lighting matches. On a phone held upright the extra map goes above and below the game instead.
 
 A few things worth knowing:
@@ -33,9 +35,9 @@ A few things worth knowing:
 - **Battles are wide too.** The battle scenery carries on past the edges, and Pokémon, trainers and health boxes slide in from off screen. Some hacks only draw their battle scenes as wide as the screen; there the scene is mirrored out from its edges so it still flows on. The dark band behind the text and the battle menu runs right across.
 - **Weather and caves work.** Fog, ash and rain reach the screen's edges, and a dark cave stays dark around your light.
 - **Menus and the title screen** can't be extended, so there the strips glow softly with the colours at the game's edges, and fade back into the map when you return to it.
-- **Supported games:** FireRed, LeafGreen, Emerald, Ruby and Sapphire (every language and revision), plus Unbound, Radical Red, Lazarus, SoulGold, Heart and Soul, Gaia, Odyssey, Amethyst 1.3.0, Glazed, Seaglass, Emerald Imperium, Emerald Legacy, Emerald Rogue, Too Many Types 2, Recharged Yellow, Super Mariomon, Ultra Violet, FireRed Rocket Edition, Ash Gray, Let's Go, Elite Redux, Monomyth, Sword and Shield Ultimate Plus, GS Chronicles and Celia's hack.
-- **DS games:** Platinum, HeartGold, SoulSilver, Black, White, Black 2, White 2 and Origin HeartGold. Their 3D world goes on past the screen, and so do their battles: the whole battle scene of Black, White and their sequels, sky, ground and all, and the others' battle backgrounds with the health boxes carried to the edges.
-- **On the Game Boy:** Yellow (the English cart), Yellow Legacy, Crystal, Crystal Legacy, Crystal Clear and Polished Crystal (version 3.2.3, the normal build) have it too. The town or route goes on past the small screen, with the people standing in it, and zoom and looking around work the same way. People in the next town or route show up in the strips before you cross over. Text boxes, the start menu, the save prompt and the options screen keep the map around them. Battles and the other menu screens aren't widened: the strips there are plain, in the colours along the screen's sides (white in most of them, Yellow's trainer card too; black beside a screen whose top part is black).
+- **Supported games:** FireRed, LeafGreen, Emerald, Ruby and Sapphire (every language and revision), plus Unbound, Radical Red, Lazarus, SoulGold, Heart and Soul, Gaia, Odyssey, Amethyst 1.3.0, Glazed, Seaglass, Emerald Imperium, Emerald Legacy, Emerald Rogue, Too Many Types 2, Recharged Yellow, Super Mariomon, Ultra Violet, FireRed Rocket Edition, Ash Gray, Let's Go, Elite Redux, Monomyth, Epsilon Emerald, Sword and Shield Ultimate Plus, GS Chronicles and Celia's hack.
+- **DS games:** Platinum, HeartGold, SoulSilver, Black, White, Black 2, White 2, Origin HeartGold and Heartfelt Gold. Their 3D world goes on past the screen, and so do their battles: the whole battle scene of Black, White and their sequels, sky, ground and all, and the others' battle backgrounds with the health boxes carried to the edges.
+- **On the Game Boy:** Red and Blue (the English carts), Yellow (in every language), Yellow Legacy, Gold, Silver, Crystal, Crystal Legacy, Crystal Clear and Polished Crystal (version 3.2.3, the normal build) have it too. The town or route goes on past the small screen, with the people standing in it, and zoom and looking around work the same way. People in the next town or route show up in the strips before you cross over. Text boxes, the start menu, the save prompt and the options screen keep the map around them. Battles and the other menu screens aren't widened: the strips there are plain, in the colours along the screen's sides (white in most of them, Yellow's trainer card too; black beside a screen whose top part is black).
 
 `EXPAND` is tagged `BETA` in Settings: it works in every game listed above, but it isn't perfect yet, and now and then you may spot something at the edges that the game itself doesn't show. If you do, [tell us](https://pokedaisy.com/feedback/) where it happened.
 
@@ -55,17 +57,18 @@ The **right stick** looks around (turn off `LOOK AROUND` in the `SCREEN` group i
 
 ## DS core: DS games on weaker devices
 
-PokeDaisy has two DS emulators. melonDS has every DS feature. DSperate needs far less from your device, so it keeps DS games at full speed on budget handhelds, older phones and tablets, and devices running 32-bit Android, where melonDS can be slow. `DS CORE` picks which one runs your DS games.
+PokeDaisy has three DS emulators. melonDS has every DS feature. DSperate needs far less from your device, so it keeps DS games at full speed on budget handhelds, older phones and tablets, and devices running 32-bit Android, where melonDS can be slow. BananaDS is the DS emulator from BananaOS, the custom firmware for the Anbernic RG DS handhelds: melonDS's core with BananaOS's speed work and its own way of drawing the screens, with `EXPAND` too. `DS CORE` picks which one runs your DS games.
 
 | Choice | What you get |
 | --- | --- |
 | `AUTO` | DSperate on a device that looks weak or runs 32-bit Android, melonDS everywhere else. The row shows which one it picked. This is the default. |
 | `MELONDS` | Always melonDS. |
 | `DSPERATE` | Always DSperate. |
+| `BANANADS` | Always BananaDS. It's only offered on a 64-bit device with Android 10 or newer. |
 
 A few things worth knowing:
 
-- **Some features are melonDS only for now.** On DSperate, `EXPAND`, `DS RESOLUTION` and `DS CPU BOOST` are greyed out, the companion's `PC` and `FLY` don't show for DS games, and fast-forward plays the music sped up (`FF MUSIC`'s `STEADY` needs melonDS). The companion's tabs, the touch screen, `DS LAYOUT`, `BATTLE BUTTONS`, cheats, achievements and your saves all work the same.
+- **Some features are melonDS only for now.** On DSperate, `EXPAND`, `DS RESOLUTION` and `DS CPU BOOST` are greyed out, the companion's `PC` and `FLY` don't show for DS games, and fast-forward plays the music sped up (`FF MUSIC`'s `STEADY` needs melonDS). On BananaDS, `EXPAND` and `DS CPU BOOST` work, but `DS RESOLUTION` is greyed out, the companion's `PC` and `FLY` don't show for DS games and fast-forward plays the music sped up. The companion's tabs, the touch screen, `DS LAYOUT`, `BATTLE BUTTONS`, cheats, achievements and your saves all work the same on all three.
 - **It applies when a DS game starts.** Change it in the companion while a game is running and it takes effect at `RESTART GAME` or the next time you open the game.
 - **Save in the game before you switch.** Each emulator only reads its own save states. When you switch, the game starts from your save file, and the place you left it on the other emulator is kept: switch back and the game picks up there again, as long as you haven't saved in the game since. Save states you made in `STATES` load only on the emulator that made them.
 
@@ -105,17 +108,21 @@ On a device that can't run a DS game at full speed, PokeDaisy keeps the game at 
 
 `STATUS BAR` adds a thin strip with the game's name, where you are, your money, the time and the battery. It's handy when the game is full screen and you can't see the device's own clock.
 
+On iPhone and iPad, go to `SCREEN` > `DISPLAY OPTIONS` to choose where the strip appears.
+
 | Choice | Where it goes |
 | --- | --- |
 | `OFF` | No bar (the default). |
 | `GAME` | Across the top of the game, exactly as wide as it. The game shrinks a little to make room. |
-| `COMPANION` | Over the companion's tabs on the bottom screen, so the game keeps its full size. |
+| `COMPANION` | Over the companion's tabs, so the game keeps its full size. |
 
 The clock follows your device's 12 or 24 hour setting. Money shows for the games where PokeDaisy can read it.
 
 ![The status bar above the game, showing the game's name, the current town, money, the time and battery](shots/status-bar.png)
 
 ## Shaders
+
+On iPhone and iPad, `DISPLAY OPTIONS` > `SHADERS` offers `FILTER`, `GRID`, `GBA COLORS` and `UNLIT SCREEN` for the game picture. Choices are remembered and combine with `ORIGINAL`, `STRETCH`, `EXPAND` and game borders. `ON COMPANION` also applies your filter and GBA colors to the companion, HUD and panel controls. Touch controls and touch-skin artwork keep their own look. `SMOOTHING` offers `OFF`, `xBRZ`, `xBR` and `SCALEFX`, using the same presets as Android.
 
 `SHADERS` opens a page of effects for how the game is drawn. They stack: you can have smoothing, the GBA's colours, the unlit screen and a filter all at once.
 
@@ -144,6 +151,8 @@ The clock follows your device's 12 or 24 hour setting. Money shows for the games
 - `xBR`: rounder and softer.
 - `SCALEFX`: the most even outlines.
 
+On iPhone and iPad, tap to switch between `OFF`, `xBRZ`, `xBR` and `SCALEFX`. Smoothing combines with your filter, GBA colors and unlit screen setting.
+
 Smoothing only applies to the game, never to the companion. On devices whose graphics chip can't run it, the row shows `N/A`.
 
 ### GBA COLORS
@@ -156,7 +165,7 @@ The first GBA had no light behind its screen. Light from the room went in throug
 
 ### On the companion too
 
-`ON COMPANION` (on by default) puts the same `FILTER` and `GBA COLORS` (not `UNLIT SCREEN`) over the companion screen and the status bar, so both screens match. The grid is sized to the game's pixels, so the lines line up with the top screen's. This needs Android 13 or newer; on older devices the companion keeps its plain look. A DS game's touch screen is part of the game, so it gets `FILTER` and `GBA COLORS` either way (Android 13 and newer).
+`ON COMPANION` (on by default) puts the same `FILTER` and `GBA COLORS` (not `UNLIT SCREEN`) over the companion screen, so both screens match. The grid is sized to the game's pixels. On iPhone and iPad it also styles the HUD and panel controls. On Android it also styles the app's status bar and needs Android 13 or newer; on older Android devices the companion keeps its plain look. A DS game's touch screen is part of the game, so it gets `FILTER` and `GBA COLORS` either way (Android 13 and newer).
 
 ## Overlay: a frame around the game
 
@@ -165,15 +174,17 @@ The first GBA had no light behind its screen. Light from the room went in throug
 - `DAISY`: PokeDaisy's blue with a dot grid and the flower mark in the margin.
 - `BEZEL`: a plain dark surround.
 
+On iPhone and iPad, pick `NONE`, `DAISY` or `BEZEL` from the shared `DISPLAY OPTIONS` > `OVERLAY` page. The choice is remembered. A selected touch skin supplies its own frame instead; `EXPAND` uses the expanded picture without a border. You can also import your own borders there, including from the library settings.
+
 They're drawn at the game's own pixel size and the game is shown at a whole-number scale inside them, so everything stays crisp (the game is a little smaller than without a frame).
 
 ![The game inside the DAISY frame: a blue border with a dot pattern and the PokeDaisy flower beside the screen](shots/overlay-daisy.png)
 
 ### Your own RetroArch overlays
 
-If you already use overlays in RetroArch, you can bring them over. On the top screen, open Settings > `OVERLAY` and tap `IMPORT FILE`. You can pick:
+If you already use overlays in RetroArch, you can bring them over. On Android's top screen, open Settings > `OVERLAY`. On iPhone and iPad, open Settings > `DISPLAY OPTIONS` > `OVERLAY`. Tap `IMPORT FILE`. You can pick:
 
-- a RetroArch overlay `.cfg` together with its PNG image,
+- a RetroArch overlay `.cfg` together with its PNG image (on iPhone and iPad, pick the `.cfg` first and its image when asked),
 - a `.zip` with overlays in it,
 - or any PNG with a see-through hole where the screen goes.
 
@@ -197,6 +208,18 @@ Overlays are switched off on a phone held upright, where the game sits across th
 - `AUTO`: follows your device's dark theme setting.
 
 The game's own art stays as it is: party slots, the map, the trainer card and battle buttons keep the game's colours. Backgrounds dim behind them.
+
+## Font
+
+`FONT` sets the letters the app is written in, on both screens at once. Pick it in the top screen's Settings or in the companion's SETTINGS, under SCREEN:
+
+- `PIXEL SMALL` (the default): small, crisp pixel letters, a little shorter and narrower than `PIXEL`, so more fits on a line. A Game Boy game shows its own letters while it runs.
+- `PIXEL`: the taller pixel letters the app used before.
+- `SMOOTH`: soft, rounded letters that are easy to read on any screen.
+- `SMOOTH BOLD`: the same letters, heavier, closer to the games' thick menu text.
+- `SYSTEM`: your device's own font.
+
+The game's own art keeps its pixel letters: type tags, party slots and the trainer card stay as the game draws them.
 
 ## Theme
 
@@ -226,6 +249,27 @@ The dates follow your device's calendar. If two holidays overlap (`LUNAR NEW YEA
 `FPS / CPU` shows a small readout in the game's top-left corner: how many frames the game ran in the last second and how much of the CPU PokeDaisy is using. It should read about 60 at normal speed.
 
 Tap the readout to open a longer panel with frame times, late frames, the screen's refresh and pacing, audio underruns, battery temperature, thermal state and memory. It's useful when a game feels choppy; see [Troubleshooting](troubleshooting.md#the-game-feels-choppy-or-the-device-runs-hot).
+
+On iPhone and iPad, the panel shows measured game and display rates, CPU use, frame times and thermal state. A dash marks an unavailable reading. Scroll the panel to see more rows on a short screen.
+
+## Game look
+
+`COMPANION LOOK`, right under `THEME`, picks how the companion and the HUD look in a game. On `GAME` (the default), they take on the style of the game you're playing, from the colors of its own menus:
+
+| Game | Companion | HUD |
+| --- | --- | --- |
+| HeartGold, SoulSilver | Grey blue windows with a dark line, red values, orange buttons | The green menu window, with a red cursor |
+| Platinum | White windows in a brown wooden frame, cream lists | Dark slate panels with a silver line |
+| Black, White | Navy windows with a cyan rim, charcoal lists and buttons | Navy panels with a cyan rim and a magenta cursor |
+| Black 2, White 2 | Violet windows with a white rim, teal values | Violet panels with a pink cursor |
+| FireRed, LeafGreen | The bag's cream list in its gold frame | The bag's window |
+| Emerald | The bag's cream list in its steel blue frame | The bag's window |
+| Ruby, Sapphire | Emerald's frame with their bag's warmer peach list | The bag's window |
+| X, Y | Smooth green windows and a rounded font | Their own buttons and panels |
+
+Hacks that run on one of these games wear its look. Other games keep the app's own look. Your theme and `DARK MODE` still apply around them: in dark mode the light looks give way to the app's dark windows, while Black and White's darker looks stay as they are.
+
+Pick `CLASSIC` to keep the app's own look in every game, X and Y included. The HUD's own `LOOK` setting picks `GAME` for the game's style or one of the app's looks; see [HUD](hud.md).
 
 ## Light companion for slow devices
 

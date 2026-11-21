@@ -23,7 +23,7 @@ import tomllib
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 GAMEDATA = os.path.join(ROOT, "gamedata")
 SCHEMAS = os.path.join(GAMEDATA, "schema")
-DATA = os.path.join(ROOT, "app/src/main/kotlin/com/pokedaisy/app/companion/data")
+DATA = os.path.join(ROOT, "shared/src/commonMain/kotlin/com/pokedaisy/app/companion/data")
 KOTLIN_OUT = os.path.join(DATA, "NativeConfigsGen.kt")
 RECORDS_OUT = os.path.join(DATA, "GameDataRecordsGen.kt")
 RECORDS = os.path.join(GAMEDATA, "gen3", "records")
@@ -332,8 +332,9 @@ def file_rank(path):
 
 def load_configs(schema):
     configs = {}
+    # area_maps.toml is AREA maps' rows by ROM CRC32, scripts/gen_area_maps.py's, not configs.
     paths = [p for p in glob.glob(os.path.join(GAMEDATA, "gen3", "**", "*.toml"), recursive=True)
-             if not p.startswith(RECORDS + os.sep)]
+             if not p.startswith(RECORDS + os.sep) and os.path.basename(p) != "area_maps.toml"]
     for path in sorted(paths, key=file_rank):
         rel = os.path.relpath(path, ROOT)
         tables = read_toml(path)

@@ -8,9 +8,6 @@ package com.pokedaisy.app
  * plays or, the engine, every frame; [listeners] hear a change at once (a clip already playing).
  */
 object GameVolume {
-    /** GAME VOLUME's slider moves in steps of this many percent (a drag, LEFT / RIGHT). */
-    const val STEP = 5
-
     @Volatile var percent: Int = 100
         private set
     @Volatile var muted: Boolean = false
@@ -31,8 +28,7 @@ object GameVolume {
     fun set(percent: Int, muted: Boolean) {
         this.percent = percent.coerceIn(0, 100)
         this.muted = muted
-        val p = this.percent / 100f
-        gain = if (muted) 0f else p * p
+        gain = gameAudioGain(this.percent, muted)
         for (l in listeners) runCatching { l() }
     }
 }

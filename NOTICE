@@ -29,7 +29,7 @@ The app shows every license below in full under Settings > LICENSES.
   contributors, Mozilla Public License 2.0 - https://github.com/mgba-emu/mgba
   (source: https://github.com/mgba-emu/mgba/tree/0.10.5). Built with two of
   its bundled libraries: blip_buf (GNU LGPL 2.1) and inih (BSD).
-  app/src/main/cpp/pk_rewind.c is adapted from mGBA's src/core/rewind.c and
+  shared/src/commonMain/cpp/pk_rewind.c is adapted from mGBA's src/core/rewind.c and
   stays under the MPL 2.0 (its header says so).
 - 3DS build only: armGBA (third_party/armgba), Copyright (c) 2026 Magnominus and the armGBA 3DS
   port contributors, Mozilla Public License 2.0 for the parts the 3DS build
@@ -41,6 +41,13 @@ The app shows every license below in full under Settings > LICENSES.
   pokedaisy-3ds fork; third_party/patches/armgba-pokedaisy.patch (a BKPT hook in
   its interpreter, an H-blank interrupt hook) is our change to it, under the MPL 2.0. Its libretro layer links RetroArch's libretro-common (MIT)
   and the 7-Zip LZMA SDK (public domain), and the 3DS build zlib (zlib License).
+- 3DS build only: gpSP 3D (third_party/gpsp, bheppe's gpSP 3D at v0.1.7), gpSP by
+  Exophase with later work by notaz, davidgfnet, the libretro team and bheppe, GNU
+  GPL 2.0 or later (used here under the GPL 3.0) - https://github.com/bheppe/gpsp-3d.
+  The library's GBA CORE: GPSP. Its arm/arm_codegen.h and arm_dpimacros.h are Wild
+  West Software's (MIT-style notice in the files); its libretro layer links
+  RetroArch's libretro-common (MIT). third_party/patches/gpsp-pokedaisy.patch (the
+  cartridge in the host's buffer) and the glue (3ds/emu/pd_gpsp*.c) are ours.
 - rcheevos (third_party/rcheevos), Copyright (c) 2018 RetroAchievements.org,
   MIT License - https://github.com/RetroAchievements/rcheevos
 - The libretro GBA core over armGBA (libretro/armgba):
@@ -76,6 +83,19 @@ The app shows every license below in full under Settings > LICENSES.
   https://github.com/thwonp/dsperate-lr. It carries DSperate v3.3.0 as its own
   submodule, under the DSperate terms above; the collection package includes
   every license text in that tree.
+- BananaDS (third_party/bananads: the SuperDrastic repository, whose bananads/
+  folder is BananaDS), Copyright (c) 2026 JorreFog and the SuperDrastic
+  contributors, GNU GPL 3.0 or later - https://github.com/JorreFog/SuperDrastic
+  (source: the submodule's pinned commit). The app's third DS core,
+  libpkbananads.so (app/src/main/cpp/bananads/): its melonDS patches and the
+  Banana 2D engine (gpu2d/), over melonDS's own software 3D renderer. Its Gengis
+  Engine (gengis/) is not built, nor the rest of that repository (SuperDrastic,
+  MIT).
+- melonDS for BananaDS (third_party/melonds-bananads), Copyright (c) melonDS
+  team, GNU GPL 3.0 - https://github.com/melonDS-emu/melonDS, at the commit
+  BananaDS pins, with BananaDS's patches and PokeDaisy's
+  app/src/main/cpp/bananads/melonds-expand.patch applied to a build copy (the
+  same bundled libraries as below).
 - melonDS (third_party/melonds), Copyright (c) melonDS team, GNU GPL 3.0 -
   https://github.com/melonDS-emu/melonDS (source: the submodule's pinned commit,
   with PokeDaisy's changes in third_party/patches/melonds-pokedaisy.patch). Built
@@ -83,7 +103,7 @@ The app shows every license below in full under Settings > LICENSES.
   Collet, BSD 2-Clause; third_party/licenses/xxHash-BSD-2-Clause.txt),
   tiny-AES-c (The Unlicense), SHA-1 by Steve Reid (public domain), blip_buf
   (GNU LGPL 2.1) and Dolphin's ARM64 emitter (GNU GPL 2.0 or later).
-- Shaders (app/src/main/kotlin/com/pokedaisy/app/ScreenShaders.kt): LCD and
+- Shaders (shared-ui/src/commonMain/kotlin/com/pokedaisy/app/ScreenShaders.kt): LCD and
   scanlines adapted from mGBA's, Copyright (C) 2017 Dominus Iniquitatis, MIT
   License (the full notice is in third_party/mgba/res/shaders/lcd.shader/lcd.fs);
   GBA colours from mGBA's gba-color shader by Pokefan531 and hunterk. LCD PAPER
@@ -94,7 +114,8 @@ The app shows every license below in full under Settings > LICENSES.
   xBR level 2 and xBRZ freescale's xBR code, Copyright (C) 2011-2016 Hyllian, MIT
   License; xBRZ, Copyright (C) Zenju, GNU GPL 3.0 (from HqMAME); ScaleFX,
   Copyright (c) 2016 Sp00kyFox, MIT License
-  (third_party/licenses/libretro-shaders.txt).
+  (third_party/licenses/libretro-shaders.txt). iOS bundles the same original
+  assets; its Metal adapter translates shader transport and vector syntax at runtime.
 - Pixel Operator font (app/src/main/assets/fonts), by Jayvee Enaguas,
   CC0 1.0 (public domain dedication).
 - Atkinson Hyperlegible (app/src/main/assets/fonts, website/public/fonts: the manual's
@@ -115,6 +136,14 @@ The app shows every license below in full under Settings > LICENSES.
   (third_party/licenses/Apache-2.0.txt; their NOTICE files in
   third_party/licenses/Apache-Commons-NOTICE.txt); XZ for Java, BSD Zero
   Clause (third_party/licenses/XZ-Java-0BSD.txt).
+- Compose Multiplatform, Copyright (c) JetBrains s.r.o. and contributors, Apache License 2.0
+  (third_party/licenses/Apache-2.0.txt) - shared state and locale APIs for the iPad app.
+- Ktor, Copyright (c) JetBrains s.r.o. and contributors, Apache License 2.0
+  (third_party/licenses/Apache-2.0.txt) - shared HTTP client for the offline manual.
+- kotlinx.atomicfu, Copyright (c) JetBrains s.r.o. and contributors, Apache License 2.0
+  (third_party/licenses/Apache-2.0.txt) - multiplatform locks in the companion data code.
+- kotlinx-datetime, Copyright (c) JetBrains s.r.o. and contributors, Apache License 2.0
+  (third_party/licenses/Apache-2.0.txt) - the device clock in the companion data code.
 - Firebase Crashlytics (with -ndk, Firebase Sessions, Installations and their
   support libraries), Apache License 2.0 - active only in builds made with the
   project's Firebase config (the official releases), and sending nothing until
@@ -122,15 +151,13 @@ The app shows every license below in full under Settings > LICENSES.
   Google Play services' play-services-basement and play-services-tasks, under
   the Android Software Development Kit License
   (https://developer.android.com/studio/terms).
-- Bouncy Castle (bcprov), Copyright (c) 2000-2024 The Legion of the Bouncy Castle
+- Bouncy Castle (its X25519 and X25519Field, copied into
+  companion/coop/x25519/), Copyright (c) 2000-2024 The Legion of the Bouncy Castle
   Inc., MIT License (third_party/licenses/BouncyCastle-MIT.txt) -
   https://www.bouncycastle.org - X25519 for the co-op link's handshake.
 - OkHttp and Okio, Copyright (c) Square, Inc., Apache License 2.0
   (third_party/licenses/Apache-2.0.txt) - https://square.github.io/okhttp/ - the
   co-op link's WebSocket to the relay.
-- ZXing core, Copyright (c) ZXing authors, Apache License 2.0
-  (third_party/licenses/Apache-2.0.txt) - https://github.com/zxing/zxing - QR
-  encoding for co-op invites.
 - Some decoders and layouts follow the community decompilations of the games
   (pret's pokered / pokeyellow / pokegold / pokecrystal / pokefirered /
   pokeemerald / pokeruby / pokeplatinum / pokeheartgold, pokeemerald-expansion,
@@ -158,6 +185,6 @@ it reads, the app carries reference data about the supported games: names of
 Pokemon, moves, items, types and places, numeric tables (stats, type matchups,
 map layouts, memory addresses) and checksums of ROM data, extracted from the
 games, the ROM hacks and the decompilation projects for interoperability.
-The unit tests' fixtures (app/src/test/resources/fixtures) are snapshots of
+The unit tests' fixtures (test-fixtures/resources/fixtures) are snapshots of
 the emulated console's RAM while a game ran; like any RAM dump they hold a
 few kilobytes the game copied there from its ROM. They aren't in the app.
