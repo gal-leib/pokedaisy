@@ -1,0 +1,34 @@
+{
+  "name": "PokeDaisy Builds",
+  "identifier": "com.pokedaisy.altstore",
+  "sourceURL": "https://raw.githubusercontent.com/gal-leib/pokedaisy/altstore/source.json",
+  "iconURL": "https://raw.githubusercontent.com/gal-leib/pokedaisy/f160c9985c6d9a7bf2cf8105afc56c539e425cdc/iosApp/PokeDaisy/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+  "apps": [
+    {
+      "name": "PokeDaisy",
+      "bundleIdentifier": "com.pokedaisy.app",
+      "developerName": "PokeDaisy contributors",
+      "localizedDescription": "PokeDaisy for iPhone and iPad, built from main.",
+      "iconURL": "https://raw.githubusercontent.com/gal-leib/pokedaisy/f160c9985c6d9a7bf2cf8105afc56c539e425cdc/iosApp/PokeDaisy/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+      "category": "games",
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSLocalNetworkUsageDescription": "PokeDaisy uses your local network to find nearby Emerald co-op partners."
+        }
+      },
+      "versions": [
+        {
+          "version": "1.0",
+          "buildVersion": "3",
+          "minOSVersion": "16.0",
+          "date": "2026-11-21T11:42:28+00:00",
+          "localizedDescription": "Built from commit f160c9985c6d.",
+          "downloadURL": "https://github.com/gal-leib/pokedaisy/releases/download/altstore-44898856516-1/PokeDaisy.ipa",
+          "size": 43321038,
+          "sha256": "19c0cd653a19a565a9b6289a2261326f11bfa0feec193433cee3a2f20d8ba47a"
+        }
+      ]
+    }
+  ]
+}
