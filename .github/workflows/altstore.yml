@@ -1,0 +1,109 @@
+name: AltStore
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: altstore
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'gal-leib/pokedaisy' && github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - run: git submodule update --init third_party/mgba third_party/rcheevos
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+
+      - name: Generate the Xcode project
+        run: brew install xcodegen && cd iosApp && xcodegen
+
+      - name: Build the unsigned device app
+        run: |
+          xcodebuild -project iosApp/PokeDaisy.xcodeproj -scheme PokeDaisy \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/build" ARCHS=arm64 CODE_SIGNING_ALLOWED=NO \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
+
+      - name: Package the IPA and generate its AltStore source
+        run: |
+          app="$RUNNER_TEMP/build/Build/Products/Release-iphoneos/PokeDaisy.app"
+          xcrun vtool -show-build "$app/PokeDaisy" | grep -E 'platform[[:space:]]+IOS$'
+          mkdir -p "$RUNNER_TEMP/package/Payload" "$RUNNER_TEMP/distribution"
+          ditto "$app" "$RUNNER_TEMP/package/Payload/PokeDaisy.app"
+          ipa="$RUNNER_TEMP/distribution/PokeDaisy.ipa"
+          (cd "$RUNNER_TEMP/package" && ditto -c -k --keepParent Payload "$ipa")
+          python3 scripts/generate_altstore_source.py "$ipa" > "$RUNNER_TEMP/distribution/source.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: altstore-distribution
+          path: ${{ runner.temp }}/distribution/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: altstore-distribution
+          path: ${{ runner.temp }}/distribution
+      - name: Publish the IPA, then advance the feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo "::notice::main advanced while this build was running"
+            exit 0
+          fi
+
+          cd "$RUNNER_TEMP/distribution"
+          tag=$(jq -er '.apps[0].versions[0].downloadURL | split("/") | .[-2]' source.json)
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$tag" PokeDaisy.ipa \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title "PokeDaisy iOS build $GITHUB_RUN_NUMBER" --notes "Built from $GITHUB_SHA."
+          fi
+          curl --fail --silent --show-error --location --retry 5 \
+            "$(jq -er '.apps[0].versions[0].downloadURL' source.json)" -o published.ipa
+          cmp PokeDaisy.ipa published.ipa
+
+          cd "$GITHUB_WORKSPACE"
+          if git ls-remote --exit-code origin refs/heads/altstore; then
+            git fetch origin refs/heads/altstore
+            git switch --detach FETCH_HEAD
+          else
+            status=$?
+            [[ "$status" == 2 ]] || exit "$status"
+            git switch --orphan altstore
+          fi
+          cp "$RUNNER_TEMP/distribution/source.json" source.json
+          git add source.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Publish iOS build $GITHUB_RUN_NUMBER from ${GITHUB_SHA:0:12}"
+          git push origin HEAD:refs/heads/altstore
