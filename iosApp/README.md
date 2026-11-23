@@ -223,4 +223,4 @@ TRADE EVOS and the party summary's EVOLVE use the common FieldTradeSupport/Field
 
 ## Emerald co-op pairing
 
-Co-op is off until it ships, as on Android: build with the Xcode setting `POKEDAISY_FEATURE_COOP=YES`, or create an empty `features/coop` file in the app's Application Support / PokeDaisy folder. Then the library's SETTINGS > CO-OP uses the shared PAIR, PARTNERS and RELAY pages. Choose a retail English Emerald save to share an invite or join a room. Tapped `pokedaisy://coop/` invites open the save picker when the library is available. To supply a built-in relay, set the Xcode build setting `POKEDAISY_COOP_RELAY_URL` to its HTTPS base URL. A relay can also be entered in the app.
+The library's SETTINGS > CO-OP uses the shared PAIR, PARTNERS and RELAY pages. Choose a retail English Emerald save to share an invite or join a room. Tapped `pokedaisy://coop/` invites open the save picker when the library is available. To supply a built-in relay, set the Xcode build setting `POKEDAISY_COOP_RELAY_URL` to its HTTPS base URL. A relay can also be entered in the app.

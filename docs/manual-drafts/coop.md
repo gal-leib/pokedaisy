@@ -6,7 +6,7 @@ order: 20
 keywords: [co-op, coop, multiplayer, two player, netplay, online, link, friend, invite, qr, room, room code, lobby, open rooms]
 ---
 
-> DRAFT, not published. Co-op is behind `FeatureFlags.coop` (off by default), so this page lives in
+> DRAFT, not published. On Android, co-op is behind `FeatureFlags.coop` (off by default), so this page lives in
 > `docs/manual-drafts/` and the manual doesn't list it. When the flag goes: move this file into
 > `docs/manual/`, set `order` to one after the Playing section's last page, add the CO-OP rows to
 > `settings-reference.md` (both screens' tables) and the search words to `synonyms.yml`, move the rows'

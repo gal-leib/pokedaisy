@@ -31,14 +31,6 @@ import platform.UIKit.*
 
 /** Account-free co-op pairing through the same relay protocol used by Android. */
 internal object IosCoopHost {
-    /**
-     * CO-OP is off until it ships, as Android's `FeatureFlags.coop` keeps it: on with the Xcode build setting
-     * `POKEDAISY_FEATURE_COOP=YES`, or a `features/coop` file in the app's files folder (Application Support / PokeDaisy).
-     */
-    val enabled: Boolean
-        get() = (NSBundle.mainBundle.objectForInfoDictionaryKey("PokeDaisyFeatureCoop") as? String).equals("YES", ignoreCase = true) ||
-            NSFileManager.defaultManager.fileExistsAtPath((appFilesDir() / "features" / "coop").toString())
-
     val defaultRelay: String
         get() = (NSBundle.mainBundle.objectForInfoDictionaryKey("PokeDaisyCoopRelayURL") as? String)
             ?.let(CoopRelay::normalize).orEmpty()
@@ -76,7 +68,7 @@ internal object IosCoopHost {
     private val pending = MutableStateFlow<String?>(null)
     val invite = pending.asStateFlow()
 
-    fun receiveInvite(link: String) { if (enabled) CoopInvite.parse(link)?.let { pending.value = it } }
+    fun receiveInvite(link: String) { CoopInvite.parse(link)?.let { pending.value = it } }
     fun consumeInvite(ticket: String) { pending.compareAndSet(ticket, null) }
 
     fun pairingHost(games: () -> List<String>, title: (String) -> String, presentFrom: () -> UIViewController?) =

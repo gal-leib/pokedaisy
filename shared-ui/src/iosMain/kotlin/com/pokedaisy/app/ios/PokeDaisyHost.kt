@@ -380,7 +380,7 @@ object PokeDaisyHost {
             onDisableResume = {
                 runCatching { resume.startFresh(); true }.getOrElse { resumeFailed(); false }
             }, onEditTouch = { if (game === g) touch.edit() }, readTouchStage = { touch.readStage().takeIf { game === g } }, gameScreen = { screen.takeIf { game === g } }, playback = { currentRuntime },
-            looks = currentLook, tradeSupported = { game === g && evolution?.supported() == true }, coop = currentCoop.takeIf { IosCoopHost.enabled })
+            looks = currentLook, tradeSupported = { game === g && evolution?.supported() == true }, coop = currentCoop)
             .also { s ->
                 L10n.apply(s.appLanguage, code)
                 g.rewindEnabled = s.rewind
@@ -609,7 +609,7 @@ object PokeDaisyHost {
                     ready = { currentOptions.settingsChanged(currentSettings) })
                 currentCheats.start()
                 g.withState { resume.restore() }
-                if (IosCoopHost.enabled) currentCoop.start(code, revision) { currentCheats.hasEnabledCheats }
+                currentCoop.start(code, revision) { currentCheats.hasEnabledCheats }
                 ra.setShinyOddsActive(p.shiny?.active == true)
                 ra.setExpShareActive(currentOptions.expShareActive)
                 ra.setFlightAnywhere(false)

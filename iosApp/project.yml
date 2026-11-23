@@ -34,8 +34,6 @@ targets:
         NSLocalNetworkUsageDescription: PokeDaisy uses your local network to find nearby Emerald co-op partners.
         NSBonjourServices: [_pdcoop._tcp]
         PokeDaisyCoopRelayURL: "$(POKEDAISY_COOP_RELAY_URL)"
-        # CO-OP stays off until it ships (IosCoopHost.enabled): YES here, or a features/coop file, turns it on.
-        PokeDaisyFeatureCoop: "$(POKEDAISY_FEATURE_COOP)"
         # The app's Documents (roms/, saves/) show in Files, so saves can be copied out and in.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
